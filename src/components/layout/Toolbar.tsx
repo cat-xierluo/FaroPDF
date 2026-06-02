@@ -2,11 +2,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  FileOutput,
   FileUp,
   FormInput,
   Highlighter,
   LayoutGrid,
+  Minus,
+  PanelLeft,
+  PanelTop,
+  Plus,
   ScanText,
   Search,
   Settings,
@@ -15,25 +18,25 @@ import { useRef, type ChangeEvent, type ComponentType, type CSSProperties } from
 import type { ReaderController } from "../../modules/reader";
 import { formatZoom, viewModeLabels } from "../../modules/reader/readerLabels";
 import type { PdfViewMode } from "../../shared/pdf/types";
-import type { InspectorPanelId } from "./types";
+import type { AppModeId, UtilityPanelId } from "./types";
 
 interface ToolbarProps {
-  activePanel: InspectorPanelId;
-  onPanelChange: (panel: InspectorPanelId) => void;
+  activeMode: AppModeId;
+  onModeChange: (mode: AppModeId) => void;
+  onUtilityPanelChange: (panel: UtilityPanelId) => void;
   reader: ReaderController;
+  utilityPanel: UtilityPanelId;
 }
 
-const panelButtons: Array<{
-  id: InspectorPanelId;
+const modeButtons: Array<{
+  id: Exclude<AppModeId, "read" | "pages">;
   label: string;
   icon: ComponentType<{ size?: number; strokeWidth?: number }>;
 }> = [
-  { id: "search", label: "搜索", icon: Search },
-  { id: "annotation", label: "批注", icon: Highlighter },
-  { id: "pages", label: "页面", icon: LayoutGrid },
+  { id: "annotate", label: "批注", icon: Highlighter },
+  { id: "export", label: "导出", icon: Download },
+  { id: "forms", label: "填写和签名", icon: FormInput },
   { id: "ocr", label: "OCR", icon: ScanText },
-  { id: "forms", label: "表单", icon: FormInput },
-  { id: "settings", label: "设置", icon: Settings },
 ];
 
 const fileInputStyle: CSSProperties = {
@@ -43,7 +46,7 @@ const fileInputStyle: CSSProperties = {
   opacity: 0,
 };
 
-export function Toolbar({ activePanel, onPanelChange, reader }: ToolbarProps) {
+export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader, utilityPanel }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const document = reader.state.document;
   const currentPage = document?.currentPage ?? 1;
@@ -66,6 +69,11 @@ export function Toolbar({ activePanel, onPanelChange, reader }: ToolbarProps) {
     reader.setViewMode(event.target.value as PdfViewMode);
   }
 
+  function openUtilityPanel(panel: UtilityPanelId) {
+    onModeChange("read");
+    onUtilityPanelChange(utilityPanel === panel ? "none" : panel);
+  }
+
   return (
     <header className="toolbar">
       <div className="toolbar__brand">
@@ -76,6 +84,38 @@ export function Toolbar({ activePanel, onPanelChange, reader }: ToolbarProps) {
           <h1>FaroPDF</h1>
           <p title={fileSubtitle}>{fileSubtitle}</p>
         </div>
+      </div>
+      <div className="toolbar__group toolbar__group--utility" aria-label="阅读区域">
+        <button
+          aria-pressed={utilityPanel === "summary" && activeMode !== "pages"}
+          className="tool-button tool-button--icon"
+          onClick={() => openUtilityPanel("summary")}
+          title="文档摘要"
+          type="button"
+        >
+          <PanelLeft size={16} />
+          <span>文档摘要</span>
+        </button>
+        <button
+          aria-pressed={activeMode === "pages"}
+          className="tool-button tool-button--icon"
+          onClick={() => onModeChange(activeMode === "pages" ? "read" : "pages")}
+          title="页面管理"
+          type="button"
+        >
+          <LayoutGrid size={16} />
+          <span>页面管理</span>
+        </button>
+        <button
+          aria-pressed={utilityPanel === "view" && activeMode !== "pages"}
+          className="tool-button tool-button--icon"
+          onClick={() => openUtilityPanel("view")}
+          title="视图设置"
+          type="button"
+        >
+          <PanelTop size={16} />
+          <span>视图设置</span>
+        </button>
       </div>
       <div className="toolbar__group" aria-label="文件操作">
         <input
@@ -94,12 +134,8 @@ export function Toolbar({ activePanel, onPanelChange, reader }: ToolbarProps) {
           <Download size={16} />
           <span>另存</span>
         </button>
-        <button className="tool-button" type="button">
-          <FileOutput size={16} />
-          <span>导出</span>
-        </button>
       </div>
-      <div className="toolbar__pager" aria-label="阅读控制" style={{ minWidth: 228 }}>
+      <div className="toolbar__pager" aria-label="阅读控制">
         <button
           aria-label="上一页"
           className="compact-button"
@@ -119,7 +155,25 @@ export function Toolbar({ activePanel, onPanelChange, reader }: ToolbarProps) {
         >
           <ChevronRight size={16} />
         </button>
+        <button
+          aria-label="缩小"
+          className="compact-button"
+          disabled={!document}
+          onClick={() => reader.setZoom(Math.max(0.25, zoom - 0.1))}
+          type="button"
+        >
+          <Minus size={14} />
+        </button>
         <span className="zoom-control">{formatZoom(zoom)}</span>
+        <button
+          aria-label="放大"
+          className="compact-button"
+          disabled={!document}
+          onClick={() => reader.setZoom(Math.min(4, zoom + 0.1))}
+          type="button"
+        >
+          <Plus size={14} />
+        </button>
         <select
           aria-label="视图模式"
           className="zoom-control"
@@ -134,19 +188,36 @@ export function Toolbar({ activePanel, onPanelChange, reader }: ToolbarProps) {
           ))}
         </select>
       </div>
-      <div className="toolbar__group toolbar__group--right" aria-label="任务入口">
-        {panelButtons.map(({ id, label, icon: Icon }) => (
+      <div className="toolbar__group toolbar__group--modes" aria-label="任务模式">
+        {modeButtons.map(({ id, label, icon: Icon }) => (
           <button
-            aria-pressed={activePanel === id}
+            aria-pressed={activeMode === id}
             className="tool-button tool-button--icon"
             key={id}
-            onClick={() => onPanelChange(id)}
+            onClick={() => onModeChange(activeMode === id ? "read" : id)}
+            title={label}
             type="button"
           >
             <Icon size={16} />
             <span>{label}</span>
           </button>
         ))}
+      </div>
+      <div className="toolbar__group toolbar__group--right" aria-label="搜索和设置">
+        <label className="toolbar-search">
+          <Search size={15} />
+          <input aria-label="全文搜索" placeholder="搜索" type="search" />
+        </label>
+        <button
+          aria-pressed={utilityPanel === "settings"}
+          className="tool-button tool-button--icon"
+          onClick={() => openUtilityPanel("settings")}
+          title="设置"
+          type="button"
+        >
+          <Settings size={16} />
+          <span>设置</span>
+        </button>
       </div>
     </header>
   );
