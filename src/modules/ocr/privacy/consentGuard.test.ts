@@ -201,6 +201,56 @@ describe("OCR privacy consent guard", () => {
     expect(result.auditRecord.consentStatus).toBe("expired");
   });
 
+  test("rejects consent decisions at the exact expiry boundary", () => {
+    const guard = createOcrPrivacyConsentGuard();
+    const notice = createOcrPrivacyNotice({
+      request: cloudRequest,
+      provider: cloudProvider,
+      issuedAt: "2026-06-02T12:00:00.000Z",
+      noticeNonce: "notice-expiry-boundary",
+      expiresAt: "2026-06-02T12:05:00.000Z",
+    });
+    const consent = createOcrNetworkConsentDecision({
+      notice,
+      granted: true,
+      decidedAt: "2026-06-02T12:01:00.000Z",
+    });
+
+    const result = guard.evaluate({
+      request: { ...cloudRequest, privacyNotice: notice, privacyConsent: consent },
+      provider: cloudProvider,
+      now: "2026-06-02T12:05:00.000Z",
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.auditRecord.consentStatus).toBe("expired");
+  });
+
+  test("rejects consent decisions with invalid expiry timestamps", () => {
+    const guard = createOcrPrivacyConsentGuard();
+    const notice = createOcrPrivacyNotice({
+      request: cloudRequest,
+      provider: cloudProvider,
+      issuedAt: "2026-06-02T12:00:00.000Z",
+      noticeNonce: "notice-invalid-expiry",
+      expiresAt: "not-a-date",
+    });
+    const consent = createOcrNetworkConsentDecision({
+      notice,
+      granted: true,
+      decidedAt: "2026-06-02T12:01:00.000Z",
+    });
+
+    const result = guard.evaluate({
+      request: { ...cloudRequest, privacyNotice: notice, privacyConsent: consent },
+      provider: cloudProvider,
+      now: "2026-06-02T12:02:00.000Z",
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.auditRecord.consentStatus).toBe("expired");
+  });
+
   test("allows local OCR without network consent", () => {
     const guard = createOcrPrivacyConsentGuard();
 

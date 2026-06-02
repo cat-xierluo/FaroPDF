@@ -213,7 +213,11 @@ export function doesOcrPrivacyNoticeMatchRequest(
 export function isOcrNetworkConsentExpired(consent: OcrNetworkConsentDecision, now: string): boolean {
   const nowTime = Date.parse(now);
   const expiresAtTime = Date.parse(consent.expiresAt);
-  return Number.isFinite(nowTime) && Number.isFinite(expiresAtTime) && nowTime > expiresAtTime;
+  if (!Number.isFinite(nowTime) || !Number.isFinite(expiresAtTime)) {
+    return true;
+  }
+
+  return nowTime >= expiresAtTime;
 }
 
 export function isNetworkOcrProviderForPrivacy(provider: OcrProviderConfig): boolean {
