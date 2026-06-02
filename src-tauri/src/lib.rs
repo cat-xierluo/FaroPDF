@@ -6,6 +6,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Manager};
+use url::Url;
 
 const SETTINGS_FILE_NAME: &str = "settings.json";
 
@@ -475,9 +476,21 @@ fn validate_ocr_request(request: &OcrCommandRequest) -> Result<(), String> {
                 ocr_provider_display_name(&request.provider)
             ));
         }
-        if !is_valid_http_endpoint(request.provider.endpoint.as_deref()) {
+        if request
+            .provider
+            .api_key_ref
+            .as_ref()
+            .map(|value| !is_safe_api_key_ref(value))
+            .unwrap_or(false)
+        {
             return Err(format!(
-                "{} 需要配置 HTTP(S) endpoint。",
+                "{} 的 apiKeyRef 必须使用凭证引用或脱敏占位。",
+                ocr_provider_display_name(&request.provider)
+            ));
+        }
+        if !is_allowed_ocr_endpoint(request.provider.endpoint.as_deref()) {
+            return Err(format!(
+                "{} 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。",
                 ocr_provider_display_name(&request.provider)
             ));
         }
@@ -647,12 +660,32 @@ fn ocr_provider_display_name(provider: &OcrCommandProvider) -> String {
         .to_string()
 }
 
-fn is_valid_http_endpoint(endpoint: Option<&str>) -> bool {
+fn is_allowed_ocr_endpoint(endpoint: Option<&str>) -> bool {
     let Some(endpoint) = endpoint.map(str::trim).filter(|value| !value.is_empty()) else {
         return false;
     };
 
-    endpoint.starts_with("https://") || endpoint.starts_with("http://")
+    let Ok(parsed) = Url::parse(endpoint) else {
+        return false;
+    };
+    let Some(host) = parsed.host_str() else {
+        return false;
+    };
+
+    parsed.scheme() == "https" || (parsed.scheme() == "http" && is_loopback_host(host))
+}
+
+fn is_safe_api_key_ref(value: &str) -> bool {
+    let trimmed = value.trim();
+    trimmed.is_empty() || is_credential_reference(trimmed) || is_masked_secret(trimmed)
+}
+
+fn is_loopback_host(host: &str) -> bool {
+    let normalized = host.trim_matches(['[', ']']).to_ascii_lowercase();
+    normalized == "localhost"
+        || normalized == "::1"
+        || normalized == "127.0.0.1"
+        || normalized.starts_with("127.")
 }
 
 fn default_ocr_quality_check() -> OcrCommandQualityCheckRequest {
@@ -789,6 +822,51 @@ mod ocr_bridge_tests {
 
         let key_error = validate_ocr_request(&missing_key).expect_err("cloud OCR needs key ref");
         assert_eq!(key_error, "PaddleOCR 需要配置 apiKeyRef。");
+    }
+
+    #[test]
+    fn rejects_raw_cloud_api_key_refs() {
+        let mut request = default_ocr_request();
+        request.provider = paddle_provider();
+        request.network_consent_granted = true;
+        request.provider.api_key_ref = Some("paddle-secret-123456".to_string());
+
+        let error = validate_ocr_request(&request).expect_err("raw key should fail");
+
+        assert_eq!(error, "PaddleOCR 的 apiKeyRef 必须使用凭证引用或脱敏占位。");
+    }
+
+    #[test]
+    fn rejects_remote_http_ocr_endpoints_but_allows_loopback_http() {
+        let mut request = default_ocr_request();
+        request.provider = paddle_provider();
+        request.network_consent_granted = true;
+        request.provider.endpoint = Some("http://ocr.example.test/paddle".to_string());
+
+        let error = validate_ocr_request(&request).expect_err("remote http should fail");
+
+        assert_eq!(
+            error,
+            "PaddleOCR 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。"
+        );
+
+        request.provider.endpoint = Some("http://127.0.0.1:8080/paddle".to_string());
+
+        validate_ocr_request(&request).expect("loopback http is allowed for debug");
+    }
+
+    #[test]
+    fn rejects_invalid_ocr_quality_sample_pages() {
+        let mut request = default_ocr_request();
+        request.quality_check = Some(OcrCommandQualityCheckRequest {
+            enabled: true,
+            sample_pages: vec![0, 2],
+            keywords: Vec::new(),
+        });
+
+        let error = validate_ocr_request(&request).expect_err("zero sample page should fail");
+
+        assert_eq!(error, "OCR 质量抽查页码必须是正整数。");
     }
 
     #[test]

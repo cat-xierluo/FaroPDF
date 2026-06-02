@@ -1,4 +1,5 @@
 import type { OcrProviderConfig, OcrProviderType } from "../ocr/types";
+import { isAllowedOcrEndpoint, isCredentialReference, isMaskedSecret, isSafeApiKeyRef } from "../ocr/providerSecurity";
 import type { PdfViewMode } from "../pdf/types";
 import type { AppSettings, DefaultSavePolicy, RecentPdfFile } from "./types";
 
@@ -187,8 +188,8 @@ export function validateAppSettings(settings: AppSettings): SettingsValidationRe
       continue;
     }
 
-    if (!isValidEndpoint(provider.endpoint)) {
-      errors.push(`${provider.displayName} 需要配置 HTTP(S) endpoint。`);
+    if (!isAllowedOcrEndpoint(provider.endpoint)) {
+      errors.push(`${provider.displayName} 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。`);
     }
     if (!provider.apiKeyRef || provider.apiKeyRef.trim().length === 0) {
       errors.push(`${provider.displayName} 需要配置 apiKeyRef 或已脱敏密钥占位。`);
@@ -259,32 +260,6 @@ function normalizeRecentFiles(input: unknown): RecentPdfFile[] {
       lastPage: typeof file.lastPage === "number" ? file.lastPage : undefined,
       lastZoom: typeof file.lastZoom === "number" ? file.lastZoom : undefined,
     }));
-}
-
-function isValidEndpoint(endpoint: string | undefined): boolean {
-  if (!endpoint || endpoint.trim().length === 0) {
-    return false;
-  }
-
-  try {
-    const parsed = new URL(endpoint);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function isCredentialReference(value: string): boolean {
-  return /^(keychain|env|credential|credential-ref|api-key-ref):[A-Za-z0-9_.:/-]+$/.test(value);
-}
-
-function isMaskedSecret(value: string): boolean {
-  return value.includes("...") || /^\*+$/.test(value);
-}
-
-function isSafeApiKeyRef(value: string): boolean {
-  const trimmed = value.trim();
-  return trimmed.length === 0 || isCredentialReference(trimmed) || isMaskedSecret(trimmed);
 }
 
 function isPdfViewMode(value: unknown): value is PdfViewMode {

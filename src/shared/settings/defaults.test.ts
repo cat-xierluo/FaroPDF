@@ -100,4 +100,34 @@ describe("default app settings", () => {
     expect(result.errors.join("\n")).toContain("PaddleOCR");
     expect(result.errors.join("\n")).not.toContain(rawKey);
   });
+
+  test("requires secure remote OCR endpoints while allowing localhost HTTP for debugging", () => {
+    const settings = createDefaultAppSettings();
+    settings.defaultOcrProviderId = "paddleocr";
+    settings.ocrProviders = settings.ocrProviders.map((provider) =>
+      provider.id === "paddleocr"
+        ? {
+            ...provider,
+            enabled: true,
+            endpoint: "http://ocr.example.test/paddle",
+            apiKeyRef: "keychain:paddle",
+          }
+        : provider,
+    );
+
+    expect(validateAppSettings(settings).errors).toContain(
+      "PaddleOCR 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。",
+    );
+
+    settings.ocrProviders = settings.ocrProviders.map((provider) =>
+      provider.id === "paddleocr"
+        ? {
+            ...provider,
+            endpoint: "http://localhost:8080/paddle",
+          }
+        : provider,
+    );
+
+    expect(validateAppSettings(settings)).toEqual({ valid: true, errors: [] });
+  });
 });

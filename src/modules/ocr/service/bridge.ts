@@ -5,6 +5,7 @@ import {
   validateOcrRequest,
   type OcrValidationResult,
 } from "../../../shared/ocr/defaults";
+import { isAllowedOcrEndpoint, isSafeApiKeyRef } from "../../../shared/ocr/providerSecurity";
 import type {
   OcrJob,
   OcrJobProgress,
@@ -73,12 +74,12 @@ export function createTauriOcrBridgeBackend(invoker: TauriInvoker = invoke): Ocr
 export function createOcrBridgeService(backend: OcrBridgeBackend = createTauriOcrBridgeBackend()): OcrBridgeService {
   return {
     async startOcr(request, context) {
-      const preparedRequest = prepareOcrRequest(request);
-      const validation = validateOcrRequest(preparedRequest);
+      const validation = validateOcrRequest(request);
       if (!validation.valid) {
         throw createValidationError("OCR 参数校验失败", validation.errors);
       }
 
+      const preparedRequest = prepareOcrRequest(request);
       const provider = resolveProvider(preparedRequest.providerId, context.providers);
       const adapter = adapters[provider.type];
       const providerErrors = adapter.validate(preparedRequest, provider);
@@ -102,12 +103,12 @@ export function createOcrBridgeService(backend: OcrBridgeBackend = createTauriOc
     },
 
     validateRequest(request, context) {
-      const preparedRequest = prepareOcrRequest(request);
-      const validation = validateOcrRequest(preparedRequest);
+      const validation = validateOcrRequest(request);
       if (!validation.valid) {
         return validation;
       }
 
+      const preparedRequest = prepareOcrRequest(request);
       const provider = context.providers.find((candidate) => candidate.id === preparedRequest.providerId);
       if (!provider) {
         return {
@@ -169,15 +170,18 @@ function createProviderAdapter(
         errors.push("OCR Provider 类型与 adapter 不匹配。");
       }
 
-      if (cloudProviderTypes.has(type)) {
+      if (isNetworkOcrProvider(provider)) {
         if (request.networkConsentGranted !== true) {
           errors.push("联网 OCR 需要用户明确确认。");
         }
         if (!provider.apiKeyRef || provider.apiKeyRef.trim().length === 0) {
           errors.push(`${provider.displayName} 需要配置 apiKeyRef。`);
         }
-        if (!isValidEndpoint(provider.endpoint)) {
-          errors.push(`${provider.displayName} 需要配置 HTTP(S) endpoint。`);
+        if (provider.apiKeyRef && !isSafeApiKeyRef(provider.apiKeyRef)) {
+          errors.push(`${provider.displayName} 的 apiKeyRef 必须使用凭证引用或脱敏占位。`);
+        }
+        if (!isAllowedOcrEndpoint(provider.endpoint)) {
+          errors.push(`${provider.displayName} 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。`);
         }
       }
 
@@ -295,17 +299,8 @@ function normalizeQualitySummary(input: unknown): OcrQualitySummary | undefined 
   };
 }
 
-function isValidEndpoint(endpoint: string | undefined): boolean {
-  if (!endpoint || endpoint.trim().length === 0) {
-    return false;
-  }
-
-  try {
-    const parsed = new URL(endpoint);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
+function isNetworkOcrProvider(provider: OcrProviderConfig): boolean {
+  return cloudProviderTypes.has(provider.type) || provider.requiresNetworkConsent;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

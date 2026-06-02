@@ -61,6 +61,7 @@ export function validateOcrRequest(request: OcrRequest): OcrValidationResult {
   const outputPath = request.outputPath?.trim();
   const outputStrategy = request.outputStrategy ?? "new-layered-pdf";
   const qualityCheck = normalizeOcrQualityCheckRequest(request.qualityCheck);
+  const rawSamplePages = request.qualityCheck?.samplePages;
 
   if (!inputPath) {
     errors.push("输入 PDF 路径不能为空。");
@@ -92,7 +93,7 @@ export function validateOcrRequest(request: OcrRequest): OcrValidationResult {
     errors.push("页码范围必须使用正整数或正整数区间，例如 1,3-5。");
   }
 
-  if (qualityCheck.samplePages.some((page) => !isPositiveInteger(page))) {
+  if (Array.isArray(rawSamplePages) && rawSamplePages.some((page) => !isPositiveInteger(page))) {
     errors.push("OCR 质量抽查页码必须是正整数。");
   }
   if (

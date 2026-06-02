@@ -269,7 +269,7 @@ ISS-007 第一版只建立 OCR bridge 基础，不在本分支执行真实 OCR�
 
 - 前端共享契约补齐 `OcrRequest`、输出策略、任务进度和质量抽查入口。
 - `ocrBridgeService` 负责 provider 查找、adapter 边界、输入/输出 PDF 校验、默认 `*-ocr.pdf` 输出路径和 bridge 错误脱敏。
-- Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有本次明确 consent、HTTP(S) endpoint 和 apiKeyRef，否则拒绝。
+- Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有本次明确 consent、安全 apiKeyRef 和 HTTPS endpoint，本机调试可使用 localhost HTTP；真实密钥串、远端明文 HTTP 和非法 endpoint 一律拒绝。
 - Tauri `start_ocr_job` 只返回 queued stub，并在 Rust 侧重复校验参数和同路径输出；错误信息不包含完整敏感本地路径。
 
 原因：
@@ -297,3 +297,4 @@ ISS-007 第一版只建立 OCR bridge 基础，不在本分支执行真实 OCR�
 - 2026-06-02：处理 `feat/text-search` code review，修正文档切换后旧搜索状态泄露、PDF.js 文本项无空格拼接、纯扫描长卷 OCR 提示滞后和空结果测试覆盖不足。
 - 2026-06-02：完成 PR #2、#3、#4 code review、冲突解决和合并清理；从最新主线启动 `ISS-005` 导出引擎和 `ISS-007` OCR bridge 两条并行任务。
 - 2026-06-02：在 `feat/ocr-bridge` 为 `ISS-007` 落地 OCR bridge/stub 第一版：共享请求与任务模型、provider adapter 边界、云端 consent/apiKeyRef 拦截、默认新 PDF 输出路径、路径脱敏、Tauri command stub 和定向测试；真实 OCR 执行、双层 PDF 生成和质量检查继续保留为后续工作。
+- 2026-06-02：处理 `feat/ocr-bridge` code review，收紧云端 provider 安全边界：apiKeyRef 必须是凭证引用或脱敏占位，远端 endpoint 必须使用 HTTPS，本机调试允许 localhost HTTP，并修正质量抽查页码在 normalization 前被静默丢弃的问题。

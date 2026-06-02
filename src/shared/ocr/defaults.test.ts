@@ -48,4 +48,20 @@ describe("OCR shared defaults", () => {
     expect(validation.errors).toContain("页码范围必须使用正整数或正整数区间，例如 1,3-5。");
     expect(sanitizeOcrError("无法写入 /Users/example/Cases/confidential bundle.pdf")).toBe("无法写入 [path]");
   });
+
+  test("rejects invalid quality check sample pages before normalizing them away", () => {
+    const validation = validateOcrRequest({
+      inputPath: "/tmp/faropdf-fixtures/source.pdf",
+      providerId: "local-ocrmypdf",
+      outputStrategy: "new-layered-pdf",
+      qualityCheck: {
+        enabled: true,
+        samplePages: [0, 2],
+        keywords: [],
+      },
+    });
+
+    expect(validation.valid).toBe(false);
+    expect(validation.errors).toContain("OCR 质量抽查页码必须是正整数。");
+  });
 });

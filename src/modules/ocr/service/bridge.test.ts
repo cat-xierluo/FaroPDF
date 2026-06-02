@@ -20,6 +20,16 @@ const paddleProvider: OcrProviderConfig = {
   requiresNetworkConsent: true,
 };
 
+const mineruProvider: OcrProviderConfig = {
+  id: "mineru",
+  type: "mineru",
+  displayName: "MinerU",
+  endpoint: "https://ocr.example.test/mineru",
+  apiKeyRef: "env:MINERU_API_KEY",
+  enabled: true,
+  requiresNetworkConsent: true,
+};
+
 describe("OCR bridge service", () => {
   let backend: OcrBridgeBackend;
 
@@ -108,6 +118,116 @@ describe("OCR bridge service", () => {
         },
       ),
     ).rejects.toThrow("PaddleOCR 需要配置 apiKeyRef。");
+
+    expect(backend.startOcr).not.toHaveBeenCalled();
+  });
+
+  test("rejects raw cloud API keys before backend invocation", async () => {
+    const service = createOcrBridgeService(backend);
+
+    await expect(
+      service.startOcr(
+        {
+          inputPath: "/tmp/faropdf-fixtures/source.pdf",
+          providerId: "paddleocr",
+          networkConsentGranted: true,
+        },
+        {
+          providers: [
+            {
+              ...paddleProvider,
+              apiKeyRef: "paddle-secret-123456",
+            },
+          ],
+        },
+      ),
+    ).rejects.toThrow("PaddleOCR 的 apiKeyRef 必须使用凭证引用或脱敏占位。");
+
+    expect(backend.startOcr).not.toHaveBeenCalled();
+  });
+
+  test("rejects remote HTTP endpoints but allows localhost HTTP for debug providers", async () => {
+    const service = createOcrBridgeService(backend);
+
+    await expect(
+      service.startOcr(
+        {
+          inputPath: "/tmp/faropdf-fixtures/source.pdf",
+          providerId: "paddleocr",
+          networkConsentGranted: true,
+        },
+        {
+          providers: [
+            {
+              ...paddleProvider,
+              endpoint: "http://ocr.example.test/paddle",
+            },
+          ],
+        },
+      ),
+    ).rejects.toThrow("PaddleOCR 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。");
+
+    await service.startOcr(
+      {
+        inputPath: "/tmp/faropdf-fixtures/source.pdf",
+        providerId: "paddleocr",
+        networkConsentGranted: true,
+      },
+      {
+        providers: [
+          {
+            ...paddleProvider,
+            endpoint: "http://127.0.0.1:8080/paddle",
+          },
+        ],
+      },
+    );
+
+    expect(backend.startOcr).toHaveBeenCalledTimes(1);
+  });
+
+  test("validates MinerU and disabled providers through the same network rules", () => {
+    const service = createOcrBridgeService(backend);
+
+    expect(
+      service.validateRequest(
+        {
+          inputPath: "/tmp/faropdf-fixtures/source.pdf",
+          providerId: "mineru",
+          networkConsentGranted: true,
+        },
+        { providers: [mineruProvider] },
+      ),
+    ).toEqual({ valid: true, errors: [] });
+
+    expect(
+      service.validateRequest(
+        {
+          inputPath: "/tmp/faropdf-fixtures/source.pdf",
+          providerId: "local-ocrmypdf",
+        },
+        { providers: [{ ...localProvider, enabled: false }] },
+      ).errors,
+    ).toContain("本地 OCRmyPDF 未启用。");
+  });
+
+  test("rejects invalid quality check sample pages before normalization", async () => {
+    const service = createOcrBridgeService(backend);
+
+    await expect(
+      service.startOcr(
+        {
+          inputPath: "/tmp/faropdf-fixtures/source.pdf",
+          providerId: "local-ocrmypdf",
+          qualityCheck: {
+            enabled: true,
+            samplePages: [0],
+            keywords: [],
+          },
+        },
+        { providers: [localProvider] },
+      ),
+    ).rejects.toThrow("OCR 质量抽查页码必须是正整数。");
 
     expect(backend.startOcr).not.toHaveBeenCalled();
   });
