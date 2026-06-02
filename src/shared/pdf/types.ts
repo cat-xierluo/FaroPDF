@@ -21,6 +21,7 @@ export type TextLayerStatus = "unknown" | "available" | "partial" | "missing" | 
 export type OcrStatus = "not-needed" | "needed" | "running" | "completed" | "failed";
 
 export interface PdfDocumentState {
+  documentId: string;
   path: string;
   name: string;
   fingerprint?: string;

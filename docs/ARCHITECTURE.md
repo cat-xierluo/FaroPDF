@@ -56,7 +56,9 @@ PDF.js page.render(canvas) + text layer + annotation overlay
   ↓
 用户搜索、批注、页面操作、水印、压缩、表单或 OCR
   ↓
-sidecar / page operation queue / export job queue / OCR job queue
+搜索按需读取页文本并建立内存索引；批注/页面/导出/OCR 写入各自队列
+  ↓
+search state / sidecar / page operation queue / export job queue / OCR job queue
   ↓
 导出时由 pdf-lib + OCR 输出文件生成新 PDF
 ```
@@ -93,6 +95,45 @@ export interface PdfPageViewport {
   height: number;
   rotation: 0 | 90 | 180 | 270;
   scale: number;
+}
+```
+
+### PdfPageText
+
+```ts
+export interface PdfPageText {
+  pageIndex: number;
+  text: string;
+  status: TextLayerStatus;
+  itemCount: number;
+  charCount: number;
+}
+```
+
+搜索模块通过阅读服务按页获取 `PdfPageText`。当前第一版只在用户输入搜索词后按批次索引页面，不在打开 PDF 时同步扫描全卷；搜索词、结果和索引都只保留在前端内存中，不写入最近记录或日志。
+
+### TextSearchState
+
+```ts
+export interface TextSearchState {
+  query: string;
+  status: 'idle' | 'indexing' | 'ready' | 'empty' | 'needs-ocr' | 'error';
+  hits: Array<{
+    id: string;
+    pageIndex: number;
+    pageNumber: number;
+    matchIndex: number;
+    snippet: string;
+  }>;
+  activeHitId?: string;
+  pendingPageCount: number;
+  textLayerStatus: TextLayerStatus;
+  ocrHint: null | {
+    visible: boolean;
+    reason: 'missing-text-layer' | 'partial-text-layer' | 'poor-text-layer';
+    message: string;
+    actionLabel: string;
+  };
 }
 ```
 

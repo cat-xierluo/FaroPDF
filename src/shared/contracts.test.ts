@@ -15,6 +15,7 @@ import type {
 describe("shared contracts", () => {
   test("models PDF state, operations, OCR jobs, and settings as worker-safe data", () => {
     const documentState: PdfDocumentState = {
+      documentId: "document-1",
       path: "/case/file.pdf",
       name: "file.pdf",
       fingerprint: "fixture",

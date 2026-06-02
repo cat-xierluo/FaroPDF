@@ -1,10 +1,12 @@
 import { useRef, type ChangeEvent, type CSSProperties, type DragEvent } from "react";
 import { textLayerStatusLabels } from "../../modules/reader/readerLabels";
+import { getSearchHighlightsForPage, type TextSearchState } from "../../modules/search";
 import type { ReaderState } from "../../modules/reader/readerState";
 
 interface ReaderCanvasProps {
   onOpenFile?: (file: File) => void | Promise<void>;
   readerState: ReaderState;
+  searchState?: TextSearchState;
 }
 
 const fileInputStyle: CSSProperties = {
@@ -16,7 +18,7 @@ const fileInputStyle: CSSProperties = {
 
 const recentPlaceholders = ["卷宗材料.pdf", "合同附件.pdf", "扫描件.pdf"];
 
-export function ReaderCanvas({ onOpenFile, readerState }: ReaderCanvasProps) {
+export function ReaderCanvas({ onOpenFile, readerState, searchState }: ReaderCanvasProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const document = readerState.document;
 
@@ -114,16 +116,29 @@ export function ReaderCanvas({ onOpenFile, readerState }: ReaderCanvasProps) {
   return (
     <main className="reader" aria-label="PDF 阅读区">
       <div className="reader__viewport" style={viewportStyle}>
-        {readerState.renderRange.pageNumbers.map((pageNumber) => (
-          <section className="pdf-page" aria-label={`第 ${pageNumber} 页`} key={pageNumber} style={pageStyle}>
-            <div className="empty-state">
-              <p className="empty-state__title">第 {pageNumber} 页</p>
-              <p className="empty-state__body">
-                {pageWidth} x {pageHeight} · 文字层{textLayerStatusLabels[document.textLayerStatus]}
-              </p>
-            </div>
-          </section>
-        ))}
+        {readerState.renderRange.pageNumbers.map((pageNumber) => {
+          const highlights = searchState ? getSearchHighlightsForPage(searchState, pageNumber - 1) : [];
+
+          return (
+            <section className="pdf-page" aria-label={`第 ${pageNumber} 页`} key={pageNumber} style={pageStyle}>
+              <div className="empty-state">
+                <p className="empty-state__title">第 {pageNumber} 页</p>
+                <p className="empty-state__body">
+                  {pageWidth} x {pageHeight} · 文字层{textLayerStatusLabels[document.textLayerStatus]}
+                </p>
+                {highlights.length > 0 ? (
+                  <div className="page-search-highlights" aria-label={`第 ${pageNumber} 页搜索高亮`}>
+                    {highlights.map((highlight) => (
+                      <span className={highlight.active ? "page-search-highlight is-active" : "page-search-highlight"} key={highlight.id}>
+                        {highlight.active ? "当前页高亮" : "搜索命中"}：{highlight.matchText}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          );
+        })}
         <section className="pdf-page pdf-page--empty" aria-label="阅读状态" style={{ ...pageStyle, minHeight: 120 }}>
           <div className="empty-state">
             <p className="empty-state__title">{document.name}</p>

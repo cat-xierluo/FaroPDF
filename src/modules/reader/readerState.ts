@@ -18,7 +18,7 @@ export interface ReaderState {
 
 export type ReaderAction =
   | { type: "reader/loadStarted"; payload: { fileName: string } }
-  | { type: "reader/loadSucceeded"; payload: ReaderLoadedMetadata }
+  | { type: "reader/loadSucceeded"; payload: { documentId: string; metadata: ReaderLoadedMetadata } }
   | { type: "reader/loadFailed"; payload: { errorMessage: string } }
   | { type: "reader/setCurrentPage"; payload: { currentPage: number } }
   | { type: "reader/setZoom"; payload: { zoom: number } }
@@ -78,24 +78,26 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
         }),
       };
     case "reader/loadSucceeded": {
+      const { documentId, metadata } = action.payload;
       const document: PdfDocumentState = {
-        path: action.payload.filePath ?? "",
-        name: action.payload.fileName,
-        fingerprint: action.payload.fingerprint,
-        pageCount: action.payload.pageCount,
+        documentId,
+        path: metadata.filePath ?? "",
+        name: metadata.fileName,
+        fingerprint: metadata.fingerprint,
+        pageCount: metadata.pageCount,
         currentPage: 1,
         zoom: state.defaults.zoom,
         viewMode: state.defaults.viewMode,
         dirty: false,
-        textLayerStatus: action.payload.textLayerStatus,
-        ocrStatus: action.payload.textLayerStatus === "missing" ? "needed" : "not-needed",
+        textLayerStatus: metadata.textLayerStatus,
+        ocrStatus: metadata.textLayerStatus === "missing" ? "needed" : "not-needed",
       };
 
       return {
         ...state,
         status: "ready",
         document,
-        pageViewports: [action.payload.initialViewport],
+        pageViewports: [metadata.initialViewport],
         renderRange: updateRenderRange(document),
         errorMessage: undefined,
       };

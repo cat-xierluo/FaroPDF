@@ -6,7 +6,7 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常处理卷宗、证据�
 
 ## 当前状态
 
-当前阶段已完成 Foundation Gate，并接入 PDF.js 阅读底座、设置/OCR provider 配置第一版和扫描预处理 preprocess-only bridge 基础。应用 Shell 已按 PDF Expert 的页面逻辑建立结构草案，后续仍需继续做 UI polish 和真实功能接入。
+当前阶段已完成 Foundation Gate，并接入 PDF.js 阅读底座、设置/OCR provider 配置、PDF Expert 风格基础 Shell、批注 sidecar 模型、扫描预处理 bridge 基础和文本层搜索第一版。搜索第一版支持按需页文本索引、命中列表、上下一个命中、当前页轻量高亮和扫描件 OCR 提示；应用 Shell 后续仍需继续做 UI polish 和真实功能接入。
 
 已固定：
 

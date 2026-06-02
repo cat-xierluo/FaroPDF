@@ -10,6 +10,7 @@ export type {
   PdfViewMode,
   TextLayerStatus,
 } from "./pdf/types";
+export type { PdfPageText } from "./pdf/text";
 export type {
   AnnotationDocumentRef,
   AnnotationSidecar,

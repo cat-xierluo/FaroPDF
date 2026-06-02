@@ -173,13 +173,15 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：检索
-- 状态：进行中（并行 worker）
+- 状态：已完成（第一版）
 - 建议分支：`feat/text-search`
 - 建议 worktree：`.claude/worktrees/tmux-text-search`
 - 依赖：ISS-002、ISS-011
 - 范围：`src/modules/search/`、`src/shared/pdf/text*`、搜索面板相关测试
 - 目标：检测文字层，建立按需搜索索引，支持命中列表、当前页高亮、上下一个命中和扫描件 OCR 提示。
 - 验收：可搜索 PDF 能稳定命中关键词；纯扫描 PDF 显示 OCR 提示；搜索索引不在打开文件时同步扫完整卷。
+- 当前实现：新增内存搜索会话、按批次页文本索引、命中列表、上下一个命中、当前页轻量高亮和文字层缺失/质量差 OCR 提示；真实 PDF text-layer 几何高亮留给阅读渲染深化。
+- 验证：`npm run typecheck`、`npm test`、`npm run lint`、`npm run build`。
 
 ### ISS-004 批注 sidecar 模型
 
@@ -300,7 +302,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：扫描预处理
-- 状态：进行中（并行 worker）
+- 状态：已完成（bridge 基础第一版；真实 OpenCV/PyMuPDF 处理后续接入）
 - 建议分支：`feat/scan-preprocess`
 - 建议 worktree：`.claude/worktrees/tmux-scan-preprocess`
 - 依赖：ISS-011、ISS-012、ISS-014
@@ -382,3 +384,5 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：合并 PR #1 `feat/pdf-expert-shell-ia` 到 `main`，清理本地和远端分支；启动 `ISS-003`、`ISS-004`、`ISS-016` 三条并行主线任务。
 - 2026-06-02：完成 ISS-004 批注 sidecar 模型第一版，落地共享批注类型、sidecar schema、仓储服务和摘要导出；UI 接入后续推进。
 - 2026-06-02：`ISS-016` 在 `feat/scan-preprocess` 完成第一版扫描预处理 job/bridge 基础：共享契约、校验、脱敏、默认另存输出、前端 service、Tauri command stub 和测试。
+- 2026-06-02：`feat/text-search` 在 `.claude/worktrees/tmux-text-search` 接手 `ISS-003`，先以测试驱动实现搜索状态、按需索引、查询服务和轻量 UI 接入。
+- 2026-06-02：完成 `ISS-003` 第一版：搜索模块按需读取 PDF.js 页文本并建立内存索引，Toolbar 展示命中列表和 OCR 提示，Reader 区展示轻量当前命中标记。
