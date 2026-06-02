@@ -92,8 +92,38 @@ FaroPDF 初始化为 Git 仓库，并推送到 GitHub 私有仓库 `FaroPDF`。�
 
 `.claude/skills/` 是本机 `legal-skills` 的绝对路径符号链接，不纳入版本库；项目级协作说明保留在 `AGENTS.md`、`CLAUDE.md` 和 `docs/` 文档中。
 
+## DEC-008 先 Foundation Gate，再多 worktree 并行
+
+- 日期：2026-06-02
+- 状态：已采纳
+
+FaroPDF v0.1 采用“两段式”推进：先在主线完成可运行应用脚手架、共享契约、基础 shell、设置入口和测试命令，再从最新 `main` 拆出多个语义分支和 worktree 并行实现功能。
+
+原因：
+
+- 脚手架、锁文件、Tauri 配置、共享类型和全局布局属于高冲突区域，不适合一开始并行修改。
+- 阅读、搜索、批注、页面整理、导出、OCR、表单和设置可以在共享契约稳定后按模块隔离。
+- 多 Agent worker 需要明确分支名、worktree 路径、文件范围、依赖和验收方式，否则容易互相覆盖或扩大范围。
+
+后续任务源以 `docs/TASKS.md` 为准。分支命名遵循 `git-workflow`，本地并行执行和 PM 巡检遵循 `multi-agent-orchestration`。
+
+## DEC-009 v0.1 设置页纳入基础能力
+
+- 日期：2026-06-02
+- 状态：已采纳
+
+由于 OCR 需要接入 PaddleOCR、MinerU 等外部 API，v0.1 将设置页纳入基础能力，而不是后置功能。设置页负责：
+
+- 默认保存目录、最近文件、默认缩放和阅读布局。
+- 默认 OCR 后端和外部 OCR provider 配置。
+- API Key 或密钥引用管理。
+- 联网 OCR 的隐私确认策略。
+
+外部 OCR API Key 不写入版本库，不在 UI、日志或错误报告中完整输出。云端 OCR 必须要求用户主动确认。
+
 ## 工作日志
 
 - 2026-06-02：初始化项目上下文，固定名称、独立项目形态、首版范围、技术选型和安全边界。
 - 2026-06-02：按 `project-init` skill 校准上下文初始化，补齐 Claude Code 配置和本地开发协作 skills。
 - 2026-06-02：初始化 Git 仓库并准备推送到 GitHub 私有仓库 `FaroPDF`，本机 skill 符号链接不纳入版本库。
+- 2026-06-02：确定 v0.1 先完成 Foundation Gate，再按 `docs/TASKS.md` 的任务包进行多 worktree 并行开发；设置页、外部 OCR provider、水印、压缩和直接编辑调研已纳入任务源。

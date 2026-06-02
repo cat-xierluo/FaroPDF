@@ -10,7 +10,9 @@
 | 前端 | React + TypeScript + Vite | 应用界面、状态管理、渲染调度 |
 | PDF 渲染 | PDF.js | 页面渲染、文本层、目录、缩略图、搜索基础 |
 | PDF 操作 | pdf-lib | 页面复制、删除、重排、表单、元数据、导出保存 |
+| PDF 操作引擎 | `pdfOperationEngine` 抽象 + pdf-lib 起步 | 水印、页码、Bates 编号、压缩预设、扁平化导出 |
 | OCR bridge | 本地命令 / Legal Skills / OCR API | 双层 PDF、扫描件预处理、质量检查 |
+| 设置与凭证 | Tauri command + 本地持久化 / 系统凭证预留 | 最近文件、默认保存策略、OCR provider 配置 |
 
 ## 系统架构
 
@@ -50,9 +52,9 @@ PDF.js getDocument(Uint8Array)
   ↓
 PDF.js page.render(canvas) + text layer + annotation overlay
   ↓
-用户搜索、批注、页面操作或 OCR
+用户搜索、批注、页面操作、水印、压缩、表单或 OCR
   ↓
-sidecar / page operation queue / OCR job queue
+sidecar / page operation queue / export job queue / OCR job queue
   ↓
 导出时由 pdf-lib + OCR 输出文件生成新 PDF
 ```
@@ -127,6 +129,33 @@ export interface PdfPageOperation {
 }
 ```
 
+### PdfExportJob
+
+```ts
+export type PdfExportJobType =
+  | 'flatten-annotations'
+  | 'flatten-form'
+  | 'watermark'
+  | 'page-number'
+  | 'bates-number'
+  | 'compress'
+  | 'page-operations';
+
+export type PdfExportJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface PdfExportJob {
+  id: string;
+  type: PdfExportJobType;
+  inputPath: string;
+  outputPath?: string;
+  status: PdfExportJobStatus;
+  payload: Record<string, unknown>;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
 ### OcrJob
 
 ```ts
@@ -152,6 +181,32 @@ export interface OcrJob {
 }
 ```
 
+### AppSettings 与 OcrProviderConfig
+
+```ts
+export type OcrProviderType = 'local-ocrmypdf' | 'legal-skills' | 'paddleocr' | 'mineru';
+
+export interface OcrProviderConfig {
+  id: string;
+  type: OcrProviderType;
+  displayName: string;
+  endpoint?: string;
+  apiKeyRef?: string;
+  enabled: boolean;
+  requiresNetworkConsent: boolean;
+}
+
+export interface AppSettings {
+  defaultSaveDirectory?: string;
+  defaultZoom: number;
+  defaultViewMode: 'continuous' | 'single' | 'double';
+  recentFiles: Array<{ path: string; name: string; lastOpenedAt: string }>;
+  defaultOcrProviderId?: string;
+  ocrProviders: OcrProviderConfig[];
+  requireNetworkOcrConfirmation: boolean;
+}
+```
+
 ## 模块规划
 
 | 模块 | 职责 |
@@ -162,9 +217,10 @@ export interface OcrJob {
 | `pdfTextService` | 文本层检测、按需全文索引、搜索命中 |
 | `annotationService` | sidecar 批注模型、编辑、导出摘要 |
 | `pdfExportService` | pdf-lib 页面操作、批注扁平化、表单导出 |
+| `pdfOperationEngine` | 抽象 PDF 写入能力，第一版用 pdf-lib 起步，预留更强引擎替换空间 |
 | `pageOrganizerService` | 旋转、删除、重排、插入、提取、合并、编号 |
 | `ocrBridgeService` | 调用本地或云端 OCR 后端，管理任务状态 |
-| `settingsService` | 最近文件、默认缩放、阅读布局、OCR 后端设置 |
+| `settingsService` | 最近文件、默认缩放、阅读布局、默认保存策略、OCR provider 设置 |
 
 ## 性能策略
 
@@ -173,13 +229,14 @@ export interface OcrJob {
 - 阅读区只保留可见页和邻近页 canvas；远离视口的页面释放 canvas。
 - 缩略图低分辨率渲染，并按滚动位置懒加载。
 - 全文索引按页分批建立，优先索引当前页附近。
-- OCR、合并、压缩等后台任务不得阻塞主线程和阅读滚动。
+- OCR、合并、压缩、水印和导出等后台任务不得阻塞主线程和阅读滚动。
 
 ## 保存策略
 
 - 原始 PDF 默认不可变。
 - 批注默认保存到 sidecar，导出时再写入新 PDF。
 - 页面整理、OCR、压缩、扁平化表单默认输出新 PDF。
+- 水印、Bates 编号、页码和批注扁平化默认输出新 PDF。
 - 覆盖原文件必须由用户显式选择并二次确认。
 
 ## OCR bridge
@@ -189,6 +246,8 @@ OCR 不直接内置到前端。第一版 bridge 支持：
 - 本地 Legal Skills 的 PDF Processor / Legal OCR。
 - 本地 `ocrmypdf` 兜底。
 - PaddleOCR / MinerU 云端后端，但必须用户确认后使用。
+
+外部 OCR provider 的 endpoint、模型参数和密钥引用由设置页管理。API Key 不写入公开仓库，不在 UI 中完整展示，不在日志或错误报告中输出。
 
 任务输出必须记录：
 
