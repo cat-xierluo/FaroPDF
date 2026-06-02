@@ -1,6 +1,6 @@
 {
-  "status": "running",
-  "phase": "verification",
+  "status": "completed",
+  "phase": "delivered",
   "branch": "feat/evidence-image-pack",
   "worktree": "/Users/maoking/Library/Application Support/maoscripts/FaroPDF/.claude/worktrees/tmux-evidence-image-pack",
   "runtime_profile": "claude-provider settings (current session; do not modify provider/env/dependencies)",
@@ -50,10 +50,23 @@
   "phase_history": [
     { "phase": "bootstrap", "at": "2026-06-02T16:04:30Z" },
     { "phase": "testing", "at": "2026-06-02T16:04:30Z" },
-    { "phase": "verification", "at": "2026-06-02T16:04:30Z" }
+    { "phase": "verification", "at": "2026-06-02T16:04:30Z" },
+    { "phase": "delivered", "at": "2026-06-02T16:23:06Z" }
   ],
+  "deliverables": {
+    "commit": "478848d feat(pages): add evidence image pack planner",
+    "branch_pushed": "origin/feat/evidence-image-pack",
+    "pull_request": "https://github.com/cat-xierluo/FaroPDF/pull/11",
+    "verification": {
+      "typecheck": "pass",
+      "tests_pages_shared": "52/52 pass",
+      "tests_full": "134/134 pass",
+      "lint": "pass",
+      "build": "pass (1774 modules transformed)"
+    }
+  },
   "pm_host": "Codex",
   "worker_backend": "Claude Code",
   "pm_correction_received": true,
-  "updated_at": "2026-06-02T16:04:30Z"
+  "updated_at": "2026-06-02T16:23:06Z"
 }
