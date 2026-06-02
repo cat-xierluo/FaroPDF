@@ -214,14 +214,17 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：页面管理
-- 状态：待处理
+- 状态：进行中（第一版底座已完成；完整 UI、真实 PDF 页面改写和插入/合并/裁剪等高级操作待后续）
 - 建议分支：`feat/page-organizer`
 - 建议 worktree：`.claude/worktrees/tmux-page-organizer`
 - 依赖：ISS-002、ISS-005
-- 范围：`src/modules/pages/`、`src/shared/pdf/pageOperation*`、页面整理相关测试
+- 范围：`src/modules/pages/`、`src/shared/pdf/pageOrganizer*`、`src/shared/pdf/pageOperation*`、页面整理相关测试
 - 参考算法：`pdf-organizer/scripts/pdf_organizer.py` 的 manifest、A4 标准化、拆分/合并执行逻辑
 - 目标：支持旋转、删除、重排、插入、提取、合并、裁剪、拆分双页扫描、A4 标准化和撤销。
 - 验收：页面操作可预览、撤销，并默认另存为新 PDF，不覆盖原始文件。
+- 当前实现：新增 `PdfPageOrganizerState` 页面整理状态，页面项记录原始页码、当前顺序、旋转角和删除状态；`pageOrganizer` service 支持旋转、删除、重排、恢复和撤销，并保持不可变状态更新；导出入口生成 `PdfPageOperationsExportOperation` / `PdfExportFileRequest`，默认输出 `*-organized.pdf`，拒绝与原始 PDF 等价的输出路径。
+- 当前边界：页面整理导出仍是 `plan-only`，只向导出引擎提交重排、旋转和删除计划；不在本分支真实改写 PDF 页序、页面旋转或删除结果，也未接入完整页面网格 UI、多选预览、插入、合并、裁剪、拆分双页扫描、A4 标准化、页级 manifest 或 Bates 编号。
+- 验证：`npm test -- --run src/modules/pages` 覆盖状态创建、旋转、删除、重排、恢复、撤销和安全输出路径；完整验证见本分支最终汇报。
 
 ### ISS-007 OCR bridge
 

@@ -11,6 +11,15 @@ export type {
   TextLayerStatus,
 } from "./pdf/types";
 export type {
+  PdfPageOrganizerAction,
+  PdfPageOrganizerActionType,
+  PdfPageOrganizerDocument,
+  PdfPageOrganizerHistoryEntry,
+  PdfPageOrganizerPage,
+  PdfPageOrganizerRotation,
+  PdfPageOrganizerState,
+} from "./pdf/pageOrganizer";
+export type {
   PdfAnnotationFlattenPlan,
   PdfAnnotationFlattenPlanEntry,
   PdfAnnotationFlattenStrategy,
