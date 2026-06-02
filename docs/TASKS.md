@@ -173,7 +173,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：检索
-- 状态：待处理
+- 状态：进行中（并行 worker）
 - 建议分支：`feat/text-search`
 - 建议 worktree：`.claude/worktrees/tmux-text-search`
 - 依赖：ISS-002、ISS-011
@@ -185,7 +185,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：批注
-- 状态：待处理
+- 状态：进行中（并行 worker）
 - 建议分支：`feat/annotations-sidecar`
 - 建议 worktree：`.claude/worktrees/tmux-annotations-sidecar`
 - 依赖：ISS-002、ISS-011
@@ -300,7 +300,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：扫描预处理
-- 状态：待处理
+- 状态：进行中（并行 worker）
 - 建议分支：`feat/scan-preprocess`
 - 建议 worktree：`.claude/worktrees/tmux-scan-preprocess`
 - 依赖：ISS-011、ISS-012、ISS-014
@@ -377,3 +377,4 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：对 `feat/pdf-expert-shell-ia` 做提交前验证，修正 900px 窄屏顶栏溢出；该分支适合作为 Draft PR 进入 code/design review，但 `ISS-009` 仍保持进行中。
 - 2026-06-02：完成 `ISS-020` 临时应用图标，按用户要求暂用最初生成的灯塔图标，并同步网页 favicon 与 Tauri 平台图标。
 - 2026-06-02：处理 Draft PR code review：页面管理无文档时显示空态而不是假页面；视图设置读取实际阅读模式；920px 窄屏继续保留搜索入口；空态拖拽打开 PDF 行为补齐。
+- 2026-06-02：合并 PR #1 `feat/pdf-expert-shell-ia` 到 `main`，清理本地和远端分支；启动 `ISS-003`、`ISS-004`、`ISS-016` 三条并行主线任务。
