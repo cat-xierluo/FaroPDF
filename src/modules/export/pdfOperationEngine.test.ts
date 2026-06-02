@@ -490,6 +490,54 @@ describe("pdf operation engine", () => {
     ).rejects.toThrow("PDF 压缩第一版只支持 plan-only 模式。");
   });
 
+  test("rejects invalid page number and Bates numbering inputs", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const engine = createPdfOperationEngine();
+
+    await expect(
+      engine.exportPdf({
+        id: "export-page-number-invalid-start",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "page-number-invalid-start",
+            type: "page-number",
+            startNumber: Number.NaN,
+          },
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("页码起始号必须是正整数。");
+
+    await expect(
+      engine.exportPdf({
+        id: "export-bates-invalid-digits",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "bates-invalid-digits",
+            type: "bates-number",
+            startNumber: 1,
+            digits: Number.POSITIVE_INFINITY,
+          },
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("Bates 编号位数必须是 0 到 12 的整数。");
+  });
+
   test("rejects non-Latin delivery tool text with a product error message", async () => {
     const inputBytes = await createPdfWithBlankPages(1);
     const engine = createPdfOperationEngine();

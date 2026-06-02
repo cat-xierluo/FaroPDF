@@ -344,13 +344,14 @@ async function applyPageNumbers(
   pageIndexes: number[],
   inputPageCount: number,
 ): Promise<string[]> {
+  const startNumber = normalizePageNumberStart(operation.startNumber);
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const fontSize = normalizePositiveNumber(operation.fontSize, 10);
   const color = parseHexColor(operation.color ?? "#202020");
   const labels: string[] = [];
 
   pageIndexes.forEach((pageIndex, sequenceIndex) => {
-    const label = formatPageNumberLabel(operation, sequenceIndex, inputPageCount);
+    const label = formatPageNumberLabel(operation, startNumber, sequenceIndex, inputPageCount);
     drawFooterLabel(pdf.getPage(pageIndex), label, font, {
       placement: operation.placement ?? "bottom-center",
       fontSize,
@@ -376,7 +377,7 @@ async function applyBatesNumbers(
   const fontSize = normalizePositiveNumber(operation.fontSize, 10);
   const color = parseHexColor(operation.color ?? "#202020");
   const labels: string[] = [];
-  const digits = Math.max(0, Math.trunc(operation.digits ?? 6));
+  const digits = normalizeBatesDigits(operation.digits);
 
   pageIndexes.forEach((pageIndex, sequenceIndex) => {
     const number = operation.startNumber + sequenceIndex;
@@ -424,13 +425,36 @@ function drawFooterLabel(
 
 function formatPageNumberLabel(
   operation: PdfPageNumberOperation,
+  startNumber: number,
   sequenceIndex: number,
   inputPageCount: number,
 ): string {
-  const pageNumber = (operation.startNumber ?? 1) + sequenceIndex;
+  const pageNumber = startNumber + sequenceIndex;
   const format = operation.format ?? "{page}";
 
   return format.replace(/\{page\}/g, String(pageNumber)).replace(/\{total\}/g, String(inputPageCount));
+}
+
+function normalizePageNumberStart(value: number | undefined): number {
+  if (value === undefined) {
+    return 1;
+  }
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("页码起始号必须是正整数。");
+  }
+
+  return value;
+}
+
+function normalizeBatesDigits(value: number | undefined): number {
+  if (value === undefined) {
+    return 6;
+  }
+  if (!Number.isInteger(value) || value < 0 || value > 12) {
+    throw new Error("Bates 编号位数必须是 0 到 12 的整数。");
+  }
+
+  return value;
 }
 
 function measureTextWidth(font: PDFFont, text: string, fontSize: number): number {
