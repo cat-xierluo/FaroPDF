@@ -5,7 +5,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ["dist", "src-tauri/target"],
+    ignores: ["dist", ".claude", "src-tauri/target"],
   },
   {
     files: ["**/*.{ts,tsx}"],
