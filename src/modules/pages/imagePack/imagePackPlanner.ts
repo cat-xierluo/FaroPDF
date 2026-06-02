@@ -34,13 +34,17 @@ export function createImagePackPlan(input: ImagePackPlanInput): ImagePackPlan {
   const sortedItems = sortItems(input.items, options.sort);
   const itemOrientationCounts = countItemOrientations(sortedItems);
   const resolvedPerPage = resolveItemsPerPage(options.itemsPerPage, itemOrientationCounts);
+
   const explicitOutputPath = normalizeOptionalString(input.outputPath);
-  const suggestedPath = suggestImagePackOutputPath(firstSourcePath(sortedItems, explicitOutputPath));
-  const outputPath = explicitOutputPath ?? suggestedPath;
+  const firstSourcePathValue = firstAvailableSourcePath(sortedItems);
+  const outputPath = resolveOutputPath(explicitOutputPath, firstSourcePathValue);
+
+  validateMarginForLayout(options.margin, resolvedPerPage, options.orientation);
   validateOutputPath(outputPath, sortedItems);
 
   const pages = buildPages(sortedItems, resolvedPerPage, options.orientation, options.margin);
   const summary = buildSummary(sortedItems, pages, options, itemOrientationCounts, resolvedPerPage);
+  const warnings = buildWarnings(options.sort);
 
   return {
     id: input.id ?? `image-pack-${input.createdAt ?? new Date().toISOString()}`,
@@ -55,14 +59,14 @@ export function createImagePackPlan(input: ImagePackPlanInput): ImagePackPlan {
     outputPath,
     pages,
     summary,
-    warnings: [],
+    warnings,
     createdAt: input.createdAt ?? new Date().toISOString(),
   };
 }
 
 export function suggestImagePackOutputPath(firstItemPath: string | undefined): string {
-  if (!firstItemPath) {
-    return `${FIXED_OUTPUT_STEM_SUFFIX}.pdf`;
+  if (!firstItemPath || firstItemPath.trim().length === 0) {
+    return "evidence-pack.pdf";
   }
 
   const trimmed = firstItemPath.trim();
@@ -154,10 +158,16 @@ function sortItems(items: ImagePackInputItem[], sort: ImagePackSortStrategy): Im
     copy.sort(compareByName);
     return copy;
   }
-  // "time" 排序需要文件 mtime，本计划模型未提供 mtime 字段，
-  // 第一版按输入顺序保持，并在 warnings 中说明；
-  // 真实文件扫描时再补 modifiedAt / 排序时间戳。
   return copy;
+}
+
+function buildWarnings(sort: ImagePackSortStrategy): string[] {
+  if (sort === "time") {
+    return [
+      "sort=time 当前保持输入顺序：plan-only 模型未携带 mtime，待真实文件扫描时再补 modifiedAt 排序。",
+    ];
+  }
+  return [];
 }
 
 function compareByName(left: ImagePackInputItem, right: ImagePackInputItem): number {
@@ -198,16 +208,84 @@ function resolveItemsPerPage(
   return option;
 }
 
-function firstSourcePath(items: ImagePackInputItem[], explicitPath: string | undefined): string | undefined {
-  if (explicitPath) {
-    return explicitPath;
-  }
+function firstAvailableSourcePath(items: ImagePackInputItem[]): string | undefined {
   for (const item of items) {
     if (item.sourcePath) {
       return item.sourcePath;
     }
   }
   return undefined;
+}
+
+function resolveOutputPath(explicitPath: string | undefined, firstSource: string | undefined): string {
+  if (explicitPath) {
+    return explicitPath;
+  }
+  if (firstSource) {
+    return suggestImagePackOutputPath(firstSource);
+  }
+  throw new Error(
+    "证据图片输出路径无法自动推导：所有条目都没有 sourcePath，请显式提供 outputPath。",
+  );
+}
+
+function validateMarginForLayout(
+  margin: number,
+  itemsPerPage: ImagePackItemsPerPage,
+  orientation: ImagePackOrientationOption,
+): void {
+  const layouts = layoutCasesFor(itemsPerPage, orientation);
+  for (const layout of layouts) {
+    const cellHeight = layout.height - 2 * margin;
+    const cellWidth =
+      itemsPerPage === 1
+        ? layout.width - 2 * margin
+        : (layout.width - (itemsPerPage + 1) * margin) / itemsPerPage;
+    if (cellHeight <= 0 || cellWidth <= 0) {
+      throw new Error(
+        `margin ${margin} 过大：在 ${layout.label} + ${itemsPerPage}/页 的布局下，单元格宽高将非正。` +
+          `请把 margin 调整为小于 ${maxSafeMargin(layout.width, layout.height, itemsPerPage)}。`,
+      );
+    }
+  }
+}
+
+interface LayoutCase {
+  width: number;
+  height: number;
+  label: string;
+}
+
+function layoutCasesFor(
+  itemsPerPage: ImagePackItemsPerPage,
+  orientation: ImagePackOrientationOption,
+): LayoutCase[] {
+  const portrait: LayoutCase = {
+    width: A4_PORTRAIT_SIZE_PT.width,
+    height: A4_PORTRAIT_SIZE_PT.height,
+    label: "A4 portrait",
+  };
+  const landscape: LayoutCase = {
+    width: A4_LANDSCAPE_SIZE_PT.width,
+    height: A4_LANDSCAPE_SIZE_PT.height,
+    label: "A4 landscape",
+  };
+  if (orientation === "portrait") {
+    return [portrait];
+  }
+  if (orientation === "landscape") {
+    return [landscape];
+  }
+  if (itemsPerPage === 1) {
+    return [portrait, landscape];
+  }
+  return [landscape];
+}
+
+function maxSafeMargin(width: number, height: number, itemsPerPage: ImagePackItemsPerPage): number {
+  const heightLimit = height / 2;
+  const widthLimit = itemsPerPage === 1 ? width / 2 : width / (itemsPerPage + 1);
+  return Math.min(heightLimit, widthLimit);
 }
 
 function buildPages(

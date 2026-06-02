@@ -328,6 +328,100 @@ describe("imagePackPlanner - invalid inputs", () => {
   });
 });
 
+describe("imagePackPlanner - output path derivation when no source path is available", () => {
+  test("suggestImagePackOutputPath(undefined) returns 'evidence-pack.pdf' without a leading dash", () => {
+    expect(suggestImagePackOutputPath(undefined)).toBe("evidence-pack.pdf");
+    expect(suggestImagePackOutputPath("")).toBe("evidence-pack.pdf");
+    expect(suggestImagePackOutputPath("   ")).toBe("evidence-pack.pdf");
+  });
+
+  test("createImagePackPlan throws a clear error when no sourcePath is available and no outputPath is provided", () => {
+    expect(() =>
+      createImagePackPlan({
+        items: [portraitItem("p1"), portraitItem("p2")],
+        options: { itemsPerPage: 2 },
+        id: "pack-no-source",
+        createdAt: FIXED_TIME,
+      }),
+    ).toThrow(/证据图片输出路径无法自动推导/);
+  });
+});
+
+describe("imagePackPlanner - margin must keep cells positive for the chosen layout", () => {
+  test("rejects margin that makes 4-per-page landscape cells non-positive", () => {
+    expect(() =>
+      createImagePackPlan({
+        items: [portraitItem("p1"), portraitItem("p2"), portraitItem("p3"), portraitItem("p4")],
+        options: { itemsPerPage: 4, orientation: "landscape", margin: 200 },
+        outputPath: "/case/evidence/margin4land.pdf",
+        id: "pack-margin-4-land",
+        createdAt: FIXED_TIME,
+      }),
+    ).toThrow(/margin 200 过大/);
+  });
+
+  test("rejects margin that makes 1-per-page portrait cells non-positive", () => {
+    expect(() =>
+      createImagePackPlan({
+        items: [portraitItem("p1")],
+        options: { itemsPerPage: 1, orientation: "portrait", margin: 300 },
+        outputPath: "/case/evidence/margin1port.pdf",
+        id: "pack-margin-1-port",
+        createdAt: FIXED_TIME,
+      }),
+    ).toThrow(/margin 300 过大/);
+  });
+
+  test("rejects margin that would break orientation=auto per_page=1 across both A4 dimensions", () => {
+    expect(() =>
+      createImagePackPlan({
+        items: [portraitItem("p1")],
+        options: { itemsPerPage: 1, orientation: "auto", margin: 300 },
+        outputPath: "/case/evidence/margin-auto.pdf",
+        id: "pack-margin-auto",
+        createdAt: FIXED_TIME,
+      }),
+    ).toThrow(/margin 300 过大/);
+  });
+});
+
+describe("imagePackPlanner - sort=time warning", () => {
+  test("includes a warning when sort='time' is used because the plan model has no mtime", () => {
+    const plan = createImagePackPlan({
+      items: [portraitItem("p1"), portraitItem("p2"), portraitItem("p3")],
+      options: { itemsPerPage: 3, sort: "time" },
+      outputPath: "/case/evidence/time-pack.pdf",
+      id: "pack-time",
+      createdAt: FIXED_TIME,
+    });
+
+    expect(plan.warnings).toHaveLength(1);
+    expect(plan.warnings[0]).toMatch(/sort=time/);
+    expect(plan.warnings[0]).toMatch(/保持输入顺序/);
+    expect(plan.items.map((item) => item.id)).toEqual(["p1", "p2", "p3"]);
+  });
+
+  test("does not warn for sort='name' or sort='none'", () => {
+    const namePlan = createImagePackPlan({
+      items: [portraitItem("p1")],
+      options: { itemsPerPage: 1, sort: "name" },
+      outputPath: "/case/evidence/name-pack.pdf",
+      id: "pack-name",
+      createdAt: FIXED_TIME,
+    });
+    const nonePlan = createImagePackPlan({
+      items: [portraitItem("p1")],
+      options: { itemsPerPage: 1, sort: "none" },
+      outputPath: "/case/evidence/none-pack.pdf",
+      id: "pack-none",
+      createdAt: FIXED_TIME,
+    });
+
+    expect(namePlan.warnings).toEqual([]);
+    expect(nonePlan.warnings).toEqual([]);
+  });
+});
+
 describe("imagePackPlanner - sort strategies and mixed sources", () => {
   test("sort=name orders items by their label or id when labels are present", () => {
     const plan = createImagePackPlan({
