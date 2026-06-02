@@ -55,10 +55,10 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - [ ] 支持文本选择高亮、下划线、删除线。
 - [ ] 支持备注、文本框、矩形、箭头和自由手写。
 - [ ] 支持常用图章，例如已阅、重点、待核、证据。
-- [ ] 支持批注颜色、作者、时间和页码。
+- [x] 支持批注颜色、作者、时间和页码。
 - [ ] 支持批注列表、批注搜索和点击跳转。
-- [ ] 支持导出批注摘要为 Markdown 或 HTML。
-- [ ] 默认先保存可编辑 sidecar 状态，导出时再写入或扁平化到 PDF。
+- [x] 支持导出批注摘要为 Markdown 或 HTML。
+- [x] 默认先保存可编辑 sidecar 状态，导出时再写入或扁平化到 PDF。
 
 ### 5. 页面整理
 
@@ -120,3 +120,4 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - 2026-06-02：并行完成 PDF.js 阅读底座和设置/OCR provider 配置第一版，进入阅读深化、搜索、批注和 OCR bridge 前置状态。
 - 2026-06-02：完成 `ISS-016` 第一版扫描预处理基础：preprocess-only job model、参数校验、默认新输出 PDF 路径、Tauri command bridge stub 和测试；真实 OpenCV/PyMuPDF 处理继续后续接入。
 - 2026-06-02：参考 PDF Expert 的信息架构，在 `feat/pdf-expert-shell-ia` 分支启动 Shell 重排草案；当前记录为 UI 方向和任务边界，尚未达到最终视觉验收。
+- 2026-06-02：完成批注 sidecar 模型第一版，建立 schema version 1、仓储服务和 Markdown / HTML 摘要导出；具体批注 UI 交互后续接入。

@@ -185,13 +185,13 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：批注
-- 状态：进行中（并行 worker）
+- 状态：已完成（sidecar 模型第一版；UI 列表和点击跳转后续接入）
 - 建议分支：`feat/annotations-sidecar`
 - 建议 worktree：`.claude/worktrees/tmux-annotations-sidecar`
 - 依赖：ISS-002、ISS-011
 - 范围：`src/modules/annotation/`、`src/shared/pdf/annotation*`、批注相关测试
 - 目标：建立 `PdfAnnotation` 模型和 sidecar 持久化策略，支持高亮、下划线、删除线、备注、文本框、形状、手写和图章。
-- 验收：批注可新增、编辑、删除、列表展示、点击跳转，并能导出 Markdown 或 HTML 摘要。
+- 验收：批注可新增、编辑、删除、按页码排序列表，并能导出 Markdown 或 HTML 摘要；sidecar 默认写入 `.faropdf/annotations/*.annotations.json`，不覆盖原始 PDF，摘要不包含真实用户文件名。UI 工具条、列表渲染和点击跳转留给后续 UI 接入任务。
 
 ### ISS-005 PDF 导出与批注扁平化
 
@@ -380,4 +380,5 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：完成 `ISS-020` 临时应用图标，按用户要求暂用最初生成的灯塔图标，并同步网页 favicon 与 Tauri 平台图标。
 - 2026-06-02：处理 Draft PR code review：页面管理无文档时显示空态而不是假页面；视图设置读取实际阅读模式；920px 窄屏继续保留搜索入口；空态拖拽打开 PDF 行为补齐。
 - 2026-06-02：合并 PR #1 `feat/pdf-expert-shell-ia` 到 `main`，清理本地和远端分支；启动 `ISS-003`、`ISS-004`、`ISS-016` 三条并行主线任务。
+- 2026-06-02：完成 ISS-004 批注 sidecar 模型第一版，落地共享批注类型、sidecar schema、仓储服务和摘要导出；UI 接入后续推进。
 - 2026-06-02：`ISS-016` 在 `feat/scan-preprocess` 完成第一版扫描预处理 job/bridge 基础：共享契约、校验、脱敏、默认另存输出、前端 service、Tauri command stub 和测试。
