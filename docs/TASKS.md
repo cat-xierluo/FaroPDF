@@ -199,7 +199,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：导出
-- 状态：待处理
+- 状态：进行中（并行 worker）
 - 建议分支：`feat/pdf-export-engine`
 - 建议 worktree：`.claude/worktrees/tmux-pdf-export-engine`
 - 依赖：ISS-011、ISS-004
@@ -224,7 +224,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：OCR
-- 状态：待处理
+- 状态：进行中（并行 worker）
 - 建议分支：`feat/ocr-bridge`
 - 建议 worktree：`.claude/worktrees/tmux-ocr-bridge`
 - 依赖：ISS-003、ISS-014
@@ -386,3 +386,4 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：`ISS-016` 在 `feat/scan-preprocess` 完成第一版扫描预处理 job/bridge 基础：共享契约、校验、脱敏、默认另存输出、前端 service、Tauri command stub 和测试。
 - 2026-06-02：`feat/text-search` 在 `.claude/worktrees/tmux-text-search` 接手 `ISS-003`，先以测试驱动实现搜索状态、按需索引、查询服务和轻量 UI 接入。
 - 2026-06-02：完成 `ISS-003` 第一版：搜索模块按需读取 PDF.js 页文本并建立内存索引，Toolbar 展示命中列表和 OCR 提示，Reader 区展示轻量当前命中标记。
+- 2026-06-02：从最新 `main` 启动下一批并行主线任务：`ISS-005` 使用 `feat/pdf-export-engine` 推进导出/扁平化底座，`ISS-007` 使用 `feat/ocr-bridge` 推进 OCR bridge；`ISS-006` 页面整理等待导出引擎稳定后再开。
