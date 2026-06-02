@@ -20,6 +20,7 @@ import type {
   OcrRequest,
   PreparedOcrRequest,
 } from "../../../shared/ocr/types";
+import { createOcrPrivacyConsentGuard } from "../privacy/consentGuard";
 
 export interface OcrBridgeBackend {
   startOcr: (request: OcrProviderBridgeRequest) => Promise<unknown>;
@@ -72,6 +73,8 @@ export function createTauriOcrBridgeBackend(invoker: TauriInvoker = invoke): Ocr
 }
 
 export function createOcrBridgeService(backend: OcrBridgeBackend = createTauriOcrBridgeBackend()): OcrBridgeService {
+  const privacyConsentGuard = createOcrPrivacyConsentGuard();
+
   return {
     async startOcr(request, context) {
       const validation = validateOcrRequest(request);
@@ -82,15 +85,24 @@ export function createOcrBridgeService(backend: OcrBridgeBackend = createTauriOc
       const preparedRequest = prepareOcrRequest(request);
       const provider = resolveProvider(preparedRequest.providerId, context.providers);
       const adapter = adapters[provider.type];
-      const providerErrors = adapter.validate(preparedRequest, provider);
+      const privacyResult = privacyConsentGuard.evaluate({
+        request: preparedRequest,
+        provider,
+      });
+      const consentAwareRequest = applyPrivacyConsentFlag(preparedRequest, privacyResult.auditRecord.consentStatus);
+      const providerErrors = [
+        ...(privacyResult.allowed ? [] : privacyResult.errors),
+        ...adapter.validate(consentAwareRequest, provider),
+      ];
       if (providerErrors.length > 0) {
         throw createValidationError("OCR Provider 校验失败", providerErrors);
       }
 
       const bridgeRequest: OcrProviderBridgeRequest = {
-        ...preparedRequest,
+        ...consentAwareRequest,
         provider,
-        networkConsentGranted: preparedRequest.networkConsentGranted === true,
+        networkConsentGranted: consentAwareRequest.networkConsentGranted === true,
+        privacyAuditRecord: privacyResult.auditRecord,
       };
 
       try {
@@ -117,7 +129,15 @@ export function createOcrBridgeService(backend: OcrBridgeBackend = createTauriOc
         };
       }
 
-      const errors = adapters[provider.type].validate(preparedRequest, provider);
+      const privacyResult = privacyConsentGuard.evaluate({
+        request: preparedRequest,
+        provider,
+      });
+      const consentAwareRequest = applyPrivacyConsentFlag(preparedRequest, privacyResult.auditRecord.consentStatus);
+      const errors = [
+        ...(privacyResult.allowed ? [] : privacyResult.errors),
+        ...adapters[provider.type].validate(consentAwareRequest, provider),
+      ];
       return {
         valid: errors.length === 0,
         errors,
@@ -128,6 +148,20 @@ export function createOcrBridgeService(backend: OcrBridgeBackend = createTauriOc
       return adapters[providerType];
     },
   };
+}
+
+function applyPrivacyConsentFlag(
+  request: PreparedOcrRequest,
+  consentStatus: string,
+): PreparedOcrRequest {
+  if (consentStatus === "granted") {
+    return {
+      ...request,
+      networkConsentGranted: true,
+    };
+  }
+
+  return request;
 }
 
 export function createOcrJobModel(

@@ -75,6 +75,14 @@ export type {
   PreparedOcrRequest,
 } from "./ocr/types";
 export type {
+  OcrNetworkConsentDecision,
+  OcrPrivacyAuditRecord,
+  OcrPrivacyConsentStatus,
+  OcrPrivacyNotice,
+  OcrPrivacyNoticeVersion,
+  RedactedPathSummary,
+} from "./security";
+export type {
   ScanPreprocessJob,
   ScanPreprocessJobStatus,
   ScanPreprocessOptions,

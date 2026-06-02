@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import type { OcrProviderConfig } from "../../../shared/ocr/types";
+import { prepareOcrRequest } from "../../../shared/ocr/defaults";
+import type { OcrProviderConfig, OcrRequest } from "../../../shared/ocr/types";
+import { createOcrNetworkConsentDecision, createOcrPrivacyNotice } from "../../../shared/security/ocrPrivacy";
 import { createOcrBridgeService, type OcrBridgeBackend } from "./bridge";
 
 const localProvider: OcrProviderConfig = {
@@ -29,6 +31,31 @@ const mineruProvider: OcrProviderConfig = {
   enabled: true,
   requiresNetworkConsent: true,
 };
+
+let consentSequence = 0;
+
+function withCurrentPrivacyConsent(request: OcrRequest, provider: OcrProviderConfig): OcrRequest {
+  consentSequence += 1;
+  const preparedRequest = prepareOcrRequest(request);
+  const notice = createOcrPrivacyNotice({
+    request: preparedRequest,
+    provider,
+    issuedAt: "2026-06-02T12:00:00.000Z",
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    noticeNonce: `bridge-test-${consentSequence}`,
+  });
+  const privacyConsent = createOcrNetworkConsentDecision({
+    notice,
+    granted: true,
+    decidedAt: "2026-06-02T12:01:00.000Z",
+  });
+
+  return {
+    ...request,
+    privacyNotice: notice,
+    privacyConsent,
+  };
+}
 
 describe("OCR bridge service", () => {
   let backend: OcrBridgeBackend;
@@ -82,23 +109,7 @@ describe("OCR bridge service", () => {
     expect(job.progress.stage).toBe("queued");
   });
 
-  test("rejects cloud OCR without explicit consent before backend invocation", async () => {
-    const service = createOcrBridgeService(backend);
-
-    await expect(
-      service.startOcr(
-        {
-          inputPath: "/tmp/faropdf-fixtures/source.pdf",
-          providerId: "paddleocr",
-        },
-        { providers: [paddleProvider] },
-      ),
-    ).rejects.toThrow("联网 OCR 需要用户明确确认。");
-
-    expect(backend.startOcr).not.toHaveBeenCalled();
-  });
-
-  test("rejects cloud OCR without a configured API key reference", async () => {
+  test("rejects cloud OCR with only a legacy consent flag before backend invocation", async () => {
     const service = createOcrBridgeService(backend);
 
     await expect(
@@ -108,6 +119,86 @@ describe("OCR bridge service", () => {
           providerId: "paddleocr",
           networkConsentGranted: true,
         },
+        { providers: [paddleProvider] },
+      ),
+    ).rejects.toThrow("联网 OCR 需要本次隐私确认。");
+
+    expect(backend.startOcr).not.toHaveBeenCalled();
+  });
+
+  test("validateRequest rejects cloud OCR with only a legacy consent flag", () => {
+    const service = createOcrBridgeService(backend);
+
+    const result = service.validateRequest(
+      {
+        inputPath: "/tmp/faropdf-fixtures/source.pdf",
+        providerId: "paddleocr",
+        networkConsentGranted: true,
+      },
+      { providers: [paddleProvider] },
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain("联网 OCR 需要本次隐私确认。");
+  });
+
+  test("forwards a redacted privacy audit record when cloud OCR carries current consent", async () => {
+    const service = createOcrBridgeService(backend);
+    const preparedRequest = {
+      inputPath: "/Users/alice/Cases/secret/source.pdf",
+      outputPath: "/Users/alice/Cases/secret/source-ocr.pdf",
+      outputStrategy: "new-layered-pdf" as const,
+      providerId: "paddleocr",
+      pageRange: "2-4",
+      qualityCheck: { enabled: false, samplePages: [], keywords: [] },
+    };
+    const notice = createOcrPrivacyNotice({
+      request: preparedRequest,
+      provider: paddleProvider,
+      issuedAt: "2026-06-02T12:00:00.000Z",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      noticeNonce: "bridge-forward-audit",
+    });
+    const privacyConsent = createOcrNetworkConsentDecision({
+      notice,
+      granted: true,
+      decidedAt: "2026-06-02T12:00:00.000Z",
+    });
+
+    await service.startOcr(
+      {
+        ...preparedRequest,
+        privacyNotice: notice,
+        privacyConsent,
+      },
+      { providers: [paddleProvider] },
+    );
+
+    expect(backend.startOcr).toHaveBeenCalledWith(
+      expect.objectContaining({
+        networkConsentGranted: true,
+        privacyAuditRecord: expect.objectContaining({
+          providerId: "paddleocr",
+          consentStatus: "granted",
+          pageRangeLabel: "2-4",
+          outputStrategy: "new-layered-pdf",
+        }),
+      }),
+    );
+    const bridgeRequest = vi.mocked(backend.startOcr).mock.calls[0][0];
+    expect(JSON.stringify(bridgeRequest.privacyAuditRecord)).not.toContain("/Users/alice");
+    expect(JSON.stringify(bridgeRequest.privacyAuditRecord)).not.toContain("source-ocr.pdf");
+  });
+
+  test("rejects cloud OCR without a configured API key reference", async () => {
+    const service = createOcrBridgeService(backend);
+
+    await expect(
+      service.startOcr(
+        withCurrentPrivacyConsent({
+          inputPath: "/tmp/faropdf-fixtures/source.pdf",
+          providerId: "paddleocr",
+        }, { ...paddleProvider, apiKeyRef: "" }),
         {
           providers: [
             {
@@ -127,11 +218,10 @@ describe("OCR bridge service", () => {
 
     await expect(
       service.startOcr(
-        {
+        withCurrentPrivacyConsent({
           inputPath: "/tmp/faropdf-fixtures/source.pdf",
           providerId: "paddleocr",
-          networkConsentGranted: true,
-        },
+        }, { ...paddleProvider, apiKeyRef: "paddle-secret-123456" }),
         {
           providers: [
             {
@@ -151,11 +241,10 @@ describe("OCR bridge service", () => {
 
     await expect(
       service.startOcr(
-        {
+        withCurrentPrivacyConsent({
           inputPath: "/tmp/faropdf-fixtures/source.pdf",
           providerId: "paddleocr",
-          networkConsentGranted: true,
-        },
+        }, { ...paddleProvider, endpoint: "http://ocr.example.test/paddle" }),
         {
           providers: [
             {
@@ -169,11 +258,10 @@ describe("OCR bridge service", () => {
 
     await expect(
       service.startOcr(
-        {
+        withCurrentPrivacyConsent({
           inputPath: "/tmp/faropdf-fixtures/source.pdf",
           providerId: "paddleocr",
-          networkConsentGranted: true,
-        },
+        }, { ...paddleProvider, endpoint: "http://127.evil.example/paddle" }),
         {
           providers: [
             {
@@ -186,11 +274,10 @@ describe("OCR bridge service", () => {
     ).rejects.toThrow("PaddleOCR 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。");
 
     await service.startOcr(
-      {
+      withCurrentPrivacyConsent({
         inputPath: "/tmp/faropdf-fixtures/source.pdf",
         providerId: "paddleocr",
-        networkConsentGranted: true,
-      },
+      }, { ...paddleProvider, endpoint: "http://127.42.0.8:8080/paddle" }),
       {
         providers: [
           {
@@ -202,11 +289,10 @@ describe("OCR bridge service", () => {
     );
 
     await service.startOcr(
-      {
+      withCurrentPrivacyConsent({
         inputPath: "/tmp/faropdf-fixtures/source.pdf",
         providerId: "paddleocr",
-        networkConsentGranted: true,
-      },
+      }, { ...paddleProvider, endpoint: "http://[::1]:8080/paddle" }),
       {
         providers: [
           {
@@ -225,11 +311,10 @@ describe("OCR bridge service", () => {
 
     expect(
       service.validateRequest(
-        {
+        withCurrentPrivacyConsent({
           inputPath: "/tmp/faropdf-fixtures/source.pdf",
           providerId: "mineru",
-          networkConsentGranted: true,
-        },
+        }, mineruProvider),
         { providers: [mineruProvider] },
       ),
     ).toEqual({ valid: true, errors: [] });
