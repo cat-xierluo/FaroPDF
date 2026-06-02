@@ -294,6 +294,24 @@ ISS-007 第一版只建立 OCR bridge 基础，不在本分支执行真实 OCR�
 - OCR 涉及案件材料、隐私和外部 API，必须先把不覆盖原件、不误联网、不泄露路径和凭证引用的边界固定下来。
 - 本地 `ocrmypdf`、Legal Skills、PaddleOCR、MinerU 和质量检查的执行模型后续可以接入同一 job model，避免 UI 直接绑定脚本 stdout 或 HTTP 实现细节。
 
+## DEC-021 页面整理第一版采用可回退状态和 plan-only 导出
+
+- 日期：2026-06-02
+- 状态：已采纳
+
+ISS-006 第一版先建立页面整理工作台底座，不在本分支真实改写 PDF。当前采用方式：
+
+- `PdfPageOrganizerState` 记录页面项的原始页码、当前顺序、旋转角、删除状态、动作记录和撤销栈。
+- `pageOrganizer` service 使用纯函数更新状态，支持旋转、删除、重排、恢复和撤销；每次高风险操作都保留上一状态快照。
+- 导出入口生成 `PdfPageOperationsExportOperation` / `PdfExportFileRequest`，默认输出 `*-organized.pdf`，并拒绝与原始 PDF 等价的输出路径。
+- 页面操作传给导出引擎时仍为 `plan-only`，只描述重排、旋转和删除计划，不声称已经完成真实页面改写。
+
+原因：
+
+- 页面整理直接影响法律材料的页序和完整性，必须先固定可回退状态与另存安全边界。
+- ISS-005 的导出引擎当前只支持页面操作计划入口；在没有完整 UI 预览和真实 pdf-lib 页面变换测试前，不应对外宣称页面重排、删除或旋转已经落盘。
+- 后续插入、合并、裁剪、拆分双页扫描、A4 标准化和 manifest 可以在同一状态模型上扩展，不必推翻第一版接口。
+
 ## 工作日志
 
 - 2026-06-02：初始化项目上下文，固定名称、独立项目形态、首版范围、技术选型和安全边界。
@@ -318,3 +336,4 @@ ISS-007 第一版只建立 OCR bridge 基础，不在本分支执行真实 OCR�
 - 2026-06-02：在 `feat/ocr-bridge` 为 `ISS-007` 落地 OCR bridge/stub 第一版：共享请求与任务模型、provider adapter 边界、云端 consent/apiKeyRef 拦截、默认新 PDF 输出路径、路径脱敏、Tauri command stub 和定向测试；真实 OCR 执行、双层 PDF 生成和质量检查继续保留为后续工作。
 - 2026-06-02：处理 `feat/ocr-bridge` code review，收紧云端 provider 安全边界：apiKeyRef 必须是凭证引用或脱敏占位，远端 endpoint 必须使用 HTTPS，本机调试允许 localhost HTTP，并修正质量抽查页码在 normalization 前被静默丢弃的问题。
 - 2026-06-02：继续处理 PR #5 OCR bridge review：前端和 Rust 侧 HTTP 本机调试 endpoint 改为只接受 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback，拒绝 `127.*` 伪装域名；OCR 错误路径脱敏补齐带逗号或中文标点的 PDF 路径；MinerU 云端负向路径补 Rust 回归测试。
+- 2026-06-02：在 `feat/page-organizer` 为 `ISS-006` 落地页面整理第一版底座：新增页面整理状态类型、旋转/删除/重排/恢复/撤销服务、默认 `*-organized.pdf` plan-only 导出请求和安全输出路径测试；真实页面改写和完整 UI 后续接入。

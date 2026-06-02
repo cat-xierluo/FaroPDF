@@ -215,6 +215,52 @@ export interface PdfPageOperation {
 }
 ```
 
+### PdfPageOrganizerState
+
+页面整理第一版在 `src/shared/pdf/pageOrganizer.ts` 记录可回退的页面工作台状态，不直接改写原始 PDF。`src/modules/pages/pageOrganizer.ts` 以纯函数方式更新状态，供后续 UI、导出服务和后台任务复用。
+
+```ts
+export interface PdfPageOrganizerPage {
+  id: string;
+  originalPageIndex: number;
+  originalPageNumber: number;
+  orderIndex: number;
+  rotation: 0 | 90 | 180 | 270;
+  deleted: boolean;
+}
+
+export interface PdfPageOrganizerState {
+  id: string;
+  document: {
+    pageCount: number;
+    sourcePath?: string;
+    fingerprint?: string;
+  };
+  pages: PdfPageOrganizerPage[];
+  actions: Array<{
+    id: string;
+    type: 'rotate' | 'delete' | 'reorder' | 'restore';
+    pageIds: string[];
+    pageIndexes: number[];
+    payload: Record<string, unknown>;
+    createdAt: string;
+  }>;
+  undoStack: Array<{
+    pages: PdfPageOrganizerPage[];
+    actions: PdfPageOrganizerState['actions'];
+    updatedAt: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+当前导出入口只生成 `PdfPageOperationsExportOperation` 和 `PdfExportFileRequest`：
+
+- 默认输出路径为 `*-organized.pdf`。
+- 输出路径必须不同于原始 PDF，`../` 等等价路径会被归一化后拒绝。
+- 页面操作以 `plan-only` 提交给导出引擎，当前不声称已经完成真实页面重排、删除或旋转。
+
 ### PdfExportJob
 
 `PdfExportJob` 记录队列型任务状态；实际导出执行使用 `PdfExportRequest` / `PdfExportResult`，确保目标是 bytes 结果或不同于原始文件的新输出路径。
@@ -282,7 +328,7 @@ export interface PdfExportResult {
 - `pdfOperationEngine` 不写文件，只返回新 PDF bytes；`pdfExportService` 在路径型导出时拒绝 `outputPath === inputPath`。
 - `flatten-form` 使用 pdf-lib `form.flatten()`，可生成不可编辑表单提交版 bytes。
 - `flatten-annotations` 当前只把 sidecar 批注转换为 `plan-only` 摘要并写入 PDF 元数据，不绘制真实高亮、形状、墨迹、图章或备注外观。
-- `page-operations` 当前只生成 `plan-only` 入口，真实旋转、删除、重排、裁剪和插入仍由页面整理任务接入。
+- `page-operations` 当前只接收页面整理生成的 `plan-only` 入口，真实旋转、删除、重排、裁剪和插入仍待后续导出深化接入。
 
 ### OcrJob
 
@@ -429,7 +475,7 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 | --- | --- |
 | `src/components/layout/` | 基础阅读器 Shell、主工具栏、按需左侧工具区、上下文工具条、阅读区、页面管理工作台和状态栏 |
 | `src/styles/` | 全局布局与设计 token |
-| `src/shared/pdf/` | PDF 文档、页面视口、批注、页面操作和导出任务契约 |
+| `src/shared/pdf/` | PDF 文档、页面视口、批注、页面整理、页面操作和导出任务契约 |
 | `src/shared/ocr/` | OCR provider、OCR job 和质量摘要契约 |
 | `src/shared/preprocess/` | 扫描预处理参数、job、进度、统计、默认值和校验 |
 | `src/shared/settings/` | AppSettings、默认设置和密钥遮罩 |
@@ -472,6 +518,17 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 - `createScanPreprocessService`：准备请求、调用 `start_scan_preprocess_job`，并脱敏 bridge 错误。
 - `src-tauri/src/lib.rs`：提供 `start_scan_preprocess_job` command stub，返回 queued job、0 页进度和安全输出路径；真实 OpenCV/PyMuPDF/Python bridge 后续接入。
 
+### Pages
+
+`src/shared/pdf/pageOrganizer.ts` 与 `src/modules/pages/` 已建立页面整理第一版状态底座：
+
+- `createPageOrganizerState`：按 PDF 页数创建页面项，记录原始页码、当前顺序、旋转角和删除状态。
+- `rotateOrganizerPages` / `deleteOrganizerPages` / `reorderOrganizerPages` / `restoreOrganizerPages`：以稳定 page id 更新页面状态，并为每次高风险操作压入撤销栈。
+- `undoPageOrganizer`：恢复上一个页面整理快照，确保旋转、删除和重排都可回退。
+- `createPageOrganizerExportRequest`：生成 `page-operations` 的 `plan-only` 导出请求，默认 `*-organized.pdf` 新输出路径，并拒绝等价覆盖原始 PDF 的路径。
+
+当前不执行真实 PDF 页序、删除或旋转改写；页面网格 UI、多选预览、插入/合并/裁剪、A4 标准化和页级 manifest 后续接入。
+
 ## 模块规划
 
 | 模块 | 职责 |
@@ -483,7 +540,7 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 | `annotationService` | sidecar 批注模型、编辑、导出摘要 |
 | `pdfExportService` | 路径型导出安全校验、仅新建写入、批注/页面操作计划和表单导出 |
 | `pdfOperationEngine` | 抽象 PDF 写入能力，第一版用 pdf-lib 起步复制 PDF、扁平化表单并生成导出计划，预留更强引擎替换空间 |
-| `pageOrganizerService` | 旋转、删除、重排、插入、提取、合并、编号 |
+| `pageOrganizerService` | 页面整理状态、旋转、删除、重排、恢复、撤销和 plan-only 导出请求 |
 | `scanPreprocessService` | 扫描件清洁、90 度方向检测、微倾斜校正、裁边和预处理输出 |
 | `compressionService` | PDF 图像资源重编码、降采样、压缩档位和压缩统计 |
 | `ocrBridgeService` | 调用本地或云端 OCR 后端，管理任务状态 |
