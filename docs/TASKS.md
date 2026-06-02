@@ -329,7 +329,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：OCR / 质量
-- 状态：待处理
+- 状态：待 PR review
 - 建议分支：`feat/ocr-quality`
 - 建议 worktree：`.claude/worktrees/tmux-ocr-quality`
 - 依赖：ISS-003、ISS-007
@@ -337,6 +337,8 @@ Agent 可根据本文件自行判断：
 - 参考算法：`pdf-processor/scripts/pdf-ocr-quality-check.py`
 - 目标：OCR 完成后展示可检索页比例、关键词命中、体积比、耗时和可选 CER。
 - 验收：OCR 输出 PDF 可生成质量报告；未达阈值时明确提示问题页和失败原因。
+- 当前进度：已新增 OCR 质量检查共享契约、默认阈值、输入校验、质量报告模型和 `ocrQualityCheckService`，可基于页面文本、关键词、输入/输出体积、耗时和可选参考文本生成报告；失败报告包含阈值检查结果和问题页原因。第一版不解析真实 PDF、不执行真实 OCR、不调用 PaddleOCR/MinerU。
+- 验证：`npm run typecheck`、`npm test -- --run src/shared/ocr src/modules/ocr`、`npm test -- --run`、`npm run lint`、`npm run build` 已通过。
 
 ### ISS-018 证据图片 A4 编排
 

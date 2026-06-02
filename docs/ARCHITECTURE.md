@@ -382,12 +382,35 @@ export interface OcrJob {
     matchedKeywords: string[];
     textPages: number;
     emptyTextPages: number;
+    fileSizeRatio?: number;
+    elapsedMs?: number;
   };
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
 }
 ```
+
+OCR 质量检查第一版单独提供纯逻辑报告模型：
+
+```ts
+export interface OcrQualityReport {
+  totalPages: number;
+  searchablePages: number;
+  searchablePageRatio: number;
+  keywordTotal: number;
+  keywordHitRate: number | null;
+  cer: number | null;
+  fileSizeRatio: number | null;
+  elapsedMs: number | null;
+  checks: OcrQualityCheckResult[];
+  problemPages: OcrQualityProblemPage[];
+  passed: boolean;
+  summary: OcrQualitySummary;
+}
+```
+
+`OcrQualityReport` 的输入来自 OCR 后页面文本、关键词、输入/输出文件体积、耗时和可选参考文本。当前不直接解析真实 PDF，也不执行 OCR provider；后续真实 OCR 任务完成后把提取出的页面文本和统计数据传入 `ocrQualityCheckService`。
 
 ### ScanPreprocessJob
 
@@ -552,7 +575,7 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 | `compressionService` | PDF 图像资源重编码、降采样、压缩档位和压缩统计；当前只有导出计划，真实处理待后台 bridge |
 | `ocrBridgeService` | 调用本地或云端 OCR 后端，管理任务状态 |
 | `ocrPrivacyConsentGuard` | 校验联网 OCR 本次 consent，生成脱敏隐私审计记录 |
-| `ocrQualityService` | OCR 可检索页比例、关键词命中、体积比、耗时和 CER 检查 |
+| `ocrQualityCheckService` | OCR 可检索页比例、关键词命中、体积比、耗时、CER、阈值结果和问题页报告 |
 | `documentOrganizerService` | 页级检查索引、文书边界 manifest、规范命名和 A4 标准化 |
 | `imagePackService` | 图片或 PDF 页面按 A4 多图编排为证据 PDF |
 | `settingsService` | 最近文件、默认缩放、阅读布局、默认保存策略、OCR provider 设置 |
@@ -582,6 +605,7 @@ OCR 不直接内置到前端。当前第一版只建立 bridge/stub，不执行�
 - `src/shared/security/` 定义联网 OCR notice、consent decision、脱敏路径摘要和 `OcrPrivacyAuditRecord`；提示可展示 provider、页码范围、输出路径、是否联网、不会覆盖原 PDF 和 API key 引用，audit/consent 不保留完整本地 PDF 路径或真实密钥。notice 带一次性 nonce、签发时间和有效期，consent 绑定输入文件指纹、输出路径指纹、provider、页码范围、输出策略和 API key 引用。
 - `src/modules/ocr/privacy/consentGuard.ts` 负责校验云端 OCR 的本次 notice/consent 是否与当前输入文件、provider、页码范围、输出路径、输出策略和有效期匹配；本地 provider 不要求联网 consent，旧布尔 consent 标记不能绕过 guard。
 - `src/modules/ocr/service/bridge.ts` 负责准备请求、校验输入/输出 PDF、拒绝覆盖原始 PDF、查找 provider，并通过 adapter 边界区分本地命令和云端 API。
+- `src/modules/ocr/quality/qualityCheckService.ts` 负责把 OCR 后页面文本和统计数据转换为质量报告，覆盖可检索页比例、关键词命中率、文件体积比、耗时和可选 CER；输入为空或页数无效时直接拒绝，避免把空结果误判为通过。
 - Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有用户本次明确 consent、安全 apiKeyRef 和 HTTPS endpoint，本机调试仅允许 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback HTTP；真实密钥串、远端明文 HTTP、伪装成 `127.*` 的域名和非法 endpoint 不会调用 Tauri command。bridge 请求会携带脱敏 `privacyAuditRecord`，但不声称已经执行真实 OCR。
 - `src-tauri/src/lib.rs` 提供 `start_ocr_job` command stub，Rust 侧重复校验 provider、页码范围、输出策略、默认 `*-ocr.pdf` 新输出路径和云端 OCR 的 `privacyAuditRecord.consentStatus=granted`，返回 queued job。
 - 错误信息不包含完整敏感 PDF 路径，带逗号或中文标点的 PDF 路径也会在展示前脱敏；API Key 只使用引用或脱敏占位，不写入日志或错误报告。
@@ -594,9 +618,9 @@ OCR 不直接内置到前端。当前第一版只建立 bridge/stub，不执行�
 - 输入文件摘要和页码范围。
 - 输出文件路径；审计记录只保留脱敏路径摘要和指纹。
 - 错误原因或回退路径。
-- OCR 后搜索质量检查结果。
+- OCR 后搜索质量检查结果，包括阈值结果和问题页原因。
 
-后续真实执行阶段再接入本地 `ocrmypdf` / Legal Skills、PaddleOCR/MinerU 请求、双层 PDF 写入和 ISS-017 质量检查报告。
+后续真实执行阶段再接入本地 `ocrmypdf` / Legal Skills、PaddleOCR/MinerU 请求、双层 PDF 写入，并把真实 PDF 文本提取、文件体积和耗时统计接入 ISS-017 质量检查报告。
 
 ## PDF 算法来源
 

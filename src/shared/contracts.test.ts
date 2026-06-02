@@ -1,10 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { FAROPDF_MODULES, getModuleBoundary } from "./foundation/modules";
+import { createDefaultOcrQualityThresholds } from "./index";
 import type {
   AppSettings,
   OcrJobProgress,
   OcrOutputStrategy,
   OcrQualityCheckRequest,
+  OcrQualityReport,
   OcrJob,
   OcrProviderConfig,
   OcrRequest,
@@ -158,6 +160,40 @@ describe("shared contracts", () => {
       completedPages: 0,
       totalPages: 12,
     };
+    const ocrQualityThresholds = createDefaultOcrQualityThresholds();
+    const ocrQualityReport: OcrQualityReport = {
+      totalPages: 12,
+      searchablePages: 12,
+      searchablePageRatio: 1,
+      keywordTotal: 2,
+      keywordHitRate: 1,
+      keywordHits: [
+        { keyword: "合同", hit: true },
+        { keyword: "签章", hit: true },
+      ],
+      cer: null,
+      fileSizeRatio: 2,
+      elapsedMs: 30_000,
+      checks: [
+        {
+          name: "searchable-page-ratio",
+          value: 1,
+          threshold: ocrQualityThresholds.minSearchablePageRatio,
+          operator: ">=",
+          passed: true,
+        },
+      ],
+      problemPages: [],
+      passed: true,
+      summary: {
+        searchedKeywords: ["合同", "签章"],
+        matchedKeywords: ["合同", "签章"],
+        textPages: 12,
+        emptyTextPages: 0,
+        fileSizeRatio: 2,
+        elapsedMs: 30_000,
+      },
+    };
     const preprocessJob: ScanPreprocessJob = {
       id: "preprocess-1",
       inputPath: "/case/file.pdf",
@@ -208,6 +244,7 @@ describe("shared contracts", () => {
     expect(ocrJob.backend).toBe("paddleocr");
     expect(ocrRequest.outputStrategy).toBe("new-layered-pdf");
     expect(ocrProgress.totalPages).toBe(12);
+    expect(ocrQualityReport.checks[0].threshold).toBe(ocrQualityThresholds.minSearchablePageRatio);
     expect(preprocessJob.options.outputMode).toBe("preprocess-only");
     expect(settings.defaultSavePolicy).toBe("always-export-copy");
   });
