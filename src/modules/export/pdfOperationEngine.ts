@@ -1,15 +1,23 @@
-import { PDFDocument } from "pdf-lib";
+import { degrees, PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
 import type {
+  PdfBatesNumberOperation,
+  PdfCompressionOperation,
   PdfAnnotationFlattenPlan,
   PdfExportRequest,
   PdfExportResult,
   PdfExportSummary,
   PdfFormFlatteningSummary,
+  PdfOutputPlacement,
+  PdfOutputToolPlanEntry,
+  PdfOutputToolOperationType,
   PdfPageOperationPlan,
+  PdfPageNumberOperation,
+  PdfWatermarkOperation,
 } from "../../shared";
 import { isPdfPath, pathsAreSame } from "./pathSafety";
 
 const PAGE_OPERATIONS_PLAN_ONLY_WARNING = "页面操作当前仅生成导出计划，尚未改写页面几何或顺序。";
+const COMPRESSION_PLAN_ONLY_WARNING = "PDF 压缩当前仅生成导出计划，尚未执行图像重编码或降采样。";
 
 export interface PdfOperationEngine {
   exportPdf: (request: PdfExportRequest) => Promise<PdfExportResult>;
@@ -36,6 +44,7 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
         operationCount: request.operations.length,
       };
       const warnings: string[] = [];
+      const outputToolEntries: PdfOutputToolPlanEntry[] = [];
 
       for (const operation of request.operations) {
         if (operation.type === "flatten-annotations") {
@@ -48,8 +57,21 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
           continue;
         }
 
+        if (isOutputToolOperation(operation)) {
+          const result = await applyOutputToolOperation(workingPdf, operation, inputPageCount);
+          outputToolEntries.push(result.entry);
+          warnings.push(...result.warnings);
+          continue;
+        }
+
         summary.pageOperationPlan = buildPageOperationPlan(operation, inputPageCount);
         warnings.push(PAGE_OPERATIONS_PLAN_ONLY_WARNING);
+      }
+
+      if (outputToolEntries.length > 0) {
+        summary.outputToolPlan = {
+          entries: outputToolEntries,
+        };
       }
 
       if (warnings.length > 0) {
@@ -173,6 +195,359 @@ function buildPageOperationPlan(
   };
 }
 
+async function applyOutputToolOperation(
+  pdf: PDFDocument,
+  operation: PdfWatermarkOperation | PdfPageNumberOperation | PdfBatesNumberOperation | PdfCompressionOperation,
+  inputPageCount: number,
+): Promise<{ entry: PdfOutputToolPlanEntry; warnings: string[] }> {
+  const pageIndexes = resolveOutputToolPageIndexes(operation.pageIndexes, inputPageCount);
+
+  if (operation.type === "watermark") {
+    const label = await applyWatermark(pdf, operation, pageIndexes);
+    return {
+      entry: {
+        operationId: operation.id,
+        type: operation.type,
+        pageIndexes,
+        status: "applied",
+        label,
+      },
+      warnings: [],
+    };
+  }
+
+  if (operation.type === "page-number") {
+    const labels = await applyPageNumbers(pdf, operation, pageIndexes, inputPageCount);
+    return {
+      entry: {
+        operationId: operation.id,
+        type: operation.type,
+        pageIndexes,
+        status: "applied",
+        label: labels.join(", "),
+      },
+      warnings: [],
+    };
+  }
+
+  if (operation.type === "bates-number") {
+    const labels = await applyBatesNumbers(pdf, operation, pageIndexes);
+    return {
+      entry: {
+        operationId: operation.id,
+        type: operation.type,
+        pageIndexes,
+        status: "applied",
+        label: labels.join(", "),
+      },
+      warnings: [],
+    };
+  }
+
+  if ((operation.mode ?? "plan-only") !== "plan-only") {
+    throw new Error("PDF 压缩第一版只支持 plan-only 模式。");
+  }
+
+  return {
+    entry: {
+      operationId: operation.id,
+      type: operation.type,
+      pageIndexes,
+      status: "planned",
+      label: operation.preset,
+    },
+    warnings: [COMPRESSION_PLAN_ONLY_WARNING],
+  };
+}
+
+async function applyWatermark(
+  pdf: PDFDocument,
+  operation: PdfWatermarkOperation,
+  pageIndexes: number[],
+): Promise<string> {
+  const watermark = operation.watermark;
+
+  if (watermark.kind === "text") {
+    const text = watermark.text.trim();
+    if (!text) {
+      throw new Error("文字水印内容不能为空。");
+    }
+
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const fontSize = normalizePositiveNumber(watermark.fontSize, 32);
+    const color = parseHexColor(watermark.color ?? "#404040");
+    const opacity = normalizeOpacity(watermark.opacity, 0.18);
+    const rotationDegrees = normalizeFiniteNumber(watermark.rotationDegrees, -35);
+
+    for (const pageIndex of pageIndexes) {
+      const page = pdf.getPage(pageIndex);
+      const width = measureTextWidth(font, text, fontSize);
+      const height = font.heightAtSize(fontSize);
+      const position = getPlacementPosition(page, {
+        width,
+        height,
+        placement: watermark.placement ?? "center",
+        margin: normalizePositiveNumber(watermark.margin, 36),
+      });
+
+      page.drawText(text, {
+        x: position.x,
+        y: position.y,
+        size: fontSize,
+        font,
+        color,
+        opacity,
+        rotate: degrees(rotationDegrees),
+      });
+    }
+
+    return text;
+  }
+
+  const image =
+    watermark.imageType === "png"
+      ? await pdf.embedPng(watermark.imageBytes)
+      : await pdf.embedJpg(watermark.imageBytes);
+  const opacity = normalizeOpacity(watermark.opacity, 0.25);
+  const rotationDegrees = normalizeFiniteNumber(watermark.rotationDegrees, 0);
+
+  for (const pageIndex of pageIndexes) {
+    const page = pdf.getPage(pageIndex);
+    const pageSize = page.getSize();
+    const requestedWidth = watermark.width;
+    const requestedHeight = watermark.height;
+    const width = normalizePositiveNumber(requestedWidth, Math.min(pageSize.width * 0.4, image.width));
+    const height = normalizePositiveNumber(requestedHeight, width * (image.height / image.width));
+    const position = getPlacementPosition(page, {
+      width,
+      height,
+      placement: watermark.placement ?? "center",
+      margin: normalizePositiveNumber(watermark.margin, 36),
+    });
+
+    page.drawImage(image, {
+      x: position.x,
+      y: position.y,
+      width,
+      height,
+      opacity,
+      rotate: degrees(rotationDegrees),
+    });
+  }
+
+  return "image watermark";
+}
+
+async function applyPageNumbers(
+  pdf: PDFDocument,
+  operation: PdfPageNumberOperation,
+  pageIndexes: number[],
+  inputPageCount: number,
+): Promise<string[]> {
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const fontSize = normalizePositiveNumber(operation.fontSize, 10);
+  const color = parseHexColor(operation.color ?? "#202020");
+  const labels: string[] = [];
+
+  pageIndexes.forEach((pageIndex, sequenceIndex) => {
+    const label = formatPageNumberLabel(operation, sequenceIndex, inputPageCount);
+    drawFooterLabel(pdf.getPage(pageIndex), label, font, {
+      placement: operation.placement ?? "bottom-center",
+      fontSize,
+      color,
+      margin: normalizePositiveNumber(operation.margin, 28),
+    });
+    labels.push(label);
+  });
+
+  return labels;
+}
+
+async function applyBatesNumbers(
+  pdf: PDFDocument,
+  operation: PdfBatesNumberOperation,
+  pageIndexes: number[],
+): Promise<string[]> {
+  if (!Number.isInteger(operation.startNumber) || operation.startNumber < 0) {
+    throw new Error("Bates 起始号必须是非负整数。");
+  }
+
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const fontSize = normalizePositiveNumber(operation.fontSize, 10);
+  const color = parseHexColor(operation.color ?? "#202020");
+  const labels: string[] = [];
+  const digits = Math.max(0, Math.trunc(operation.digits ?? 6));
+
+  pageIndexes.forEach((pageIndex, sequenceIndex) => {
+    const number = operation.startNumber + sequenceIndex;
+    const label = `${operation.prefix ?? ""}${String(number).padStart(digits, "0")}${operation.suffix ?? ""}`;
+    drawFooterLabel(pdf.getPage(pageIndex), label, font, {
+      placement: operation.placement ?? "bottom-right",
+      fontSize,
+      color,
+      margin: normalizePositiveNumber(operation.margin, 28),
+    });
+    labels.push(label);
+  });
+
+  return labels;
+}
+
+function drawFooterLabel(
+  page: PDFPage,
+  label: string,
+  font: PDFFont,
+  options: {
+    placement: PdfOutputPlacement;
+    fontSize: number;
+    color: ReturnType<typeof rgb>;
+    margin: number;
+  },
+): void {
+  const width = measureTextWidth(font, label, options.fontSize);
+  const height = font.heightAtSize(options.fontSize);
+  const position = getPlacementPosition(page, {
+    width,
+    height,
+    placement: options.placement,
+    margin: options.margin,
+  });
+
+  page.drawText(label, {
+    x: position.x,
+    y: position.y,
+    size: options.fontSize,
+    font,
+    color: options.color,
+  });
+}
+
+function formatPageNumberLabel(
+  operation: PdfPageNumberOperation,
+  sequenceIndex: number,
+  inputPageCount: number,
+): string {
+  const pageNumber = (operation.startNumber ?? 1) + sequenceIndex;
+  const format = operation.format ?? "{page}";
+
+  return format.replace(/\{page\}/g, String(pageNumber)).replace(/\{total\}/g, String(inputPageCount));
+}
+
+function measureTextWidth(font: PDFFont, text: string, fontSize: number): number {
+  try {
+    return font.widthOfTextAtSize(text, fontSize);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("WinAnsi cannot encode")) {
+      throw Object.assign(new Error("PDF 交付工具第一版暂不支持非 Latin-1 文本。"), {
+        cause: error instanceof Error ? error : new Error(message),
+      });
+    }
+
+    throw error;
+  }
+}
+
+function getPlacementPosition(
+  page: PDFPage,
+  input: {
+    width: number;
+    height: number;
+    placement: PdfOutputPlacement;
+    margin: number;
+  },
+): { x: number; y: number } {
+  const pageSize = page.getSize();
+  const centerX = (pageSize.width - input.width) / 2;
+  const centerY = (pageSize.height - input.height) / 2;
+  const left = input.margin;
+  const right = pageSize.width - input.margin - input.width;
+  const bottom = input.margin;
+  const top = pageSize.height - input.margin - input.height;
+
+  switch (input.placement) {
+    case "top-left":
+      return { x: left, y: top };
+    case "top-center":
+      return { x: centerX, y: top };
+    case "top-right":
+      return { x: right, y: top };
+    case "bottom-left":
+      return { x: left, y: bottom };
+    case "bottom-center":
+      return { x: centerX, y: bottom };
+    case "bottom-right":
+      return { x: right, y: bottom };
+    case "center":
+    default:
+      return { x: centerX, y: centerY };
+  }
+}
+
+function resolveOutputToolPageIndexes(pageIndexes: number[] | undefined, inputPageCount: number): number[] {
+  const resolvedPageIndexes =
+    pageIndexes && pageIndexes.length > 0
+      ? Array.from(new Set(pageIndexes))
+      : Array.from({ length: inputPageCount }, (_, pageIndex) => pageIndex);
+
+  if (resolvedPageIndexes.some((pageIndex) => !isPageIndexInRange(pageIndex, inputPageCount))) {
+    throw new Error("交付工具页码超出源 PDF 页数。");
+  }
+
+  return resolvedPageIndexes;
+}
+
+function isOutputToolOperation(
+  operation: PdfExportRequest["operations"][number],
+): operation is PdfWatermarkOperation | PdfPageNumberOperation | PdfBatesNumberOperation | PdfCompressionOperation {
+  return isOutputToolOperationType(operation.type);
+}
+
+function isOutputToolOperationType(type: string): type is PdfOutputToolOperationType {
+  return type === "watermark" || type === "page-number" || type === "bates-number" || type === "compress";
+}
+
+function normalizePositiveNumber(value: number | undefined, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function normalizeFiniteNumber(value: number | undefined, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function normalizeOpacity(value: number | undefined, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.min(1, Math.max(0, value));
+}
+
+function parseHexColor(value: string): ReturnType<typeof rgb> {
+  const trimmed = value.trim();
+  const sixDigitMatch = /^#?([a-fA-F0-9]{6})$/.exec(trimmed);
+  if (sixDigitMatch) {
+    const hex = sixDigitMatch[1];
+    return rgb(
+      Number.parseInt(hex.slice(0, 2), 16) / 255,
+      Number.parseInt(hex.slice(2, 4), 16) / 255,
+      Number.parseInt(hex.slice(4, 6), 16) / 255,
+    );
+  }
+
+  const threeDigitMatch = /^#?([a-fA-F0-9]{3})$/.exec(trimmed);
+  if (threeDigitMatch) {
+    const hex = threeDigitMatch[1];
+    return rgb(
+      Number.parseInt(hex[0] + hex[0], 16) / 255,
+      Number.parseInt(hex[1] + hex[1], 16) / 255,
+      Number.parseInt(hex[2] + hex[2], 16) / 255,
+    );
+  }
+
+  throw new Error("PDF 交付工具颜色必须是十六进制颜色。");
+}
+
 function isPageIndexInRange(pageIndex: number, pageCount: number): boolean {
   return Number.isInteger(pageIndex) && pageIndex >= 0 && pageIndex < pageCount;
 }
@@ -203,6 +578,10 @@ function applyExportMetadata(pdf: PDFDocument, summary: PdfExportSummary): void 
 
   if (summary.pageOperationPlan) {
     keywords.push("faropdf:page-operations-plan-only");
+  }
+
+  if (summary.outputToolPlan) {
+    keywords.push("faropdf:output-tools", `faropdf:output-tool-count:${summary.outputToolPlan.entries.length}`);
   }
 
   pdf.setKeywords(keywords);

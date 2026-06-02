@@ -300,7 +300,11 @@ export type PdfExportDestination =
 export type PdfExportOperation =
   | { id: string; type: 'flatten-annotations'; sidecar: AnnotationSidecar; strategy?: 'plan-only' }
   | { id: string; type: 'flatten-form' }
-  | { id: string; type: 'page-operations'; operations: PdfPageOperation[]; mode?: 'plan-only' };
+  | { id: string; type: 'page-operations'; operations: PdfPageOperation[]; mode?: 'plan-only' }
+  | { id: string; type: 'watermark'; pageIndexes?: number[]; watermark: TextOrImageWatermark }
+  | { id: string; type: 'page-number'; pageIndexes?: number[]; format?: string; startNumber?: number }
+  | { id: string; type: 'bates-number'; pageIndexes?: number[]; prefix?: string; suffix?: string; startNumber: number; digits?: number }
+  | { id: string; type: 'compress'; pageIndexes?: number[]; preset: 'screen' | 'ebook' | 'print' | 'court-upload'; mode?: 'plan-only' };
 
 export interface PdfExportRequest {
   id: string;
@@ -329,6 +333,8 @@ export interface PdfExportResult {
 - `flatten-form` 使用 pdf-lib `form.flatten()`，可生成不可编辑表单提交版 bytes。
 - `flatten-annotations` 当前只把 sidecar 批注转换为 `plan-only` 摘要并写入 PDF 元数据，不绘制真实高亮、形状、墨迹、图章或备注外观。
 - `page-operations` 当前只接收页面整理生成的 `plan-only` 入口，真实旋转、删除、重排、裁剪和插入仍待后续导出深化接入。
+- `watermark`、`page-number`、`bates-number` 使用 pdf-lib 写入新 PDF bytes；文字绘制第一版使用内置 Helvetica，只支持 Latin-1 文本，中文水印/页码待后续字体接入。
+- `compress` 当前只生成 `plan-only` 摘要和警告，不执行 PyMuPDF 式图像重编码、降采样或对象流优化。
 
 ### OcrJob
 
@@ -540,10 +546,10 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 | `pdfTextService` | 文本层检测、按需全文索引、搜索命中 |
 | `annotationService` | sidecar 批注模型、编辑、导出摘要 |
 | `pdfExportService` | 路径型导出安全校验、仅新建写入、批注/页面操作计划和表单导出 |
-| `pdfOperationEngine` | 抽象 PDF 写入能力，第一版用 pdf-lib 起步复制 PDF、扁平化表单并生成导出计划，预留更强引擎替换空间 |
+| `pdfOperationEngine` | 抽象 PDF 写入能力，第一版用 pdf-lib 起步复制 PDF、扁平化表单、写入水印/页码/Bates 并生成导出计划，预留更强引擎替换空间 |
 | `pageOrganizerService` | 页面整理状态、旋转、删除、重排、恢复、撤销和 plan-only 导出请求 |
 | `scanPreprocessService` | 扫描件清洁、90 度方向检测、微倾斜校正、裁边和预处理输出 |
-| `compressionService` | PDF 图像资源重编码、降采样、压缩档位和压缩统计 |
+| `compressionService` | PDF 图像资源重编码、降采样、压缩档位和压缩统计；当前只有导出计划，真实处理待后台 bridge |
 | `ocrBridgeService` | 调用本地或云端 OCR 后端，管理任务状态 |
 | `ocrPrivacyConsentGuard` | 校验联网 OCR 本次 consent，生成脱敏隐私审计记录 |
 | `ocrQualityService` | OCR 可检索页比例、关键词命中、体积比、耗时和 CER 检查 |

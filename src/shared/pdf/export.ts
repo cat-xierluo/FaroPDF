@@ -1,7 +1,22 @@
 import type { AnnotationSidecar, PdfAnnotationType } from "./annotation";
 import type { PdfPageOperation, PdfPageOperationType } from "./types";
 
-export type PdfExportOperationType = "flatten-annotations" | "flatten-form" | "page-operations";
+export type PdfExportOperationType =
+  | "flatten-annotations"
+  | "flatten-form"
+  | "page-operations"
+  | PdfOutputToolOperationType;
+
+export type PdfOutputToolOperationType = "watermark" | "page-number" | "bates-number" | "compress";
+export type PdfOutputToolStatus = "applied" | "planned";
+export type PdfOutputPlacement =
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "center"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
 
 export interface PdfExportSource {
   bytes: Uint8Array;
@@ -21,7 +36,11 @@ export type PdfExportDestination =
 export type PdfExportOperation =
   | PdfFlattenAnnotationsOperation
   | PdfFlattenFormOperation
-  | PdfPageOperationsExportOperation;
+  | PdfPageOperationsExportOperation
+  | PdfWatermarkOperation
+  | PdfPageNumberOperation
+  | PdfBatesNumberOperation
+  | PdfCompressionOperation;
 
 export interface PdfFlattenAnnotationsOperation {
   id: string;
@@ -45,6 +64,75 @@ export interface PdfPageOperationsExportOperation {
 }
 
 export type PdfPageOperationExportMode = "plan-only";
+
+export interface PdfWatermarkOperation {
+  id: string;
+  type: "watermark";
+  pageIndexes?: number[];
+  watermark: PdfWatermarkSpec;
+}
+
+export type PdfWatermarkSpec = PdfTextWatermarkSpec | PdfImageWatermarkSpec;
+
+export interface PdfTextWatermarkSpec {
+  kind: "text";
+  text: string;
+  placement?: PdfOutputPlacement;
+  fontSize?: number;
+  color?: string;
+  opacity?: number;
+  rotationDegrees?: number;
+  margin?: number;
+}
+
+export interface PdfImageWatermarkSpec {
+  kind: "image";
+  imageBytes: Uint8Array;
+  imageType: "png" | "jpg";
+  placement?: PdfOutputPlacement;
+  width?: number;
+  height?: number;
+  opacity?: number;
+  rotationDegrees?: number;
+  margin?: number;
+}
+
+export interface PdfPageNumberOperation {
+  id: string;
+  type: "page-number";
+  pageIndexes?: number[];
+  format?: string;
+  startNumber?: number;
+  placement?: PdfOutputPlacement;
+  fontSize?: number;
+  color?: string;
+  margin?: number;
+}
+
+export interface PdfBatesNumberOperation {
+  id: string;
+  type: "bates-number";
+  pageIndexes?: number[];
+  prefix?: string;
+  suffix?: string;
+  startNumber: number;
+  digits?: number;
+  placement?: PdfOutputPlacement;
+  fontSize?: number;
+  color?: string;
+  margin?: number;
+}
+
+export type PdfCompressionPreset = "screen" | "ebook" | "print" | "court-upload";
+export type PdfCompressionMode = "plan-only";
+
+export interface PdfCompressionOperation {
+  id: string;
+  type: "compress";
+  pageIndexes?: number[];
+  preset: PdfCompressionPreset;
+  mode?: PdfCompressionMode;
+}
 
 export interface PdfExportRequest {
   id: string;
@@ -96,6 +184,18 @@ export interface PdfPageOperationPlanEntry {
   status: "planned";
 }
 
+export interface PdfOutputToolPlan {
+  entries: PdfOutputToolPlanEntry[];
+}
+
+export interface PdfOutputToolPlanEntry {
+  operationId: string;
+  type: PdfOutputToolOperationType;
+  pageIndexes: number[];
+  status: PdfOutputToolStatus;
+  label: string;
+}
+
 export interface PdfExportSummary {
   inputPageCount: number;
   outputPageCount: number;
@@ -103,6 +203,7 @@ export interface PdfExportSummary {
   annotationPlan?: PdfAnnotationFlattenPlan;
   formFlattening?: PdfFormFlatteningSummary;
   pageOperationPlan?: PdfPageOperationPlan;
+  outputToolPlan?: PdfOutputToolPlan;
   warnings?: string[];
 }
 
@@ -113,4 +214,3 @@ export interface PdfExportResult {
   summary: PdfExportSummary;
   completedAt: string;
 }
-

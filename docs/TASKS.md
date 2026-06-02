@@ -285,7 +285,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：导出 / 法律材料
-- 状态：待处理
+- 状态：已完成（交付工具导出底座第一版；真实压缩后续接入）
 - 建议分支：`feat/pdf-output-tools`
 - 建议 worktree：`.claude/worktrees/tmux-pdf-output-tools`
 - 依赖：ISS-005、ISS-006
@@ -293,6 +293,8 @@ Agent 可根据本文件自行判断：
 - 参考算法：`pdf-processor/scripts/pdf-compress.py`、`pdf-add-page-numbers.py`、`pdf-merge.py`
 - 目标：支持文字水印、图片水印、普通页码、Bates 编号和常用压缩预设。
 - 验收：每个操作都提供预览或明确输出路径；默认另存为新 PDF；Bates 编号支持起始号、前后缀和位置选择。
+- 当前进度：新增 `watermark`、`page-number`、`bates-number`、`compress` 导出 operation 契约和 `outputToolPlan` 摘要；`pdfOperationEngine` 可用 pdf-lib 写入文字/图片水印、普通页码和 Bates 编号，默认保留原 PDF 并输出新 bytes；`createPdfOutputToolsExportRequest` 默认生成 `*-delivery.pdf`，拒绝相对输出路径和等价覆盖原 PDF；压缩预设当前以 `plan-only` 记录并提示尚未执行图像重编码/降采样。第一版内置字体只支持 Latin-1 文本，中文水印/页码需后续接入自定义字体或系统字体。
+- 验证：`npm test -- --run src/modules/export/pdfOperationEngine.test.ts src/modules/export/outputTools.test.ts`、`npm run typecheck`。
 - UI 备注：不要把水印、压缩、Bates 和“转 Word/Excel/图片”等格式转换混成同一层级；FaroPDF 后续应拆成“交付工具”和“格式转换”两个入口或二级分组。
 
 ### ISS-014 设置页与外部 OCR Provider 配置
