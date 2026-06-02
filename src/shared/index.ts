@@ -28,4 +28,14 @@ export type {
   PdfStampName,
 } from "./pdf/annotation";
 export type { OcrBackend, OcrJob, OcrJobStatus, OcrProviderConfig, OcrProviderType } from "./ocr/types";
+export type {
+  ScanPreprocessJob,
+  ScanPreprocessJobStatus,
+  ScanPreprocessOptions,
+  ScanPreprocessOutputMode,
+  ScanPreprocessProgress,
+  ScanPreprocessProgressStage,
+  ScanPreprocessRequest,
+  ScanPreprocessSummary,
+} from "./preprocess/types";
 export type { AppSettings, DefaultSavePolicy, RecentPdfFile } from "./settings/types";

@@ -308,6 +308,8 @@ Agent 可根据本文件自行判断：
 - 参考算法：`pdf-processor/scripts/pdf-preprocess-core.py`、`pdf_preprocess_skew.py`、`pdf-preprocess-ocr.py`
 - 目标：支持扫描件增强、90 度粗方向检测、微倾斜校正、拆分页面、裁剪页面、清除空白边、分块处理、并行处理和只预处理输出。
 - 验收：用户可在不 OCR 的情况下输出清洁校正后的新 PDF；任务显示旋转页数、倾斜校正页数、拆分页数、裁边页数、清边页数、耗时和输出路径；扫描/OCR 工具条至少覆盖增强扫描、拆分页面、裁剪页面、清除空白边和识别文本。
+- 当前进度：已建立第一版 preprocess-only 任务契约、保守默认参数、参数校验、路径脱敏、默认新输出 PDF 路径、前端 service、Tauri command bridge stub、queued 进度状态和测试。真实 OpenCV/PyMuPDF 处理、页面级统计回填和扫描/OCR 工具条接入继续保留为后续工作。
+- 验证：新增前端测试覆盖默认参数、输出路径、校验和 service bridge；新增 Rust 单元测试覆盖安全输出路径和 command stub。
 
 ### ISS-017 OCR 质量检查
 
@@ -379,3 +381,4 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：处理 Draft PR code review：页面管理无文档时显示空态而不是假页面；视图设置读取实际阅读模式；920px 窄屏继续保留搜索入口；空态拖拽打开 PDF 行为补齐。
 - 2026-06-02：合并 PR #1 `feat/pdf-expert-shell-ia` 到 `main`，清理本地和远端分支；启动 `ISS-003`、`ISS-004`、`ISS-016` 三条并行主线任务。
 - 2026-06-02：完成 ISS-004 批注 sidecar 模型第一版，落地共享批注类型、sidecar schema、仓储服务和摘要导出；UI 接入后续推进。
+- 2026-06-02：`ISS-016` 在 `feat/scan-preprocess` 完成第一版扫描预处理 job/bridge 基础：共享契约、校验、脱敏、默认另存输出、前端 service、Tauri command stub 和测试。
