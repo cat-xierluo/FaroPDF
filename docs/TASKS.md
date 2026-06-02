@@ -26,6 +26,7 @@ FaroPDF v0.1 先到达一个可并行开发的基础状态，再用多分支、�
 - 每个 worker 默认只修改自己任务的 `范围` 文件；需要改共享契约时先回到 PM 会话确认。
 - `package.json`、锁文件、`src-tauri/`、`src/shared/`、`src/App.tsx`、全局样式和路由由 foundation 或 PM 统一收口。
 - worker 完成后提交、推送并创建 PR；PM 检查 diff 范围、验证结果和文档同步后再合并。
+- PDF 算法融入参考 `docs/PDF_ALGORITHMS.md`；不得把 Agent skill CLI 流程原样变成 UI 逻辑。
 
 ## 基础状态任务
 
@@ -124,7 +125,8 @@ FaroPDF v0.1 先到达一个可并行开发的基础状态，再用多分支、�
 - 建议 worktree：`.claude/worktrees/tmux-page-organizer`
 - 依赖：ISS-002、ISS-005
 - 范围：`src/modules/pages/`、`src/shared/pdf/pageOperation*`、页面整理相关测试
-- 目标：支持旋转、删除、重排、插入、提取、合并、裁剪、拆分双页扫描和撤销。
+- 参考算法：`pdf-organizer/scripts/pdf_organizer.py` 的 manifest、A4 标准化、拆分/合并执行逻辑
+- 目标：支持旋转、删除、重排、插入、提取、合并、裁剪、拆分双页扫描、A4 标准化和撤销。
 - 验收：页面操作可预览、撤销，并默认另存为新 PDF，不覆盖原始文件。
 
 ### ISS-007 OCR bridge
@@ -136,6 +138,7 @@ FaroPDF v0.1 先到达一个可并行开发的基础状态，再用多分支、�
 - 建议 worktree：`.claude/worktrees/tmux-ocr-bridge`
 - 依赖：ISS-003、ISS-014
 - 范围：`src/modules/ocr/`、`src/shared/ocr/`、`src-tauri/` OCR command、OCR 相关测试
+- 参考算法：`pdf-processor/scripts/pdf-ocr.py`、`pdf_ocr_paddle_api.py`、`pdf_ocr_mineru.py`、`pdf_ocr_layered.py`
 - 目标：建立 OCR 任务模型，优先连接本地 Legal Skills / `ocrmypdf`，并支持 PaddleOCR、MinerU 等外部 OCR API adapter。
 - 验收：纯扫描 PDF 可触发 OCR 任务；任务显示后端、页码范围、进度、输出路径和失败原因；生成双层 PDF 后能做搜索质量抽查。
 
@@ -184,6 +187,7 @@ FaroPDF v0.1 先到达一个可并行开发的基础状态，再用多分支、�
 - 建议 worktree：`.claude/worktrees/tmux-pdf-output-tools`
 - 依赖：ISS-005、ISS-006
 - 范围：`src/modules/export/`、`src/modules/pages/`、`src/shared/pdf/outputTools*`、导出工具相关测试
+- 参考算法：`pdf-processor/scripts/pdf-compress.py`、`pdf-add-page-numbers.py`、`pdf-merge.py`
 - 目标：支持文字水印、图片水印、普通页码、Bates 编号和常用压缩预设。
 - 验收：每个操作都提供预览或明确输出路径；默认另存为新 PDF；Bates 编号支持起始号、前后缀和位置选择。
 
@@ -198,6 +202,58 @@ FaroPDF v0.1 先到达一个可并行开发的基础状态，再用多分支、�
 - 范围：`src/modules/settings/`、`src/shared/settings/`、`src-tauri/` 设置持久化 command、设置相关测试
 - 目标：建立设置页，管理默认保存策略、最近文件、默认 OCR 后端、PaddleOCR/MinerU API 配置和联网处理确认策略。
 - 验收：设置可持久化；API Key 以安全方式存储或留给系统凭证方案；UI 不展示完整密钥；未配置云端 OCR 时不会误触发联网请求。
+
+### ISS-016 扫描清洁与校正 pipeline
+
+- 优先级：P0
+- 类型：扫描预处理
+- 状态：待处理
+- 建议分支：`feat/scan-preprocess`
+- 建议 worktree：`.claude/worktrees/tmux-scan-preprocess`
+- 依赖：ISS-011、ISS-012、ISS-014
+- 范围：`src/modules/preprocess/`、`src/shared/preprocess/`、`src-tauri/` 预处理 command、预处理相关测试
+- 参考算法：`pdf-processor/scripts/pdf-preprocess-core.py`、`pdf_preprocess_skew.py`、`pdf-preprocess-ocr.py`
+- 目标：支持扫描件清洁、90 度粗方向检测、微倾斜校正、可选裁边、分块处理、并行处理和只预处理输出。
+- 验收：用户可在不 OCR 的情况下输出清洁校正后的新 PDF；任务显示旋转页数、倾斜校正页数、裁边页数、耗时和输出路径。
+
+### ISS-017 OCR 质量检查
+
+- 优先级：P0
+- 类型：OCR / 质量
+- 状态：待处理
+- 建议分支：`feat/ocr-quality`
+- 建议 worktree：`.claude/worktrees/tmux-ocr-quality`
+- 依赖：ISS-003、ISS-007
+- 范围：`src/modules/ocr/quality/`、`src/shared/ocr/quality*`、OCR 质量相关测试
+- 参考算法：`pdf-processor/scripts/pdf-ocr-quality-check.py`
+- 目标：OCR 完成后展示可检索页比例、关键词命中、体积比、耗时和可选 CER。
+- 验收：OCR 输出 PDF 可生成质量报告；未达阈值时明确提示问题页和失败原因。
+
+### ISS-018 证据图片 A4 编排
+
+- 优先级：P1
+- 类型：页面管理 / 证据材料
+- 状态：待处理
+- 建议分支：`feat/evidence-image-pack`
+- 建议 worktree：`.claude/worktrees/tmux-evidence-image-pack`
+- 依赖：ISS-005、ISS-006
+- 范围：`src/modules/pages/imagePack/`、`src/shared/pdf/imagePack*`、图片编排相关测试
+- 参考算法：`img2pdf/scripts/img_to_pdf.py`
+- 目标：支持图片目录、多个图片或已有 PDF 页面按 A4 1/2/3/4 张每页编排为新 PDF。
+- 验收：竖版截图可自动 3 张/页，横版截图可自动 1 张/页；支持边距、排序和横竖版选择；原始图片和 PDF 不变。
+
+### ISS-019 文书整理 manifest 与规范命名
+
+- 优先级：P1
+- 类型：法律材料整理
+- 状态：待处理
+- 建议分支：`feat/document-organizer-manifest`
+- 建议 worktree：`.claude/worktrees/tmux-document-organizer-manifest`
+- 依赖：ISS-003、ISS-006
+- 范围：`src/modules/organizer/`、`src/shared/organizer/`、文书整理相关测试
+- 参考算法：`pdf-organizer/scripts/pdf_organizer.py`
+- 目标：生成页级检查索引、文书边界建议、拆分/合并 manifest 和规范命名建议。
+- 验收：系统只给出 manifest 和预览，不自动高风险拆分法律材料；用户确认后才另存输出。
 
 ## 暂缓任务
 
@@ -219,3 +275,4 @@ FaroPDF v0.1 先到达一个可并行开发的基础状态，再用多分支、�
 - 2026-06-02：按 `project-init` skill 补齐 `CLAUDE.md`、`.claude/settings.json`、`.gitignore`，并安装开发项目 profile 对应的本地协作 skills。
 - 2026-06-02：初始化项目 Git 基线，推送到同名 GitHub private 仓库 `FaroPDF`。
 - 2026-06-02：将 v0.1 拆分为 foundation gate 和多 worktree 并行任务包，补充设置页、外部 OCR provider、水印、压缩和直接编辑调研任务。
+- 2026-06-02：分析 `pdf-processor`、`pdf-organizer`、`img2pdf` 的脚本算法，将扫描清洁校正、压缩、OCR 质量检查、证据图片编排和文书整理 manifest 纳入任务源。

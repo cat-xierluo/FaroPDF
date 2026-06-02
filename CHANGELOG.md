@@ -10,3 +10,4 @@
 - 按 `project-init` skill 补齐 `CLAUDE.md`、`.claude/settings.json`、`.gitignore`，并安装开发协作 skills。
 - 初始化 Git 基线，并推送到同名 GitHub private 仓库 `FaroPDF`。
 - 明确 v0.1 采用 Foundation Gate + 多 worktree 并行推进，并补充设置页、外部 OCR provider、水印、压缩等第一版任务。
+- 梳理 `pdf-processor`、`pdf-organizer`、`img2pdf` 的脚本算法，新增扫描清洁校正、压缩、OCR 质量检查、证据图片编排和文书整理 manifest 的融入计划。

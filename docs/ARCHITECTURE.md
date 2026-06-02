@@ -12,6 +12,7 @@
 | PDF 操作 | pdf-lib | 页面复制、删除、重排、表单、元数据、导出保存 |
 | PDF 操作引擎 | `pdfOperationEngine` 抽象 + pdf-lib 起步 | 水印、页码、Bates 编号、压缩预设、扁平化导出 |
 | OCR bridge | 本地命令 / Legal Skills / OCR API | 双层 PDF、扫描件预处理、质量检查 |
+| 扫描预处理 | OpenCV / PyMuPDF / OCR bridge | 清洁校正、方向检测、倾斜校正、裁边、预处理输出 |
 | 设置与凭证 | Tauri command + 本地持久化 / 系统凭证预留 | 最近文件、默认保存策略、OCR provider 配置 |
 
 ## 系统架构
@@ -219,7 +220,12 @@ export interface AppSettings {
 | `pdfExportService` | pdf-lib 页面操作、批注扁平化、表单导出 |
 | `pdfOperationEngine` | 抽象 PDF 写入能力，第一版用 pdf-lib 起步，预留更强引擎替换空间 |
 | `pageOrganizerService` | 旋转、删除、重排、插入、提取、合并、编号 |
+| `scanPreprocessService` | 扫描件清洁、90 度方向检测、微倾斜校正、裁边和预处理输出 |
+| `compressionService` | PDF 图像资源重编码、降采样、压缩档位和压缩统计 |
 | `ocrBridgeService` | 调用本地或云端 OCR 后端，管理任务状态 |
+| `ocrQualityService` | OCR 可检索页比例、关键词命中、体积比、耗时和 CER 检查 |
+| `documentOrganizerService` | 页级检查索引、文书边界 manifest、规范命名和 A4 标准化 |
+| `imagePackService` | 图片或 PDF 页面按 A4 多图编排为证据 PDF |
 | `settingsService` | 最近文件、默认缩放、阅读布局、默认保存策略、OCR provider 设置 |
 
 ## 性能策略
@@ -256,3 +262,15 @@ OCR 不直接内置到前端。第一版 bridge 支持：
 - 输出文件路径。
 - 错误原因或回退路径。
 - OCR 后搜索质量检查结果。
+
+## PDF 算法来源
+
+FaroPDF 可复用本机 `legal-skills` 中成熟 PDF 脚本的算法，但不直接把 Agent skill 工作流当作产品实现。详细映射见 `docs/PDF_ALGORITHMS.md`。
+
+当前吸收范围：
+
+- `pdf-processor`：扫描预处理、纠偏、压缩、OCR provider、OCR 质量检查。
+- `pdf-organizer`：文字层检测、页级检查、文书边界 manifest、A4 标准化。
+- `img2pdf`：证据图片和 PDF 页面 A4 多图编排。
+
+产品实现上，UI 只调用统一 job model；Python 脚本或外部命令只能作为 Tauri 后台 bridge、sidecar 或未来算法移植来源。

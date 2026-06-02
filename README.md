@@ -54,3 +54,4 @@ npm run tauri build
 - `docs/DECISIONS.md`：关键决策记录。
 - `docs/ARCHITECTURE.md`：技术架构和接口模型。
 - `docs/DESIGN.md`：视觉与交互规范。
+- `docs/PDF_ALGORITHMS.md`：PDF 处理脚本算法融入计划。

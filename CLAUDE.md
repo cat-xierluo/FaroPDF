@@ -31,6 +31,7 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常阅读卷宗、证据�
 | ROADMAP.md | docs/ | 路线图、阶段任务、进度日志 |
 | DECISIONS.md | docs/ | 技术决策记录 + 工作日志 |
 | TASKS.md | docs/ | 待办追踪：待处理任务、缺陷修复、技术债清理 |
+| PDF_ALGORITHMS.md | docs/ | PDF 处理脚本算法融入计划 |
 
 ## 当前阶段
 
@@ -55,6 +56,7 @@ npm run tauri build  # 构建桌面应用
 - 页面操作：pdf-lib 负责页面复制、删除、重排、表单、元数据和导出保存。
 - 性能策略：页面虚拟化，只渲染可见页和邻近页；缩略图、全文索引、批注列表和 OCR 按需加载。
 - OCR 策略：通过 bridge 调用本地 Legal Skills / `ocrmypdf`，并预留 PaddleOCR / MinerU；联网 OCR 必须用户确认。
+- PDF 算法来源：扫描清洁校正、压缩、OCR provider、证据图片编排和文书整理 manifest 参考 `docs/PDF_ALGORITHMS.md`。
 - 保存策略：原始 PDF 默认不可变；批注先保存 sidecar，导出时再写入或扁平化到新 PDF。
 
 ## PDF 安全边界

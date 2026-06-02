@@ -121,9 +121,30 @@ FaroPDF v0.1 采用“两段式”推进：先在主线完成可运行应用脚�
 
 外部 OCR API Key 不写入版本库，不在 UI、日志或错误报告中完整输出。云端 OCR 必须要求用户主动确认。
 
+## DEC-010 吸收 legal-skills PDF 脚本算法，不照搬 Agent 工作流
+
+- 日期：2026-06-02
+- 状态：已采纳
+
+FaroPDF 将吸收本机 `legal-skills` 中 `pdf-processor`、`pdf-organizer`、`img2pdf` 的脚本算法能力，但不把这些 skill 的 Agent 工作流原样复制为产品实现。
+
+采用方式：
+
+- `pdf-processor` 提供扫描清洁校正、OpenCV 倾斜检测、PyMuPDF 压缩、OCR provider 调度和 OCR 质量检查的算法来源。
+- `pdf-organizer` 提供文字层检测、页级检查、文书边界 manifest、规范命名和 A4 标准化的算法来源。
+- `img2pdf` 提供证据图片/PDF 页面 A4 多图编排的算法来源。
+
+实现原则：
+
+- UI 层只调用 FaroPDF 的统一 job model，不依赖脚本 stdout。
+- 纯算法能力逐步拆入产品模块；重依赖能力通过 Tauri 后台 command、sidecar 或 Python bridge 执行。
+- 外部 API 和密钥仍由设置页管理；联网 OCR 必须主动确认。
+- 所有处理默认输出新 PDF，不覆盖原始材料。
+
 ## 工作日志
 
 - 2026-06-02：初始化项目上下文，固定名称、独立项目形态、首版范围、技术选型和安全边界。
 - 2026-06-02：按 `project-init` skill 校准上下文初始化，补齐 Claude Code 配置和本地开发协作 skills。
 - 2026-06-02：初始化 Git 仓库并准备推送到 GitHub 私有仓库 `FaroPDF`，本机 skill 符号链接不纳入版本库。
 - 2026-06-02：确定 v0.1 先完成 Foundation Gate，再按 `docs/TASKS.md` 的任务包进行多 worktree 并行开发；设置页、外部 OCR provider、水印、压缩和直接编辑调研已纳入任务源。
+- 2026-06-02：完成 `pdf-processor`、`pdf-organizer`、`img2pdf` 脚本算法梳理，新增 `docs/PDF_ALGORITHMS.md` 并同步任务源。
