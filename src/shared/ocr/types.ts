@@ -1,3 +1,5 @@
+import type { OcrNetworkConsentDecision, OcrPrivacyAuditRecord } from "../security/types";
+
 export type OcrProviderType = "local-ocrmypdf" | "legal-skills" | "paddleocr" | "mineru";
 export type OcrBackend = OcrProviderType;
 export type OcrJobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
@@ -56,6 +58,7 @@ export interface OcrRequest {
   providerId: string;
   outputStrategy?: OcrOutputStrategy;
   networkConsentGranted?: boolean;
+  privacyConsent?: OcrNetworkConsentDecision;
   qualityCheck?: OcrQualityCheckRequest;
 }
 
@@ -68,6 +71,7 @@ export interface PreparedOcrRequest extends OcrRequest {
 export interface OcrProviderBridgeRequest extends PreparedOcrRequest {
   provider: OcrProviderConfig;
   networkConsentGranted: boolean;
+  privacyAuditRecord?: OcrPrivacyAuditRecord;
 }
 
 export interface OcrJobProgress {

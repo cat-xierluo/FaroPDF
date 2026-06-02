@@ -271,13 +271,15 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：安全
-- 状态：待处理
+- 状态：已完成（隐私提示模型、consent guard 和审计记录第一版；完整 UI 弹窗后续接入）
 - 建议分支：`feat/privacy-safety`
 - 建议 worktree：`.claude/worktrees/tmux-privacy-safety`
 - 依赖：ISS-014、ISS-007
 - 范围：`src/modules/settings/`、`src/modules/ocr/`、`src/shared/security/`、隐私提示相关测试
 - 目标：联网 OCR 前提供明确提示，记录后端、文件范围、输出路径，不在日志中泄露敏感内容。
 - 验收：任何云端 OCR 都需要用户主动确认；API Key 不写入版本库、日志或错误报告。
+- 当前进度：新增 `src/shared/security/` 隐私提示、consent decision、脱敏路径摘要、API key 引用脱敏和审计记录模型；新增 `src/modules/ocr/privacy/consentGuard`，云端 provider 未携带本次匹配 consent 时拒绝，本地 provider 不要求联网 consent；`ocrBridgeService` 会把脱敏 `privacyAuditRecord` 交给后端请求。第一版不执行真实 PaddleOCR/MinerU 调用，不生成完整 UI 弹窗。
+- 验证：`npm test -- --run src/shared/security src/modules/ocr`、`npm run typecheck`、`npm run lint`、`npm test -- --run`、`npm run build`。
 
 ### ISS-013 水印、页码、Bates 编号与压缩
 

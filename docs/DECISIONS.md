@@ -312,6 +312,20 @@ ISS-006 第一版先建立页面整理工作台底座，不在本分支真实改
 - ISS-005 的导出引擎当前只支持页面操作计划入口；在没有完整 UI 预览和真实 pdf-lib 页面变换测试前，不应对外宣称页面重排、删除或旋转已经落盘。
 - 后续插入、合并、裁剪、拆分双页扫描、A4 标准化和 manifest 可以在同一状态模型上扩展，不必推翻第一版接口。
 
+## DEC-022 联网 OCR 隐私确认采用 notice/consent/audit 三段模型
+
+- 日期：2026-06-02
+- 状态：已采纳
+
+ISS-010 第一版不做完整 UI 弹窗，先把联网 OCR 的用户确认和审计边界建成可测试模型/服务：
+
+- `src/shared/security/` 生成联网 OCR notice，明确 provider、页码范围、输出路径、是否联网、不会覆盖原 PDF 和 API key 引用/脱敏占位。
+- consent decision 绑定 notice id、一次性 nonce、签发时间、有效期、输入文件指纹、输出路径指纹、provider、页码范围、输出策略和 API key 引用，不保存完整本地 PDF 路径。
+- audit record 记录 providerId、后端类型、页码范围、输出策略、联网状态、同意状态、脱敏输入/输出路径摘要和脱敏 apiKeyRef；不保留真实密钥或完整本地路径。
+- `ocrPrivacyConsentGuard` 对云端 provider 要求本次 notice 与 consent 同时匹配当前请求，本地 provider 不要求联网 consent；`ocrBridgeService` 把脱敏 `privacyAuditRecord` 附到后端请求，旧布尔 consent 标记不能单独放行云端 OCR。
+
+原因：法律材料可能包含案件隐私、商业秘密和个人信息。先固定 notice/consent/audit 的数据边界，可以让后续 UI 弹窗、设置页和真实 PaddleOCR/MinerU adapter 复用同一安全模型，避免把 UI 文案、日志字段和后端请求各自散落实现。
+
 ## 工作日志
 
 - 2026-06-02：初始化项目上下文，固定名称、独立项目形态、首版范围、技术选型和安全边界。
@@ -337,3 +351,4 @@ ISS-006 第一版先建立页面整理工作台底座，不在本分支真实改
 - 2026-06-02：处理 `feat/ocr-bridge` code review，收紧云端 provider 安全边界：apiKeyRef 必须是凭证引用或脱敏占位，远端 endpoint 必须使用 HTTPS，本机调试允许 localhost HTTP，并修正质量抽查页码在 normalization 前被静默丢弃的问题。
 - 2026-06-02：继续处理 PR #5 OCR bridge review：前端和 Rust 侧 HTTP 本机调试 endpoint 改为只接受 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback，拒绝 `127.*` 伪装域名；OCR 错误路径脱敏补齐带逗号或中文标点的 PDF 路径；MinerU 云端负向路径补 Rust 回归测试。
 - 2026-06-02：在 `feat/page-organizer` 为 `ISS-006` 落地页面整理第一版底座：新增页面整理状态类型、旋转/删除/重排/恢复/撤销服务、默认 `*-organized.pdf` plan-only 导出请求和安全输出路径测试；真实页面改写和完整 UI 后续接入。
+- 2026-06-02：在 `feat/privacy-safety` 完成 `ISS-010` 第一版：新增联网 OCR 隐私 notice、consent decision、脱敏 audit record、`ocrPrivacyConsentGuard` 和 bridge audit 衔接；随后按 code review 收紧为本次 notice/consent 双匹配、输入文件指纹、nonce、有效期和 Rust audit 复验，旧布尔 consent 不能单独放行云端 OCR；真实 PaddleOCR/MinerU 调用和完整 UI 弹窗继续留给后续任务。

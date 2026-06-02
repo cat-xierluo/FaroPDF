@@ -477,6 +477,7 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 | `src/styles/` | 全局布局与设计 token |
 | `src/shared/pdf/` | PDF 文档、页面视口、批注、页面整理、页面操作和导出任务契约 |
 | `src/shared/ocr/` | OCR provider、OCR job 和质量摘要契约 |
+| `src/shared/security/` | 联网 OCR 隐私提示、consent decision、脱敏路径摘要、API key 引用脱敏和审计记录契约 |
 | `src/shared/preprocess/` | 扫描预处理参数、job、进度、统计、默认值和校验 |
 | `src/shared/settings/` | AppSettings、默认设置和密钥遮罩 |
 | `src/shared/foundation/` | 多 worktree worker 的模块边界声明 |
@@ -544,6 +545,7 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 | `scanPreprocessService` | 扫描件清洁、90 度方向检测、微倾斜校正、裁边和预处理输出 |
 | `compressionService` | PDF 图像资源重编码、降采样、压缩档位和压缩统计 |
 | `ocrBridgeService` | 调用本地或云端 OCR 后端，管理任务状态 |
+| `ocrPrivacyConsentGuard` | 校验联网 OCR 本次 consent，生成脱敏隐私审计记录 |
 | `ocrQualityService` | OCR 可检索页比例、关键词命中、体积比、耗时和 CER 检查 |
 | `documentOrganizerService` | 页级检查索引、文书边界 manifest、规范命名和 A4 标准化 |
 | `imagePackService` | 图片或 PDF 页面按 A4 多图编排为证据 PDF |
@@ -571,8 +573,10 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 OCR 不直接内置到前端。当前第一版只建立 bridge/stub，不执行真实 OCR、不生成双层 PDF、不发起 PaddleOCR/MinerU 联网请求。已落地边界：
 
 - `src/shared/ocr/` 定义 `OcrRequest`、页码范围、`new-layered-pdf` 输出策略、任务进度和质量抽查入口；`text-sidecar`、`quality-check-only` 仅作为后续策略类型，第一版校验会拒绝执行。
+- `src/shared/security/` 定义联网 OCR notice、consent decision、脱敏路径摘要和 `OcrPrivacyAuditRecord`；提示可展示 provider、页码范围、输出路径、是否联网、不会覆盖原 PDF 和 API key 引用，audit/consent 不保留完整本地 PDF 路径或真实密钥。
+- `src/modules/ocr/privacy/consentGuard.ts` 负责校验云端 OCR 的本次 consent 是否与 provider、页码范围、输出路径和输出策略匹配；本地 provider 不要求联网 consent。
 - `src/modules/ocr/service/bridge.ts` 负责准备请求、校验输入/输出 PDF、拒绝覆盖原始 PDF、查找 provider，并通过 adapter 边界区分本地命令和云端 API。
-- Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有用户本次明确 consent、安全 apiKeyRef 和 HTTPS endpoint，本机调试仅允许 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback HTTP；真实密钥串、远端明文 HTTP、伪装成 `127.*` 的域名和非法 endpoint 不会调用 Tauri command。
+- Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有用户本次明确 consent、安全 apiKeyRef 和 HTTPS endpoint，本机调试仅允许 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback HTTP；真实密钥串、远端明文 HTTP、伪装成 `127.*` 的域名和非法 endpoint 不会调用 Tauri command。bridge 请求会携带脱敏 `privacyAuditRecord`，但不声称已经执行真实 OCR。
 - `src-tauri/src/lib.rs` 提供 `start_ocr_job` command stub，Rust 侧重复校验 provider、页码范围、输出策略和默认 `*-ocr.pdf` 新输出路径，返回 queued job。
 - 错误信息不包含完整敏感 PDF 路径，带逗号或中文标点的 PDF 路径也会在展示前脱敏；API Key 只使用引用或脱敏占位，不写入日志或错误报告。
 
@@ -581,8 +585,8 @@ OCR 不直接内置到前端。当前第一版只建立 bridge/stub，不执行�
 任务输出必须记录：
 
 - 使用的后端。
-- 输入文件和页码范围。
-- 输出文件路径。
+- 输入文件摘要和页码范围。
+- 输出文件路径；审计记录只保留脱敏路径摘要和指纹。
 - 错误原因或回退路径。
 - OCR 后搜索质量检查结果。
 

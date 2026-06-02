@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { OcrProviderConfig } from "../../../shared/ocr/types";
+import { createOcrNetworkConsentDecision, createOcrPrivacyNotice } from "../../../shared/security/ocrPrivacy";
 import { createOcrBridgeService, type OcrBridgeBackend } from "./bridge";
 
 const localProvider: OcrProviderConfig = {
@@ -96,6 +97,47 @@ describe("OCR bridge service", () => {
     ).rejects.toThrow("联网 OCR 需要用户明确确认。");
 
     expect(backend.startOcr).not.toHaveBeenCalled();
+  });
+
+  test("forwards a redacted privacy audit record when cloud OCR carries current consent", async () => {
+    const service = createOcrBridgeService(backend);
+    const preparedRequest = {
+      inputPath: "/Users/alice/Cases/secret/source.pdf",
+      outputPath: "/Users/alice/Cases/secret/source-ocr.pdf",
+      outputStrategy: "new-layered-pdf" as const,
+      providerId: "paddleocr",
+      pageRange: "2-4",
+      qualityCheck: { enabled: false, samplePages: [], keywords: [] },
+    };
+    const notice = createOcrPrivacyNotice({ request: preparedRequest, provider: paddleProvider });
+    const privacyConsent = createOcrNetworkConsentDecision({
+      notice,
+      granted: true,
+      decidedAt: "2026-06-02T12:00:00.000Z",
+    });
+
+    await service.startOcr(
+      {
+        ...preparedRequest,
+        privacyConsent,
+      },
+      { providers: [paddleProvider] },
+    );
+
+    expect(backend.startOcr).toHaveBeenCalledWith(
+      expect.objectContaining({
+        networkConsentGranted: true,
+        privacyAuditRecord: expect.objectContaining({
+          providerId: "paddleocr",
+          consentStatus: "granted",
+          pageRangeLabel: "2-4",
+          outputStrategy: "new-layered-pdf",
+        }),
+      }),
+    );
+    const bridgeRequest = vi.mocked(backend.startOcr).mock.calls[0][0];
+    expect(JSON.stringify(bridgeRequest.privacyAuditRecord)).not.toContain("/Users/alice");
+    expect(JSON.stringify(bridgeRequest.privacyAuditRecord)).not.toContain("source-ocr.pdf");
   });
 
   test("rejects cloud OCR without a configured API key reference", async () => {
