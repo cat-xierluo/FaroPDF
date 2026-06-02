@@ -124,6 +124,10 @@ export function restoreOrganizerPages(
   input: PageOrganizerSelectionInput,
 ): PdfPageOrganizerState {
   const selectedPages = resolveSelectedPages(state, input.pageIds, { allowDeleted: true });
+  if (selectedPages.some((page) => !page.deleted)) {
+    throw new Error("只能恢复已删除页面。");
+  }
+
   const selectedIds = new Set(selectedPages.map((page) => page.id));
   const nextPages = normalizePageOrder(
     state.pages.map((page) =>
@@ -160,7 +164,7 @@ export function reorderOrganizerPages(
     ...remainingActivePages.slice(input.toIndex),
   ];
   const deletedPages = state.pages.filter((page) => page.deleted);
-  const nextPages = normalizePageOrder([...reorderedActivePages, ...deletedPages].map(clonePage));
+  const nextPages = normalizePageOrder(mergeActiveAndDeletedPages(reorderedActivePages, deletedPages));
   const action = createAction(state, "reorder", selectedPages, input.createdAt, {
     toIndex: input.toIndex,
     orderedPageIndexes: nextPages.map((page) => page.originalPageIndex),
@@ -198,6 +202,7 @@ export function createPageOrganizerExportRequest(
   if (!isPdfPath(inputPath)) {
     throw new Error("页面整理输入文件必须是 PDF。");
   }
+  validatePageOrganizerState(state);
 
   const outputPath = (input.outputPath ?? suggestPageOrganizerOutputPath(inputPath)).trim();
   validatePageOrganizerOutputPath(inputPath, outputPath);
@@ -388,13 +393,65 @@ function validatePageOrganizerOutputPath(inputPath: string, outputPath: string):
   if (!isPdfPath(outputPath)) {
     throw new Error("页面整理输出文件必须是 PDF。");
   }
+  if (!isAbsolutePath(outputPath)) {
+    throw new Error("页面整理输出路径必须是绝对路径。");
+  }
   if (samePath(inputPath, outputPath)) {
     throw new Error("页面整理输出 PDF 必须是不同于原始 PDF 的新文件。");
   }
 }
 
+function validatePageOrganizerState(state: PdfPageOrganizerState): void {
+  if (!Number.isInteger(state.document.pageCount) || state.document.pageCount <= 0) {
+    throw new Error("页面整理状态页数必须是正整数。");
+  }
+  if (state.pages.length !== state.document.pageCount) {
+    throw new Error("页面整理状态页码必须唯一且覆盖源 PDF。");
+  }
+
+  const indexes = state.pages.map((page) => page.originalPageIndex);
+  const uniqueIndexes = new Set(indexes);
+  const coversSourcePdf = indexes.every((pageIndex) => isPageIndexInRange(pageIndex, state.document.pageCount));
+  if (uniqueIndexes.size !== state.document.pageCount || !coversSourcePdf) {
+    throw new Error("页面整理状态页码必须唯一且覆盖源 PDF。");
+  }
+}
+
+function mergeActiveAndDeletedPages(
+  activePages: PdfPageOrganizerPage[],
+  deletedPages: PdfPageOrganizerPage[],
+): PdfPageOrganizerPage[] {
+  const mergedPages = activePages.map(clonePage);
+  const sortedDeletedPages = [...deletedPages].sort(
+    (left, right) => left.originalPageIndex - right.originalPageIndex,
+  );
+
+  for (const deletedPage of sortedDeletedPages) {
+    let insertAfterIndex = -1;
+    for (let pageIndex = 0; pageIndex < mergedPages.length; pageIndex += 1) {
+      const page = mergedPages[pageIndex];
+      if (!page.deleted && page.originalPageIndex < deletedPage.originalPageIndex) {
+        insertAfterIndex = pageIndex;
+      }
+    }
+
+    mergedPages.splice(insertAfterIndex + 1, 0, clonePage(deletedPage));
+  }
+
+  return mergedPages;
+}
+
 function isPdfPath(path: string): boolean {
   return path.trim().toLowerCase().endsWith(".pdf");
+}
+
+function isAbsolutePath(path: string): boolean {
+  const trimmed = path.trim();
+  return trimmed.startsWith("/") || /^[A-Za-z]:[\\/]/.test(trimmed);
+}
+
+function isPageIndexInRange(pageIndex: number, pageCount: number): boolean {
+  return Number.isInteger(pageIndex) && pageIndex >= 0 && pageIndex < pageCount;
 }
 
 function samePath(left: string, right: string): boolean {

@@ -146,6 +146,47 @@ describe("page organizer", () => {
     expect(undone.actions).toEqual([]);
   });
 
+  test("preserves deleted page position when active pages are reordered and later restored", () => {
+    const initial = createPageOrganizerState({ pageCount: 4, createdAt: FIXED_TIME });
+    const deleted = deleteOrganizerPages(initial, {
+      pageIds: ["page-2"],
+      createdAt: FIXED_TIME,
+    });
+    const reordered = reorderOrganizerPages(deleted, {
+      pageIds: ["page-4"],
+      toIndex: 0,
+      createdAt: FIXED_TIME,
+    });
+    const restored = restoreOrganizerPages(reordered, {
+      pageIds: ["page-2"],
+      createdAt: FIXED_TIME,
+    });
+
+    expect(reordered.pages.map((page) => ({ id: page.id, deleted: page.deleted }))).toEqual([
+      { id: "page-4", deleted: false },
+      { id: "page-1", deleted: false },
+      { id: "page-2", deleted: true },
+      { id: "page-3", deleted: false },
+    ]);
+    expect(restored.pages.map((page) => ({ id: page.id, deleted: page.deleted }))).toEqual([
+      { id: "page-4", deleted: false },
+      { id: "page-1", deleted: false },
+      { id: "page-2", deleted: false },
+      { id: "page-3", deleted: false },
+    ]);
+  });
+
+  test("rejects restoring pages that are not currently deleted", () => {
+    const initial = createPageOrganizerState({ pageCount: 2, createdAt: FIXED_TIME });
+
+    expect(() =>
+      restoreOrganizerPages(initial, {
+        pageIds: ["page-1"],
+        createdAt: FIXED_TIME,
+      }),
+    ).toThrow("只能恢复已删除页面。");
+  });
+
   test("builds a plan-only export request with a safe organized output path", () => {
     const initial = createPageOrganizerState({
       id: "organizer-1",
@@ -214,5 +255,65 @@ describe("page organizer", () => {
         requestedAt: FIXED_TIME,
       }),
     ).toThrow("页面整理输出 PDF 必须是不同于原始 PDF 的新文件。");
+  });
+
+  test("rejects unsafe export paths before creating export requests", () => {
+    const state = createPageOrganizerState({
+      pageCount: 1,
+      sourcePath: "/case/source.pdf",
+      createdAt: FIXED_TIME,
+    });
+
+    expect(() =>
+      createPageOrganizerExportRequest(state, {
+        id: "export-pages-relative",
+        outputPath: "source-organized.pdf",
+        requestedAt: FIXED_TIME,
+      }),
+    ).toThrow("页面整理输出路径必须是绝对路径。");
+
+    expect(() =>
+      createPageOrganizerExportRequest(state, {
+        id: "export-pages-docx",
+        outputPath: "/case/source-organized.docx",
+        requestedAt: FIXED_TIME,
+      }),
+    ).toThrow("页面整理输出文件必须是 PDF。");
+  });
+
+  test("rejects corrupted organizer state before generating page operations", () => {
+    const duplicatePageState = createPageOrganizerState({
+      pageCount: 2,
+      sourcePath: "/case/source.pdf",
+      createdAt: FIXED_TIME,
+    });
+    duplicatePageState.pages[1] = {
+      ...duplicatePageState.pages[1],
+      originalPageIndex: 0,
+    };
+
+    expect(() =>
+      createPageOrganizerExportRequest(duplicatePageState, {
+        id: "export-pages-duplicate",
+        requestedAt: FIXED_TIME,
+      }),
+    ).toThrow("页面整理状态页码必须唯一且覆盖源 PDF。");
+
+    const outOfRangePageState = createPageOrganizerState({
+      pageCount: 2,
+      sourcePath: "/case/source.pdf",
+      createdAt: FIXED_TIME,
+    });
+    outOfRangePageState.pages[1] = {
+      ...outOfRangePageState.pages[1],
+      originalPageIndex: 2,
+    };
+
+    expect(() =>
+      createPageOrganizerExportRequest(outOfRangePageState, {
+        id: "export-pages-out-of-range",
+        requestedAt: FIXED_TIME,
+      }),
+    ).toThrow("页面整理状态页码必须唯一且覆盖源 PDF。");
   });
 });
