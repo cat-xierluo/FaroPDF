@@ -84,8 +84,8 @@ export function exportAnnotationSummaryMarkdown(summary: AnnotationSummary): str
   const lines = [
     "# FaroPDF 批注摘要",
     "",
-    `- 文档：${summary.documentLabel}`,
-    `- 导出时间：${summary.exportedAt}`,
+    `- 文档：${escapeMarkdownHtml(summary.documentLabel)}`,
+    `- 导出时间：${escapeMarkdownHtml(summary.exportedAt)}`,
     `- 批注数量：${summary.totalCount}`,
   ];
 
@@ -93,18 +93,18 @@ export function exportAnnotationSummaryMarkdown(summary: AnnotationSummary): str
     lines.push("", `## 第 ${group.pageNumber} 页`);
 
     for (const item of group.items) {
-      lines.push(`- ${item.typeLabel} · ${item.color}`);
+      lines.push(`- ${escapeMarkdownHtml(item.typeLabel)} · ${escapeMarkdownHtml(item.color)}`);
 
       if (item.stampLabel) {
-        lines.push(`  - 图章：${item.stampLabel}`);
+        lines.push(`  - 图章：${escapeMarkdownHtml(item.stampLabel)}`);
       }
 
       if (item.quote) {
-        lines.push(`  - 原文：${item.quote}`);
+        lines.push(`  - 原文：${escapeMarkdownHtml(item.quote)}`);
       }
 
       if (item.content) {
-        lines.push(`  - 内容：${item.content}`);
+        lines.push(`  - 内容：${escapeMarkdownHtml(item.content)}`);
       }
     }
   }
@@ -161,4 +161,8 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function escapeMarkdownHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

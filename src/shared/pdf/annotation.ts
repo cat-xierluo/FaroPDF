@@ -46,6 +46,7 @@ export interface PdfAnnotationInk {
 }
 
 export type PdfStampName = "reviewed" | "important" | "todo" | "evidence" | "custom";
+export const PDF_STAMP_NAMES: PdfStampName[] = ["reviewed", "important", "todo", "evidence", "custom"];
 
 export interface PdfAnnotationStamp {
   label: string;

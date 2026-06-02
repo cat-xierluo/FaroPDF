@@ -6,6 +6,7 @@ import {
   parseAnnotationSidecar,
   serializeAnnotationSidecar,
   sortAnnotations,
+  validateAnnotationSidecar,
 } from "./sidecar";
 
 export interface AnnotationStorage {
@@ -35,7 +36,7 @@ export class AnnotationRepository {
     const sidecarPath = this.getSidecarPath(document);
     const content = await this.storage.readText(sidecarPath);
 
-    if (!content) {
+    if (content === undefined) {
       return buildAnnotationSidecar({
         document,
         now: this.now(),
@@ -46,12 +47,12 @@ export class AnnotationRepository {
   }
 
   async save(document: AnnotationDocumentRef, sidecar: AnnotationSidecar): Promise<AnnotationSidecar> {
-    const nextSidecar: AnnotationSidecar = {
+    const nextSidecar = validateAnnotationSidecar({
       ...sidecar,
       document: buildSidecarDocumentRef(document),
       annotations: sortAnnotations(sidecar.annotations),
       updatedAt: this.now(),
-    };
+    });
     const sidecarPath = this.getSidecarPath(document);
 
     await this.storage.writeText(sidecarPath, serializeAnnotationSidecar(nextSidecar));

@@ -5,6 +5,7 @@ import {
   deriveAnnotationSidecarPath,
   parseAnnotationSidecar,
   serializeAnnotationSidecar,
+  validateAnnotationSidecar,
 } from "./sidecar";
 import type { AnnotationDocumentRef } from "../../shared/pdf/annotation";
 
@@ -148,5 +149,27 @@ describe("annotation sidecar", () => {
     });
 
     expect(() => parseAnnotationSidecar(unsupportedJson)).toThrow("Unsupported annotation sidecar schema version");
+  });
+
+  test("validates nested annotation fields before serializing", () => {
+    const invalidSidecar = buildAnnotationSidecar({
+      document: documentRef,
+      now: "2026-06-02T10:00:00.000Z",
+      annotations: [
+        {
+          id: "ann-invalid",
+          type: "stamp",
+          pageIndex: 0,
+          rects: [{ x: 1, y: 2, width: 3, height: 4 }],
+          color: "#f7d46a",
+          stamp: { label: "Bad", name: "unsupported" as "custom" },
+          createdAt: "2026-06-02T10:00:00.000Z",
+          updatedAt: "2026-06-02T10:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(() => validateAnnotationSidecar(invalidSidecar)).toThrow("unsupported stamp name");
+    expect(() => serializeAnnotationSidecar(invalidSidecar)).toThrow("unsupported stamp name");
   });
 });

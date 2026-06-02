@@ -1,3 +1,21 @@
+export type {
+  AnnotationDocumentRef,
+  AnnotationSidecar,
+  AnnotationSidecarDocumentRef,
+  PdfAnnotation,
+  PdfAnnotationAuthor,
+  PdfAnnotationInk,
+  PdfAnnotationInput,
+  PdfAnnotationLine,
+  PdfAnnotationPatch,
+  PdfAnnotationStamp,
+  PdfAnnotationStyle,
+  PdfAnnotationType,
+  PdfPoint,
+  PdfRect,
+  PdfStampName,
+} from "./annotation";
+
 export type PdfViewMode = "continuous" | "single" | "double";
 export type TextLayerStatus = "unknown" | "available" | "partial" | "missing" | "poor";
 export type OcrStatus = "not-needed" | "needed" | "running" | "completed" | "failed";

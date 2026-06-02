@@ -74,4 +74,36 @@ describe("annotation summary export", () => {
     expect(markdown).not.toContain("真实案卷名称");
     expect(html).not.toContain("真实案卷名称");
   });
+
+  test("escapes HTML-capable content in Markdown and HTML summaries", () => {
+    const summary = buildAnnotationSummary({
+      document: { path: "/tmp/source.pdf", fingerprint: "unsafe<&>" },
+      annotations: [
+        {
+          id: "ann-xss",
+          type: "stamp",
+          pageIndex: 0,
+          rects: [{ x: 1, y: 2, width: 3, height: 4 }],
+          color: "#fff\"><img src=x onerror=alert(1)>",
+          quote: "<script>alert(1)</script>",
+          content: "A&B <img onerror=alert(1)>",
+          stamp: { label: "<img onerror=alert(1)>", name: "custom" },
+          createdAt: "2026-06-02T12:00:00.000Z",
+          updatedAt: "2026-06-02T12:00:00.000Z",
+        },
+      ],
+      exportedAt: "2026-06-02T12:30:00.000Z",
+    });
+
+    const markdown = exportAnnotationSummaryMarkdown(summary);
+    const html = exportAnnotationSummaryHtml(summary);
+
+    expect(markdown).toContain("PDF unsafe&lt;&amp;&gt;");
+    expect(markdown).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(markdown).not.toContain("<script>");
+    expect(markdown).not.toContain("<img");
+    expect(html).toContain("PDF unsafe&lt;&amp;&gt;");
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("<img");
+  });
 });

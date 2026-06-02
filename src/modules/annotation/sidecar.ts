@@ -1,10 +1,17 @@
 import {
   PDF_ANNOTATION_TYPES,
+  PDF_STAMP_NAMES,
   type AnnotationDocumentRef,
   type AnnotationSidecar,
   type AnnotationSidecarDocumentRef,
   type PdfAnnotation,
+  type PdfAnnotationAuthor,
+  type PdfAnnotationInk,
+  type PdfAnnotationLine,
+  type PdfAnnotationStamp,
+  type PdfAnnotationStyle,
   type PdfAnnotationType,
+  type PdfPoint,
   type PdfRect,
 } from "../../shared/pdf/annotation";
 
@@ -38,14 +45,11 @@ export function buildAnnotationSidecar(options: BuildAnnotationSidecarOptions): 
 }
 
 export function serializeAnnotationSidecar(sidecar: AnnotationSidecar): string {
-  return `${JSON.stringify(
-    {
-      ...sidecar,
-      annotations: sortAnnotations(sidecar.annotations),
-    },
-    null,
-    2,
-  )}\n`;
+  return `${JSON.stringify(validateAnnotationSidecar(sidecar), null, 2)}\n`;
+}
+
+export function validateAnnotationSidecar(sidecar: AnnotationSidecar): AnnotationSidecar {
+  return parseAnnotationSidecar(JSON.stringify(sidecar));
 }
 
 export function parseAnnotationSidecar(json: string): AnnotationSidecar {
@@ -175,11 +179,11 @@ function readAnnotation(value: unknown): PdfAnnotation {
     ...(typeof value.opacity === "number" ? { opacity: value.opacity } : {}),
     ...(typeof value.content === "string" ? { content: value.content } : {}),
     ...(typeof value.quote === "string" ? { quote: value.quote } : {}),
-    ...(isRecord(value.author) ? { author: value.author } : {}),
-    ...(isRecord(value.style) ? { style: value.style } : {}),
-    ...(isRecord(value.line) ? { line: value.line } : {}),
-    ...(isRecord(value.ink) ? { ink: value.ink } : {}),
-    ...(isRecord(value.stamp) ? { stamp: value.stamp } : {}),
+    ...(value.author !== undefined ? { author: readAuthor(value.author) } : {}),
+    ...(value.style !== undefined ? { style: readStyle(value.style) } : {}),
+    ...(value.line !== undefined ? { line: readLine(value.line) } : {}),
+    ...(value.ink !== undefined ? { ink: readInk(value.ink) } : {}),
+    ...(value.stamp !== undefined ? { stamp: readStamp(value.stamp) } : {}),
     createdAt: readString(value.createdAt, "annotation.createdAt"),
     updatedAt: readString(value.updatedAt, "annotation.updatedAt"),
   } as PdfAnnotation;
@@ -212,12 +216,103 @@ function readRects(value: unknown): PdfRect[] {
   });
 }
 
+function readAuthor(value: unknown): PdfAnnotationAuthor {
+  if (!isRecord(value)) {
+    throw new Error("Invalid annotation sidecar: annotation.author must be an object");
+  }
+
+  return {
+    ...(value.id !== undefined ? { id: readString(value.id, "annotation.author.id") } : {}),
+    ...(value.displayName !== undefined
+      ? { displayName: readString(value.displayName, "annotation.author.displayName") }
+      : {}),
+  };
+}
+
+function readStyle(value: unknown): PdfAnnotationStyle {
+  if (!isRecord(value)) {
+    throw new Error("Invalid annotation sidecar: annotation.style must be an object");
+  }
+
+  return {
+    ...(value.strokeWidth !== undefined ? { strokeWidth: readPositiveNumber(value.strokeWidth, "style.strokeWidth") } : {}),
+    ...(value.fontSize !== undefined ? { fontSize: readPositiveNumber(value.fontSize, "style.fontSize") } : {}),
+    ...(value.fontFamily !== undefined ? { fontFamily: readString(value.fontFamily, "style.fontFamily") } : {}),
+    ...(value.fillColor !== undefined ? { fillColor: readString(value.fillColor, "style.fillColor") } : {}),
+  };
+}
+
+function readLine(value: unknown): PdfAnnotationLine {
+  if (!isRecord(value)) {
+    throw new Error("Invalid annotation sidecar: annotation.line must be an object");
+  }
+
+  return {
+    start: readPoint(value.start, "line.start"),
+    end: readPoint(value.end, "line.end"),
+  };
+}
+
+function readInk(value: unknown): PdfAnnotationInk {
+  if (!isRecord(value) || !Array.isArray(value.strokes)) {
+    throw new Error("Invalid annotation sidecar: annotation.ink.strokes must be an array");
+  }
+
+  return {
+    strokes: value.strokes.map((stroke, strokeIndex) => {
+      if (!Array.isArray(stroke)) {
+        throw new Error(`Invalid annotation sidecar: ink.strokes[${strokeIndex}] must be an array`);
+      }
+
+      return stroke.map((point, pointIndex) => readPoint(point, `ink.strokes[${strokeIndex}][${pointIndex}]`));
+    }),
+  };
+}
+
+function readStamp(value: unknown): PdfAnnotationStamp {
+  if (!isRecord(value)) {
+    throw new Error("Invalid annotation sidecar: annotation.stamp must be an object");
+  }
+
+  const name = readString(value.name, "annotation.stamp.name");
+
+  if (!PDF_STAMP_NAMES.includes(name as PdfAnnotationStamp["name"])) {
+    throw new Error("Invalid annotation sidecar: unsupported stamp name");
+  }
+
+  return {
+    label: readString(value.label, "annotation.stamp.label"),
+    name: name as PdfAnnotationStamp["name"],
+  };
+}
+
+function readPoint(value: unknown, fieldName: string): PdfPoint {
+  if (!isRecord(value)) {
+    throw new Error(`Invalid annotation sidecar: ${fieldName} must be an object`);
+  }
+
+  return {
+    x: readNumber(value.x, `${fieldName}.x`),
+    y: readNumber(value.y, `${fieldName}.y`),
+  };
+}
+
 function readString(value: unknown, fieldName: string): string {
   if (typeof value !== "string") {
     throw new Error(`Invalid annotation sidecar: ${fieldName} must be a string`);
   }
 
   return value;
+}
+
+function readPositiveNumber(value: unknown, fieldName: string): number {
+  const number = readNumber(value, fieldName);
+
+  if (number <= 0) {
+    throw new Error(`Invalid annotation sidecar: ${fieldName} must be positive`);
+  }
+
+  return number;
 }
 
 function readNumber(value: unknown, fieldName: string): number {

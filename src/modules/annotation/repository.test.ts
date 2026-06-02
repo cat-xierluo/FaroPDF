@@ -94,4 +94,30 @@ describe("annotation repository and service", () => {
 
     expect(annotations.map((annotation) => annotation.id)).toEqual(["ann-page-1", "ann-page-1-later", "ann-page-2"]);
   });
+
+  test("treats an empty sidecar file as invalid JSON instead of missing", async () => {
+    const storage = createMemoryAnnotationStorage({
+      "/Users/lawyer/cases/.faropdf/annotations/source-fingerprint.annotations.json": "",
+    });
+    const repository = new AnnotationRepository({ storage, now: fixedClock });
+
+    await expect(repository.load(documentRef)).rejects.toThrow("Invalid annotation sidecar JSON");
+  });
+
+  test("rejects invalid annotation data before writing sidecar content", async () => {
+    const storage = createMemoryAnnotationStorage();
+    const repository = new AnnotationRepository({ storage, now: fixedClock });
+    const service = new AnnotationService({ repository, createId: fixedIds, now: fixedClock });
+
+    await expect(
+      service.addAnnotation(documentRef, {
+        type: "note",
+        pageIndex: -1,
+        rects: [{ x: 20, y: 30, width: 24, height: 24 }],
+        color: "#f2b84b",
+      }),
+    ).rejects.toThrow("annotation.pageIndex must be a non-negative integer");
+
+    expect(storage.files.size).toBe(0);
+  });
 });
