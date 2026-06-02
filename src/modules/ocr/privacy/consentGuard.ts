@@ -3,6 +3,8 @@ import {
   createOcrPrivacyAuditRecord,
   createOcrPrivacyNotice,
   doesOcrNetworkConsentMatchNotice,
+  doesOcrPrivacyNoticeMatchRequest,
+  isOcrNetworkConsentExpired,
   isNetworkOcrProviderForPrivacy,
 } from "../../../shared/security/ocrPrivacy";
 import type { OcrPrivacyAuditRecord, OcrPrivacyNotice } from "../../../shared/security/types";
@@ -11,7 +13,6 @@ export interface OcrPrivacyConsentGuardInput {
   request: PreparedOcrRequest;
   provider: OcrProviderConfig;
   now?: string;
-  allowLegacyConsentFlag?: boolean;
 }
 
 export interface OcrPrivacyConsentGuardResult {
@@ -47,9 +48,8 @@ function evaluateOcrPrivacyConsent({
   request,
   provider,
   now = new Date().toISOString(),
-  allowLegacyConsentFlag = false,
 }: OcrPrivacyConsentGuardInput): OcrPrivacyConsentGuardResult {
-  const notice = createOcrPrivacyNotice({ request, provider });
+  const notice = request.privacyNotice ?? createOcrPrivacyNotice({ request, provider, issuedAt: now });
   const isNetworkRequired = isNetworkOcrProviderForPrivacy(provider);
 
   if (!isNetworkRequired) {
@@ -65,49 +65,43 @@ function evaluateOcrPrivacyConsent({
     };
   }
 
-  if (request.privacyConsent) {
-    if (!request.privacyConsent.granted) {
-      return buildDeniedResult(notice, now, "denied", ["联网 OCR 隐私确认未授予。"]);
-    }
-
-    if (!doesOcrNetworkConsentMatchNotice(request.privacyConsent, notice)) {
-      return buildDeniedResult(notice, now, "mismatched", ["隐私确认与当前 OCR 请求不匹配。"]);
-    }
-
-    return {
-      allowed: true,
-      errors: [],
-      isNetworkRequired,
-      notice,
-      auditRecord: createOcrPrivacyAuditRecord({
-        notice,
-        consentStatus: "granted",
-        createdAt: now,
-      }),
-    };
+  if (!request.privacyConsent) {
+    return buildDeniedResult(notice, now, "missing", ["联网 OCR 需要本次隐私确认。"]);
   }
 
-  if (allowLegacyConsentFlag && request.networkConsentGranted === true) {
-    return {
-      allowed: true,
-      errors: [],
-      isNetworkRequired,
-      notice,
-      auditRecord: createOcrPrivacyAuditRecord({
-        notice,
-        consentStatus: "legacy-granted",
-        createdAt: now,
-      }),
-    };
+  if (!request.privacyNotice || !doesOcrPrivacyNoticeMatchRequest(notice, request, provider)) {
+    return buildDeniedResult(notice, now, "mismatched", ["隐私确认与当前 OCR 请求不匹配。"]);
   }
 
-  return buildDeniedResult(notice, now, "missing", ["联网 OCR 需要本次隐私确认。"]);
+  if (!request.privacyConsent.granted) {
+    return buildDeniedResult(notice, now, "denied", ["联网 OCR 隐私确认未授予。"]);
+  }
+
+  if (isOcrNetworkConsentExpired(request.privacyConsent, now)) {
+    return buildDeniedResult(notice, now, "expired", ["隐私确认已过期，请重新确认。"]);
+  }
+
+  if (!doesOcrNetworkConsentMatchNotice(request.privacyConsent, notice)) {
+    return buildDeniedResult(notice, now, "mismatched", ["隐私确认与当前 OCR 请求不匹配。"]);
+  }
+
+  return {
+    allowed: true,
+    errors: [],
+    isNetworkRequired,
+    notice,
+    auditRecord: createOcrPrivacyAuditRecord({
+      notice,
+      consentStatus: "granted",
+      createdAt: now,
+    }),
+  };
 }
 
 function buildDeniedResult(
   notice: OcrPrivacyNotice,
   now: string,
-  consentStatus: "missing" | "denied" | "mismatched",
+  consentStatus: "missing" | "denied" | "mismatched" | "expired",
   errors: string[],
 ): OcrPrivacyConsentGuardResult {
   return {

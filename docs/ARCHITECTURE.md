@@ -573,11 +573,11 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 OCR 不直接内置到前端。当前第一版只建立 bridge/stub，不执行真实 OCR、不生成双层 PDF、不发起 PaddleOCR/MinerU 联网请求。已落地边界：
 
 - `src/shared/ocr/` 定义 `OcrRequest`、页码范围、`new-layered-pdf` 输出策略、任务进度和质量抽查入口；`text-sidecar`、`quality-check-only` 仅作为后续策略类型，第一版校验会拒绝执行。
-- `src/shared/security/` 定义联网 OCR notice、consent decision、脱敏路径摘要和 `OcrPrivacyAuditRecord`；提示可展示 provider、页码范围、输出路径、是否联网、不会覆盖原 PDF 和 API key 引用，audit/consent 不保留完整本地 PDF 路径或真实密钥。
-- `src/modules/ocr/privacy/consentGuard.ts` 负责校验云端 OCR 的本次 consent 是否与 provider、页码范围、输出路径和输出策略匹配；本地 provider 不要求联网 consent。
+- `src/shared/security/` 定义联网 OCR notice、consent decision、脱敏路径摘要和 `OcrPrivacyAuditRecord`；提示可展示 provider、页码范围、输出路径、是否联网、不会覆盖原 PDF 和 API key 引用，audit/consent 不保留完整本地 PDF 路径或真实密钥。notice 带一次性 nonce、签发时间和有效期，consent 绑定输入文件指纹、输出路径指纹、provider、页码范围、输出策略和 API key 引用。
+- `src/modules/ocr/privacy/consentGuard.ts` 负责校验云端 OCR 的本次 notice/consent 是否与当前输入文件、provider、页码范围、输出路径、输出策略和有效期匹配；本地 provider 不要求联网 consent，旧布尔 consent 标记不能绕过 guard。
 - `src/modules/ocr/service/bridge.ts` 负责准备请求、校验输入/输出 PDF、拒绝覆盖原始 PDF、查找 provider，并通过 adapter 边界区分本地命令和云端 API。
 - Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有用户本次明确 consent、安全 apiKeyRef 和 HTTPS endpoint，本机调试仅允许 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback HTTP；真实密钥串、远端明文 HTTP、伪装成 `127.*` 的域名和非法 endpoint 不会调用 Tauri command。bridge 请求会携带脱敏 `privacyAuditRecord`，但不声称已经执行真实 OCR。
-- `src-tauri/src/lib.rs` 提供 `start_ocr_job` command stub，Rust 侧重复校验 provider、页码范围、输出策略和默认 `*-ocr.pdf` 新输出路径，返回 queued job。
+- `src-tauri/src/lib.rs` 提供 `start_ocr_job` command stub，Rust 侧重复校验 provider、页码范围、输出策略、默认 `*-ocr.pdf` 新输出路径和云端 OCR 的 `privacyAuditRecord.consentStatus=granted`，返回 queued job。
 - 错误信息不包含完整敏感 PDF 路径，带逗号或中文标点的 PDF 路径也会在展示前脱敏；API Key 只使用引用或脱敏占位，不写入日志或错误报告。
 
 外部 OCR provider 的 endpoint、模型参数和密钥引用由设置页管理。API Key 不写入公开仓库，不在 UI 中完整展示，不在日志或错误报告中输出。

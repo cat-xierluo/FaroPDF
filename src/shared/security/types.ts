@@ -12,6 +12,9 @@ export interface RedactedPathSummary {
 export interface OcrPrivacyNotice {
   noticeVersion: OcrPrivacyNoticeVersion;
   noticeId: string;
+  noticeNonce: string;
+  noticeIssuedAt: string;
+  expiresAt: string;
   providerId: string;
   providerType: OcrProviderType;
   providerDisplayName: string;
@@ -20,6 +23,7 @@ export interface OcrPrivacyNotice {
   outputPath: string;
   outputPathSummary: RedactedPathSummary;
   inputPathSummary: RedactedPathSummary;
+  inputPathFingerprint: string;
   outputStrategy: OcrOutputStrategy;
   isNetworkRequired: boolean;
   originalPdfWillBeOverwritten: false;
@@ -30,10 +34,15 @@ export interface OcrPrivacyNotice {
 export interface OcrNetworkConsentDecision {
   noticeVersion: OcrPrivacyNoticeVersion;
   noticeId: string;
+  noticeNonce: string;
+  noticeIssuedAt: string;
+  expiresAt: string;
   providerId: string;
   providerType: OcrProviderType;
   backend: OcrProviderType;
   pageRangeLabel: string;
+  inputPath: RedactedPathSummary;
+  inputPathFingerprint: string;
   outputPath: RedactedPathSummary;
   outputPathFingerprint: string;
   outputStrategy: OcrOutputStrategy;
@@ -49,8 +58,8 @@ export type OcrPrivacyConsentStatus =
   | "missing"
   | "denied"
   | "mismatched"
-  | "granted"
-  | "legacy-granted";
+  | "expired"
+  | "granted";
 
 export interface OcrPrivacyAuditRecord {
   schemaVersion: 1;
@@ -58,6 +67,7 @@ export interface OcrPrivacyAuditRecord {
   eventType: "ocr-privacy-consent";
   noticeVersion: OcrPrivacyNoticeVersion;
   noticeId: string;
+  noticeNonce: string;
   providerId: string;
   providerType: OcrProviderType;
   providerDisplayName: string;

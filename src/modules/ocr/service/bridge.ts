@@ -88,7 +88,6 @@ export function createOcrBridgeService(backend: OcrBridgeBackend = createTauriOc
       const privacyResult = privacyConsentGuard.evaluate({
         request: preparedRequest,
         provider,
-        allowLegacyConsentFlag: true,
       });
       const consentAwareRequest = applyPrivacyConsentFlag(preparedRequest, privacyResult.auditRecord.consentStatus);
       const providerErrors = [
@@ -133,7 +132,6 @@ export function createOcrBridgeService(backend: OcrBridgeBackend = createTauriOc
       const privacyResult = privacyConsentGuard.evaluate({
         request: preparedRequest,
         provider,
-        allowLegacyConsentFlag: true,
       });
       const consentAwareRequest = applyPrivacyConsentFlag(preparedRequest, privacyResult.auditRecord.consentStatus);
       const errors = [
@@ -156,7 +154,7 @@ function applyPrivacyConsentFlag(
   request: PreparedOcrRequest,
   consentStatus: string,
 ): PreparedOcrRequest {
-  if (consentStatus === "granted" || consentStatus === "legacy-granted") {
+  if (consentStatus === "granted") {
     return {
       ...request,
       networkConsentGranted: true,

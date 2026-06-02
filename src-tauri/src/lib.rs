@@ -326,6 +326,7 @@ struct OcrCommandRequest {
     provider: OcrCommandProvider,
     output_strategy: String,
     network_consent_granted: bool,
+    privacy_audit_record: Option<OcrCommandPrivacyAuditRecord>,
     quality_check: Option<OcrCommandQualityCheckRequest>,
 }
 
@@ -348,6 +349,16 @@ struct OcrCommandQualityCheckRequest {
     enabled: bool,
     sample_pages: Vec<u32>,
     keywords: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OcrCommandPrivacyAuditRecord {
+    provider_id: String,
+    backend: String,
+    output_strategy: String,
+    is_network_required: bool,
+    consent_status: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -462,8 +473,8 @@ fn validate_ocr_request(request: &OcrCommandRequest) -> Result<(), String> {
     }
 
     if is_cloud_ocr_provider(&request.provider) {
-        if !request.network_consent_granted {
-            return Err("联网 OCR 需要用户明确确认。".to_string());
+        if !request.network_consent_granted || !has_current_ocr_privacy_audit(request) {
+            return Err("联网 OCR 需要本次隐私确认。".to_string());
         }
         if request
             .provider
@@ -511,6 +522,18 @@ fn validate_ocr_request(request: &OcrCommandRequest) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn has_current_ocr_privacy_audit(request: &OcrCommandRequest) -> bool {
+    let Some(audit) = request.privacy_audit_record.as_ref() else {
+        return false;
+    };
+
+    audit.consent_status == "granted"
+        && audit.is_network_required
+        && audit.provider_id == request.provider.id
+        && audit.backend == request.provider.provider_type
+        && audit.output_strategy == request.output_strategy
 }
 
 fn resolve_scan_preprocess_output_path(
@@ -791,11 +814,22 @@ mod ocr_bridge_tests {
             provider: local_provider(),
             output_strategy: "new-layered-pdf".to_string(),
             network_consent_granted: false,
+            privacy_audit_record: None,
             quality_check: Some(OcrCommandQualityCheckRequest {
                 enabled: true,
                 sample_pages: vec![1, 3],
                 keywords: vec!["合同".to_string()],
             }),
+        }
+    }
+
+    fn granted_ocr_privacy_audit(provider_id: &str, backend: &str) -> OcrCommandPrivacyAuditRecord {
+        OcrCommandPrivacyAuditRecord {
+            provider_id: provider_id.to_string(),
+            backend: backend.to_string(),
+            output_strategy: "new-layered-pdf".to_string(),
+            is_network_required: true,
+            consent_status: "granted".to_string(),
         }
     }
 
@@ -831,10 +865,11 @@ mod ocr_bridge_tests {
 
         let consent_error =
             validate_ocr_request(&missing_consent).expect_err("cloud OCR needs consent");
-        assert_eq!(consent_error, "联网 OCR 需要用户明确确认。");
+        assert_eq!(consent_error, "联网 OCR 需要本次隐私确认。");
 
         let mut missing_key = missing_consent;
         missing_key.network_consent_granted = true;
+        missing_key.privacy_audit_record = Some(granted_ocr_privacy_audit("paddleocr", "paddleocr"));
         missing_key.provider.api_key_ref = Some(String::new());
 
         let key_error = validate_ocr_request(&missing_key).expect_err("cloud OCR needs key ref");
@@ -842,10 +877,22 @@ mod ocr_bridge_tests {
     }
 
     #[test]
+    fn rejects_cloud_ocr_with_legacy_consent_flag_but_no_privacy_audit() {
+        let mut request = default_ocr_request();
+        request.provider = paddle_provider();
+        request.network_consent_granted = true;
+
+        let error = validate_ocr_request(&request).expect_err("cloud OCR needs current audit");
+
+        assert_eq!(error, "联网 OCR 需要本次隐私确认。");
+    }
+
+    #[test]
     fn rejects_raw_cloud_api_key_refs() {
         let mut request = default_ocr_request();
         request.provider = paddle_provider();
         request.network_consent_granted = true;
+        request.privacy_audit_record = Some(granted_ocr_privacy_audit("paddleocr", "paddleocr"));
         request.provider.api_key_ref = Some("paddle-secret-123456".to_string());
 
         let error = validate_ocr_request(&request).expect_err("raw key should fail");
@@ -858,6 +905,7 @@ mod ocr_bridge_tests {
         let mut request = default_ocr_request();
         request.provider = paddle_provider();
         request.network_consent_granted = true;
+        request.privacy_audit_record = Some(granted_ocr_privacy_audit("paddleocr", "paddleocr"));
         request.provider.endpoint = Some("http://ocr.example.test/paddle".to_string());
 
         let error = validate_ocr_request(&request).expect_err("remote http should fail");
@@ -877,6 +925,7 @@ mod ocr_bridge_tests {
         let mut request = default_ocr_request();
         request.provider = mineru_provider();
         request.network_consent_granted = true;
+        request.privacy_audit_record = Some(granted_ocr_privacy_audit("mineru", "mineru"));
         request.provider.endpoint = Some("http://127.evil.example/mineru".to_string());
 
         let error =

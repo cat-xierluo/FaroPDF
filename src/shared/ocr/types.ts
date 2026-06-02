@@ -1,4 +1,4 @@
-import type { OcrNetworkConsentDecision, OcrPrivacyAuditRecord } from "../security/types";
+import type { OcrNetworkConsentDecision, OcrPrivacyAuditRecord, OcrPrivacyNotice } from "../security/types";
 
 export type OcrProviderType = "local-ocrmypdf" | "legal-skills" | "paddleocr" | "mineru";
 export type OcrBackend = OcrProviderType;
@@ -58,6 +58,7 @@ export interface OcrRequest {
   providerId: string;
   outputStrategy?: OcrOutputStrategy;
   networkConsentGranted?: boolean;
+  privacyNotice?: OcrPrivacyNotice;
   privacyConsent?: OcrNetworkConsentDecision;
   qualityCheck?: OcrQualityCheckRequest;
 }
