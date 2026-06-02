@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{
     fs,
+    net::IpAddr,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -682,10 +683,14 @@ fn is_safe_api_key_ref(value: &str) -> bool {
 
 fn is_loopback_host(host: &str) -> bool {
     let normalized = host.trim_matches(['[', ']']).to_ascii_lowercase();
-    normalized == "localhost"
-        || normalized == "::1"
-        || normalized == "127.0.0.1"
-        || normalized.starts_with("127.")
+    if normalized == "localhost" {
+        return true;
+    }
+
+    normalized
+        .parse::<IpAddr>()
+        .map(|address| address.is_loopback())
+        .unwrap_or(false)
 }
 
 fn default_ocr_quality_check() -> OcrCommandQualityCheckRequest {
@@ -761,6 +766,18 @@ mod ocr_bridge_tests {
             display_name: Some("PaddleOCR".to_string()),
             endpoint: Some("https://ocr.example.test/paddle".to_string()),
             api_key_ref: Some("keychain:paddle".to_string()),
+            enabled: true,
+            requires_network_consent: true,
+        }
+    }
+
+    fn mineru_provider() -> OcrCommandProvider {
+        OcrCommandProvider {
+            id: "mineru".to_string(),
+            provider_type: "mineru".to_string(),
+            display_name: Some("MinerU".to_string()),
+            endpoint: Some("https://ocr.example.test/mineru".to_string()),
+            api_key_ref: Some("env:MINERU_API_KEY".to_string()),
             enabled: true,
             requires_network_consent: true,
         }
@@ -853,6 +870,22 @@ mod ocr_bridge_tests {
         request.provider.endpoint = Some("http://127.0.0.1:8080/paddle".to_string());
 
         validate_ocr_request(&request).expect("loopback http is allowed for debug");
+    }
+
+    #[test]
+    fn rejects_mineru_spoofed_127_http_endpoint() {
+        let mut request = default_ocr_request();
+        request.provider = mineru_provider();
+        request.network_consent_granted = true;
+        request.provider.endpoint = Some("http://127.evil.example/mineru".to_string());
+
+        let error =
+            validate_ocr_request(&request).expect_err("spoofed 127 hostname should fail");
+
+        assert_eq!(
+            error,
+            "MinerU 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。"
+        );
     }
 
     #[test]

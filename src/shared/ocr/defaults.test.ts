@@ -37,6 +37,7 @@ describe("OCR shared defaults", () => {
   });
 
   test("validates page ranges and redacts PDF paths in OCR bridge errors", () => {
+    const sensitivePath = "/Users/example/Cases/case, confidential.pdf";
     const validation = validateOcrRequest({
       inputPath: "/tmp/faropdf-fixtures/source.pdf",
       providerId: "local-ocrmypdf",
@@ -46,7 +47,9 @@ describe("OCR shared defaults", () => {
 
     expect(validation.valid).toBe(false);
     expect(validation.errors).toContain("页码范围必须使用正整数或正整数区间，例如 1,3-5。");
-    expect(sanitizeOcrError("无法写入 /Users/example/Cases/confidential bundle.pdf")).toBe("无法写入 [path]");
+    expect(sanitizeOcrError(`无法写入 ${sensitivePath}，请检查文件权限。`)).toBe(
+      "无法写入 [path]，请检查文件权限。",
+    );
   });
 
   test("rejects invalid quality check sample pages before normalizing them away", () => {

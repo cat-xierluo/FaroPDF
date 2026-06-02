@@ -146,7 +146,7 @@ describe("OCR bridge service", () => {
     expect(backend.startOcr).not.toHaveBeenCalled();
   });
 
-  test("rejects remote HTTP endpoints but allows localhost HTTP for debug providers", async () => {
+  test("rejects remote HTTP and spoofed 127 hostnames but allows true loopback HTTP", async () => {
     const service = createOcrBridgeService(backend);
 
     await expect(
@@ -167,6 +167,24 @@ describe("OCR bridge service", () => {
       ),
     ).rejects.toThrow("PaddleOCR 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。");
 
+    await expect(
+      service.startOcr(
+        {
+          inputPath: "/tmp/faropdf-fixtures/source.pdf",
+          providerId: "paddleocr",
+          networkConsentGranted: true,
+        },
+        {
+          providers: [
+            {
+              ...paddleProvider,
+              endpoint: "http://127.evil.example/paddle",
+            },
+          ],
+        },
+      ),
+    ).rejects.toThrow("PaddleOCR 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。");
+
     await service.startOcr(
       {
         inputPath: "/tmp/faropdf-fixtures/source.pdf",
@@ -177,13 +195,29 @@ describe("OCR bridge service", () => {
         providers: [
           {
             ...paddleProvider,
-            endpoint: "http://127.0.0.1:8080/paddle",
+            endpoint: "http://127.42.0.8:8080/paddle",
           },
         ],
       },
     );
 
-    expect(backend.startOcr).toHaveBeenCalledTimes(1);
+    await service.startOcr(
+      {
+        inputPath: "/tmp/faropdf-fixtures/source.pdf",
+        providerId: "paddleocr",
+        networkConsentGranted: true,
+      },
+      {
+        providers: [
+          {
+            ...paddleProvider,
+            endpoint: "http://[::1]:8080/paddle",
+          },
+        ],
+      },
+    );
+
+    expect(backend.startOcr).toHaveBeenCalledTimes(2);
   });
 
   test("validates MinerU and disabled providers through the same network rules", () => {
@@ -255,9 +289,10 @@ describe("OCR bridge service", () => {
     expect(backend.startOcr).not.toHaveBeenCalled();
   });
 
-  test("redacts backend error paths and does not retain the raw path in cause", async () => {
+  test("redacts backend error paths with punctuation and does not retain the raw path in cause", async () => {
+    const sensitivePath = "/Users/example/Cases/case, confidential.pdf";
     vi.mocked(backend.startOcr).mockRejectedValue(
-      new Error("无法读取 /Users/example/Cases/confidential bundle.pdf"),
+      new Error(`无法读取 ${sensitivePath}，请检查文件权限。`),
     );
     const service = createOcrBridgeService(backend);
 
@@ -273,11 +308,11 @@ describe("OCR bridge service", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toContain("[path]");
-      expect((error as Error).message).not.toContain("/Users/example/Cases/confidential bundle.pdf");
+      expect((error as Error).message).not.toContain(sensitivePath);
       const cause = (error as Error & { cause?: unknown }).cause;
       expect(cause).toBeInstanceOf(Error);
       expect((cause as Error).message).toContain("[path]");
-      expect((cause as Error).message).not.toContain("/Users/example/Cases/confidential bundle.pdf");
+      expect((cause as Error).message).not.toContain(sensitivePath);
     }
   });
 });

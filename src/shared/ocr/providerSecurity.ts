@@ -34,10 +34,21 @@ export function isAllowedOcrEndpoint(endpoint: string | undefined): boolean {
 
 function isLoopbackHost(hostname: string): boolean {
   const normalized = hostname.toLowerCase().replace(/^\[(.*)\]$/, "$1");
-  return (
-    normalized === "localhost" ||
-    normalized === "127.0.0.1" ||
-    normalized === "::1" ||
-    normalized.startsWith("127.")
-  );
+  return normalized === "localhost" || normalized === "::1" || isLoopbackIpv4Address(normalized);
+}
+
+function isLoopbackIpv4Address(hostname: string): boolean {
+  const octets = hostname.split(".");
+  if (octets.length !== 4) {
+    return false;
+  }
+
+  const numbers = octets.map((octet) => {
+    if (!/^\d+$/.test(octet)) {
+      return Number.NaN;
+    }
+    return Number(octet);
+  });
+
+  return numbers.every((octet) => Number.isInteger(octet) && octet >= 0 && octet <= 255) && numbers[0] === 127;
 }

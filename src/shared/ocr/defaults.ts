@@ -130,8 +130,8 @@ export function suggestOcrOutputPath(inputPath: string): string {
 
 export function sanitizeOcrError(message: string): string {
   return message
-    .replace(/\b[A-Za-z]:[\\/][^，。；;,\n\r]*?\.pdf/gi, "[path]")
-    .replace(/\/[^，。；;,\n\r]*?\.pdf/gi, "[path]");
+    .replace(/\b[A-Za-z]:[\\/][^\n\r]*?\.pdf(?=$|[\s"'”’)\]}，。；;,.!?！？、])/gi, "[path]")
+    .replace(/\/[^\n\r]*?\.pdf(?=$|[\s"'”’)\]}，。；;,.!?！？、])/gi, "[path]");
 }
 
 function isPdfPath(path: string): boolean {

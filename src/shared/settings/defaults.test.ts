@@ -123,7 +123,20 @@ describe("default app settings", () => {
       provider.id === "paddleocr"
         ? {
             ...provider,
-            endpoint: "http://localhost:8080/paddle",
+            endpoint: "http://127.evil.example/paddle",
+          }
+        : provider,
+    );
+
+    expect(validateAppSettings(settings).errors).toContain(
+      "PaddleOCR 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。",
+    );
+
+    settings.ocrProviders = settings.ocrProviders.map((provider) =>
+      provider.id === "paddleocr"
+        ? {
+            ...provider,
+            endpoint: "http://127.0.24.8:8080/paddle",
           }
         : provider,
     );
