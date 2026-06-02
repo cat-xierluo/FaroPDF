@@ -4,9 +4,18 @@
 
 ## 推进策略
 
+`docs/TASKS.md` 是 FaroPDF 的唯一任务源。所有待办、缺陷、技术债、算法素材、候选议题和 worktree 分组建议都记录在本文件。其他文档只记录路线图、架构、设计和决策，不另建任务计划文档。
+
 FaroPDF v0.1 先到达一个可并行开发的基础状态，再用多分支、多 worktree 推进完整基础版功能。
 
 基础状态完成前，优先只在 `main` 或单一 foundation 分支推进，避免多个 worker 同时修改脚手架、依赖、Tauri 配置和共享类型。基础状态完成后，各 worker 从最新 `main` 创建独立分支和 worktree，按本文件声明的范围修改文件。
+
+Agent 可根据本文件自行判断：
+
+- 哪些素材可以晋升为正式 ISS 任务。
+- 哪些 ISS 可以合并到同一个 worktree 分支顺序推进。
+- 哪些任务必须拆成独立 worktree，避免共享文件冲突。
+- 哪些任务仍只是素材或调研，不应立即开工。
 
 ### 基础状态门槛
 
@@ -26,7 +35,43 @@ FaroPDF v0.1 先到达一个可并行开发的基础状态，再用多分支、�
 - 每个 worker 默认只修改自己任务的 `范围` 文件；需要改共享契约时先回到 PM 会话确认。
 - `package.json`、锁文件、`src-tauri/`、`src/shared/`、`src/App.tsx`、全局样式和路由由 foundation 或 PM 统一收口。
 - worker 完成后提交、推送并创建 PR；PM 检查 diff 范围、验证结果和文档同步后再合并。
-- PDF 算法融入参考 `docs/PDF_ALGORITHMS.md`；不得把 Agent skill CLI 流程原样变成 UI 逻辑。
+- 不得把 Agent skill CLI 流程原样变成 UI 逻辑；脚本只能作为算法来源、后台 bridge 或 sidecar 参考。
+
+### Worktree 分组原则
+
+同一 worktree 分支可以包含多个 ISS，但必须满足：
+
+- 文件范围高度重合，且不会和其他 worker 争抢 `package.json`、锁文件、`src-tauri/`、`src/shared/` 或全局布局。
+- 任务存在明确依赖顺序，放在同一分支能减少重复改动。
+- 验收命令一致，且最终 PR 能清楚说明覆盖的 ISS。
+
+建议合并组：
+
+- `feat/foundation-scaffold`：ISS-001、ISS-011、ISS-012。
+- `feat/pdf-output-tools`：ISS-005、ISS-013，可在导出引擎稳定后合并推进。
+- `feat/ocr-pipeline`：ISS-007、ISS-016、ISS-017，可在设置页和文本层完成后合并推进。
+- `feat/page-organizer-suite`：ISS-006、ISS-018、ISS-019，可在阅读底座和导出引擎完成后合并推进。
+
+## PDF 算法素材池
+
+以下来自本机 `legal-skills` 的 PDF 脚本。它们不是独立计划文档，也不是必须照搬的实现；agent 可以把它们晋升为正式 ISS、合并进现有 ISS，或保留为后续素材。
+
+| 来源 | 重点脚本 | 可复用能力 | 当前归属 |
+| --- | --- | --- | --- |
+| `pdf-processor` | `pdf-preprocess-core.py`、`pdf_preprocess_skew.py`、`pdf-preprocess-ocr.py` | 扫描清洁、90 度方向检测、微倾斜校正、裁边、分块/并行预处理 | ISS-016 |
+| `pdf-processor` | `pdf-compress.py` | PyMuPDF 图像资源重编码、降采样、保留文字层/批注/书签的压缩统计 | ISS-013 |
+| `pdf-processor` | `pdf-ocr.py`、`pdf_ocr_paddle_api.py`、`pdf_ocr_mineru.py`、`pdf_ocr_layered.py` | PaddleOCR / MinerU / ocrmypdf provider、双层 PDF 叠层、API fallback | ISS-007、ISS-014 |
+| `pdf-processor` | `pdf-ocr-quality-check.py` | 可检索页比例、关键词命中率、体积比、耗时、可选 CER | ISS-017 |
+| `pdf-organizer` | `pdf_organizer.py` | 文字层检测、页级检查、文书边界信号、manifest、A4 标准化、拆分/合并/命名 | ISS-006、ISS-019 |
+| `img2pdf` | `img_to_pdf.py` | 图片或 PDF 页面按 A4 1/2/3/4 张每页编排 | ISS-018 |
+
+产品化原则：
+
+- 纯算法能力优先拆入 FaroPDF 模块，例如压缩、A4 编排、页码/Bates、水印、文字层检测、页级 manifest。
+- 重依赖能力走后台 bridge，例如 OpenCV 预处理、`ocrmypdf`、PaddleOCR API、MinerU API。
+- UI 层只调用统一 job model，不直接解析脚本 stdout。
+- 外部 API 和密钥由设置页管理；联网 OCR 必须主动确认。
+- 所有处理默认输出新 PDF，不覆盖原始材料。
 
 ## 基础状态任务
 

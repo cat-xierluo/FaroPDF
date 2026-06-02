@@ -265,7 +265,7 @@ OCR 不直接内置到前端。第一版 bridge 支持：
 
 ## PDF 算法来源
 
-FaroPDF 可复用本机 `legal-skills` 中成熟 PDF 脚本的算法，但不直接把 Agent skill 工作流当作产品实现。详细映射见 `docs/PDF_ALGORITHMS.md`。
+FaroPDF 可复用本机 `legal-skills` 中成熟 PDF 脚本的算法，但不直接把 Agent skill 工作流当作产品实现。具体算法素材、候选议题和任务归属以 `docs/TASKS.md` 为唯一来源。
 
 当前吸收范围：
 

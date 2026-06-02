@@ -50,8 +50,7 @@ npm run tauri build
 
 - `AGENTS.md`：协作规则和 PDF 安全边界。
 - `docs/ROADMAP.md`：路线图和首版范围。
-- `docs/TASKS.md`：待办、缺陷和技术债。
+- `docs/TASKS.md`：唯一任务源，记录待办、缺陷、技术债、算法素材、候选议题和 worktree 分组建议。
 - `docs/DECISIONS.md`：关键决策记录。
 - `docs/ARCHITECTURE.md`：技术架构和接口模型。
 - `docs/DESIGN.md`：视觉与交互规范。
-- `docs/PDF_ALGORITHMS.md`：PDF 处理脚本算法融入计划。

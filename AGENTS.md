@@ -15,7 +15,7 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常阅读卷宗、证据�
 
 - 全程使用中文回复与写作。
 - 遵循 `docs/ROADMAP.md` 路线图驱动开发。
-- 待办、缺陷、技术债记录到 `docs/TASKS.md`。
+- `docs/TASKS.md` 是唯一任务源；待办、缺陷、技术债、算法素材、候选议题和 worktree 分组建议都记录在这里。
 - 重要技术选择和工作摘要记录到 `docs/DECISIONS.md`。
 - 用户可见变更写入 `CHANGELOG.md`。
 - 涉及 UI、交互和视觉时遵循 `docs/DESIGN.md`。
@@ -28,11 +28,10 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常阅读卷宗、证据�
 | `README.md` | 项目介绍、定位、快速开始和当前状态 |
 | `CHANGELOG.md` | 用户可见变更记录 |
 | `docs/ROADMAP.md` | 路线图、阶段任务和进度日志 |
-| `docs/TASKS.md` | 待办、缺陷、技术债和未归属想法 |
+| `docs/TASKS.md` | 唯一任务源：待办、缺陷、技术债、算法素材、候选议题和 worktree 分组建议 |
 | `docs/DECISIONS.md` | 技术决策记录与工作日志 |
 | `docs/ARCHITECTURE.md` | 架构、数据流、核心接口和技术边界 |
 | `docs/DESIGN.md` | 视觉系统、布局、控件和交互规范 |
-| `docs/PDF_ALGORITHMS.md` | PDF 处理脚本算法融入计划 |
 
 ## PDF 安全边界
 
@@ -49,9 +48,16 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常阅读卷宗、证据�
 - 第一阶段先搭建可日用的基础版：快读、检索、批注、OCR bridge、页面整理、表单签署。
 - 技术实现优先按需加载：首屏只加载应用 shell 和基础阅读能力，缩略图、全文索引、批注列表、OCR 和页面整理按需启动。
 - PDF.js 负责阅读渲染和文本层；pdf-lib 负责页面复制、删除、重排、表单和导出保存；OCR 通过 bridge 调用本地工具或用户确认后的云端能力。
-- 扫描清洁校正、压缩、OCR provider、证据图片编排和文书整理 manifest 的算法来源见 `docs/PDF_ALGORITHMS.md`。
+- 扫描清洁校正、压缩、OCR provider、证据图片编排和文书整理 manifest 的算法来源记录在 `docs/TASKS.md`。
 - 避免把重型 OCR 引擎、批量转换链路或扫描预处理同步塞进前端主线程。
 - 面向律师工作流时，优先做“可验证、可回退、可交接”的能力，而不是炫技式编辑。
+
+## 多 Agent 与 worktree 编排
+
+- Agent 以 `docs/TASKS.md` 为唯一任务源，不另建任务计划文档。
+- Agent 可根据 `docs/TASKS.md` 自行判断哪些素材应晋升为正式 ISS，哪些 ISS 可放入同一 worktree 分支顺序推进。
+- 文件范围重叠、共享依赖多或存在强依赖链的任务可以同组；会争抢脚手架、锁文件、`src-tauri/`、`src/shared/` 或全局布局的任务必须谨慎拆分。
+- 分支和 worktree 命名遵循 `git-workflow` 与 `multi-agent-orchestration`：分支名写任务语义，worktree 路径可写本地执行来源前缀。
 
 ## 完成标准
 
