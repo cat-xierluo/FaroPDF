@@ -6,7 +6,7 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常处理卷宗、证据�
 
 ## 当前状态
 
-当前阶段为项目上下文初始化，尚未 scaffold 应用代码。
+当前阶段为 Foundation Gate。`feat/foundation-scaffold` 分支已建立 Tauri v2 + React + TypeScript + Vite 基础工程、三栏阅读器 Shell、设置入口、共享契约和基础测试。
 
 已固定：
 
@@ -14,6 +14,7 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常处理卷宗、证据�
 - 技术方向：Tauri v2 + React + TypeScript + Vite + PDF.js + pdf-lib。
 - 首版目标：快读、检索、批注、OCR/扫描、页面整理、常用导出、表单签署和设置。
 - 安全边界：默认不覆盖原始 PDF，高风险操作另存或导出。
+- 并行策略：Foundation Gate 合并后按 `docs/TASKS.md` 拆分多分支、多 worktree。
 
 ## 首版能力目标
 
@@ -34,16 +35,27 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常处理卷宗、证据�
 - 离线优先：本地能力优先，联网 OCR 或云端处理必须让用户明确知情。
 - 可回退：批注和页面操作先保留可编辑状态，导出时再写入新 PDF。
 
-## 计划中的开发命令
-
-正式初始化代码后补充：
+## 开发命令
 
 ```bash
 npm install
-npm run tauri dev
+npm run dev
 npm run typecheck
 npm test
+npm run lint
+npm run build
+npm run tauri dev
 npm run tauri build
+```
+
+当前基础验证命令：
+
+```bash
+npm run typecheck
+npm test
+npm run lint
+npm run build
+cd src-tauri && cargo check
 ```
 
 ## 文档

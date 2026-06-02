@@ -79,37 +79,40 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：工程基础
-- 状态：待处理
+- 状态：已完成（待合并）
 - 建议分支：`feat/foundation-scaffold`
 - 建议 worktree：`.claude/worktrees/tmux-foundation-scaffold`
 - 依赖：无
 - 范围：`package.json`、锁文件、`src-tauri/`、`src/` 基础入口、测试配置、构建配置、README 开发命令
 - 目标：创建 Tauri v2 + React + TypeScript + Vite 应用，并补齐基础测试、类型检查、Lint 和构建脚本。
 - 验收：本地可启动空壳应用，`typecheck`、测试和构建命令可运行。
+- 验证：`npm run typecheck`、`npm test`、`npm run lint`、`npm run build`、`cd src-tauri && cargo check`。
 
 ### ISS-011 共享契约与模块边界
 
 - 优先级：P0
 - 类型：工程基础
-- 状态：待处理
+- 状态：已完成（待合并）
 - 建议分支：`feat/shared-contracts`
 - 建议 worktree：`.claude/worktrees/tmux-shared-contracts`
 - 依赖：ISS-001
 - 范围：`src/shared/`、`src/modules/*/README.md`、`docs/ARCHITECTURE.md`
 - 目标：建立 PDF 文档、页面视口、批注、页面操作、导出任务、OCR provider、设置项和后台任务的共享类型与模块边界。
 - 验收：各功能 worker 可只依赖共享契约开工；类型检查通过；架构文档同步记录核心接口。
+- 验证：`src/shared/contracts.test.ts` 覆盖核心契约和 `FAROPDF_MODULES` 模块边界。
 
 ### ISS-012 基础应用 Shell 与验证夹具
 
 - 优先级：P0
 - 类型：UI / 工程基础
-- 状态：待处理
+- 状态：已完成（待合并）
 - 建议分支：`feat/app-shell-foundation`
 - 建议 worktree：`.claude/worktrees/tmux-app-shell-foundation`
 - 依赖：ISS-001、ISS-011
 - 范围：`src/App.tsx`、`src/components/layout/`、`src/styles/`、`src/modules/settings/` 入口、`tests/fixtures/`
 - 目标：建立三栏阅读布局、顶部工具栏、状态栏、右侧 Inspector、设置入口和测试用 PDF fixture 策略。
 - 验收：空壳应用能展示阅读器布局；设置页可打开；测试 fixture 不包含敏感材料；符合 `docs/DESIGN.md` 的清亮阅读器方向。
+- 验证：`src/App.test.tsx` 覆盖阅读器首屏和设置入口；`tests/fixtures/README.md` 记录夹具安全规则。
 
 ## 并行功能任务
 
@@ -321,3 +324,4 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：初始化项目 Git 基线，推送到同名 GitHub private 仓库 `FaroPDF`。
 - 2026-06-02：将 v0.1 拆分为 foundation gate 和多 worktree 并行任务包，补充设置页、外部 OCR provider、水印、压缩和直接编辑调研任务。
 - 2026-06-02：分析 `pdf-processor`、`pdf-organizer`、`img2pdf` 的脚本算法，将扫描清洁校正、压缩、OCR 质量检查、证据图片编排和文书整理 manifest 纳入任务源。
+- 2026-06-02：在 `feat/foundation-scaffold` 完成 ISS-001、ISS-011、ISS-012，建立可运行 Tauri/React 工程、共享契约、三栏阅读器 Shell、设置入口和 fixture 规则。

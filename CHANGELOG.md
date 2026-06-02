@@ -1,5 +1,14 @@
 # FaroPDF 变更记录
 
+## 0.1.0-alpha.0 - 2026-06-02
+
+- 创建 Tauri v2 + React + TypeScript + Vite 基础工程。
+- 建立基础阅读器 Shell：顶部工具栏、左侧文档导航、中央 PDF 阅读区、右侧任务面板和底部状态栏。
+- 建立设置入口和默认 OCR provider 设置，联网 OCR 默认要求确认，外部 provider 默认未启用。
+- 建立共享契约：PDF 文档状态、页面视口、批注、页面操作、导出任务、OCR provider、OCR 任务和应用设置。
+- 建立 `src/modules/` 模块边界和测试 fixture 规则，为后续多 worktree worker 提供文件范围。
+- 补齐 `typecheck`、测试、lint、构建和 Tauri/Rust 检查基础命令。
+
 ## 0.0.0 - 2026-06-02
 
 - 初始化 FaroPDF 项目上下文。

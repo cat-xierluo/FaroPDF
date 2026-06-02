@@ -71,14 +71,27 @@ export type OcrStatus = 'not-needed' | 'needed' | 'running' | 'completed' | 'fai
 export interface PdfDocumentState {
   path: string;
   name: string;
-  bytes: Uint8Array;
+  fingerprint?: string;
   pageCount: number;
   currentPage: number;
   zoom: number;
+  viewMode: 'continuous' | 'single' | 'double';
   dirty: boolean;
   textLayerStatus: TextLayerStatus;
   ocrStatus: OcrStatus;
   lastSavedAt?: string;
+}
+```
+
+### PdfPageViewport
+
+```ts
+export interface PdfPageViewport {
+  pageIndex: number;
+  width: number;
+  height: number;
+  rotation: 0 | 90 | 180 | 270;
+  scale: number;
 }
 ```
 
@@ -119,6 +132,8 @@ export type PdfPageOperationType =
   | 'insert'
   | 'extract'
   | 'merge'
+  | 'crop'
+  | 'split-scan'
   | 'number';
 
 export interface PdfPageOperation {
@@ -201,12 +216,28 @@ export interface AppSettings {
   defaultSaveDirectory?: string;
   defaultZoom: number;
   defaultViewMode: 'continuous' | 'single' | 'double';
+  defaultSavePolicy: 'always-export-copy' | 'ask-each-time' | 'allow-overwrite-with-confirmation';
   recentFiles: Array<{ path: string; name: string; lastOpenedAt: string }>;
   defaultOcrProviderId?: string;
   ocrProviders: OcrProviderConfig[];
   requireNetworkOcrConfirmation: boolean;
 }
 ```
+
+## 已落地目录边界
+
+Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任务声明的模块目录：
+
+| 目录 | 职责 |
+| --- | --- |
+| `src/components/layout/` | 基础阅读器 Shell、工具栏、侧栏、阅读区、任务面板和状态栏 |
+| `src/styles/` | 全局布局与设计 token |
+| `src/shared/pdf/` | PDF 文档、页面视口、批注、页面操作和导出任务契约 |
+| `src/shared/ocr/` | OCR provider、OCR job 和质量摘要契约 |
+| `src/shared/settings/` | AppSettings、默认设置和密钥遮罩 |
+| `src/shared/foundation/` | 多 worktree worker 的模块边界声明 |
+| `src/modules/*/README.md` | reader、search、annotation、pages、export、ocr、forms、settings 的模块职责 |
+| `tests/fixtures/` | 可提交测试夹具规则，不放真实法律材料 |
 
 ## 模块规划
 
