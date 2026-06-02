@@ -198,6 +198,63 @@ export interface OcrJob {
 }
 ```
 
+### ScanPreprocessJob
+
+```ts
+export type ScanPreprocessJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type ScanPreprocessOutputMode = 'preprocess-only';
+
+export interface ScanPreprocessOptions {
+  enhanceScans: boolean;
+  detectOrientation: boolean;
+  deskew: boolean;
+  splitPages: boolean;
+  cropPages: boolean;
+  trimBlankEdges: boolean;
+  outputMode: ScanPreprocessOutputMode;
+  dpi: number;
+  jpegQuality: number;
+  skewThresholdDegrees: number;
+  rotationConfidence: number;
+  maxDeskewDegrees: number;
+  blankEdgeMarginPx: number;
+  blankEdgeThreshold: number;
+  parallelJobs: number;
+  chunkPages: number;
+  preserveOriginalPageSize: boolean;
+}
+
+export interface ScanPreprocessJob {
+  id: string;
+  inputPath: string;
+  outputPath: string;
+  pageRange?: string;
+  status: ScanPreprocessJobStatus;
+  options: ScanPreprocessOptions;
+  progress: {
+    stage: 'queued' | 'validating' | 'preprocessing' | 'writing-output' | 'completed' | 'failed';
+    completedPages: number;
+    totalPages: number;
+    message?: string;
+  };
+  summary?: {
+    totalPages: number;
+    processedPages: number;
+    rotatedPages: number;
+    deskewedPages: number;
+    splitPages: number;
+    croppedPages: number;
+    blankEdgesClearedPages: number;
+    elapsedMs: number;
+    outputPath: string;
+    preprocessOnly: boolean;
+  };
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
 ### AppSettings 与 OcrProviderConfig
 
 ```ts
@@ -235,9 +292,10 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 | `src/styles/` | 全局布局与设计 token |
 | `src/shared/pdf/` | PDF 文档、页面视口、批注、页面操作和导出任务契约 |
 | `src/shared/ocr/` | OCR provider、OCR job 和质量摘要契约 |
+| `src/shared/preprocess/` | 扫描预处理参数、job、进度、统计、默认值和校验 |
 | `src/shared/settings/` | AppSettings、默认设置和密钥遮罩 |
 | `src/shared/foundation/` | 多 worktree worker 的模块边界声明 |
-| `src/modules/*/README.md` | reader、search、annotation、pages、export、ocr、forms、settings 的模块职责 |
+| `src/modules/*/README.md` | reader、search、annotation、pages、export、preprocess、ocr、forms、settings 的模块职责 |
 | `tests/fixtures/` | 可提交测试夹具规则，不放真实法律材料 |
 
 ## 已落地服务
@@ -264,6 +322,16 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 - `SettingsPanel`：支持默认保存策略、默认缩放、阅读模式、OCR provider、联网 OCR 确认和外部 provider endpoint/apiKeyRef 编辑。
 
 `src-tauri/src/lib.rs` 已提供 `read_app_settings` 与 `write_app_settings`，将设置写入应用配置目录下的 `settings.json`，不触碰用户 PDF 文件。
+
+### Scan Preprocess
+
+`src/shared/preprocess/` 与 `src/modules/preprocess/` 已建立扫描预处理第一版 job bridge：
+
+- `createDefaultScanPreprocessOptions`：从 `pdf-processor` 脚本吸收保守默认值，默认 preprocess-only、300 DPI、JPEG 90、旋转置信度 0.5、倾斜阈值 0.3 度、最大微倾斜 5 度、串行处理、不分块、不默认裁剪。
+- `validateScanPreprocessRequest`：校验 PDF 输入输出、页码范围、DPI、JPEG 质量、旋转置信度、倾斜阈值、并行数、分块页数和清边参数；错误信息不包含完整本地路径。
+- `suggestScanPreprocessOutputPath`：默认生成 `*-preprocessed.pdf`，不覆盖原始 PDF。
+- `createScanPreprocessService`：准备请求、调用 `start_scan_preprocess_job`，并脱敏 bridge 错误。
+- `src-tauri/src/lib.rs`：提供 `start_scan_preprocess_job` command stub，返回 queued job、0 页进度和安全输出路径；真实 OpenCV/PyMuPDF/Python bridge 后续接入。
 
 ## 模块规划
 
