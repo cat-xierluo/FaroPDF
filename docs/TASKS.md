@@ -206,8 +206,8 @@ Agent 可根据本文件自行判断：
 - 范围：`src/modules/export/`、`src/shared/pdf/export*`、pdf-lib 相关测试
 - 目标：建立 `pdfOperationEngine` 抽象，用 pdf-lib 起步处理批注扁平化、表单扁平化、页面操作和新 PDF 导出。
 - 验收：导出的 PDF 保留阅读批注和页面操作结果；原始 PDF 不变；后续可替换更强 PDF 引擎而不推翻 UI 层。
-- 当前实现：新增共享 `PdfExportRequest` / `PdfExportResult` / `PdfExportOperation` 契约；`pdfOperationEngine` 可用 pdf-lib 读取 PDF bytes、复制为新 PDF bytes、执行 AcroForm `flatten()`；`pdfExportService` 要求输出到新路径并写入新 bytes。
-- 当前边界：批注 sidecar 仅转换为 `plan-only` 导出计划和 PDF 元数据，不绘制高亮、图章、墨迹等真实几何；页面操作仅生成计划入口，不改写页序、旋转、裁剪或删除结果；UI、Tauri 文件保存、复杂水印/Bates/压缩仍待后续接入。
+- 当前实现：新增共享 `PdfExportRequest` / `PdfExportResult` / `PdfExportOperation` 契约；`pdfOperationEngine` 可用 pdf-lib 读取 PDF bytes、复制为新 PDF bytes、执行 AcroForm `flatten()`；`pdfExportService` 要求输出到绝对新 PDF 路径，支持 storage 路径解析，并通过 `writeNewFile` 仅新建写入。
+- 当前边界：批注 sidecar 仅转换为经过页数、指纹和页码校验的 `plan-only` 导出计划和 PDF 元数据，不绘制高亮、图章、墨迹等真实几何；页面操作仅生成经过页码校验的计划入口，不改写页序、旋转、裁剪或删除结果；UI、Tauri 文件保存、复杂水印/Bates/压缩仍待后续接入。
 - 验证：`npm run typecheck`、`npm test -- src/modules/export/pdfOperationEngine.test.ts src/modules/export/pdfExportService.test.ts src/shared/contracts.test.ts` 已通过；完整验证见本分支最终汇报。
 
 ### ISS-006 页面整理工作台

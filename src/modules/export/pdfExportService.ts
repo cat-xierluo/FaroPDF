@@ -1,11 +1,18 @@
 import type { PdfExportFileRequest, PdfExportResult } from "../../shared";
-import { isPdfPath, normalizePathForComparison, pathsAreSame, sanitizePdfExportError } from "./pathSafety";
+import {
+  isAbsolutePath,
+  isPdfPath,
+  normalizePathForComparison,
+  pathsAreSame,
+  sanitizePdfExportError,
+} from "./pathSafety";
 import { createPdfOperationEngine, type PdfOperationEngine } from "./pdfOperationEngine";
 
 export interface PdfExportStorage {
   readFile: (path: string) => Promise<Uint8Array>;
-  writeFile: (path: string, bytes: Uint8Array) => Promise<void>;
-  exists?: (path: string) => Promise<boolean>;
+  writeNewFile: (path: string, bytes: Uint8Array) => Promise<void>;
+  exists: (path: string) => Promise<boolean>;
+  resolvePath?: (path: string) => Promise<string>;
 }
 
 export interface PdfExportService {
@@ -50,12 +57,21 @@ export function createMemoryPdfExportStorage(initialFiles: Record<string, Uint8A
       return copyBytes(bytes);
     },
 
-    async writeFile(path, bytes) {
-      files.set(normalizePathForComparison(path), copyBytes(bytes));
+    async writeNewFile(path, bytes) {
+      const normalizedPath = normalizePathForComparison(path);
+      if (files.has(normalizedPath)) {
+        throw new Error("导出输出路径已存在，请选择新的 PDF 文件路径。");
+      }
+
+      files.set(normalizedPath, copyBytes(bytes));
     },
 
     async exists(path) {
       return files.has(normalizePathForComparison(path));
+    },
+
+    async resolvePath(path) {
+      return normalizePathForComparison(path);
     },
   };
 }
@@ -77,11 +93,17 @@ async function validateFileRequest(request: PdfExportFileRequest, storage: PdfEx
     throw new Error("导出输出路径必须是 PDF。");
   }
 
-  if (pathsAreSame(request.inputPath, request.outputPath)) {
+  if (!isAbsolutePath(request.outputPath)) {
+    throw new Error("导出输出路径必须是绝对路径。");
+  }
+
+  const resolvedInputPath = await resolveStoragePath(storage, request.inputPath);
+  const resolvedOutputPath = await resolveStoragePath(storage, request.outputPath);
+  if (pathsAreSame(resolvedInputPath, resolvedOutputPath)) {
     throw new Error("导出输出路径不能与原始 PDF 相同");
   }
 
-  if ((await storage.exists?.(request.outputPath)) === true) {
+  if (await outputPathExists(storage, request.outputPath)) {
     throw new Error("导出输出路径已存在，请选择新的 PDF 文件路径。");
   }
 }
@@ -129,11 +151,39 @@ async function exportWithSanitizedError(
 
 async function writeOutputFile(storage: PdfExportStorage, outputPath: string, bytes: Uint8Array): Promise<void> {
   try {
-    await storage.writeFile(outputPath, bytes);
+    await storage.writeNewFile(outputPath, bytes);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const sanitizedMessage = sanitizePdfExportError(message);
     throw Object.assign(new Error(`PDF 导出写入失败：${sanitizedMessage}`), {
+      cause: new Error(sanitizedMessage),
+    });
+  }
+}
+
+async function resolveStoragePath(storage: PdfExportStorage, path: string): Promise<string> {
+  if (!storage.resolvePath) {
+    return path;
+  }
+
+  try {
+    return await storage.resolvePath(path);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const sanitizedMessage = sanitizePdfExportError(message);
+    throw Object.assign(new Error(`PDF 导出路径检查失败：${sanitizedMessage}`), {
+      cause: new Error(sanitizedMessage),
+    });
+  }
+}
+
+async function outputPathExists(storage: PdfExportStorage, outputPath: string): Promise<boolean> {
+  try {
+    return await storage.exists(outputPath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const sanitizedMessage = sanitizePdfExportError(message);
+    throw Object.assign(new Error(`PDF 导出路径检查失败：${sanitizedMessage}`), {
       cause: new Error(sanitizedMessage),
     });
   }

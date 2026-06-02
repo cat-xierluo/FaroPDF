@@ -6,10 +6,16 @@ export function pathsAreSame(left: string, right: string): boolean {
   return normalizePathForComparison(left) === normalizePathForComparison(right);
 }
 
+export function isAbsolutePath(path: string): boolean {
+  const trimmed = path.trim();
+  return trimmed.startsWith("/") || /^[A-Za-z]:[\\/]/.test(trimmed);
+}
+
 export function sanitizePdfExportError(message: string): string {
   return message
-    .replace(/\b[A-Za-z]:[\\/][^，。；;,\n\r]*?\.pdf/gi, "[path]")
-    .replace(/\/[^，。；;,\n\r]*?\.pdf/gi, "[path]");
+    .replace(/\b[A-Za-z]:[\\/][^\n\r]*?\.pdf/gi, "[path]")
+    .replace(/\/[^\n\r]*?\.pdf/gi, "[path]")
+    .replace(/\b(api[-_]?key|token|secret|password)=\S+/gi, "$1=[redacted]");
 }
 
 export function normalizePathForComparison(path: string): string {

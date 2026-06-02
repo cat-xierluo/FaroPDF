@@ -1,12 +1,10 @@
 import { PDFDocument } from "pdf-lib";
 import type {
-  AnnotationSidecar,
   PdfAnnotationFlattenPlan,
   PdfExportRequest,
   PdfExportResult,
   PdfExportSummary,
   PdfFormFlatteningSummary,
-  PdfPageOperation,
   PdfPageOperationPlan,
 } from "../../shared";
 import { isPdfPath, pathsAreSame } from "./pathSafety";
@@ -41,7 +39,7 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
 
       for (const operation of request.operations) {
         if (operation.type === "flatten-annotations") {
-          summary.annotationPlan = buildAnnotationFlattenPlan(operation.sidecar);
+          summary.annotationPlan = buildAnnotationFlattenPlan(operation, request.source.fingerprint, inputPageCount);
           continue;
         }
 
@@ -50,7 +48,7 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
           continue;
         }
 
-        summary.pageOperationPlan = buildPageOperationPlan(operation.operations);
+        summary.pageOperationPlan = buildPageOperationPlan(operation, inputPageCount);
         warnings.push(PAGE_OPERATIONS_PLAN_ONLY_WARNING);
       }
 
@@ -99,7 +97,29 @@ function validatePdfExportRequest(request: PdfExportRequest): void {
   }
 }
 
-function buildAnnotationFlattenPlan(sidecar: AnnotationSidecar): PdfAnnotationFlattenPlan {
+function buildAnnotationFlattenPlan(
+  operation: Extract<PdfExportRequest["operations"][number], { type: "flatten-annotations" }>,
+  sourceFingerprint: string | undefined,
+  inputPageCount: number,
+): PdfAnnotationFlattenPlan {
+  const sidecar = operation.sidecar;
+  if ((operation.strategy ?? "plan-only") !== "plan-only") {
+    throw new Error("批注扁平化第一版只支持 plan-only 策略。");
+  }
+  if (sidecar.document.pageCount !== undefined && sidecar.document.pageCount !== inputPageCount) {
+    throw new Error("批注 sidecar 页数与源 PDF 不一致。");
+  }
+  if (
+    sourceFingerprint &&
+    sidecar.document.fingerprint &&
+    sidecar.document.fingerprint !== sourceFingerprint
+  ) {
+    throw new Error("批注 sidecar 指纹与源 PDF 不一致。");
+  }
+  if (sidecar.annotations.some((annotation) => !isPageIndexInRange(annotation.pageIndex, inputPageCount))) {
+    throw new Error("批注页码超出源 PDF 页数。");
+  }
+
   return {
     strategy: "plan-only",
     annotationCount: sidecar.annotations.length,
@@ -126,17 +146,35 @@ function flattenFormFields(pdf: PDFDocument): PdfFormFlatteningSummary {
   };
 }
 
-function buildPageOperationPlan(operations: PdfPageOperation[]): PdfPageOperationPlan {
+function buildPageOperationPlan(
+  operation: Extract<PdfExportRequest["operations"][number], { type: "page-operations" }>,
+  inputPageCount: number,
+): PdfPageOperationPlan {
+  if ((operation.mode ?? "plan-only") !== "plan-only") {
+    throw new Error("页面操作导出第一版只支持 plan-only 模式。");
+  }
+  if (
+    operation.operations.some((pageOperation) =>
+      pageOperation.pageIndexes.some((pageIndex) => !isPageIndexInRange(pageIndex, inputPageCount)),
+    )
+  ) {
+    throw new Error("页面操作页码超出源 PDF 页数。");
+  }
+
   return {
     mode: "plan-only",
-    operationCount: operations.length,
-    entries: operations.map((operation) => ({
-      operationId: operation.id,
-      type: operation.type,
-      pageIndexes: [...operation.pageIndexes],
+    operationCount: operation.operations.length,
+    entries: operation.operations.map((pageOperation) => ({
+      operationId: pageOperation.id,
+      type: pageOperation.type,
+      pageIndexes: [...pageOperation.pageIndexes],
       status: "planned",
     })),
   };
+}
+
+function isPageIndexInRange(pageIndex: number, pageCount: number): boolean {
+  return Number.isInteger(pageIndex) && pageIndex >= 0 && pageIndex < pageCount;
 }
 
 async function copyPdfDocument(sourcePdf: PDFDocument): Promise<PDFDocument> {

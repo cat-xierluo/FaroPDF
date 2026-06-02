@@ -86,6 +86,114 @@ describe("pdf operation engine", () => {
     expect(outputPdf.getKeywords()).toContain("faropdf:annotation-plan-only");
   });
 
+  test("rejects annotation plans that do not match the source PDF", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const engine = createPdfOperationEngine();
+    const sidecar = createAnnotationSidecar([createAnnotation("ann-out-of-range", "highlight")]);
+    sidecar.document.pageCount = 2;
+
+    await expect(
+      engine.exportPdf({
+        id: "export-annotation-mismatch",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+          fingerprint: "fixture",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "flatten-ann-mismatch",
+            type: "flatten-annotations",
+            sidecar,
+            strategy: "plan-only",
+          },
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("批注 sidecar 页数与源 PDF 不一致。");
+
+    sidecar.document.pageCount = 1;
+    sidecar.document.fingerprint = "other-fixture";
+
+    await expect(
+      engine.exportPdf({
+        id: "export-annotation-fingerprint",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+          fingerprint: "fixture",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "flatten-ann-fingerprint",
+            type: "flatten-annotations",
+            sidecar,
+            strategy: "plan-only",
+          },
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("批注 sidecar 指纹与源 PDF 不一致。");
+  });
+
+  test("rejects unsupported annotation flatten strategy and out-of-range annotation pages", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const engine = createPdfOperationEngine();
+    const sidecar = createAnnotationSidecar([createAnnotation("ann-out-of-range", "highlight")]);
+
+    await expect(
+      engine.exportPdf({
+        id: "export-annotation-strategy",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "flatten-ann-strategy",
+            type: "flatten-annotations",
+            sidecar,
+            strategy: "draw",
+          } as never,
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("批注扁平化第一版只支持 plan-only 策略。");
+
+    sidecar.annotations[0].pageIndex = 1;
+
+    await expect(
+      engine.exportPdf({
+        id: "export-annotation-page",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "flatten-ann-page",
+            type: "flatten-annotations",
+            sidecar,
+            strategy: "plan-only",
+          },
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("批注页码超出源 PDF 页数。");
+  });
+
   test("flattens AcroForm fields when the form flatten operation is requested", async () => {
     const inputBytes = await createPdfWithTextField();
     const engine = createPdfOperationEngine();
@@ -163,6 +271,62 @@ describe("pdf operation engine", () => {
     });
     expect(result.summary.warnings).toContain("页面操作当前仅生成导出计划，尚未改写页面几何或顺序。");
   });
+
+  test("rejects unsupported page operation mode and out-of-range page indexes", async () => {
+    const inputBytes = await createPdfWithBlankPages(2);
+    const engine = createPdfOperationEngine();
+    const pageOperation: PdfPageOperation = {
+      id: "page-op-invalid",
+      type: "rotate",
+      pageIndexes: [2],
+      payload: { angle: 90 },
+      createdAt: "2026-06-02T00:00:00.000Z",
+    };
+
+    await expect(
+      engine.exportPdf({
+        id: "export-pages-mode",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "page-plan-mode",
+            type: "page-operations",
+            operations: [pageOperation],
+            mode: "apply",
+          } as never,
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("页面操作导出第一版只支持 plan-only 模式。");
+
+    await expect(
+      engine.exportPdf({
+        id: "export-pages-out-of-range",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "page-plan-out-of-range",
+            type: "page-operations",
+            operations: [pageOperation],
+            mode: "plan-only",
+          },
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("页面操作页码超出源 PDF 页数。");
+  });
 });
 
 async function createPdfWithBlankPages(pageCount: number): Promise<Uint8Array> {
@@ -217,4 +381,3 @@ function createAnnotation(id: string, type: PdfAnnotation["type"]): PdfAnnotatio
     updatedAt: "2026-06-02T00:00:00.000Z",
   };
 }
-
