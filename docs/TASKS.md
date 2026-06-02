@@ -120,13 +120,14 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：阅读核心
-- 状态：进行中（worker: Beauvoir）
+- 状态：已完成
 - 建议分支：`feat/reader-core`
 - 建议 worktree：`.claude/worktrees/tmux-reader-core`
 - 依赖：ISS-001、ISS-011、ISS-012
 - 范围：`src/modules/reader/`、`src/shared/pdf/reader*`、阅读相关测试
 - 目标：接入 PDF.js，支持打开本地 PDF、worker 渲染、页面虚拟化、缩放、页码跳转、连续阅读、单页和双页视图。
 - 验收：几百页 PDF 打开后只渲染可见页附近；滚动和缩放不卡住主界面；阅读状态可被搜索、批注、页面整理模块复用。
+- 验证：`npm run typecheck`、`npm test`、`npm run lint`、`npm run build`、`cd src-tauri && cargo check`。当前实现已接入 PDF.js 加载、worker chunk、文件输入、阅读状态、缩放/视图模式和虚拟化范围计算；真实 canvas 渲染调度留给后续阅读深化。
 
 ### ISS-003 文本层检测与全文搜索
 
@@ -243,13 +244,14 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：设置 / OCR
-- 状态：进行中（worker: Laplace）
+- 状态：已完成
 - 建议分支：`feat/settings-ocr-providers`
 - 建议 worktree：`.claude/worktrees/tmux-settings-ocr-providers`
 - 依赖：ISS-011、ISS-012
 - 范围：`src/modules/settings/`、`src/shared/settings/`、`src-tauri/` 设置持久化 command、设置相关测试
 - 目标：建立设置页，管理默认保存策略、最近文件、默认 OCR 后端、PaddleOCR/MinerU API 配置和联网处理确认策略。
 - 验收：设置可持久化；API Key 以安全方式存储或留给系统凭证方案；UI 不展示完整密钥；未配置云端 OCR 时不会误触发联网请求。
+- 验证：`npm run typecheck`、`npm test`、`npm run lint`、`npm run build`、`cd src-tauri && cargo check`。当前实现已提供设置 service、Tauri read/write command、provider 校验、API Key 脱敏和设置页编辑；系统 Keychain 集成留给后续安全深化。
 
 ### ISS-016 扫描清洁与校正 pipeline
 
@@ -326,3 +328,4 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：分析 `pdf-processor`、`pdf-organizer`、`img2pdf` 的脚本算法，将扫描清洁校正、压缩、OCR 质量检查、证据图片编排和文书整理 manifest 纳入任务源。
 - 2026-06-02：在 `feat/foundation-scaffold` 完成 ISS-001、ISS-011、ISS-012，建立可运行 Tauri/React 工程、共享契约、三栏阅读器 Shell、设置入口和 fixture 规则。
 - 2026-06-02：从最新 `main` 创建 `feat/reader-core` 与 `feat/settings-ocr-providers` worktree，并启动两个并行 worker 推进 ISS-002 与 ISS-014。
+- 2026-06-02：合并 `feat/reader-core` 与 `feat/settings-ocr-providers`，完成 PDF.js 阅读底座和设置/OCR provider 配置第一版。

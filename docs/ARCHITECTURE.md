@@ -239,6 +239,31 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 | `src/modules/*/README.md` | reader、search、annotation、pages、export、ocr、forms、settings 的模块职责 |
 | `tests/fixtures/` | 可提交测试夹具规则，不放真实法律材料 |
 
+## 已落地服务
+
+### Reader
+
+`src/modules/reader/` 已建立 PDF.js 阅读底座：
+
+- `pdfReaderService`：懒加载 `pdfjs-dist`，配置独立 PDF.js worker，读取 PDF 页数、指纹、首页尺寸和文字层初始状态。
+- `readerState`：维护打开状态、页码、缩放、视图模式、文字层状态和错误信息。
+- `virtualization`：按当前页、总页数、视图模式和 overscan 计算应渲染页范围。
+- `useReaderController`：连接文件输入、PDF 加载和阅读状态。
+
+当前 UI 使用阅读占位页展示虚拟化范围；真实 canvas 渲染、滚动驱动当前页和页级尺寸缓存继续由后续阅读深化任务完成。
+
+### Settings
+
+`src/shared/settings/` 与 `src/modules/settings/` 已建立设置和 OCR provider 配置底座：
+
+- `createDefaultAppSettings`：提供默认保存策略、默认缩放、默认视图、最近文件数组、本地 OCR provider、PaddleOCR 和 MinerU provider。
+- `validateAppSettings`：校验缩放范围、默认 OCR provider、联网 provider endpoint、apiKeyRef 和联网确认策略。
+- `sanitizeAppSettingsForStorage` / `exportSafeAppSettings`：保存和展示前对 API Key 引用脱敏。
+- `createSettingsService`：通过 Tauri command 读取、校验和写入设置。
+- `SettingsPanel`：支持默认保存策略、默认缩放、阅读模式、OCR provider、联网 OCR 确认和外部 provider endpoint/apiKeyRef 编辑。
+
+`src-tauri/src/lib.rs` 已提供 `read_app_settings` 与 `write_app_settings`，将设置写入应用配置目录下的 `settings.json`，不触碰用户 PDF 文件。
+
 ## 模块规划
 
 | 模块 | 职责 |
