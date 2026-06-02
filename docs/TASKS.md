@@ -120,7 +120,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：阅读核心
-- 状态：待处理
+- 状态：进行中（worker: Beauvoir）
 - 建议分支：`feat/reader-core`
 - 建议 worktree：`.claude/worktrees/tmux-reader-core`
 - 依赖：ISS-001、ISS-011、ISS-012
@@ -243,7 +243,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：设置 / OCR
-- 状态：待处理
+- 状态：进行中（worker: Laplace）
 - 建议分支：`feat/settings-ocr-providers`
 - 建议 worktree：`.claude/worktrees/tmux-settings-ocr-providers`
 - 依赖：ISS-011、ISS-012
@@ -325,3 +325,4 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：将 v0.1 拆分为 foundation gate 和多 worktree 并行任务包，补充设置页、外部 OCR provider、水印、压缩和直接编辑调研任务。
 - 2026-06-02：分析 `pdf-processor`、`pdf-organizer`、`img2pdf` 的脚本算法，将扫描清洁校正、压缩、OCR 质量检查、证据图片编排和文书整理 manifest 纳入任务源。
 - 2026-06-02：在 `feat/foundation-scaffold` 完成 ISS-001、ISS-011、ISS-012，建立可运行 Tauri/React 工程、共享契约、三栏阅读器 Shell、设置入口和 fixture 规则。
+- 2026-06-02：从最新 `main` 创建 `feat/reader-core` 与 `feat/settings-ocr-providers` worktree，并启动两个并行 worker 推进 ISS-002 与 ISS-014。
