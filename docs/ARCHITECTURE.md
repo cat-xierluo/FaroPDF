@@ -22,15 +22,16 @@
 │ Tauri v2                                    │
 │ ┌─────────────────────────────────────────┐ │
 │ │ React App                               │ │
-│ │ ┌──────────────┬──────────────────────┐ │ │
-│ │ │ Sidebar      │ PDF Reader Canvas    │ │ │
-│ │ │ Thumbnails   │ PDF.js virtual pages │ │ │
-│ │ │ Outline      │ Text / annotation    │ │ │
-│ │ └──────────────┴──────────────────────┘ │ │
 │ │ ┌──────────────────────────────────────┐ │ │
-│ │ │ Right Inspector                       │ │ │
-│ │ │ Search / Annotations / OCR / Pages    │ │ │
+│ │ │ Main Toolbar                         │ │ │
+│ │ │ Summary / Page / View / Mode / Search│ │ │
 │ │ └──────────────────────────────────────┘ │ │
+│ │ ┌──────────────┬──────────────────────┐ │ │
+│ │ │ Utility Pane │ PDF Reader Canvas    │ │ │
+│ │ │ Summary/View │ or Task Workspace    │ │ │
+│ │ │ Settings     │ Page grid / PDF.js   │ │ │
+│ │ └──────────────┴──────────────────────┘ │ │
+│ │ Context Toolbar for annotate/OCR/export  │ │
 │ └─────────────────────────────────────────┘ │
 │ Tauri commands: fs / dialog / OCR bridge    │
 └─────────────────────────────────────────────┘
@@ -230,7 +231,7 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 
 | 目录 | 职责 |
 | --- | --- |
-| `src/components/layout/` | 基础阅读器 Shell、工具栏、侧栏、阅读区、任务面板和状态栏 |
+| `src/components/layout/` | 基础阅读器 Shell、主工具栏、按需左侧工具区、上下文工具条、阅读区、页面管理工作台和状态栏 |
 | `src/styles/` | 全局布局与设计 token |
 | `src/shared/pdf/` | PDF 文档、页面视口、批注、页面操作和导出任务契约 |
 | `src/shared/ocr/` | OCR provider、OCR job 和质量摘要契约 |

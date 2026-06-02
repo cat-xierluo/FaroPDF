@@ -1,7 +1,3 @@
-export type InspectorPanelId =
-  | "search"
-  | "annotation"
-  | "ocr"
-  | "pages"
-  | "forms"
-  | "settings";
+export type AppModeId = "read" | "annotate" | "export" | "forms" | "ocr" | "pages";
+
+export type UtilityPanelId = "summary" | "view" | "settings" | "none";

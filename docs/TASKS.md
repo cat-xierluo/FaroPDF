@@ -23,7 +23,7 @@ Agent 可根据本文件自行判断：
 
 - Tauri v2 + React + TypeScript + Vite 应用可启动。
 - `typecheck`、测试、构建命令可运行。
-- PDF 阅读器三栏 shell、工具栏、状态栏和设置入口存在。
+- PDF 阅读器主工具栏、按需左侧工具区、上下文工具条、页面管理工作台、状态栏和设置入口存在。
 - `PdfDocumentState`、`PdfPageViewport`、`PdfAnnotation`、`PdfPageOperation`、`PdfExportJob`、`OcrProviderConfig`、`OcrJob`、`AppSettings` 等共享契约已落盘。
 - `src/modules/` 下 reader、search、annotation、pages、export、ocr、forms、settings 模块边界已建立。
 - worker 文件范围和验证命令已写入对应任务。
@@ -73,6 +73,33 @@ Agent 可根据本文件自行判断：
 - 外部 API 和密钥由设置页管理；联网 OCR 必须主动确认。
 - 所有处理默认输出新 PDF，不覆盖原始材料。
 
+## PDF Expert UI 探索素材池
+
+以下观察只作为信息架构和交互编排参考，不复制 PDF Expert 的品牌、图标、配色或具体视觉资产。探索使用 `/tmp/faropdf-ui-sample.pdf` 临时无敏感样例；不记录用户真实最近文件名和搜索历史。
+
+已观察结论：
+
+- 新建标签页：顶部主工具栏 disabled，中央是打开/拖拽 PDF 区，旁边提供 Word/PDF、图片/PDF 转换入口，下方是最近文件缩略图。
+- 阅读态：顶部主工具带 + 中央 PDF 页面 + 左侧按需文档摘要，不常驻右侧 Inspector。
+- 文档摘要：左侧抽屉顶部用小图标切换书签、大纲、批注、缩略图；缩略图较大，当前页高亮，页码和纸张尺寸显示在缩略图下方。
+- 视图设置：占用左侧工具区，提供单页/双页、无拆分/垂直/水平分屏，不作为右侧面板。
+- 页面管理：进入独立页面网格工作台，阅读区被替换；顶部显示插入页、附加文件、旋转、复制、粘贴、摘录、删除等专用工具条。
+- 批注模式：主工具栏切换模式，第二行上下文工具条显示高亮、下划线、删除线、笔、橡皮擦、文本、形状、笔记、图章、签名、内容选定和裁剪。
+- 编辑 PDF 模式：第二行工具条显示文本、图像、链接、隐藏。v0.1 直接编辑 PDF 原文暂缓，但“隐藏/遮盖”可作为法律材料安全编辑后续议题。
+- 导出模式：第二行工具条偏格式转换，包括转 Word、Excel、PowerPoint、文本和图片；这与 FaroPDF 的水印/压缩/Bates 交付工具不是同一层级。
+- 填写和签名：第二行工具条包含文本、签名、日期、钩号、叉号、图章、图像，右侧有导出为压平。
+- 扫描和文本识别：第二行工具条包含增强扫描、拆分页面、裁剪页面、清除空白边、识别文本、内容选定和裁剪。
+- 搜索：顶部搜索框带搜索选项和历史菜单；不应把历史关键词写入日志或任务源。搜索结果后续应以轻量结果层呈现，而不是常驻右栏。
+
+当前差距：
+
+- 当前 `feat/pdf-expert-shell-ia` 只是信息架构草案：顶栏仍过密，图标语义和按钮分组还不够自然，视觉细节没有达到可合并的设计系统质量。
+- FaroPDF 当前把导出、水印、压缩、Bates 混在一个模式里；后续需要拆成“格式转换”和“交付工具”两类。
+- 空态缺少 PDF Expert 那种打开/拖拽区、转换入口、最近文件缩略图的完整编排。
+- 左侧缩略图还是占位，未接入真实 PDF.js 缩略图、当前页同步、批注/搜索/OCR 标记。
+- 搜索只有输入框，没有结果层、命中跳转和文字层/OCR 提示。
+- 页面管理工作台只有壳层网格，没有拖拽、选择、多选、撤销、导出路径和风险确认。
+
 ## 基础状态任务
 
 ### ISS-001 初始化 Tauri 应用脚手架
@@ -105,13 +132,13 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：UI / 工程基础
-- 状态：已完成（待合并）
+- 状态：已完成
 - 建议分支：`feat/app-shell-foundation`
 - 建议 worktree：`.claude/worktrees/tmux-app-shell-foundation`
 - 依赖：ISS-001、ISS-011
 - 范围：`src/App.tsx`、`src/components/layout/`、`src/styles/`、`src/modules/settings/` 入口、`tests/fixtures/`
-- 目标：建立三栏阅读布局、顶部工具栏、状态栏、右侧 Inspector、设置入口和测试用 PDF fixture 策略。
-- 验收：空壳应用能展示阅读器布局；设置页可打开；测试 fixture 不包含敏感材料；符合 `docs/DESIGN.md` 的清亮阅读器方向。
+- 目标：建立 PDF Expert 风格信息架构的基础 Shell：主工具栏、按需左侧工具区、上下文工具条、页面管理工作台、状态栏、设置入口和测试用 PDF fixture 策略。
+- 验收：空壳应用能展示阅读器布局；默认不常驻右侧 Inspector；设置页可打开；测试 fixture 不包含敏感材料；符合 `docs/DESIGN.md` 的清亮阅读器方向。
 - 验证：`src/App.test.tsx` 覆盖阅读器首屏和设置入口；`tests/fixtures/README.md` 记录夹具安全规则。
 
 ## 并行功能任务
@@ -189,7 +216,7 @@ Agent 可根据本文件自行判断：
 - 范围：`src/modules/ocr/`、`src/shared/ocr/`、`src-tauri/` OCR command、OCR 相关测试
 - 参考算法：`pdf-processor/scripts/pdf-ocr.py`、`pdf_ocr_paddle_api.py`、`pdf_ocr_mineru.py`、`pdf_ocr_layered.py`
 - 目标：建立 OCR 任务模型，优先连接本地 Legal Skills / `ocrmypdf`，并支持 PaddleOCR、MinerU 等外部 OCR API adapter。
-- 验收：纯扫描 PDF 可触发 OCR 任务；任务显示后端、页码范围、进度、输出路径和失败原因；生成双层 PDF 后能做搜索质量抽查。
+- 验收：纯扫描 PDF 可触发 OCR 任务；任务显示后端、页码范围、进度、输出路径和失败原因；生成双层 PDF 后能做搜索质量抽查；OCR 模式工具条至少覆盖识别文本、输出双层 PDF 和质量检查。
 
 ### ISS-008 表单填写与签署
 
@@ -200,20 +227,22 @@ Agent 可根据本文件自行判断：
 - 建议 worktree：`.claude/worktrees/tmux-forms-signing`
 - 依赖：ISS-002、ISS-005
 - 范围：`src/modules/forms/`、`src/shared/pdf/form*`、表单签署相关测试
-- 目标：支持 AcroForm 字段识别、填写、签名图片、手写签名和扁平化导出。
-- 验收：常见 PDF 表单可填写并导出为不可编辑提交版。
+- 目标：支持 AcroForm 字段识别、填写、签名图片、手写签名、日期、勾号、叉号、图章、图片和扁平化导出。
+- 验收：常见 PDF 表单可填写并导出为不可编辑提交版；填写和签名模式工具条覆盖文本、签名、日期、勾号、叉号、图章、图片和导出为压平。
 
 ### ISS-009 设计系统落地
 
 - 优先级：P0
 - 类型：UI
-- 状态：待处理
-- 建议分支：`feat/design-system`
-- 建议 worktree：`.claude/worktrees/tmux-design-system`
+- 状态：进行中（结构草案，未达到 UI 验收）
+- 建议分支：`feat/pdf-expert-shell-ia`
+- 建议 worktree：当前 checkout 已切到 `feat/pdf-expert-shell-ia`；后续如并行推进，再从最新 `main` 创建 `.claude/worktrees/tmux-pdf-expert-shell-ia`
 - 依赖：ISS-012
 - 范围：`src/components/`、`src/styles/`、`src/modules/*` 的视觉整合、`docs/DESIGN.md`
-- 目标：按 `docs/DESIGN.md` 实现清亮阅读布局、克制工具栏、左侧缩略图/目录、右侧搜索/批注/OCR/页面/表单面板。
-- 验收：界面不复用 Folia 的 Markdown 编辑布局，PDF 页面始终是主视觉；桌面和窄屏视口不出现文本重叠。
+- 目标：按 `docs/DESIGN.md` 实现 PDF Expert 风格信息架构：中央阅读优先、左侧按需工具区、顶部搜索、模式上下文工具条和独立页面管理工作台。
+- 验收：界面不复用 Folia 的 Markdown 编辑布局，不常驻右侧 Inspector；PDF 页面始终是主视觉；桌面和窄屏视口不出现文本重叠。
+- 当前进度：已在 `feat/pdf-expert-shell-ia` 做出基础壳层重排，并补上 PDF Expert 风格空态、转换入口、最近文件占位、分组导出工具条、填写签名工具条、扫描/OCR 工具条和页面管理“另存为新 PDF”出口；已用 `/tmp/faropdf-ui-sample.pdf` 检查打开态、页面管理和导出工具条，并修正 900px 窄屏顶栏溢出。但 UI 还未达到最终合并标准，必须继续做视觉密度、真实缩略图、搜索结果层、页面管理交互和真实文件态 polish。
+- 下一步：继续推进阅读态真实 PDF 打开后的视觉 polish、搜索结果层、页面管理多选/撤销/风险提示，以及扫描/OCR 任务参数区；先补测试，再实现，最后用浏览器截图检查无重叠。
 
 ### ISS-010 法律材料隐私与联网 OCR 提示
 
@@ -239,6 +268,7 @@ Agent 可根据本文件自行判断：
 - 参考算法：`pdf-processor/scripts/pdf-compress.py`、`pdf-add-page-numbers.py`、`pdf-merge.py`
 - 目标：支持文字水印、图片水印、普通页码、Bates 编号和常用压缩预设。
 - 验收：每个操作都提供预览或明确输出路径；默认另存为新 PDF；Bates 编号支持起始号、前后缀和位置选择。
+- UI 备注：不要把水印、压缩、Bates 和“转 Word/Excel/图片”等格式转换混成同一层级；FaroPDF 后续应拆成“交付工具”和“格式转换”两个入口或二级分组。
 
 ### ISS-014 设置页与外部 OCR Provider 配置
 
@@ -263,8 +293,8 @@ Agent 可根据本文件自行判断：
 - 依赖：ISS-011、ISS-012、ISS-014
 - 范围：`src/modules/preprocess/`、`src/shared/preprocess/`、`src-tauri/` 预处理 command、预处理相关测试
 - 参考算法：`pdf-processor/scripts/pdf-preprocess-core.py`、`pdf_preprocess_skew.py`、`pdf-preprocess-ocr.py`
-- 目标：支持扫描件清洁、90 度粗方向检测、微倾斜校正、可选裁边、分块处理、并行处理和只预处理输出。
-- 验收：用户可在不 OCR 的情况下输出清洁校正后的新 PDF；任务显示旋转页数、倾斜校正页数、裁边页数、耗时和输出路径。
+- 目标：支持扫描件增强、90 度粗方向检测、微倾斜校正、拆分页面、裁剪页面、清除空白边、分块处理、并行处理和只预处理输出。
+- 验收：用户可在不 OCR 的情况下输出清洁校正后的新 PDF；任务显示旋转页数、倾斜校正页数、拆分页数、裁边页数、清边页数、耗时和输出路径；扫描/OCR 工具条至少覆盖增强扫描、拆分页面、裁剪页面、清除空白边和识别文本。
 
 ### ISS-017 OCR 质量检查
 
@@ -326,6 +356,9 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：初始化项目 Git 基线，推送到同名 GitHub private 仓库 `FaroPDF`。
 - 2026-06-02：将 v0.1 拆分为 foundation gate 和多 worktree 并行任务包，补充设置页、外部 OCR provider、水印、压缩和直接编辑调研任务。
 - 2026-06-02：分析 `pdf-processor`、`pdf-organizer`、`img2pdf` 的脚本算法，将扫描清洁校正、压缩、OCR 质量检查、证据图片编排和文书整理 manifest 纳入任务源。
-- 2026-06-02：在 `feat/foundation-scaffold` 完成 ISS-001、ISS-011、ISS-012，建立可运行 Tauri/React 工程、共享契约、三栏阅读器 Shell、设置入口和 fixture 规则。
+- 2026-06-02：在 `feat/foundation-scaffold` 完成 ISS-001、ISS-011、ISS-012，建立可运行 Tauri/React 工程、共享契约、基础阅读器 Shell、设置入口和 fixture 规则。
 - 2026-06-02：从最新 `main` 创建 `feat/reader-core` 与 `feat/settings-ocr-providers` worktree，并启动两个并行 worker 推进 ISS-002 与 ISS-014。
 - 2026-06-02：合并 `feat/reader-core` 与 `feat/settings-ocr-providers`，完成 PDF.js 阅读底座和设置/OCR provider 配置第一版。
+- 2026-06-02：观察 PDF Expert 的阅读态、批注、编辑、导出、填写签名、扫描 OCR、视图设置和页面管理模式后，在 `feat/pdf-expert-shell-ia` 分支启动 FaroPDF Shell 重排草案；当前 UI 尚未达到可合并验收。
+- 2026-06-02：清理已合并的 foundation、reader-core、settings-ocr-providers 旧 worktree、本地分支和远端分支；继续推进 `feat/pdf-expert-shell-ia`，补齐空态工作区和导出/填写签名/扫描 OCR/页面管理工具条。
+- 2026-06-02：对 `feat/pdf-expert-shell-ia` 做提交前验证，修正 900px 窄屏顶栏溢出；该分支适合作为 Draft PR 进入 code/design review，但 `ISS-009` 仍保持进行中。

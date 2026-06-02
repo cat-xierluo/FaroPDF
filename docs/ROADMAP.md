@@ -118,3 +118,4 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - 2026-06-02：纳入 `pdf-processor`、`pdf-organizer`、`img2pdf` 的脚本算法来源，新增扫描清洁校正、压缩算法、OCR 质量检查、证据图片编排和文书整理 manifest。
 - 2026-06-02：在 foundation 分支完成 Tauri/React 脚手架、基础阅读器 Shell、共享契约、设置入口和验证命令。
 - 2026-06-02：并行完成 PDF.js 阅读底座和设置/OCR provider 配置第一版，进入阅读深化、搜索、批注和 OCR bridge 前置状态。
+- 2026-06-02：参考 PDF Expert 的信息架构，在 `feat/pdf-expert-shell-ia` 分支启动 Shell 重排草案；当前记录为 UI 方向和任务边界，尚未达到最终视觉验收。

@@ -6,7 +6,7 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常处理卷宗、证据�
 
 ## 当前状态
 
-当前阶段为 Foundation Gate。`feat/foundation-scaffold` 分支已建立 Tauri v2 + React + TypeScript + Vite 基础工程、三栏阅读器 Shell、设置入口、共享契约和基础测试。
+当前阶段已完成 Foundation Gate，并接入 PDF.js 阅读底座和设置/OCR provider 配置第一版。应用 Shell 正在 `feat/pdf-expert-shell-ia` 分支按 PDF Expert 的页面逻辑重排；当前是结构草案，尚未达到最终 UI 验收。
 
 已固定：
 
