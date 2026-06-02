@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PdfDocumentState } from "../../shared/pdf/types";
 import type { PdfPageText } from "../../shared/pdf/text";
 import {
@@ -37,27 +37,36 @@ export function useTextSearchController({
 }: TextSearchControllerOptions): TextSearchController {
   const pageCount = document?.pageCount ?? 0;
   const currentPageIndex = Math.max((document?.currentPage ?? 1) - 1, 0);
+  const documentId = document?.documentId ?? "no-document";
+  const activeDocumentIdRef = useRef(documentId);
   const sessionRef = useRef<TextSearchSession | null>(null);
   const requestIdRef = useRef(0);
   const [state, setState] = useState(() => createIdleSearchState(pageCount));
-  const documentSearchKey = useMemo(
-    () => (document ? `${document.fingerprint ?? "no-fingerprint"}:${document.pageCount}` : "no-document"),
-    [document?.fingerprint, document?.pageCount],
-  );
+
+  activeDocumentIdRef.current = documentId;
 
   useEffect(() => {
+    requestIdRef.current += 1;
+
     if (pageCount === 0) {
       sessionRef.current = null;
       setState(createIdleSearchState(0));
       return;
     }
 
+    const sessionDocumentId = documentId;
     sessionRef.current = createTextSearchSession({
       pageCount,
-      readPageText,
+      readPageText: async (pageIndex) => {
+        if (activeDocumentIdRef.current !== sessionDocumentId) {
+          throw new Error("文档已切换，搜索索引已重置。");
+        }
+
+        return readPageText(pageIndex);
+      },
     });
     setState(createIdleSearchState(pageCount));
-  }, [documentSearchKey, pageCount, readPageText]);
+  }, [documentId, pageCount, readPageText]);
 
   const setQuery = useCallback(
     (query: string) => {
@@ -148,6 +157,7 @@ export function useTextSearchController({
   }, [activateState]);
 
   const reset = useCallback(() => {
+    requestIdRef.current += 1;
     const nextState = sessionRef.current?.reset() ?? createIdleSearchState(pageCount);
     setState(nextState);
   }, [pageCount]);

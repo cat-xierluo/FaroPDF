@@ -7,6 +7,7 @@ import { createInitialReaderState, readerReducer } from "./readerState";
 
 export function useReaderController(settings: AppSettings) {
   const loadedDocumentRef = useRef<LoadedPdfDocument | null>(null);
+  const loadRequestIdRef = useRef(0);
   const initialState = useMemo(
     () =>
       createInitialReaderState({
@@ -18,14 +19,28 @@ export function useReaderController(settings: AppSettings) {
   const [state, dispatch] = useReducer(readerReducer, initialState);
 
   const openFile = useCallback(async (file: File) => {
+    const loadRequestId = loadRequestIdRef.current + 1;
+    loadRequestIdRef.current = loadRequestId;
     dispatch({ type: "reader/loadStarted", payload: { fileName: file.name } });
 
     try {
       await loadedDocumentRef.current?.destroy();
       const loadedDocument = await loadPdfFromFile(file);
+      if (loadRequestIdRef.current !== loadRequestId) {
+        await loadedDocument.destroy();
+        return;
+      }
+
       loadedDocumentRef.current = loadedDocument;
-      dispatch({ type: "reader/loadSucceeded", payload: loadedDocument.metadata });
+      dispatch({
+        type: "reader/loadSucceeded",
+        payload: { documentId: `document-${loadRequestId}`, metadata: loadedDocument.metadata },
+      });
     } catch (error) {
+      if (loadRequestIdRef.current !== loadRequestId) {
+        return;
+      }
+
       dispatch({
         type: "reader/loadFailed",
         payload: { errorMessage: error instanceof Error ? error.message : "无法打开 PDF" },

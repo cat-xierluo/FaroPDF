@@ -182,12 +182,13 @@ export function summarizeTextLayerStatus(pages: PdfPageText[], expectedPageCount
   const availablePages = pages.filter((page) => page.status === "available" && page.charCount > 0).length;
   const missingPages = pages.filter((page) => page.status === "missing").length;
   const poorPages = pages.filter((page) => page.status === "poor" || (page.status === "available" && page.charCount === 0)).length;
+  const indexedPageCount = pages.length;
 
-  if (missingPages === expectedPageCount) {
+  if (availablePages === 0 && missingPages > 0 && missingPages + poorPages === indexedPageCount) {
     return "missing";
   }
 
-  if (availablePages === 0 && poorPages === expectedPageCount) {
+  if (availablePages === 0 && poorPages === indexedPageCount) {
     return "poor";
   }
 
@@ -332,7 +333,7 @@ function resolveSearchStatus({
     return "idle";
   }
 
-  if (ocrHint?.reason === "missing-text-layer" && hits.length === 0 && pendingPageCount === 0) {
+  if (ocrHint?.reason === "missing-text-layer" && hits.length === 0) {
     return "needs-ocr";
   }
 

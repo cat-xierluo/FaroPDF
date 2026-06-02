@@ -103,7 +103,7 @@ async function readPageText(document: PdfJsDocumentLike, pageIndex: number): Pro
 
   try {
     const textItems = extractTextItems(await page.getTextContent());
-    const text = textItems.join("");
+    const text = joinTextItemsForSearch(textItems);
 
     return {
       pageIndex,
@@ -133,6 +133,48 @@ function extractTextItems(textContent: PdfJsTextContentLike) {
       return "";
     })
     .filter((text) => text.length > 0);
+}
+
+function joinTextItemsForSearch(textItems: string[]) {
+  return textItems.reduce((text, item) => {
+    if (!text) {
+      return item;
+    }
+
+    if (hasVisibleBoundaryWhitespace(text, item) || !shouldSeparateTextItems(text, item)) {
+      return `${text}${item}`;
+    }
+
+    return `${text} ${item}`;
+  }, "");
+}
+
+function hasVisibleBoundaryWhitespace(left: string, right: string) {
+  return /\s$/.test(left) || /^\s/.test(right);
+}
+
+function shouldSeparateTextItems(left: string, right: string) {
+  const leftChar = left.trimEnd().at(-1) ?? "";
+  const rightChar = right.trimStart().at(0) ?? "";
+
+  if (!leftChar || !rightChar) {
+    return false;
+  }
+
+  if (!isAsciiWordChar(leftChar) || !isAsciiWordChar(rightChar)) {
+    return false;
+  }
+
+  return (
+    /\d/.test(leftChar) ||
+    /\d/.test(rightChar) ||
+    (/[a-z]/.test(leftChar) && /[A-Z]/.test(rightChar)) ||
+    (/[A-Z]/.test(leftChar) && /[A-Z]/.test(rightChar))
+  );
+}
+
+function isAsciiWordChar(character: string) {
+  return /^[A-Za-z0-9]$/.test(character);
 }
 
 export async function loadPdfFromBytes(

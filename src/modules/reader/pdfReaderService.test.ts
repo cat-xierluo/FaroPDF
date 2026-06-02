@@ -6,7 +6,7 @@ function createAdapter() {
   const getPage = vi.fn(async (pageNumber: number) => ({
     rotate: pageNumber === 2 ? 90 : 0,
     getTextContent: vi.fn(async () => ({
-      items: pageNumber === 1 ? [{ str: "合同" }] : [],
+      items: pageNumber === 1 ? [{ str: "United" }, { str: "States" }, { str: "合同" }, { str: "第一页" }] : [],
     })),
     getViewport: ({ scale }: { scale: number }) => ({
       width: (pageNumber === 1 ? 612 : 700) * scale,
@@ -76,12 +76,14 @@ describe("pdfReaderService", () => {
       rotation: 90,
       scale: 1.25,
     });
+    const expectedPageText = "United States合同第一页";
+
     await expect(loaded.getPageText(0)).resolves.toEqual({
       pageIndex: 0,
-      text: "合同",
+      text: expectedPageText,
       status: "available",
-      itemCount: 1,
-      charCount: 2,
+      itemCount: 4,
+      charCount: expectedPageText.length,
     });
     await expect(loaded.getPageText(1)).resolves.toEqual({
       pageIndex: 1,

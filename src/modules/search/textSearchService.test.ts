@@ -85,7 +85,7 @@ describe("textSearchService", () => {
 
   test("models OCR hints when searchable text is missing", async () => {
     const session = createTextSearchSession({
-      pageCount: 2,
+      pageCount: 100,
       readPageText: async (pageIndex) => pageText(pageIndex, "", "missing"),
     });
 
@@ -93,12 +93,30 @@ describe("textSearchService", () => {
 
     expect(state.status).toBe("needs-ocr");
     expect(state.textLayerStatus).toBe("missing");
+    expect(state.pendingPageCount).toBe(98);
     expect(state.ocrHint).toEqual({
       visible: true,
       reason: "missing-text-layer",
       message: "当前 PDF 缺少可搜索文字层，建议先进行 OCR 后再搜索。",
       actionLabel: "转到 OCR",
     });
+  });
+
+  test("reports empty only after all indexed text pages have no hits", async () => {
+    const session = createTextSearchSession({
+      pageCount: 2,
+      readPageText: async (pageIndex) =>
+        [
+          pageText(0, "第一页只有目录。"),
+          pageText(1, "第二页只有附录。"),
+        ][pageIndex],
+    });
+
+    const state = await session.search("合同", { batchSize: 2, startPageIndex: 0 });
+
+    expect(state.status).toBe("empty");
+    expect(state.hits).toHaveLength(0);
+    expect(state.ocrHint).toBeNull();
   });
 
   test("summarizes mixed text layer quality without treating partial scans as fully searchable", () => {

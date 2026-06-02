@@ -21,12 +21,13 @@ describe("readerReducer", () => {
   test("records document state when a PDF is loaded", () => {
     const state = readerReducer(
       createInitialReaderState({ defaultZoom: 1.25, defaultViewMode: "double" }),
-      { type: "reader/loadSucceeded", payload: loadedMetadata },
+      { type: "reader/loadSucceeded", payload: { documentId: "document-1", metadata: loadedMetadata } },
     );
 
     expect(state.status).toBe("ready");
     expect(state.document).toMatchObject({
       path: "/case/evidence.pdf",
+      documentId: "document-1",
       name: "evidence.pdf",
       fingerprint: "fingerprint-a",
       pageCount: 12,
@@ -44,7 +45,7 @@ describe("readerReducer", () => {
   test("clamps page navigation to the loaded document", () => {
     const loaded = readerReducer(createInitialReaderState(), {
       type: "reader/loadSucceeded",
-      payload: loadedMetadata,
+      payload: { documentId: "document-1", metadata: loadedMetadata },
     });
 
     const afterTooLarge = readerReducer(loaded, {
@@ -63,7 +64,7 @@ describe("readerReducer", () => {
   test("updates zoom, view mode, and text layer status without losing document identity", () => {
     const loaded = readerReducer(createInitialReaderState(), {
       type: "reader/loadSucceeded",
-      payload: loadedMetadata,
+      payload: { documentId: "document-1", metadata: loadedMetadata },
     });
     const zoomed = readerReducer(loaded, {
       type: "reader/setZoom",
