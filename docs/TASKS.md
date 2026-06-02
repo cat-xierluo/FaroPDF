@@ -227,7 +227,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：OCR
-- 状态：进行中（并行 worker）
+- 状态：进行中（bridge/stub 第一版已完成，真实 OCR 待接入）
 - 建议分支：`feat/ocr-bridge`
 - 建议 worktree：`.claude/worktrees/tmux-ocr-bridge`
 - 依赖：ISS-003、ISS-014
@@ -235,6 +235,8 @@ Agent 可根据本文件自行判断：
 - 参考算法：`pdf-processor/scripts/pdf-ocr.py`、`pdf_ocr_paddle_api.py`、`pdf_ocr_mineru.py`、`pdf_ocr_layered.py`
 - 目标：建立 OCR 任务模型，优先连接本地 Legal Skills / `ocrmypdf`，并支持 PaddleOCR、MinerU 等外部 OCR API adapter。
 - 验收：纯扫描 PDF 可触发 OCR 任务；任务显示后端、页码范围、进度、输出路径和失败原因；生成双层 PDF 后能做搜索质量抽查；OCR 模式工具条至少覆盖识别文本、输出双层 PDF 和质量检查。
+- 当前进度：已建立 OCR 请求、输出策略、任务进度、质量抽查入口等共享类型；新增 `ocrBridgeService` 和 provider adapter 边界，覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；Tauri `start_ocr_job` command stub 做参数校验、默认 `*-ocr.pdf` 新输出路径和同路径拒绝；云端 provider 未明确 consent、缺少安全 apiKeyRef、使用真实密钥串或远端明文 HTTP endpoint 时拒绝，本机调试只允许 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback HTTP；OCR 错误脱敏覆盖带逗号或中文标点的 PDF 路径。当前不会执行真实 OCR、不会生成双层 PDF、不会发起联网请求，也不会做真实质量检查。
+- 下一步：接入本地 `ocrmypdf` / Legal Skills 后台执行、PaddleOCR/MinerU API 凭证读取与调用、双层 PDF 生成、任务队列持久化、OCR 模式工具条和 ISS-017 质量检查报告。
 
 ### ISS-008 表单填写与签署
 

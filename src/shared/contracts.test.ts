@@ -2,8 +2,12 @@ import { describe, expect, test } from "vitest";
 import { FAROPDF_MODULES, getModuleBoundary } from "./foundation/modules";
 import type {
   AppSettings,
+  OcrJobProgress,
+  OcrOutputStrategy,
+  OcrQualityCheckRequest,
   OcrJob,
   OcrProviderConfig,
+  OcrRequest,
   PdfAnnotation,
   PdfDocumentState,
   PdfExportJob,
@@ -124,9 +128,35 @@ describe("shared contracts", () => {
       id: "ocr-1",
       inputPath: "/case/file.pdf",
       backend: "paddleocr",
+      providerId: "paddle",
       status: "queued",
+      outputStrategy: "new-layered-pdf",
+      progress: {
+        stage: "queued",
+        completedPages: 0,
+        totalPages: 0,
+      },
       createdAt: "2026-06-02T00:00:00.000Z",
       updatedAt: "2026-06-02T00:00:00.000Z",
+    };
+    const ocrOutputStrategy: OcrOutputStrategy = "new-layered-pdf";
+    const ocrQualityCheck: OcrQualityCheckRequest = {
+      enabled: true,
+      samplePages: [1, 3],
+      keywords: ["合同", "签章"],
+    };
+    const ocrRequest: OcrRequest = {
+      inputPath: "/case/file.pdf",
+      outputPath: "/case/file-ocr.pdf",
+      providerId: "paddle",
+      outputStrategy: ocrOutputStrategy,
+      networkConsentGranted: true,
+      qualityCheck: ocrQualityCheck,
+    };
+    const ocrProgress: OcrJobProgress = {
+      stage: "queued",
+      completedPages: 0,
+      totalPages: 12,
     };
     const preprocessJob: ScanPreprocessJob = {
       id: "preprocess-1",
@@ -176,6 +206,8 @@ describe("shared contracts", () => {
     expect(exportRequest.destination.type).toBe("bytes");
     expect(exportResult.summary.annotationPlan?.strategy).toBe("plan-only");
     expect(ocrJob.backend).toBe("paddleocr");
+    expect(ocrRequest.outputStrategy).toBe("new-layered-pdf");
+    expect(ocrProgress.totalPages).toBe(12);
     expect(preprocessJob.options.outputMode).toBe("preprocess-only");
     expect(settings.defaultSavePolicy).toBe("always-export-copy");
   });

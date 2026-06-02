@@ -2,10 +2,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{
     fs,
+    net::IpAddr,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Manager};
+use url::Url;
 
 const SETTINGS_FILE_NAME: &str = "settings.json";
 
@@ -49,7 +51,10 @@ fn start_scan_preprocess_job(
     let input_path = PathBuf::from(request.input_path.trim());
     let output_path = resolve_scan_preprocess_output_path(
         input_path,
-        request.output_path.as_ref().map(|path| PathBuf::from(path.trim())),
+        request
+            .output_path
+            .as_ref()
+            .map(|path| PathBuf::from(path.trim())),
     )?;
     let output_path_string = output_path.to_string_lossy().to_string();
     let now = current_timestamp_string();
@@ -84,6 +89,47 @@ fn start_scan_preprocess_job(
     })
 }
 
+#[tauri::command]
+fn start_ocr_job(request: OcrCommandRequest) -> Result<OcrCommandJob, String> {
+    validate_ocr_request(&request)?;
+
+    let input_path = PathBuf::from(request.input_path.trim());
+    let output_path = resolve_ocr_output_path(
+        input_path,
+        request
+            .output_path
+            .as_ref()
+            .map(|path| PathBuf::from(path.trim())),
+    )?;
+    let output_path_string = output_path.to_string_lossy().to_string();
+    let now = current_timestamp_string();
+    let quality_check = request
+        .quality_check
+        .unwrap_or_else(default_ocr_quality_check);
+
+    Ok(OcrCommandJob {
+        id: format!("ocr-stub-{now}"),
+        input_path: request.input_path,
+        output_path: output_path_string,
+        page_range: request.page_range,
+        backend: request.provider.provider_type.clone(),
+        provider_id: request.provider.id,
+        status: "queued".to_string(),
+        output_strategy: request.output_strategy,
+        progress: OcrCommandProgress {
+            stage: "queued".to_string(),
+            completed_pages: 0,
+            total_pages: 0,
+            message: Some(
+                "等待后台 OCR bridge 接入，当前不会执行真实 OCR 或联网请求。".to_string(),
+            ),
+        },
+        quality_check,
+        created_at: now.clone(),
+        updated_at: now,
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -91,7 +137,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_app_settings,
             write_app_settings,
-            start_scan_preprocess_job
+            start_scan_preprocess_job,
+            start_ocr_job
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -270,6 +317,65 @@ struct ScanPreprocessCommandSummary {
     preprocess_only: bool,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OcrCommandRequest {
+    input_path: String,
+    output_path: Option<String>,
+    page_range: Option<String>,
+    provider: OcrCommandProvider,
+    output_strategy: String,
+    network_consent_granted: bool,
+    quality_check: Option<OcrCommandQualityCheckRequest>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OcrCommandProvider {
+    id: String,
+    #[serde(rename = "type")]
+    provider_type: String,
+    display_name: Option<String>,
+    endpoint: Option<String>,
+    api_key_ref: Option<String>,
+    enabled: bool,
+    requires_network_consent: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OcrCommandQualityCheckRequest {
+    enabled: bool,
+    sample_pages: Vec<u32>,
+    keywords: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OcrCommandJob {
+    id: String,
+    input_path: String,
+    output_path: String,
+    page_range: Option<String>,
+    backend: String,
+    provider_id: String,
+    status: String,
+    output_strategy: String,
+    progress: OcrCommandProgress,
+    quality_check: OcrCommandQualityCheckRequest,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OcrCommandProgress {
+    stage: String,
+    completed_pages: u32,
+    total_pages: u32,
+    message: Option<String>,
+}
+
 fn validate_scan_preprocess_request(request: &ScanPreprocessCommandRequest) -> Result<(), String> {
     let input_path = request.input_path.trim();
     if input_path.is_empty() {
@@ -323,6 +429,90 @@ fn validate_scan_preprocess_request(request: &ScanPreprocessCommandRequest) -> R
     Ok(())
 }
 
+fn validate_ocr_request(request: &OcrCommandRequest) -> Result<(), String> {
+    let input_path = request.input_path.trim();
+    if input_path.is_empty() {
+        return Err("输入 PDF 路径不能为空。".to_string());
+    }
+    if !is_pdf_path(Path::new(input_path)) {
+        return Err("输入文件必须是 PDF。".to_string());
+    }
+
+    if request.provider.id.trim().is_empty() {
+        return Err("OCR Provider 不能为空。".to_string());
+    }
+    if !is_supported_ocr_provider(&request.provider.provider_type) {
+        return Err("OCR Provider 类型无效。".to_string());
+    }
+    if !request.provider.enabled {
+        return Err(format!(
+            "{} 未启用。",
+            ocr_provider_display_name(&request.provider)
+        ));
+    }
+
+    if request.output_strategy != "new-layered-pdf" {
+        return Err("OCR bridge 第一版只支持 new-layered-pdf 输出策略。".to_string());
+    }
+
+    if let Some(page_range) = request.page_range.as_ref() {
+        if !is_valid_page_range(page_range) {
+            return Err("页码范围必须使用正整数或正整数区间，例如 1,3-5。".to_string());
+        }
+    }
+
+    if is_cloud_ocr_provider(&request.provider) {
+        if !request.network_consent_granted {
+            return Err("联网 OCR 需要用户明确确认。".to_string());
+        }
+        if request
+            .provider
+            .api_key_ref
+            .as_ref()
+            .map(|value| value.trim().is_empty())
+            .unwrap_or(true)
+        {
+            return Err(format!(
+                "{} 需要配置 apiKeyRef。",
+                ocr_provider_display_name(&request.provider)
+            ));
+        }
+        if request
+            .provider
+            .api_key_ref
+            .as_ref()
+            .map(|value| !is_safe_api_key_ref(value))
+            .unwrap_or(false)
+        {
+            return Err(format!(
+                "{} 的 apiKeyRef 必须使用凭证引用或脱敏占位。",
+                ocr_provider_display_name(&request.provider)
+            ));
+        }
+        if !is_allowed_ocr_endpoint(request.provider.endpoint.as_deref()) {
+            return Err(format!(
+                "{} 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。",
+                ocr_provider_display_name(&request.provider)
+            ));
+        }
+    }
+
+    let input_path = PathBuf::from(input_path);
+    let output_path = request
+        .output_path
+        .as_ref()
+        .map(|path| PathBuf::from(path.trim()));
+    resolve_ocr_output_path(input_path, output_path)?;
+
+    if let Some(quality_check) = request.quality_check.as_ref() {
+        if quality_check.sample_pages.iter().any(|page| *page == 0) {
+            return Err("OCR 质量抽查页码必须是正整数。".to_string());
+        }
+    }
+
+    Ok(())
+}
+
 fn resolve_scan_preprocess_output_path(
     input_path: PathBuf,
     output_path: Option<PathBuf>,
@@ -331,7 +521,27 @@ fn resolve_scan_preprocess_output_path(
         return Err("输入文件必须是 PDF。".to_string());
     }
 
-    let resolved_output = output_path.unwrap_or_else(|| suggest_scan_preprocess_output_path(&input_path));
+    let resolved_output =
+        output_path.unwrap_or_else(|| suggest_scan_preprocess_output_path(&input_path));
+    if !is_pdf_path(&resolved_output) {
+        return Err("输出文件必须是 PDF。".to_string());
+    }
+    if paths_are_same(&input_path, &resolved_output) {
+        return Err("输出 PDF 必须是不同于原始 PDF 的新文件。".to_string());
+    }
+
+    Ok(resolved_output)
+}
+
+fn resolve_ocr_output_path(
+    input_path: PathBuf,
+    output_path: Option<PathBuf>,
+) -> Result<PathBuf, String> {
+    if !is_pdf_path(&input_path) {
+        return Err("输入文件必须是 PDF。".to_string());
+    }
+
+    let resolved_output = output_path.unwrap_or_else(|| suggest_ocr_output_path(&input_path));
     if !is_pdf_path(&resolved_output) {
         return Err("输出文件必须是 PDF。".to_string());
     }
@@ -349,6 +559,20 @@ fn suggest_scan_preprocess_output_path(input_path: &Path) -> PathBuf {
         .filter(|value| !value.trim().is_empty())
         .unwrap_or("document");
     let output_name = format!("{stem}-preprocessed.pdf");
+
+    input_path
+        .parent()
+        .map(|parent| parent.join(&output_name))
+        .unwrap_or_else(|| PathBuf::from(output_name))
+}
+
+fn suggest_ocr_output_path(input_path: &Path) -> PathBuf {
+    let stem = input_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("document");
+    let output_name = format!("{stem}-ocr.pdf");
 
     input_path
         .parent()
@@ -415,6 +639,68 @@ fn has_enabled_scan_operation(options: &ScanPreprocessCommandOptions) -> bool {
         || options.trim_blank_edges
 }
 
+fn is_supported_ocr_provider(provider_type: &str) -> bool {
+    matches!(
+        provider_type,
+        "local-ocrmypdf" | "legal-skills" | "paddleocr" | "mineru"
+    )
+}
+
+fn is_cloud_ocr_provider(provider: &OcrCommandProvider) -> bool {
+    matches!(provider.provider_type.as_str(), "paddleocr" | "mineru")
+        || provider.requires_network_consent
+}
+
+fn ocr_provider_display_name(provider: &OcrCommandProvider) -> String {
+    provider
+        .display_name
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .unwrap_or(provider.id.as_str())
+        .to_string()
+}
+
+fn is_allowed_ocr_endpoint(endpoint: Option<&str>) -> bool {
+    let Some(endpoint) = endpoint.map(str::trim).filter(|value| !value.is_empty()) else {
+        return false;
+    };
+
+    let Ok(parsed) = Url::parse(endpoint) else {
+        return false;
+    };
+    let Some(host) = parsed.host_str() else {
+        return false;
+    };
+
+    parsed.scheme() == "https" || (parsed.scheme() == "http" && is_loopback_host(host))
+}
+
+fn is_safe_api_key_ref(value: &str) -> bool {
+    let trimmed = value.trim();
+    trimmed.is_empty() || is_credential_reference(trimmed) || is_masked_secret(trimmed)
+}
+
+fn is_loopback_host(host: &str) -> bool {
+    let normalized = host.trim_matches(['[', ']']).to_ascii_lowercase();
+    if normalized == "localhost" {
+        return true;
+    }
+
+    normalized
+        .parse::<IpAddr>()
+        .map(|address| address.is_loopback())
+        .unwrap_or(false)
+}
+
+fn default_ocr_quality_check() -> OcrCommandQualityCheckRequest {
+    OcrCommandQualityCheckRequest {
+        enabled: false,
+        sample_pages: Vec::new(),
+        keywords: Vec::new(),
+    }
+}
+
 fn is_valid_page_range(raw: &str) -> bool {
     let parts = raw
         .split(',')
@@ -454,6 +740,191 @@ fn current_timestamp_string() -> String {
         .map(|duration| duration.as_millis())
         .unwrap_or(0);
     millis.to_string()
+}
+
+#[cfg(test)]
+mod ocr_bridge_tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn local_provider() -> OcrCommandProvider {
+        OcrCommandProvider {
+            id: "local-ocrmypdf".to_string(),
+            provider_type: "local-ocrmypdf".to_string(),
+            display_name: Some("本地 OCRmyPDF".to_string()),
+            endpoint: None,
+            api_key_ref: None,
+            enabled: true,
+            requires_network_consent: false,
+        }
+    }
+
+    fn paddle_provider() -> OcrCommandProvider {
+        OcrCommandProvider {
+            id: "paddleocr".to_string(),
+            provider_type: "paddleocr".to_string(),
+            display_name: Some("PaddleOCR".to_string()),
+            endpoint: Some("https://ocr.example.test/paddle".to_string()),
+            api_key_ref: Some("keychain:paddle".to_string()),
+            enabled: true,
+            requires_network_consent: true,
+        }
+    }
+
+    fn mineru_provider() -> OcrCommandProvider {
+        OcrCommandProvider {
+            id: "mineru".to_string(),
+            provider_type: "mineru".to_string(),
+            display_name: Some("MinerU".to_string()),
+            endpoint: Some("https://ocr.example.test/mineru".to_string()),
+            api_key_ref: Some("env:MINERU_API_KEY".to_string()),
+            enabled: true,
+            requires_network_consent: true,
+        }
+    }
+
+    fn default_ocr_request() -> OcrCommandRequest {
+        OcrCommandRequest {
+            input_path: "/tmp/faropdf-fixtures/source.pdf".to_string(),
+            output_path: None,
+            page_range: Some("1,3-5".to_string()),
+            provider: local_provider(),
+            output_strategy: "new-layered-pdf".to_string(),
+            network_consent_granted: false,
+            quality_check: Some(OcrCommandQualityCheckRequest {
+                enabled: true,
+                sample_pages: vec![1, 3],
+                keywords: vec!["合同".to_string()],
+            }),
+        }
+    }
+
+    #[test]
+    fn resolves_default_ocr_output_path_without_overwriting_input_pdf() {
+        let output =
+            resolve_ocr_output_path(PathBuf::from("/tmp/faropdf-fixtures/source.pdf"), None)
+                .expect("output path");
+
+        assert_eq!(
+            output,
+            PathBuf::from("/tmp/faropdf-fixtures/source-ocr.pdf")
+        );
+    }
+
+    #[test]
+    fn rejects_same_ocr_output_path_without_leaking_the_full_path() {
+        let error = resolve_ocr_output_path(
+            PathBuf::from("/tmp/faropdf-fixtures/./source.pdf"),
+            Some(PathBuf::from("/tmp/faropdf-fixtures/nested/../source.pdf")),
+        )
+        .expect_err("same output path should fail");
+
+        assert!(error.contains("输出 PDF 必须是不同于原始 PDF 的新文件。"));
+        assert!(!error.contains("/tmp/faropdf-fixtures/source.pdf"));
+    }
+
+    #[test]
+    fn rejects_cloud_ocr_without_consent_or_api_key_ref() {
+        let mut missing_consent = default_ocr_request();
+        missing_consent.provider = paddle_provider();
+        missing_consent.network_consent_granted = false;
+
+        let consent_error =
+            validate_ocr_request(&missing_consent).expect_err("cloud OCR needs consent");
+        assert_eq!(consent_error, "联网 OCR 需要用户明确确认。");
+
+        let mut missing_key = missing_consent;
+        missing_key.network_consent_granted = true;
+        missing_key.provider.api_key_ref = Some(String::new());
+
+        let key_error = validate_ocr_request(&missing_key).expect_err("cloud OCR needs key ref");
+        assert_eq!(key_error, "PaddleOCR 需要配置 apiKeyRef。");
+    }
+
+    #[test]
+    fn rejects_raw_cloud_api_key_refs() {
+        let mut request = default_ocr_request();
+        request.provider = paddle_provider();
+        request.network_consent_granted = true;
+        request.provider.api_key_ref = Some("paddle-secret-123456".to_string());
+
+        let error = validate_ocr_request(&request).expect_err("raw key should fail");
+
+        assert_eq!(error, "PaddleOCR 的 apiKeyRef 必须使用凭证引用或脱敏占位。");
+    }
+
+    #[test]
+    fn rejects_remote_http_ocr_endpoints_but_allows_loopback_http() {
+        let mut request = default_ocr_request();
+        request.provider = paddle_provider();
+        request.network_consent_granted = true;
+        request.provider.endpoint = Some("http://ocr.example.test/paddle".to_string());
+
+        let error = validate_ocr_request(&request).expect_err("remote http should fail");
+
+        assert_eq!(
+            error,
+            "PaddleOCR 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。"
+        );
+
+        request.provider.endpoint = Some("http://127.0.0.1:8080/paddle".to_string());
+
+        validate_ocr_request(&request).expect("loopback http is allowed for debug");
+    }
+
+    #[test]
+    fn rejects_mineru_spoofed_127_http_endpoint() {
+        let mut request = default_ocr_request();
+        request.provider = mineru_provider();
+        request.network_consent_granted = true;
+        request.provider.endpoint = Some("http://127.evil.example/mineru".to_string());
+
+        let error =
+            validate_ocr_request(&request).expect_err("spoofed 127 hostname should fail");
+
+        assert_eq!(
+            error,
+            "MinerU 需要配置 HTTPS endpoint，本机调试可使用 localhost HTTP。"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_ocr_quality_sample_pages() {
+        let mut request = default_ocr_request();
+        request.quality_check = Some(OcrCommandQualityCheckRequest {
+            enabled: true,
+            sample_pages: vec![0, 2],
+            keywords: Vec::new(),
+        });
+
+        let error = validate_ocr_request(&request).expect_err("zero sample page should fail");
+
+        assert_eq!(error, "OCR 质量抽查页码必须是正整数。");
+    }
+
+    #[test]
+    fn rejects_invalid_ocr_page_range() {
+        let mut request = default_ocr_request();
+        request.page_range = Some("5-2".to_string());
+
+        let error = validate_ocr_request(&request).expect_err("invalid page range should fail");
+
+        assert_eq!(error, "页码范围必须使用正整数或正整数区间，例如 1,3-5。");
+    }
+
+    #[test]
+    fn command_stub_returns_queued_ocr_job_with_safe_output_path() {
+        let request = default_ocr_request();
+
+        let job = start_ocr_job(request).expect("queued OCR job");
+
+        assert_eq!(job.status, "queued");
+        assert_eq!(job.backend, "local-ocrmypdf");
+        assert_eq!(job.output_path, "/tmp/faropdf-fixtures/source-ocr.pdf");
+        assert_eq!(job.progress.stage, "queued");
+        assert_eq!(job.progress.completed_pages, 0);
+        assert_eq!(job.quality_check.enabled, true);
+    }
 }
 
 #[cfg(test)]
@@ -537,7 +1008,10 @@ mod scan_preprocess_tests {
         let job = start_scan_preprocess_job(request).expect("queued job");
 
         assert_eq!(job.status, "queued");
-        assert_eq!(job.output_path, "/tmp/faropdf-fixtures/source-preprocessed.pdf");
+        assert_eq!(
+            job.output_path,
+            "/tmp/faropdf-fixtures/source-preprocessed.pdf"
+        );
         assert_eq!(job.progress.completed_pages, 0);
         assert_eq!(job.progress.stage, "queued");
         assert_eq!(job.summary.rotated_pages, 0);

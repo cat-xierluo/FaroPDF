@@ -48,7 +48,23 @@ export type {
   PdfRect,
   PdfStampName,
 } from "./pdf/annotation";
-export type { OcrBackend, OcrJob, OcrJobStatus, OcrProviderConfig, OcrProviderType } from "./ocr/types";
+export type {
+  OcrBackend,
+  OcrJob,
+  OcrJobProgress,
+  OcrJobProgressStage,
+  OcrJobStatus,
+  OcrOutputStrategy,
+  OcrPageRange,
+  OcrPageRangeSegment,
+  OcrProviderBridgeRequest,
+  OcrProviderConfig,
+  OcrProviderType,
+  OcrQualityCheckRequest,
+  OcrQualitySummary,
+  OcrRequest,
+  PreparedOcrRequest,
+} from "./ocr/types";
 export type {
   ScanPreprocessJob,
   ScanPreprocessJobStatus,
