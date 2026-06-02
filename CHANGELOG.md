@@ -1,0 +1,11 @@
+# FaroPDF 变更记录
+
+## 0.0.0 - 2026-06-02
+
+- 初始化 FaroPDF 项目上下文。
+- 固定项目定位：独立 PDF 阅读器，不并入 Folia。
+- 固定首版范围：快读、检索、批注、OCR/扫描、页面整理、表单签署。
+- 固定技术方向：Tauri v2 + React + TypeScript + Vite + PDF.js + pdf-lib + OCR bridge。
+- 建立 `AGENTS.md`、`README.md` 和 `docs/` 文档体系。
+- 按 `project-init` skill 补齐 `CLAUDE.md`、`.claude/settings.json`、`.gitignore`，并安装开发协作 skills。
+- 初始化 Git 基线，并推送到同名 GitHub private 仓库 `FaroPDF`。

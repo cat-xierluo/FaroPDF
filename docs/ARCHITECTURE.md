@@ -1,0 +1,199 @@
+# FaroPDF 架构文档
+
+> Last updated: 2026-06-02
+
+## 技术栈
+
+| 层 | 技术 | 职责 |
+| --- | --- | --- |
+| 桌面壳 | Tauri v2 | 文件打开、保存、系统窗口、文件关联、后台命令 bridge |
+| 前端 | React + TypeScript + Vite | 应用界面、状态管理、渲染调度 |
+| PDF 渲染 | PDF.js | 页面渲染、文本层、目录、缩略图、搜索基础 |
+| PDF 操作 | pdf-lib | 页面复制、删除、重排、表单、元数据、导出保存 |
+| OCR bridge | 本地命令 / Legal Skills / OCR API | 双层 PDF、扫描件预处理、质量检查 |
+
+## 系统架构
+
+```text
+┌─────────────────────────────────────────────┐
+│ Tauri v2                                    │
+│ ┌─────────────────────────────────────────┐ │
+│ │ React App                               │ │
+│ │ ┌──────────────┬──────────────────────┐ │ │
+│ │ │ Sidebar      │ PDF Reader Canvas    │ │ │
+│ │ │ Thumbnails   │ PDF.js virtual pages │ │ │
+│ │ │ Outline      │ Text / annotation    │ │ │
+│ │ └──────────────┴──────────────────────┘ │ │
+│ │ ┌──────────────────────────────────────┐ │ │
+│ │ │ Right Inspector                       │ │ │
+│ │ │ Search / Annotations / OCR / Pages    │ │ │
+│ │ └──────────────────────────────────────┘ │ │
+│ └─────────────────────────────────────────┘ │
+│ Tauri commands: fs / dialog / OCR bridge    │
+└─────────────────────────────────────────────┘
+```
+
+## 数据流
+
+```text
+打开 PDF
+  ↓
+Tauri fs 读取二进制
+  ↓
+PdfDocumentState 写入前端状态
+  ↓
+PDF.js getDocument(Uint8Array)
+  ↓
+读取页数、目录、页面尺寸和初始文字层状态
+  ↓
+虚拟化阅读区只请求可见页和邻近页
+  ↓
+PDF.js page.render(canvas) + text layer + annotation overlay
+  ↓
+用户搜索、批注、页面操作或 OCR
+  ↓
+sidecar / page operation queue / OCR job queue
+  ↓
+导出时由 pdf-lib + OCR 输出文件生成新 PDF
+```
+
+## 核心接口
+
+### PdfDocumentState
+
+```ts
+export type TextLayerStatus = 'unknown' | 'available' | 'partial' | 'missing' | 'poor';
+export type OcrStatus = 'not-needed' | 'needed' | 'running' | 'completed' | 'failed';
+
+export interface PdfDocumentState {
+  path: string;
+  name: string;
+  bytes: Uint8Array;
+  pageCount: number;
+  currentPage: number;
+  zoom: number;
+  dirty: boolean;
+  textLayerStatus: TextLayerStatus;
+  ocrStatus: OcrStatus;
+  lastSavedAt?: string;
+}
+```
+
+### PdfAnnotation
+
+```ts
+export type PdfAnnotationType =
+  | 'highlight'
+  | 'underline'
+  | 'strikeout'
+  | 'note'
+  | 'textbox'
+  | 'rectangle'
+  | 'arrow'
+  | 'ink'
+  | 'stamp';
+
+export interface PdfAnnotation {
+  id: string;
+  type: PdfAnnotationType;
+  pageIndex: number;
+  rects: Array<{ x: number; y: number; width: number; height: number }>;
+  color: string;
+  content?: string;
+  author?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### PdfPageOperation
+
+```ts
+export type PdfPageOperationType =
+  | 'rotate'
+  | 'delete'
+  | 'reorder'
+  | 'insert'
+  | 'extract'
+  | 'merge'
+  | 'number';
+
+export interface PdfPageOperation {
+  id: string;
+  type: PdfPageOperationType;
+  pageIndexes: number[];
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+```
+
+### OcrJob
+
+```ts
+export type OcrBackend = 'local-ocrmypdf' | 'legal-skills' | 'paddleocr' | 'mineru';
+export type OcrJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export interface OcrJob {
+  id: string;
+  inputPath: string;
+  pageRange?: string;
+  backend: OcrBackend;
+  status: OcrJobStatus;
+  outputPath?: string;
+  quality?: {
+    searchedKeywords: string[];
+    matchedKeywords: string[];
+    textPages: number;
+    emptyTextPages: number;
+  };
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## 模块规划
+
+| 模块 | 职责 |
+| --- | --- |
+| `fileService` | 打开、另存、导出 PDF 和 sidecar |
+| `pdfDocumentService` | PDF.js 文档加载、页数、目录、页面尺寸 |
+| `pdfRenderScheduler` | 页面虚拟化、渲染队列、取消不可见页渲染 |
+| `pdfTextService` | 文本层检测、按需全文索引、搜索命中 |
+| `annotationService` | sidecar 批注模型、编辑、导出摘要 |
+| `pdfExportService` | pdf-lib 页面操作、批注扁平化、表单导出 |
+| `pageOrganizerService` | 旋转、删除、重排、插入、提取、合并、编号 |
+| `ocrBridgeService` | 调用本地或云端 OCR 后端，管理任务状态 |
+| `settingsService` | 最近文件、默认缩放、阅读布局、OCR 后端设置 |
+
+## 性能策略
+
+- 首屏只加载应用 shell、文件服务和阅读容器。
+- PDF.js worker、缩略图、全文搜索、批注列表、页面整理和 OCR bridge 按需加载。
+- 阅读区只保留可见页和邻近页 canvas；远离视口的页面释放 canvas。
+- 缩略图低分辨率渲染，并按滚动位置懒加载。
+- 全文索引按页分批建立，优先索引当前页附近。
+- OCR、合并、压缩等后台任务不得阻塞主线程和阅读滚动。
+
+## 保存策略
+
+- 原始 PDF 默认不可变。
+- 批注默认保存到 sidecar，导出时再写入新 PDF。
+- 页面整理、OCR、压缩、扁平化表单默认输出新 PDF。
+- 覆盖原文件必须由用户显式选择并二次确认。
+
+## OCR bridge
+
+OCR 不直接内置到前端。第一版 bridge 支持：
+
+- 本地 Legal Skills 的 PDF Processor / Legal OCR。
+- 本地 `ocrmypdf` 兜底。
+- PaddleOCR / MinerU 云端后端，但必须用户确认后使用。
+
+任务输出必须记录：
+
+- 使用的后端。
+- 输入文件和页码范围。
+- 输出文件路径。
+- 错误原因或回退路径。
+- OCR 后搜索质量检查结果。
