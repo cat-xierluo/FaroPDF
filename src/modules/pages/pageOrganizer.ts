@@ -430,7 +430,7 @@ function mergeActiveAndDeletedPages(
     let insertAfterIndex = -1;
     for (let pageIndex = 0; pageIndex < mergedPages.length; pageIndex += 1) {
       const page = mergedPages[pageIndex];
-      if (!page.deleted && page.originalPageIndex < deletedPage.originalPageIndex) {
+      if (page.originalPageIndex < deletedPage.originalPageIndex) {
         insertAfterIndex = pageIndex;
       }
     }

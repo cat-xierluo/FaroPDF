@@ -176,6 +176,26 @@ describe("page organizer", () => {
     ]);
   });
 
+  test("restores adjacent deleted pages in original order after active pages are reordered", () => {
+    const initial = createPageOrganizerState({ pageCount: 4, createdAt: FIXED_TIME });
+    const deleted = deleteOrganizerPages(initial, {
+      pageIds: ["page-2", "page-3"],
+      createdAt: FIXED_TIME,
+    });
+    const reordered = reorderOrganizerPages(deleted, {
+      pageIds: ["page-4"],
+      toIndex: 0,
+      createdAt: FIXED_TIME,
+    });
+    const restored = restoreOrganizerPages(reordered, {
+      pageIds: ["page-2", "page-3"],
+      createdAt: FIXED_TIME,
+    });
+
+    expect(restored.pages.map((page) => page.id)).toEqual(["page-4", "page-1", "page-2", "page-3"]);
+    expect(restored.pages.map((page) => page.deleted)).toEqual([false, false, false, false]);
+  });
+
   test("rejects restoring pages that are not currently deleted", () => {
     const initial = createPageOrganizerState({ pageCount: 2, createdAt: FIXED_TIME });
 
