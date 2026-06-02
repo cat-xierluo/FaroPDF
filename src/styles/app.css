@@ -379,6 +379,11 @@ select.zoom-control {
   background: var(--accent-soft);
 }
 
+.choice-grid button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
 .reader {
   min-height: 0;
   overflow: auto;
@@ -577,6 +582,31 @@ select.zoom-control {
   list-style: none;
 }
 
+.page-organizer__empty {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  min-height: 100%;
+  padding: 28px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.page-organizer__empty h2 {
+  margin: 0;
+  color: var(--fg);
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.page-organizer__empty p {
+  max-width: 360px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+}
+
 .page-card {
   display: grid;
   justify-items: center;
@@ -767,29 +797,41 @@ select.zoom-control {
 
 @media (max-width: 920px) {
   .toolbar {
-    grid-template-columns: 44px max-content max-content 236px max-content 34px;
-    gap: 5px;
+    grid-template-columns: 44px max-content max-content 212px max-content minmax(112px, 1fr);
+    gap: 4px;
     padding: 0 8px;
   }
 
   .toolbar__brand > div:last-child,
-  .toolbar-search,
   select.zoom-control {
     display: none;
   }
 
   .toolbar__pager {
-    min-width: 236px;
+    min-width: 212px;
     gap: 4px;
   }
 
   .compact-button {
-    width: 28px;
+    width: 26px;
   }
 
   .page-control,
   .zoom-control {
-    min-width: 48px;
+    min-width: 44px;
+  }
+
+  .toolbar__group--utility .tool-button,
+  .toolbar__group--modes .tool-button,
+  .toolbar__group[aria-label="文件操作"] .tool-button,
+  .toolbar__group--right .tool-button {
+    min-width: 28px;
+    width: 28px;
+  }
+
+  .toolbar-search {
+    min-width: 78px;
+    padding: 0 6px;
   }
 
   .workspace {

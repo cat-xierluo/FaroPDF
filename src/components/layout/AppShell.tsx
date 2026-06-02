@@ -62,7 +62,7 @@ export function AppShell({
       />
       {showContextToolbar ? <ContextToolbar mode={activeMode} /> : null}
       <div className={showUtilityPanel ? "workspace" : "workspace workspace--full"}>
-        {showUtilityPanel ? <UtilityPanel panel={utilityPanel} settings={settings} /> : null}
+        {showUtilityPanel ? <UtilityPanel panel={utilityPanel} reader={reader} settings={settings} /> : null}
         {activeMode === "pages" ? (
           <PageOrganizerWorkspace reader={reader} />
         ) : (
@@ -74,9 +74,23 @@ export function AppShell({
   );
 }
 
-function UtilityPanel({ panel, settings }: { panel: Exclude<UtilityPanelId, "none">; settings: AppSettings }) {
+function UtilityPanel({
+  panel,
+  reader,
+  settings,
+}: {
+  panel: Exclude<UtilityPanelId, "none">;
+  reader: ReaderController;
+  settings: AppSettings;
+}) {
   if (panel === "view") {
-    return <ViewSettingsPanel />;
+    return (
+      <ViewSettingsPanel
+        canChangeViewMode={reader.state.document !== null}
+        onViewModeChange={reader.setViewMode}
+        viewMode={reader.state.document?.viewMode ?? reader.state.defaults.viewMode}
+      />
+    );
   }
 
   if (panel === "settings") {
@@ -120,8 +134,20 @@ function ContextToolbar({ mode }: { mode: Exclude<AppModeId, "read" | "pages"> }
 }
 
 function PageOrganizerWorkspace({ reader }: { reader: ReaderController }) {
-  const pageCount = reader.state.document?.pageCount ?? 5;
+  const pageCount = reader.state.document?.pageCount ?? 0;
   const pages = Array.from({ length: Math.min(pageCount, 12) }, (_, index) => index + 1);
+
+  if (!reader.state.document) {
+    return (
+      <main className="page-organizer" aria-label="页面管理工作台">
+        <section className="page-organizer__empty" aria-label="页面管理空态">
+          <div className="open-dropzone__sheet" aria-hidden="true" />
+          <h2>打开 PDF 后管理页面</h2>
+          <p>旋转、摘录、删除和另存操作只会在文档打开后启用。</p>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="page-organizer" aria-label="页面管理工作台">

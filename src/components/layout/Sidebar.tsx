@@ -1,8 +1,14 @@
 import { useState } from "react";
+import type { PdfViewMode } from "../../shared/pdf/types";
 
 const placeholderPages = [1, 2, 3];
 const summaryTabs = ["书签", "大纲", "批注列表", "缩略图"] as const;
 type SummaryTab = (typeof summaryTabs)[number];
+const viewModeOptions: Array<{ id: PdfViewMode; label: string }> = [
+  { id: "continuous", label: "连续" },
+  { id: "single", label: "单页" },
+  { id: "double", label: "双页" },
+];
 
 export function DocumentSummaryPanel() {
   const [activeTab, setActiveTab] = useState<SummaryTab>("缩略图");
@@ -42,31 +48,42 @@ export function DocumentSummaryPanel() {
   );
 }
 
-export function ViewSettingsPanel() {
+interface ViewSettingsPanelProps {
+  canChangeViewMode: boolean;
+  onViewModeChange: (viewMode: PdfViewMode) => void;
+  viewMode: PdfViewMode;
+}
+
+export function ViewSettingsPanel({ canChangeViewMode, onViewModeChange, viewMode }: ViewSettingsPanelProps) {
   return (
     <aside className="utility-panel view-settings" aria-label="视图设置">
       <h2>布局选项</h2>
       <section aria-label="页面布局">
         <p className="utility-label">页面布局</p>
-        <div className="choice-grid">
-          <button aria-pressed="true" type="button">
-            单页
-          </button>
-          <button aria-pressed="false" type="button">
-            双页
-          </button>
+        <div className="choice-grid choice-grid--three">
+          {viewModeOptions.map((option) => (
+            <button
+              aria-pressed={viewMode === option.id}
+              disabled={!canChangeViewMode}
+              key={option.id}
+              onClick={() => onViewModeChange(option.id)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       </section>
       <section aria-label="分屏视图">
         <p className="utility-label">分屏视图</p>
         <div className="choice-grid choice-grid--three">
-          <button aria-pressed="true" type="button">
+          <button aria-pressed="true" disabled type="button">
             无拆分
           </button>
-          <button aria-pressed="false" type="button">
+          <button aria-pressed="false" disabled type="button">
             垂直
           </button>
-          <button aria-pressed="false" type="button">
+          <button aria-pressed="false" disabled type="button">
             水平
           </button>
         </div>

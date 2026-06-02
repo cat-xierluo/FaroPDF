@@ -37,8 +37,10 @@ describe("FaroPDF app shell", () => {
     await user.click(screen.getByRole("button", { name: "页面管理" }));
 
     expect(screen.getByRole("main", { name: "页面管理工作台" })).toBeInTheDocument();
-    expect(screen.getByRole("toolbar", { name: "页面管理工具条" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "另存为新 PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "页面管理空态" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "打开 PDF 后管理页面" })).toBeInTheDocument();
+    expect(screen.queryByRole("toolbar", { name: "页面管理工具条" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "另存为新 PDF" })).not.toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "文档摘要" })).not.toBeInTheDocument();
   });
 
@@ -74,8 +76,11 @@ describe("FaroPDF app shell", () => {
     await user.click(screen.getByRole("button", { name: "视图设置" }));
 
     expect(screen.getByRole("complementary", { name: "视图设置" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "连续" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "单页" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "单页" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "双页" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "双页" })).toHaveAttribute("aria-pressed", "false");
 
     await user.click(screen.getByRole("button", { name: "设置" }));
 

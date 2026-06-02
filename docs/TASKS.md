@@ -100,13 +100,26 @@ Agent 可根据本文件自行判断：
 - 搜索只有输入框，没有结果层、命中跳转和文字层/OCR 提示。
 - 页面管理工作台只有壳层网格，没有拖拽、选择、多选、撤销、导出路径和风险确认。
 
+## 品牌与视觉资产
+
+### ISS-020 临时应用图标
+
+- 优先级：P1
+- 类型：品牌 / UI
+- 状态：已完成
+- 来源：用户要求先暂用最初生成的灯塔图标。
+- 范围：`src-tauri/icons/`、`public/favicon.png`、`index.html`、`docs/DESIGN.md`、`CHANGELOG.md`
+- 目标：为 FaroPDF 提供当前可用的应用图标，后续正式品牌图标再继续简化。
+- 验收：桌面图标和网页 favicon 均使用同一灯塔主图导出；Tauri 图标配置继续复用现有路径；原始生成图已复制到项目内作为当前源图。
+- 验证：检查源图和导出图标尺寸、ICO/ICNS 文件类型，并运行前端构建验证图标资源不破坏打包。
+
 ## 基础状态任务
 
 ### ISS-001 初始化 Tauri 应用脚手架
 
 - 优先级：P0
 - 类型：工程基础
-- 状态：已完成（待合并）
+- 状态：已完成
 - 建议分支：`feat/foundation-scaffold`
 - 建议 worktree：`.claude/worktrees/tmux-foundation-scaffold`
 - 依赖：无
@@ -119,7 +132,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：工程基础
-- 状态：已完成（待合并）
+- 状态：已完成
 - 建议分支：`feat/shared-contracts`
 - 建议 worktree：`.claude/worktrees/tmux-shared-contracts`
 - 依赖：ISS-001
@@ -241,7 +254,7 @@ Agent 可根据本文件自行判断：
 - 范围：`src/components/`、`src/styles/`、`src/modules/*` 的视觉整合、`docs/DESIGN.md`
 - 目标：按 `docs/DESIGN.md` 实现 PDF Expert 风格信息架构：中央阅读优先、左侧按需工具区、顶部搜索、模式上下文工具条和独立页面管理工作台。
 - 验收：界面不复用 Folia 的 Markdown 编辑布局，不常驻右侧 Inspector；PDF 页面始终是主视觉；桌面和窄屏视口不出现文本重叠。
-- 当前进度：已在 `feat/pdf-expert-shell-ia` 做出基础壳层重排，并补上 PDF Expert 风格空态、转换入口、最近文件占位、分组导出工具条、填写签名工具条、扫描/OCR 工具条和页面管理“另存为新 PDF”出口；已用 `/tmp/faropdf-ui-sample.pdf` 检查打开态、页面管理和导出工具条，并修正 900px 窄屏顶栏溢出。但 UI 还未达到最终合并标准，必须继续做视觉密度、真实缩略图、搜索结果层、页面管理交互和真实文件态 polish。
+- 当前进度：已在 `feat/pdf-expert-shell-ia` 做出基础壳层重排，并补上 PDF Expert 风格空态、转换入口、最近文件占位、分组导出工具条、填写签名工具条、扫描/OCR 工具条和页面管理“另存为新 PDF”出口；已用 `/tmp/faropdf-ui-sample.pdf` 检查打开态、页面管理和导出工具条，并修正 900px 窄屏顶栏溢出。code review 后已修正无文档页面管理假页面、视图设置状态硬编码和窄屏搜索入口隐藏问题。但 UI 还未达到最终合并标准，必须继续做视觉密度、真实缩略图、搜索结果层、页面管理交互和真实文件态 polish。
 - 下一步：继续推进阅读态真实 PDF 打开后的视觉 polish、搜索结果层、页面管理多选/撤销/风险提示，以及扫描/OCR 任务参数区；先补测试，再实现，最后用浏览器截图检查无重叠。
 
 ### ISS-010 法律材料隐私与联网 OCR 提示
@@ -362,3 +375,5 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：观察 PDF Expert 的阅读态、批注、编辑、导出、填写签名、扫描 OCR、视图设置和页面管理模式后，在 `feat/pdf-expert-shell-ia` 分支启动 FaroPDF Shell 重排草案；当前 UI 尚未达到可合并验收。
 - 2026-06-02：清理已合并的 foundation、reader-core、settings-ocr-providers 旧 worktree、本地分支和远端分支；继续推进 `feat/pdf-expert-shell-ia`，补齐空态工作区和导出/填写签名/扫描 OCR/页面管理工具条。
 - 2026-06-02：对 `feat/pdf-expert-shell-ia` 做提交前验证，修正 900px 窄屏顶栏溢出；该分支适合作为 Draft PR 进入 code/design review，但 `ISS-009` 仍保持进行中。
+- 2026-06-02：完成 `ISS-020` 临时应用图标，按用户要求暂用最初生成的灯塔图标，并同步网页 favicon 与 Tauri 平台图标。
+- 2026-06-02：处理 Draft PR code review：页面管理无文档时显示空态而不是假页面；视图设置读取实际阅读模式；920px 窄屏继续保留搜索入口；空态拖拽打开 PDF 行为补齐。

@@ -1,4 +1,4 @@
-import { useRef, type ChangeEvent, type CSSProperties } from "react";
+import { useRef, type ChangeEvent, type CSSProperties, type DragEvent } from "react";
 import { textLayerStatusLabels } from "../../modules/reader/readerLabels";
 import type { ReaderState } from "../../modules/reader/readerState";
 
@@ -30,6 +30,17 @@ export function ReaderCanvas({ onOpenFile, readerState }: ReaderCanvasProps) {
       }
     }
 
+    function handleDrop(event: DragEvent<HTMLElement>) {
+      event.preventDefault();
+      const file = Array.from(event.dataTransfer.files).find(
+        (droppedFile) => droppedFile.type === "application/pdf" || droppedFile.name.toLowerCase().endsWith(".pdf"),
+      );
+
+      if (file) {
+        void onOpenFile?.(file);
+      }
+    }
+
     return (
       <main className="reader" aria-label="PDF 阅读区">
         <div className="reader__start">
@@ -43,7 +54,12 @@ export function ReaderCanvas({ onOpenFile, readerState }: ReaderCanvasProps) {
               Word 转成 PDF
             </button>
           </section>
-          <section className="open-dropzone" aria-label="打开 PDF 文档">
+          <section
+            className="open-dropzone"
+            aria-label="打开 PDF 文档"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={handleDrop}
+          >
             <input
               accept="application/pdf,.pdf"
               aria-label="选择空态 PDF 文件"
