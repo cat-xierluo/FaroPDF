@@ -29,17 +29,17 @@ describe("scan preprocess service", () => {
     const service = createScanPreprocessService(backend);
 
     const job = await service.startPreprocess({
-      inputPath: "/secret/case/evidence.pdf",
+      inputPath: "/tmp/faropdf-fixtures/source.pdf",
       options: createDefaultScanPreprocessOptions(),
     });
 
     expect(backend.startScanPreprocess).toHaveBeenCalledWith({
-      inputPath: "/secret/case/evidence.pdf",
-      outputPath: "/secret/case/evidence-preprocessed.pdf",
+      inputPath: "/tmp/faropdf-fixtures/source.pdf",
+      outputPath: "/tmp/faropdf-fixtures/source-preprocessed.pdf",
       options: createDefaultScanPreprocessOptions(),
     });
     expect(job.status).toBe("queued");
-    expect(job.outputPath).toBe("/secret/case/evidence-preprocessed.pdf");
+    expect(job.outputPath).toBe("/tmp/faropdf-fixtures/source-preprocessed.pdf");
     expect(job.progress.completedPages).toBe(0);
   });
 
@@ -48,8 +48,8 @@ describe("scan preprocess service", () => {
 
     await expect(
       service.startPreprocess({
-        inputPath: "/secret/case/evidence.pdf",
-        outputPath: "/secret/case/evidence.pdf",
+        inputPath: "/tmp/faropdf-fixtures/source.pdf",
+        outputPath: "/tmp/faropdf-fixtures/source.pdf",
         options: {
           ...createDefaultScanPreprocessOptions(),
           dpi: 10,
@@ -59,8 +59,8 @@ describe("scan preprocess service", () => {
 
     try {
       await service.startPreprocess({
-        inputPath: "/secret/case/evidence.pdf",
-        outputPath: "/secret/case/evidence.pdf",
+        inputPath: "/tmp/faropdf-fixtures/source.pdf",
+        outputPath: "/tmp/faropdf-fixtures/source.pdf",
         options: {
           ...createDefaultScanPreprocessOptions(),
           dpi: 10,
@@ -68,8 +68,31 @@ describe("scan preprocess service", () => {
       });
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).not.toContain("/secret/case/evidence.pdf");
+      expect((error as Error).message).not.toContain("/tmp/faropdf-fixtures/source.pdf");
     }
     expect(backend.startScanPreprocess).not.toHaveBeenCalled();
+  });
+
+  test("redacts backend error paths without retaining the raw error in cause", async () => {
+    vi.mocked(backend.startScanPreprocess).mockRejectedValue(
+      new Error("无法写入 /tmp/faropdf fixtures/source bundle.pdf"),
+    );
+    const service = createScanPreprocessService(backend);
+
+    try {
+      await service.startPreprocess({
+        inputPath: "/tmp/faropdf-fixtures/source.pdf",
+        options: createDefaultScanPreprocessOptions(),
+      });
+      expect.fail("expected backend failure");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain("[path]");
+      expect((error as Error).message).not.toContain("/tmp/faropdf fixtures/source bundle.pdf");
+      const cause = (error as Error & { cause?: unknown }).cause;
+      expect(cause).toBeInstanceOf(Error);
+      expect((cause as Error).message).toContain("[path]");
+      expect((cause as Error).message).not.toContain("/tmp/faropdf fixtures/source bundle.pdf");
+    }
   });
 });

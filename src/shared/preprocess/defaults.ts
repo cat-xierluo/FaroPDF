@@ -157,8 +157,8 @@ export function suggestScanPreprocessOutputPath(inputPath: string): string {
 
 export function sanitizeScanPreprocessError(message: string): string {
   return message
-    .replace(/[A-Za-z]:\\[^，。；\s]+?\.pdf/gi, "[path]")
-    .replace(/\/[^，。；\s]+?\.pdf/gi, "[path]");
+    .replace(/\b[A-Za-z]:[\\/][^，。；;,\n\r]*?\.pdf/gi, "[path]")
+    .replace(/\/[^，。；;,\n\r]*?\.pdf/gi, "[path]");
 }
 
 function hasEnabledOperation(options: ScanPreprocessOptions): boolean {
@@ -181,7 +181,33 @@ function samePath(left: string, right: string): boolean {
 }
 
 function normalizePathForComparison(path: string): string {
-  return path.trim().replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  const normalizedSeparators = path.trim().replace(/\\/g, "/");
+  const driveMatch = /^([A-Za-z]:)(.*)$/.exec(normalizedSeparators);
+  const drivePrefix = driveMatch?.[1]?.toLowerCase() ?? "";
+  const pathBody = driveMatch ? driveMatch[2] : normalizedSeparators;
+  const isAbsolute = pathBody.startsWith("/");
+  const parts: string[] = [];
+
+  for (const part of pathBody.split("/")) {
+    if (!part || part === ".") {
+      continue;
+    }
+
+    if (part === "..") {
+      const lastPart = parts.at(-1);
+      if (lastPart && lastPart !== "..") {
+        parts.pop();
+      } else if (!isAbsolute) {
+        parts.push(part);
+      }
+      continue;
+    }
+
+    parts.push(part);
+  }
+
+  const prefix = `${drivePrefix}${isAbsolute ? "/" : ""}`;
+  return `${prefix}${parts.join("/")}`.replace(/\/+$/, "").toLowerCase();
 }
 
 function isValidPageRange(raw: string): boolean {

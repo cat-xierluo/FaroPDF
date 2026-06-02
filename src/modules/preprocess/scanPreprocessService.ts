@@ -44,9 +44,7 @@ export function createScanPreprocessService(
         return normalizeScanPreprocessJob(backendJob, preparedRequest);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw Object.assign(new Error(`扫描预处理 bridge 调用失败：${sanitizeScanPreprocessError(message)}`), {
-          cause: error,
-        });
+        throw createSanitizedBridgeError(message);
       }
     },
 
@@ -54,6 +52,13 @@ export function createScanPreprocessService(
       return validateScanPreprocessRequest(prepareScanPreprocessRequest(request));
     },
   };
+}
+
+function createSanitizedBridgeError(message: string): Error {
+  const sanitizedMessage = sanitizeScanPreprocessError(message);
+  return Object.assign(new Error(`扫描预处理 bridge 调用失败：${sanitizedMessage}`), {
+    cause: new Error(sanitizedMessage),
+  });
 }
 
 function normalizeScanPreprocessJob(input: unknown, request: ScanPreprocessRequest): ScanPreprocessJob {

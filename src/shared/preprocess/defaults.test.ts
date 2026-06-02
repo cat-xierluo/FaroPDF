@@ -28,15 +28,19 @@ describe("scan preprocess defaults", () => {
   });
 
   test("suggests a new PDF path without overwriting the original", () => {
-    expect(suggestScanPreprocessOutputPath("/matter/evidence.pdf")).toBe("/matter/evidence-preprocessed.pdf");
-    expect(suggestScanPreprocessOutputPath("/matter/evidence.PDF")).toBe("/matter/evidence-preprocessed.pdf");
-    expect(suggestScanPreprocessOutputPath("evidence")).toBe("evidence-preprocessed.pdf");
+    expect(suggestScanPreprocessOutputPath("/tmp/faropdf-fixtures/sample.pdf")).toBe(
+      "/tmp/faropdf-fixtures/sample-preprocessed.pdf",
+    );
+    expect(suggestScanPreprocessOutputPath("/tmp/faropdf-fixtures/sample.PDF")).toBe(
+      "/tmp/faropdf-fixtures/sample-preprocessed.pdf",
+    );
+    expect(suggestScanPreprocessOutputPath("sample")).toBe("sample-preprocessed.pdf");
   });
 
   test("validates numeric bounds, page ranges, and destructive output paths", () => {
     const request: ScanPreprocessRequest = {
-      inputPath: "/secret/case/evidence.pdf",
-      outputPath: "/secret/case/evidence.pdf",
+      inputPath: "/tmp/faropdf-fixtures/./source.pdf",
+      outputPath: "/tmp/faropdf-fixtures/nested/../source.pdf",
       pageRange: "0,3-1",
       options: {
         ...createDefaultScanPreprocessOptions(),
@@ -66,12 +70,12 @@ describe("scan preprocess defaults", () => {
         "分块页数必须为 0 到 500；0 表示不分块。",
       ]),
     );
-    expect(validation.errors.join(" ")).not.toContain("/secret/case/evidence.pdf");
+    expect(validation.errors.join(" ")).not.toContain("/tmp/faropdf-fixtures/source.pdf");
   });
 
   test("sanitizes backend errors without leaking full local paths", () => {
     const error = sanitizeScanPreprocessError(
-      "无法处理 /Users/maoking/案件/商业秘密/客户A证据.pdf，因为输出 /tmp/raw-output.pdf 不可写。",
+      "无法处理 /tmp/faropdf fixtures/source bundle.pdf，因为输出 /tmp/raw output.pdf 不可写。",
     );
 
     expect(error).toBe("无法处理 [path]，因为输出 [path] 不可写。");

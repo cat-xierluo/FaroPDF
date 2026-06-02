@@ -316,6 +316,9 @@ fn validate_scan_preprocess_request(request: &ScanPreprocessCommandRequest) -> R
     if options.blank_edge_margin_px > 200 {
         return Err("清边保留边距必须在 0 到 200 像素之间。".to_string());
     }
+    if options.blank_edge_threshold == 0 {
+        return Err("空白边阈值必须在 1 到 255 之间。".to_string());
+    }
 
     Ok(())
 }
@@ -365,11 +368,42 @@ fn paths_are_same(left: &Path, right: &Path) -> bool {
 }
 
 fn normalize_path_for_compare(path: &Path) -> String {
-    path.to_string_lossy()
-        .trim()
-        .replace('\\', "/")
-        .trim_end_matches('/')
-        .to_ascii_lowercase()
+    let normalized_separators = path.to_string_lossy().trim().replace('\\', "/");
+    let (drive_prefix, path_body) = normalized_separators
+        .as_bytes()
+        .get(1)
+        .filter(|byte| **byte == b':')
+        .map(|_| (&normalized_separators[..2], &normalized_separators[2..]))
+        .unwrap_or(("", normalized_separators.as_str()));
+    let is_absolute = path_body.starts_with('/');
+    let mut parts: Vec<&str> = Vec::new();
+
+    for part in path_body.split('/') {
+        if part.is_empty() || part == "." {
+            continue;
+        }
+
+        if part == ".." {
+            if parts.last().is_some_and(|last_part| *last_part != "..") {
+                parts.pop();
+            } else if !is_absolute {
+                parts.push(part);
+            }
+            continue;
+        }
+
+        parts.push(part);
+    }
+
+    let absolute_separator = if is_absolute { "/" } else { "" };
+    format!(
+        "{}{}{}",
+        drive_prefix.to_ascii_lowercase(),
+        absolute_separator,
+        parts.join("/")
+    )
+    .trim_end_matches('/')
+    .to_ascii_lowercase()
 }
 
 fn has_enabled_scan_operation(options: &ScanPreprocessCommandOptions) -> bool {
@@ -452,30 +486,49 @@ mod scan_preprocess_tests {
     #[test]
     fn resolves_default_output_path_without_overwriting_input_pdf() {
         let output = resolve_scan_preprocess_output_path(
-            PathBuf::from("/tmp/faropdf/evidence.pdf"),
+            PathBuf::from("/tmp/faropdf-fixtures/source.pdf"),
             None,
         )
         .expect("output path");
 
-        assert_eq!(output, PathBuf::from("/tmp/faropdf/evidence-preprocessed.pdf"));
+        assert_eq!(
+            output,
+            PathBuf::from("/tmp/faropdf-fixtures/source-preprocessed.pdf")
+        );
     }
 
     #[test]
     fn rejects_same_output_path_without_leaking_the_full_path() {
         let error = resolve_scan_preprocess_output_path(
-            PathBuf::from("/secret/case/evidence.pdf"),
-            Some(PathBuf::from("/secret/case/evidence.pdf")),
+            PathBuf::from("/tmp/faropdf-fixtures/./source.pdf"),
+            Some(PathBuf::from("/tmp/faropdf-fixtures/nested/../source.pdf")),
         )
         .expect_err("same output path should fail");
 
         assert!(error.contains("输出 PDF 必须是不同于原始 PDF 的新文件。"));
-        assert!(!error.contains("/secret/case/evidence.pdf"));
+        assert!(!error.contains("/tmp/faropdf-fixtures/source.pdf"));
+    }
+
+    #[test]
+    fn rejects_invalid_blank_edge_threshold() {
+        let mut request = ScanPreprocessCommandRequest {
+            input_path: "/tmp/faropdf-fixtures/source.pdf".to_string(),
+            output_path: None,
+            page_range: None,
+            options: default_scan_options(),
+        };
+        request.options.blank_edge_threshold = 0;
+
+        let error = validate_scan_preprocess_request(&request)
+            .expect_err("zero blank edge threshold should fail");
+
+        assert_eq!(error, "空白边阈值必须在 1 到 255 之间。");
     }
 
     #[test]
     fn command_stub_returns_queued_job_and_safe_summary() {
         let request = ScanPreprocessCommandRequest {
-            input_path: "/tmp/faropdf/evidence.pdf".to_string(),
+            input_path: "/tmp/faropdf-fixtures/source.pdf".to_string(),
             output_path: None,
             page_range: Some("1,3-5".to_string()),
             options: default_scan_options(),
@@ -484,10 +537,13 @@ mod scan_preprocess_tests {
         let job = start_scan_preprocess_job(request).expect("queued job");
 
         assert_eq!(job.status, "queued");
-        assert_eq!(job.output_path, "/tmp/faropdf/evidence-preprocessed.pdf");
+        assert_eq!(job.output_path, "/tmp/faropdf-fixtures/source-preprocessed.pdf");
         assert_eq!(job.progress.completed_pages, 0);
         assert_eq!(job.progress.stage, "queued");
         assert_eq!(job.summary.rotated_pages, 0);
-        assert_eq!(job.summary.output_path, "/tmp/faropdf/evidence-preprocessed.pdf");
+        assert_eq!(
+            job.summary.output_path,
+            "/tmp/faropdf-fixtures/source-preprocessed.pdf"
+        );
     }
 }
