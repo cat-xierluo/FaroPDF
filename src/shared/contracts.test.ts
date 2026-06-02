@@ -9,6 +9,7 @@ import type {
   PdfExportJob,
   PdfPageOperation,
   PdfPageViewport,
+  ScanPreprocessJob,
 } from "./index";
 
 describe("shared contracts", () => {
@@ -74,6 +75,38 @@ describe("shared contracts", () => {
       createdAt: "2026-06-02T00:00:00.000Z",
       updatedAt: "2026-06-02T00:00:00.000Z",
     };
+    const preprocessJob: ScanPreprocessJob = {
+      id: "preprocess-1",
+      inputPath: "/case/file.pdf",
+      outputPath: "/case/file-preprocessed.pdf",
+      status: "queued",
+      options: {
+        enhanceScans: true,
+        detectOrientation: true,
+        deskew: true,
+        splitPages: false,
+        cropPages: false,
+        trimBlankEdges: false,
+        outputMode: "preprocess-only",
+        dpi: 300,
+        jpegQuality: 90,
+        skewThresholdDegrees: 0.3,
+        rotationConfidence: 0.5,
+        maxDeskewDegrees: 5,
+        blankEdgeMarginPx: 10,
+        blankEdgeThreshold: 254,
+        parallelJobs: 1,
+        chunkPages: 0,
+        preserveOriginalPageSize: true,
+      },
+      progress: {
+        stage: "queued",
+        completedPages: 0,
+        totalPages: 0,
+      },
+      createdAt: "2026-06-02T00:00:00.000Z",
+      updatedAt: "2026-06-02T00:00:00.000Z",
+    };
     const settings: AppSettings = {
       defaultZoom: 1,
       defaultViewMode: "continuous",
@@ -88,6 +121,7 @@ describe("shared contracts", () => {
     expect(annotation.type).toBe("highlight");
     expect(exportJob.status).toBe("queued");
     expect(ocrJob.backend).toBe("paddleocr");
+    expect(preprocessJob.options.outputMode).toBe("preprocess-only");
     expect(settings.defaultSavePolicy).toBe("always-export-copy");
   });
 
@@ -98,10 +132,12 @@ describe("shared contracts", () => {
       "annotation",
       "pages",
       "export",
+      "preprocess",
       "ocr",
       "forms",
       "settings",
     ]);
+    expect(getModuleBoundary("preprocess").sharedContracts).toContain("src/shared/preprocess");
     expect(getModuleBoundary("ocr").sharedContracts).toContain("src/shared/ocr");
     expect(getModuleBoundary("reader").ownedPaths).toContain("src/modules/reader");
   });

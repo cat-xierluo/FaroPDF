@@ -1,3 +1,21 @@
+export type {
+  AnnotationDocumentRef,
+  AnnotationSidecar,
+  AnnotationSidecarDocumentRef,
+  PdfAnnotation,
+  PdfAnnotationAuthor,
+  PdfAnnotationInk,
+  PdfAnnotationInput,
+  PdfAnnotationLine,
+  PdfAnnotationPatch,
+  PdfAnnotationStamp,
+  PdfAnnotationStyle,
+  PdfAnnotationType,
+  PdfPoint,
+  PdfRect,
+  PdfStampName,
+} from "./annotation";
+
 export type PdfViewMode = "continuous" | "single" | "double";
 export type TextLayerStatus = "unknown" | "available" | "partial" | "missing" | "poor";
 export type OcrStatus = "not-needed" | "needed" | "running" | "completed" | "failed";
@@ -23,36 +41,6 @@ export interface PdfPageViewport {
   height: number;
   rotation: 0 | 90 | 180 | 270;
   scale: number;
-}
-
-export interface PdfRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export type PdfAnnotationType =
-  | "highlight"
-  | "underline"
-  | "strikeout"
-  | "note"
-  | "textbox"
-  | "rectangle"
-  | "arrow"
-  | "ink"
-  | "stamp";
-
-export interface PdfAnnotation {
-  id: string;
-  type: PdfAnnotationType;
-  pageIndex: number;
-  rects: PdfRect[];
-  color: string;
-  content?: string;
-  author?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export type PdfPageOperationType =

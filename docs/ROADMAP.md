@@ -55,10 +55,10 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - [ ] 支持文本选择高亮、下划线、删除线。
 - [ ] 支持备注、文本框、矩形、箭头和自由手写。
 - [ ] 支持常用图章，例如已阅、重点、待核、证据。
-- [ ] 支持批注颜色、作者、时间和页码。
+- [x] 支持批注颜色、作者、时间和页码。
 - [ ] 支持批注列表、批注搜索和点击跳转。
-- [ ] 支持导出批注摘要为 Markdown 或 HTML。
-- [ ] 默认先保存可编辑 sidecar 状态，导出时再写入或扁平化到 PDF。
+- [x] 支持导出批注摘要为 Markdown 或 HTML。
+- [x] 默认先保存可编辑 sidecar 状态，导出时再写入或扁平化到 PDF。
 
 ### 5. 页面整理
 
@@ -80,7 +80,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 ### 6. OCR/扫描
 
 - [ ] 检测纯扫描页、低文字量页和疑似 OCR 失败页。
-- [ ] 支持扫描件清洁校正：粗方向检测、微倾斜校正、可选裁边和分块处理。
+- [ ] 支持扫描件清洁校正：粗方向检测、微倾斜校正、可选裁边和分块处理。（已建立 preprocess-only job/bridge stub，真实处理待接入）
 - [ ] 提供 OCR bridge，优先连接本地 Legal Skills / `ocrmypdf`。
 - [ ] PaddleOCR / MinerU 等联网 OCR 需用户明确确认。
 - [ ] OCR 任务后台运行，显示进度、后端、输出路径和失败原因。
@@ -118,5 +118,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - 2026-06-02：纳入 `pdf-processor`、`pdf-organizer`、`img2pdf` 的脚本算法来源，新增扫描清洁校正、压缩算法、OCR 质量检查、证据图片编排和文书整理 manifest。
 - 2026-06-02：在 foundation 分支完成 Tauri/React 脚手架、基础阅读器 Shell、共享契约、设置入口和验证命令。
 - 2026-06-02：并行完成 PDF.js 阅读底座和设置/OCR provider 配置第一版，进入阅读深化、搜索、批注和 OCR bridge 前置状态。
+- 2026-06-02：完成 `ISS-016` 第一版扫描预处理基础：preprocess-only job model、参数校验、默认新输出 PDF 路径、Tauri command bridge stub 和测试；真实 OpenCV/PyMuPDF 处理继续后续接入。
 - 2026-06-02：参考 PDF Expert 的信息架构，在 `feat/pdf-expert-shell-ia` 分支启动 Shell 重排草案；当前记录为 UI 方向和任务边界，尚未达到最终视觉验收。
+- 2026-06-02：完成批注 sidecar 模型第一版，建立 schema version 1、仓储服务和 Markdown / HTML 摘要导出；具体批注 UI 交互后续接入。
 - 2026-06-02：完成 `ISS-003` 文本层检测与全文搜索第一版：按需内存索引、结果列表、上下一个命中、当前页轻量高亮和 OCR 提示已落地；真实 PDF text-layer 几何高亮继续随阅读渲染深化。

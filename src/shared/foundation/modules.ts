@@ -4,6 +4,7 @@ export type FaroPdfModuleId =
   | "annotation"
   | "pages"
   | "export"
+  | "preprocess"
   | "ocr"
   | "forms"
   | "settings";
@@ -51,6 +52,13 @@ export const FAROPDF_MODULES: ModuleBoundary[] = [
     ownedPaths: ["src/modules/export"],
     sharedContracts: ["src/shared/pdf"],
     verification: ["npm run typecheck", "npm test"],
+  },
+  {
+    id: "preprocess",
+    label: "扫描预处理",
+    ownedPaths: ["src/modules/preprocess"],
+    sharedContracts: ["src/shared/preprocess", "src/shared/pdf"],
+    verification: ["npm run typecheck", "npm test", "cd src-tauri && cargo check"],
   },
   {
     id: "ocr",

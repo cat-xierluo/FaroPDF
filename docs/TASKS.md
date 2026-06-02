@@ -187,13 +187,13 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：批注
-- 状态：进行中（并行 worker）
+- 状态：已完成（sidecar 模型第一版；UI 列表和点击跳转后续接入）
 - 建议分支：`feat/annotations-sidecar`
 - 建议 worktree：`.claude/worktrees/tmux-annotations-sidecar`
 - 依赖：ISS-002、ISS-011
 - 范围：`src/modules/annotation/`、`src/shared/pdf/annotation*`、批注相关测试
 - 目标：建立 `PdfAnnotation` 模型和 sidecar 持久化策略，支持高亮、下划线、删除线、备注、文本框、形状、手写和图章。
-- 验收：批注可新增、编辑、删除、列表展示、点击跳转，并能导出 Markdown 或 HTML 摘要。
+- 验收：批注可新增、编辑、删除、按页码排序列表，并能导出 Markdown 或 HTML 摘要；sidecar 默认写入 `.faropdf/annotations/*.annotations.json`，不覆盖原始 PDF，摘要不包含真实用户文件名。UI 工具条、列表渲染和点击跳转留给后续 UI 接入任务。
 
 ### ISS-005 PDF 导出与批注扁平化
 
@@ -302,7 +302,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：扫描预处理
-- 状态：进行中（并行 worker）
+- 状态：已完成（bridge 基础第一版；真实 OpenCV/PyMuPDF 处理后续接入）
 - 建议分支：`feat/scan-preprocess`
 - 建议 worktree：`.claude/worktrees/tmux-scan-preprocess`
 - 依赖：ISS-011、ISS-012、ISS-014
@@ -310,6 +310,8 @@ Agent 可根据本文件自行判断：
 - 参考算法：`pdf-processor/scripts/pdf-preprocess-core.py`、`pdf_preprocess_skew.py`、`pdf-preprocess-ocr.py`
 - 目标：支持扫描件增强、90 度粗方向检测、微倾斜校正、拆分页面、裁剪页面、清除空白边、分块处理、并行处理和只预处理输出。
 - 验收：用户可在不 OCR 的情况下输出清洁校正后的新 PDF；任务显示旋转页数、倾斜校正页数、拆分页数、裁边页数、清边页数、耗时和输出路径；扫描/OCR 工具条至少覆盖增强扫描、拆分页面、裁剪页面、清除空白边和识别文本。
+- 当前进度：已建立第一版 preprocess-only 任务契约、保守默认参数、参数校验、路径脱敏、默认新输出 PDF 路径、前端 service、Tauri command bridge stub、queued 进度状态和测试。真实 OpenCV/PyMuPDF 处理、页面级统计回填和扫描/OCR 工具条接入继续保留为后续工作。
+- 验证：新增前端测试覆盖默认参数、输出路径、校验和 service bridge；新增 Rust 单元测试覆盖安全输出路径和 command stub。
 
 ### ISS-017 OCR 质量检查
 
@@ -380,5 +382,7 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：完成 `ISS-020` 临时应用图标，按用户要求暂用最初生成的灯塔图标，并同步网页 favicon 与 Tauri 平台图标。
 - 2026-06-02：处理 Draft PR code review：页面管理无文档时显示空态而不是假页面；视图设置读取实际阅读模式；920px 窄屏继续保留搜索入口；空态拖拽打开 PDF 行为补齐。
 - 2026-06-02：合并 PR #1 `feat/pdf-expert-shell-ia` 到 `main`，清理本地和远端分支；启动 `ISS-003`、`ISS-004`、`ISS-016` 三条并行主线任务。
+- 2026-06-02：完成 ISS-004 批注 sidecar 模型第一版，落地共享批注类型、sidecar schema、仓储服务和摘要导出；UI 接入后续推进。
+- 2026-06-02：`ISS-016` 在 `feat/scan-preprocess` 完成第一版扫描预处理 job/bridge 基础：共享契约、校验、脱敏、默认另存输出、前端 service、Tauri command stub 和测试。
 - 2026-06-02：`feat/text-search` 在 `.claude/worktrees/tmux-text-search` 接手 `ISS-003`，先以测试驱动实现搜索状态、按需索引、查询服务和轻量 UI 接入。
 - 2026-06-02：完成 `ISS-003` 第一版：搜索模块按需读取 PDF.js 页文本并建立内存索引，Toolbar 展示命中列表和 OCR 提示，Reader 区展示轻量当前命中标记。

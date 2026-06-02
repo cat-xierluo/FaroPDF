@@ -1,7 +1,5 @@
 export type {
   OcrStatus,
-  PdfAnnotation,
-  PdfAnnotationType,
   PdfDocumentState,
   PdfExportJob,
   PdfExportJobStatus,
@@ -9,10 +7,36 @@ export type {
   PdfPageOperation,
   PdfPageOperationType,
   PdfPageViewport,
-  PdfRect,
   PdfViewMode,
   TextLayerStatus,
 } from "./pdf/types";
 export type { PdfPageText } from "./pdf/text";
+export type {
+  AnnotationDocumentRef,
+  AnnotationSidecar,
+  AnnotationSidecarDocumentRef,
+  PdfAnnotation,
+  PdfAnnotationAuthor,
+  PdfAnnotationInk,
+  PdfAnnotationInput,
+  PdfAnnotationLine,
+  PdfAnnotationPatch,
+  PdfAnnotationStamp,
+  PdfAnnotationStyle,
+  PdfAnnotationType,
+  PdfPoint,
+  PdfRect,
+  PdfStampName,
+} from "./pdf/annotation";
 export type { OcrBackend, OcrJob, OcrJobStatus, OcrProviderConfig, OcrProviderType } from "./ocr/types";
+export type {
+  ScanPreprocessJob,
+  ScanPreprocessJobStatus,
+  ScanPreprocessOptions,
+  ScanPreprocessOutputMode,
+  ScanPreprocessProgress,
+  ScanPreprocessProgressStage,
+  ScanPreprocessRequest,
+  ScanPreprocessSummary,
+} from "./preprocess/types";
 export type { AppSettings, DefaultSavePolicy, RecentPdfFile } from "./settings/types";
