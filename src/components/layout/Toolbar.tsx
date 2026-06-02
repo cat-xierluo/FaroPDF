@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useRef, type ChangeEvent, type ComponentType, type CSSProperties } from "react";
 import type { ReaderController } from "../../modules/reader";
+import type { TextSearchController } from "../../modules/search";
 import { formatZoom, viewModeLabels } from "../../modules/reader/readerLabels";
 import type { PdfViewMode } from "../../shared/pdf/types";
 import type { AppModeId, UtilityPanelId } from "./types";
@@ -25,6 +26,7 @@ interface ToolbarProps {
   onModeChange: (mode: AppModeId) => void;
   onUtilityPanelChange: (panel: UtilityPanelId) => void;
   reader: ReaderController;
+  search: TextSearchController;
   utilityPanel: UtilityPanelId;
 }
 
@@ -46,7 +48,7 @@ const fileInputStyle: CSSProperties = {
   opacity: 0,
 };
 
-export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader, utilityPanel }: ToolbarProps) {
+export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader, search, utilityPanel }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const document = reader.state.document;
   const currentPage = document?.currentPage ?? 1;
@@ -204,10 +206,20 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
         ))}
       </div>
       <div className="toolbar__group toolbar__group--right" aria-label="搜索和设置">
-        <label className="toolbar-search">
-          <Search size={15} />
-          <input aria-label="全文搜索" placeholder="搜索" type="search" />
-        </label>
+        <div className="toolbar-search-wrap">
+          <label className="toolbar-search">
+            <Search size={15} />
+            <input
+              aria-label="全文搜索"
+              disabled={!document}
+              onChange={(event) => search.setQuery(event.target.value)}
+              placeholder={document ? "搜索" : "打开后搜索"}
+              type="search"
+              value={search.state.query}
+            />
+          </label>
+          <SearchResultsPopover search={search} />
+        </div>
         <button
           aria-pressed={utilityPanel === "settings"}
           className="tool-button tool-button--icon"
@@ -220,5 +232,65 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
         </button>
       </div>
     </header>
+  );
+}
+
+function SearchResultsPopover({ search }: { search: TextSearchController }) {
+  const state = search.state;
+  const shouldShow = state.query.trim().length > 0;
+
+  if (!shouldShow) {
+    return null;
+  }
+
+  return (
+    <div className="search-popover" role="region" aria-label="搜索结果">
+      <div className="search-popover__summary">
+        <span>命中 {state.hits.length} 处</span>
+        {state.pendingPageCount > 0 ? <small>仍有 {state.pendingPageCount} 页未索引</small> : null}
+      </div>
+      <div className="search-popover__nav" role="toolbar" aria-label="搜索命中导航">
+        <button className="compact-button" disabled={state.hits.length === 0} onClick={search.selectPreviousHit} type="button">
+          <ChevronLeft size={15} />
+          <span>上一个命中</span>
+        </button>
+        <button className="compact-button" disabled={state.hits.length === 0} onClick={search.selectNextHit} type="button">
+          <ChevronRight size={15} />
+          <span>下一个命中</span>
+        </button>
+        {state.pendingPageCount > 0 ? (
+          <button className="context-tool" onClick={search.indexMore} type="button">
+            继续索引
+          </button>
+        ) : null}
+      </div>
+      {state.ocrHint?.visible ? (
+        <div className="search-ocr-hint">
+          <p>{state.ocrHint.message}</p>
+          <button className="context-tool context-tool--primary" onClick={search.requestOcr} type="button">
+            {state.ocrHint.actionLabel}
+          </button>
+        </div>
+      ) : null}
+      {state.status === "indexing" ? <p className="search-popover__empty">正在建立搜索索引...</p> : null}
+      {state.status === "empty" ? <p className="search-popover__empty">暂未命中。</p> : null}
+      {state.status === "error" ? <p className="search-popover__empty">{state.errorMessage}</p> : null}
+      {state.hits.length > 0 ? (
+        <ol className="search-results-list">
+          {state.hits.map((hit) => (
+            <li key={hit.id}>
+              <button
+                aria-pressed={state.activeHitId === hit.id}
+                onClick={() => search.selectHit(hit.id)}
+                type="button"
+              >
+                <span>第 {hit.pageNumber} 页</span>
+                <small>{hit.snippet}</small>
+              </button>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </div>
   );
 }

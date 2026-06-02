@@ -1,5 +1,6 @@
 import type { AppSettings } from "../../shared";
 import type { ReaderController } from "../../modules/reader";
+import type { TextSearchController } from "../../modules/search";
 import { ReaderCanvas } from "./ReaderCanvas";
 import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
@@ -12,6 +13,7 @@ interface AppShellProps {
   onModeChange: (mode: AppModeId) => void;
   onUtilityPanelChange: (panel: UtilityPanelId) => void;
   reader: ReaderController;
+  search: TextSearchController;
   settings: AppSettings;
   utilityPanel: UtilityPanelId;
 }
@@ -45,6 +47,7 @@ export function AppShell({
   onModeChange,
   onUtilityPanelChange,
   reader,
+  search,
   settings,
   utilityPanel,
 }: AppShellProps) {
@@ -58,6 +61,7 @@ export function AppShell({
         onModeChange={onModeChange}
         onUtilityPanelChange={onUtilityPanelChange}
         reader={reader}
+        search={search}
         utilityPanel={utilityPanel}
       />
       {showContextToolbar ? <ContextToolbar mode={activeMode} /> : null}
@@ -66,7 +70,7 @@ export function AppShell({
         {activeMode === "pages" ? (
           <PageOrganizerWorkspace reader={reader} />
         ) : (
-          <ReaderCanvas onOpenFile={reader.openFile} readerState={reader.state} />
+          <ReaderCanvas onOpenFile={reader.openFile} readerState={reader.state} searchState={search.state} />
         )}
       </div>
       <StatusBar readerState={reader.state} />

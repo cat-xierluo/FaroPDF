@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { AppShell } from "./components/layout/AppShell";
 import type { AppModeId, UtilityPanelId } from "./components/layout/types";
 import { useReaderController } from "./modules/reader";
+import { useTextSearchController } from "./modules/search";
 import { createDefaultAppSettings } from "./shared/settings/defaults";
 import "./styles/app.css";
 
@@ -10,6 +11,12 @@ function App() {
   const [activeMode, setActiveMode] = useState<AppModeId>("read");
   const [utilityPanel, setUtilityPanel] = useState<UtilityPanelId>("summary");
   const reader = useReaderController(settings);
+  const search = useTextSearchController({
+    document: reader.state.document,
+    readPageText: reader.getPageText,
+    onRequestOcr: () => setActiveMode("ocr"),
+    onSelectPage: reader.setCurrentPage,
+  });
 
   function handleModeChange(nextMode: AppModeId) {
     setActiveMode(nextMode);
@@ -36,6 +43,7 @@ function App() {
       onModeChange={handleModeChange}
       onUtilityPanelChange={handleUtilityPanelChange}
       reader={reader}
+      search={search}
       settings={settings}
       utilityPanel={utilityPanel}
     />

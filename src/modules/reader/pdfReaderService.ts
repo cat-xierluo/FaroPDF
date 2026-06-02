@@ -1,4 +1,5 @@
 import type { ReaderByteLoadInput, ReaderLoadedMetadata } from "../../shared/pdf/reader";
+import type { PdfPageText } from "../../shared/pdf/text";
 import type { PdfPageViewport, TextLayerStatus } from "../../shared/pdf/types";
 import { configurePdfjsWorker } from "./pdfjsWorker";
 
@@ -40,6 +41,7 @@ export interface PdfJsReaderAdapter {
 export interface LoadedPdfDocument {
   metadata: ReaderLoadedMetadata;
   getPageViewport: (pageIndex: number, scale?: number) => Promise<PdfPageViewport>;
+  getPageText: (pageIndex: number) => Promise<PdfPageText>;
   destroy: () => Promise<void>;
 }
 
@@ -67,7 +69,7 @@ async function readTextLayerStatus(page: PdfJsPageLike): Promise<TextLayerStatus
 
   try {
     const textContent = await page.getTextContent();
-    return textContent.items && textContent.items.length > 0 ? "available" : "missing";
+    return extractTextItems(textContent).length > 0 ? "available" : "missing";
   } catch {
     return "unknown";
   }
@@ -84,6 +86,53 @@ async function readPageViewport(document: PdfJsDocumentLike, pageIndex: number, 
     rotation: normalizeRotation(viewport.rotation ?? page.rotate),
     scale,
   };
+}
+
+async function readPageText(document: PdfJsDocumentLike, pageIndex: number): Promise<PdfPageText> {
+  const page = await document.getPage(pageIndex + 1);
+
+  if (!page.getTextContent) {
+    return {
+      pageIndex,
+      text: "",
+      status: "unknown",
+      itemCount: 0,
+      charCount: 0,
+    };
+  }
+
+  try {
+    const textItems = extractTextItems(await page.getTextContent());
+    const text = textItems.join("");
+
+    return {
+      pageIndex,
+      text,
+      status: textItems.length > 0 && text.length > 0 ? "available" : "missing",
+      itemCount: textItems.length,
+      charCount: text.length,
+    };
+  } catch {
+    return {
+      pageIndex,
+      text: "",
+      status: "unknown",
+      itemCount: 0,
+      charCount: 0,
+    };
+  }
+}
+
+function extractTextItems(textContent: PdfJsTextContentLike) {
+  return (textContent.items ?? [])
+    .map((item) => {
+      if (typeof item === "object" && item !== null && "str" in item && typeof item.str === "string") {
+        return item.str;
+      }
+
+      return "";
+    })
+    .filter((text) => text.length > 0);
 }
 
 export async function loadPdfFromBytes(
@@ -114,6 +163,7 @@ export async function loadPdfFromBytes(
       textLayerStatus,
     },
     getPageViewport: (pageIndex, scale = 1) => readPageViewport(document, pageIndex, scale),
+    getPageText: (pageIndex) => readPageText(document, pageIndex),
     destroy: () => loadingTask.destroy?.() ?? Promise.resolve(),
   };
 }

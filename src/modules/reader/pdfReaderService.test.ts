@@ -76,6 +76,20 @@ describe("pdfReaderService", () => {
       rotation: 90,
       scale: 1.25,
     });
+    await expect(loaded.getPageText(0)).resolves.toEqual({
+      pageIndex: 0,
+      text: "合同",
+      status: "available",
+      itemCount: 1,
+      charCount: 2,
+    });
+    await expect(loaded.getPageText(1)).resolves.toEqual({
+      pageIndex: 1,
+      text: "",
+      status: "missing",
+      itemCount: 0,
+      charCount: 0,
+    });
     await loaded.destroy();
     expect(destroy).toHaveBeenCalledOnce();
   });

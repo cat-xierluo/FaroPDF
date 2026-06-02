@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useReducer, useRef } from "react";
 import type { AppSettings } from "../../shared/settings/types";
+import type { PdfPageText } from "../../shared/pdf/text";
 import type { PdfViewMode } from "../../shared/pdf/types";
 import { loadPdfFromFile, type LoadedPdfDocument } from "./pdfReaderService";
 import { createInitialReaderState, readerReducer } from "./readerState";
@@ -44,12 +45,23 @@ export function useReaderController(settings: AppSettings) {
     dispatch({ type: "reader/setViewMode", payload: { viewMode } });
   }, []);
 
+  const getPageText = useCallback(async (pageIndex: number): Promise<PdfPageText> => {
+    const loadedDocument = loadedDocumentRef.current;
+
+    if (!loadedDocument) {
+      throw new Error("尚未打开 PDF");
+    }
+
+    return loadedDocument.getPageText(pageIndex);
+  }, []);
+
   return {
     state,
     openFile,
     setCurrentPage,
     setZoom,
     setViewMode,
+    getPageText,
   };
 }
 
