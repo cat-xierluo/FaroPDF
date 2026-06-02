@@ -536,6 +536,15 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 
 当前不执行真实 PDF 页序、删除或旋转改写；页面网格 UI、多选预览、插入/合并/裁剪、A4 标准化和页级 manifest 后续接入。
 
+### 证据图片 A4 编排（imagePack）
+
+`src/shared/pdf/imagePack.ts` 与 `src/modules/pages/imagePack/imagePackPlanner.ts` 已建立证据图片 A4 编排第一版 plan-only 底座（ISS-018）：
+
+- 共享契约：`ImagePackInputItem`（`image` / `pdf-page` 两种 source，含 `width` / `height` / `sourcePath` / `sourcePageIndex` / `label`）、`ImagePackLayoutOptions`（`itemsPerPage` / `orientation` / `margin` / `sort`）、`ImagePackPlan`（含 `pages` / `cells` / `summary` / `warnings`），以及 A4 尺寸常量 `A4_PORTRAIT_SIZE_PT` / `A4_LANDSCAPE_SIZE_PT`。
+- `createImagePackPlan`：纯函数规划器，校验条目、归一化选项、按 `sort` 排序、解析 `itemsPerPage=auto`、生成单元格布局、建议 `*-evidence-pack.pdf` 输出路径并拒绝与输入 `sourcePath` 等价的输出。
+- `suggestImagePackOutputPath`：根据第一个输入 `sourcePath` 生成 `*-evidence-pack.pdf`，无路径时回退 `evidence-pack.pdf`。
+- 边界：当前是 plan-only，不读取真实图片或 PDF、不渲染像素、不向 `pdfOperationEngine` 提交 operation、不引入新依赖；不修改 `package.json` / 锁文件 / `src-tauri/` / `src/App.tsx` / `src/styles/`。
+
 ## 模块规划
 
 | 模块 | 职责 |

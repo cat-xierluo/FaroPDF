@@ -1,0 +1,59 @@
+{
+  "status": "running",
+  "phase": "verification",
+  "branch": "feat/evidence-image-pack",
+  "worktree": "/Users/maoking/Library/Application Support/maoscripts/FaroPDF/.claude/worktrees/tmux-evidence-image-pack",
+  "runtime_profile": "claude-provider settings (current session; do not modify provider/env/dependencies)",
+  "allowed_files": [
+    "src/modules/pages/imagePack/**",
+    "src/modules/pages/index.ts",
+    "src/modules/pages/README.md",
+    "src/shared/pdf/imagePack*",
+    "src/shared/index.ts",
+    "src/shared/contracts.test.ts",
+    "docs/TASKS.md",
+    "docs/DECISIONS.md",
+    "docs/ARCHITECTURE.md",
+    "CHANGELOG.md",
+    ".agent-context/STATUS.json",
+    ".agent-context/RESULT.md",
+    ".agent-context/PATCH_SUMMARY.md"
+  ],
+  "forbidden_files": [
+    "package.json",
+    "package-lock.json",
+    "node_modules/**",
+    "src-tauri/**",
+    "src/App.tsx",
+    "src/styles/**",
+    ".gitignore",
+    "any provider/api key/secret/env profile file"
+  ],
+  "tooling": {
+    "node": "v25.2.1",
+    "npm": "11.6.2"
+  },
+  "task": {
+    "id": "ISS-018",
+    "title": "证据图片 A4 编排",
+    "priority": "P1",
+    "type": "页面管理 / 证据材料",
+    "scope": "evidence-image-pack-planner (plan-only first version; no real fs picking, no real render, no new deps)",
+    "out_of_scope": [
+      "real filesystem directory picking",
+      "image/PDF rendering dependencies",
+      "modifying package or lock files",
+      "OCR quality PR files",
+      "app shell UI"
+    ]
+  },
+  "phase_history": [
+    { "phase": "bootstrap", "at": "2026-06-02T16:04:30Z" },
+    { "phase": "testing", "at": "2026-06-02T16:04:30Z" },
+    { "phase": "verification", "at": "2026-06-02T16:04:30Z" }
+  ],
+  "pm_host": "Codex",
+  "worker_backend": "Claude Code",
+  "pm_correction_received": true,
+  "updated_at": "2026-06-02T16:04:30Z"
+}

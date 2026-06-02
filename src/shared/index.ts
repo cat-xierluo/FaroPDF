@@ -20,6 +20,22 @@ export type {
   PdfPageOrganizerState,
 } from "./pdf/pageOrganizer";
 export type {
+  ImagePackCell,
+  ImagePackInputItem,
+  ImagePackItemsPerPage,
+  ImagePackLayoutOptions,
+  ImagePackOrientation,
+  ImagePackOrientationOption,
+  ImagePackPage,
+  ImagePackPerPageOption,
+  ImagePackPlan,
+  ImagePackPlanInput,
+  ImagePackSortStrategy,
+  ImagePackSourceKind,
+  ImagePackSummary,
+} from "./pdf/imagePack";
+export { A4_LANDSCAPE_SIZE_PT, A4_PORTRAIT_SIZE_PT } from "./pdf/imagePack";
+export type {
   PdfAnnotationFlattenPlan,
   PdfAnnotationFlattenPlanEntry,
   PdfAnnotationFlattenStrategy,
