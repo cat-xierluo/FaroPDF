@@ -60,7 +60,7 @@ PDF.js page.render(canvas) + text layer + annotation overlay
   ↓
 search state / sidecar / page operation queue / export job queue / OCR job queue
   ↓
-导出时由 pdf-lib + OCR 输出文件生成新 PDF
+导出时由 pdfOperationEngine 读取 PDF bytes，用 pdf-lib 生成新 PDF bytes；路径型导出再写入新输出路径
 ```
 
 ## 核心接口
@@ -217,6 +217,8 @@ export interface PdfPageOperation {
 
 ### PdfExportJob
 
+`PdfExportJob` 记录队列型任务状态；实际导出执行使用 `PdfExportRequest` / `PdfExportResult`，确保目标是 bytes 结果或不同于原始文件的新输出路径。
+
 ```ts
 export type PdfExportJobType =
   | 'flatten-annotations'
@@ -241,6 +243,46 @@ export interface PdfExportJob {
   updatedAt: string;
 }
 ```
+
+### PdfExportRequest
+
+```ts
+export type PdfExportDestination =
+  | { type: 'bytes' }
+  | { type: 'file'; outputPath: string };
+
+export type PdfExportOperation =
+  | { id: string; type: 'flatten-annotations'; sidecar: AnnotationSidecar; strategy?: 'plan-only' }
+  | { id: string; type: 'flatten-form' }
+  | { id: string; type: 'page-operations'; operations: PdfPageOperation[]; mode?: 'plan-only' };
+
+export interface PdfExportRequest {
+  id: string;
+  source: {
+    bytes: Uint8Array;
+    path?: string;
+    fingerprint?: string;
+  };
+  destination: PdfExportDestination;
+  operations: PdfExportOperation[];
+  requestedAt: string;
+}
+
+export interface PdfExportResult {
+  id: string;
+  bytes: Uint8Array;
+  destination: PdfExportDestination;
+  summary: PdfExportSummary;
+  completedAt: string;
+}
+```
+
+导出引擎第一版边界：
+
+- `pdfOperationEngine` 不写文件，只返回新 PDF bytes；`pdfExportService` 在路径型导出时拒绝 `outputPath === inputPath`。
+- `flatten-form` 使用 pdf-lib `form.flatten()`，可生成不可编辑表单提交版 bytes。
+- `flatten-annotations` 当前只把 sidecar 批注转换为 `plan-only` 摘要并写入 PDF 元数据，不绘制真实高亮、形状、墨迹、图章或备注外观。
+- `page-operations` 当前只生成 `plan-only` 入口，真实旋转、删除、重排、裁剪和插入仍由页面整理任务接入。
 
 ### OcrJob
 
