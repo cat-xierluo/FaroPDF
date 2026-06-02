@@ -1,4 +1,6 @@
 import {
+  ChevronLeft,
+  ChevronRight,
   Download,
   FileOutput,
   FileUp,
@@ -9,17 +11,22 @@ import {
   Search,
   Settings,
 } from "lucide-react";
+import { useRef, type ChangeEvent, type ComponentType, type CSSProperties } from "react";
+import type { ReaderController } from "../../modules/reader";
+import { formatZoom, viewModeLabels } from "../../modules/reader/readerLabels";
+import type { PdfViewMode } from "../../shared/pdf/types";
 import type { InspectorPanelId } from "./types";
 
 interface ToolbarProps {
   activePanel: InspectorPanelId;
   onPanelChange: (panel: InspectorPanelId) => void;
+  reader: ReaderController;
 }
 
 const panelButtons: Array<{
   id: InspectorPanelId;
   label: string;
-  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  icon: ComponentType<{ size?: number; strokeWidth?: number }>;
 }> = [
   { id: "search", label: "搜索", icon: Search },
   { id: "annotation", label: "批注", icon: Highlighter },
@@ -29,7 +36,36 @@ const panelButtons: Array<{
   { id: "settings", label: "设置", icon: Settings },
 ];
 
-export function Toolbar({ activePanel, onPanelChange }: ToolbarProps) {
+const fileInputStyle: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  opacity: 0,
+};
+
+export function Toolbar({ activePanel, onPanelChange, reader }: ToolbarProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const document = reader.state.document;
+  const currentPage = document?.currentPage ?? 1;
+  const pageCount = document?.pageCount ?? 0;
+  const zoom = document?.zoom ?? reader.state.defaults.zoom;
+  const viewMode = document?.viewMode ?? reader.state.defaults.viewMode;
+  const fileSubtitle =
+    reader.state.status === "loading" ? "正在打开" : document?.name ?? reader.state.errorMessage ?? "等待文件";
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (file) {
+      void reader.openFile(file);
+      event.target.value = "";
+    }
+  }
+
+  function handleViewModeChange(event: ChangeEvent<HTMLSelectElement>) {
+    reader.setViewMode(event.target.value as PdfViewMode);
+  }
+
   return (
     <header className="toolbar">
       <div className="toolbar__brand">
@@ -38,11 +74,19 @@ export function Toolbar({ activePanel, onPanelChange }: ToolbarProps) {
         </span>
         <div>
           <h1>FaroPDF</h1>
-          <p>等待文件</p>
+          <p title={fileSubtitle}>{fileSubtitle}</p>
         </div>
       </div>
       <div className="toolbar__group" aria-label="文件操作">
-        <button className="tool-button tool-button--primary" type="button">
+        <input
+          accept="application/pdf,.pdf"
+          aria-label="选择本地 PDF 文件"
+          onChange={handleFileChange}
+          ref={fileInputRef}
+          style={fileInputStyle}
+          type="file"
+        />
+        <button className="tool-button tool-button--primary" onClick={() => fileInputRef.current?.click()} type="button">
           <FileUp size={16} />
           <span>打开 PDF</span>
         </button>
@@ -55,15 +99,40 @@ export function Toolbar({ activePanel, onPanelChange }: ToolbarProps) {
           <span>导出</span>
         </button>
       </div>
-      <div className="toolbar__pager" aria-label="阅读控制">
-        <button className="compact-button" type="button" aria-label="上一页">
-          -
+      <div className="toolbar__pager" aria-label="阅读控制" style={{ minWidth: 228 }}>
+        <button
+          aria-label="上一页"
+          className="compact-button"
+          disabled={!document || currentPage <= 1}
+          onClick={() => reader.setCurrentPage(currentPage - 1)}
+          type="button"
+        >
+          <ChevronLeft size={16} />
         </button>
-        <span className="page-control">1 / 0</span>
-        <button className="compact-button" type="button" aria-label="下一页">
-          +
+        <span className="page-control">{currentPage} / {pageCount}</span>
+        <button
+          aria-label="下一页"
+          className="compact-button"
+          disabled={!document || currentPage >= pageCount}
+          onClick={() => reader.setCurrentPage(currentPage + 1)}
+          type="button"
+        >
+          <ChevronRight size={16} />
         </button>
-        <span className="zoom-control">100%</span>
+        <span className="zoom-control">{formatZoom(zoom)}</span>
+        <select
+          aria-label="视图模式"
+          className="zoom-control"
+          disabled={!document}
+          onChange={handleViewModeChange}
+          value={viewMode}
+        >
+          {Object.entries(viewModeLabels).map(([mode, label]) => (
+            <option key={mode} value={mode}>
+              {label}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="toolbar__group toolbar__group--right" aria-label="任务入口">
         {panelButtons.map(({ id, label, icon: Icon }) => (
