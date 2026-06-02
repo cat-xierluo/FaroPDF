@@ -9,6 +9,7 @@ import type {
   PdfPageOperation,
   PdfPageOperationPlan,
 } from "../../shared";
+import { isPdfPath, pathsAreSame } from "./pathSafety";
 
 const PAGE_OPERATIONS_PLAN_ONLY_WARNING = "页面操作当前仅生成导出计划，尚未改写页面几何或顺序。";
 
@@ -85,10 +86,14 @@ function validatePdfExportRequest(request: PdfExportRequest): void {
     throw new Error("PDF 导出请求缺少输出路径");
   }
 
+  if (request.destination.type === "file" && !isPdfPath(request.destination.outputPath)) {
+    throw new Error("导出输出路径必须是 PDF。");
+  }
+
   if (
     request.source.path &&
     request.destination.type === "file" &&
-    normalizePath(request.source.path) === normalizePath(request.destination.outputPath)
+    pathsAreSame(request.source.path, request.destination.outputPath)
   ) {
     throw new Error("导出输出路径不能与原始 PDF 相同");
   }
@@ -167,8 +172,4 @@ function applyExportMetadata(pdf: PDFDocument, summary: PdfExportSummary): void 
 
 function copyBytes(bytes: Uint8Array): Uint8Array {
   return new Uint8Array(bytes);
-}
-
-function normalizePath(path: string): string {
-  return path.replace(/\\/g, "/").replace(/\/+$/, "");
 }
