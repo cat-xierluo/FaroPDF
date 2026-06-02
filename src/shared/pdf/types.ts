@@ -24,36 +24,6 @@ export interface PdfPageViewport {
   scale: number;
 }
 
-export interface PdfRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export type PdfAnnotationType =
-  | "highlight"
-  | "underline"
-  | "strikeout"
-  | "note"
-  | "textbox"
-  | "rectangle"
-  | "arrow"
-  | "ink"
-  | "stamp";
-
-export interface PdfAnnotation {
-  id: string;
-  type: PdfAnnotationType;
-  pageIndex: number;
-  rects: PdfRect[];
-  color: string;
-  content?: string;
-  author?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export type PdfPageOperationType =
   | "rotate"
   | "delete"
