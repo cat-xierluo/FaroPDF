@@ -116,8 +116,36 @@ export interface PdfAnnotation {
   pageIndex: number;
   rects: Array<{ x: number; y: number; width: number; height: number }>;
   color: string;
+  opacity?: number;
   content?: string;
-  author?: string;
+  quote?: string;
+  author?: { id?: string; displayName?: string };
+  style?: { strokeWidth?: number; fontSize?: number; fontFamily?: string; fillColor?: string };
+  line?: { start: { x: number; y: number }; end: { x: number; y: number } };
+  ink?: { strokes: Array<Array<{ x: number; y: number }>> };
+  stamp?: { label: string; name: 'reviewed' | 'important' | 'todo' | 'evidence' | 'custom' };
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### AnnotationSidecar
+
+批注第一版采用可编辑 sidecar，不直接写回原始 PDF。默认路径为原 PDF 所在目录下的 `.faropdf/annotations/<document-key>.annotations.json`：
+
+- 有 PDF fingerprint 时使用 fingerprint 派生安全文件名。
+- 无 fingerprint 时使用源路径哈希兜底，不把真实文件名写进 sidecar 文件名。
+- sidecar 内容只保存 `fingerprint`、`pageCount`、schema version、时间戳和批注数组，不保存源 PDF 文件名。
+- Markdown / HTML 批注摘要使用 `PDF <fingerprint>` 或通用标签，不包含真实用户文件名。
+
+```ts
+export interface AnnotationSidecar {
+  schemaVersion: 1;
+  document: {
+    fingerprint?: string;
+    pageCount?: number;
+  };
+  annotations: PdfAnnotation[];
   createdAt: string;
   updatedAt: string;
 }
