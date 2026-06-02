@@ -272,6 +272,116 @@ describe("pdf operation engine", () => {
     expect(result.summary.warnings).toContain("页面操作当前仅生成导出计划，尚未改写页面几何或顺序。");
   });
 
+  test("applies text watermark, page numbers, and Bates numbers as delivery tool operations", async () => {
+    const inputBytes = await createPdfWithBlankPages(2);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-output-tools-1",
+      source: {
+        bytes: inputBytes,
+        path: "/case/source.pdf",
+      },
+      destination: {
+        type: "bytes",
+      },
+      operations: [
+        {
+          id: "watermark-1",
+          type: "watermark",
+          watermark: {
+            kind: "text",
+            text: "CONFIDENTIAL",
+            placement: "center",
+            fontSize: 28,
+            opacity: 0.2,
+            rotationDegrees: -35,
+          },
+        },
+        {
+          id: "page-number-1",
+          type: "page-number",
+          format: "Page {page} / {total}",
+          placement: "bottom-center",
+          startNumber: 1,
+        },
+        {
+          id: "bates-1",
+          type: "bates-number",
+          prefix: "FARO-",
+          startNumber: 120,
+          digits: 6,
+          placement: "bottom-right",
+        },
+      ],
+      requestedAt: "2026-06-02T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+
+    expect(outputPdf.getPageCount()).toBe(2);
+    expect(result.summary.outputToolPlan?.entries).toEqual([
+      {
+        operationId: "watermark-1",
+        type: "watermark",
+        pageIndexes: [0, 1],
+        status: "applied",
+        label: "CONFIDENTIAL",
+      },
+      {
+        operationId: "page-number-1",
+        type: "page-number",
+        pageIndexes: [0, 1],
+        status: "applied",
+        label: "Page 1 / 2, Page 2 / 2",
+      },
+      {
+        operationId: "bates-1",
+        type: "bates-number",
+        pageIndexes: [0, 1],
+        status: "applied",
+        label: "FARO-000120, FARO-000121",
+      },
+    ]);
+    expect(outputPdf.getKeywords()).toContain("faropdf:output-tools");
+  });
+
+  test("keeps compression presets as a plan-only delivery tool entry", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-compress-plan-1",
+      source: {
+        bytes: inputBytes,
+        path: "/case/source.pdf",
+      },
+      destination: {
+        type: "bytes",
+      },
+      operations: [
+        {
+          id: "compress-1",
+          type: "compress",
+          preset: "court-upload",
+          mode: "plan-only",
+        },
+      ],
+      requestedAt: "2026-06-02T00:00:00.000Z",
+    });
+
+    expect(result.summary.outputToolPlan?.entries).toEqual([
+      {
+        operationId: "compress-1",
+        type: "compress",
+        pageIndexes: [0],
+        status: "planned",
+        label: "court-upload",
+      },
+    ]);
+    expect(result.summary.warnings).toContain("PDF 压缩当前仅生成导出计划，尚未执行图像重编码或降采样。");
+  });
+
   test("rejects unsupported page operation mode and out-of-range page indexes", async () => {
     const inputBytes = await createPdfWithBlankPages(2);
     const engine = createPdfOperationEngine();
@@ -326,6 +436,135 @@ describe("pdf operation engine", () => {
         requestedAt: "2026-06-02T00:00:00.000Z",
       }),
     ).rejects.toThrow("页面操作页码超出源 PDF 页数。");
+  });
+
+  test("rejects delivery tools with invalid pages or unsafe compression modes", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const engine = createPdfOperationEngine();
+
+    await expect(
+      engine.exportPdf({
+        id: "export-output-tool-page",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "watermark-out-of-range",
+            type: "watermark",
+            pageIndexes: [1],
+            watermark: {
+              kind: "text",
+              text: "CONFIDENTIAL",
+            },
+          },
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("交付工具页码超出源 PDF 页数。");
+
+    await expect(
+      engine.exportPdf({
+        id: "export-compress-mode",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "compress-apply",
+            type: "compress",
+            preset: "court-upload",
+            mode: "apply",
+          } as never,
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("PDF 压缩第一版只支持 plan-only 模式。");
+  });
+
+  test("rejects invalid page number and Bates numbering inputs", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const engine = createPdfOperationEngine();
+
+    await expect(
+      engine.exportPdf({
+        id: "export-page-number-invalid-start",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "page-number-invalid-start",
+            type: "page-number",
+            startNumber: Number.NaN,
+          },
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("页码起始号必须是正整数。");
+
+    await expect(
+      engine.exportPdf({
+        id: "export-bates-invalid-digits",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "bates-invalid-digits",
+            type: "bates-number",
+            startNumber: 1,
+            digits: Number.POSITIVE_INFINITY,
+          },
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("Bates 编号位数必须是 0 到 12 的整数。");
+  });
+
+  test("rejects non-Latin delivery tool text with a product error message", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const engine = createPdfOperationEngine();
+
+    await expect(
+      engine.exportPdf({
+        id: "export-output-tool-font",
+        source: {
+          bytes: inputBytes,
+          path: "/case/source.pdf",
+        },
+        destination: {
+          type: "bytes",
+        },
+        operations: [
+          {
+            id: "watermark-chinese",
+            type: "watermark",
+            watermark: {
+              kind: "text",
+              text: "机密",
+            },
+          },
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("PDF 交付工具第一版暂不支持非 Latin-1 文本。");
   });
 });
 

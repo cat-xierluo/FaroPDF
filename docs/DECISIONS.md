@@ -326,6 +326,20 @@ ISS-010 第一版不做完整 UI 弹窗，先把联网 OCR 的用户确认和审
 
 原因：法律材料可能包含案件隐私、商业秘密和个人信息。先固定 notice/consent/audit 的数据边界，可以让后续 UI 弹窗、设置页和真实 PaddleOCR/MinerU adapter 复用同一安全模型，避免把 UI 文案、日志字段和后端请求各自散落实现。
 
+## DEC-023 交付工具第一版采用 pdf-lib 写入和压缩 plan-only
+
+- 日期：2026-06-02
+- 状态：已采纳
+
+ISS-013 第一版把水印、普通页码、Bates 编号和压缩预设纳入导出引擎统一 operation，而不是另建独立文件写入链路：
+
+- `watermark`、`page-number`、`bates-number` 由 `pdfOperationEngine` 使用 pdf-lib 写入新 PDF bytes，并通过 `outputToolPlan` 记录页码、状态和摘要标签。
+- `createPdfOutputToolsExportRequest` 生成路径型导出请求，默认输出 `*-delivery.pdf`，拒绝相对路径和等价覆盖原始 PDF。
+- `compress` 只记录 plan-only 摘要和警告，不在本阶段执行图像重编码、降采样、对象流优化或 PyMuPDF 压缩。
+- 文字绘制暂用 pdf-lib 内置 Helvetica，因此第一版只支持 Latin-1 文本；中文水印、中文页码和更精细的法律交付字体需要后续接入自定义字体或系统字体。
+
+原因：水印、页码和 Bates 编号可以在现有 bytes-first 导出引擎内安全落地；压缩则涉及图像资源重编码、文字层/批注/书签保留和体积质量统计，直接用 pdf-lib 伪装压缩会误导用户，必须留给后续后台 bridge 或更强 PDF 引擎实现。
+
 ## 工作日志
 
 - 2026-06-02：初始化项目上下文，固定名称、独立项目形态、首版范围、技术选型和安全边界。
@@ -352,3 +366,4 @@ ISS-010 第一版不做完整 UI 弹窗，先把联网 OCR 的用户确认和审
 - 2026-06-02：继续处理 PR #5 OCR bridge review：前端和 Rust 侧 HTTP 本机调试 endpoint 改为只接受 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback，拒绝 `127.*` 伪装域名；OCR 错误路径脱敏补齐带逗号或中文标点的 PDF 路径；MinerU 云端负向路径补 Rust 回归测试。
 - 2026-06-02：在 `feat/page-organizer` 为 `ISS-006` 落地页面整理第一版底座：新增页面整理状态类型、旋转/删除/重排/恢复/撤销服务、默认 `*-organized.pdf` plan-only 导出请求和安全输出路径测试；真实页面改写和完整 UI 后续接入。
 - 2026-06-02：在 `feat/privacy-safety` 完成 `ISS-010` 第一版：新增联网 OCR 隐私 notice、consent decision、脱敏 audit record、`ocrPrivacyConsentGuard` 和 bridge audit 衔接；随后按 code review 收紧为本次 notice/consent 双匹配、输入文件指纹、nonce、有效期和 Rust audit 复验，旧布尔 consent 不能单独放行云端 OCR；真实 PaddleOCR/MinerU 调用和完整 UI 弹窗继续留给后续任务。
+- 2026-06-02：在 `feat/pdf-output-tools` 完成 `ISS-013` 第一版：新增水印、页码、Bates 和压缩预设导出 operation，支持 `*-delivery.pdf` 安全输出请求；文字/图片水印、页码和 Bates 用 pdf-lib 写入新 PDF，压缩保持 plan-only 并记录后续真实处理边界。
