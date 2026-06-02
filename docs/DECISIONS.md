@@ -141,6 +141,21 @@ FaroPDF 将吸收本机 `legal-skills` 中 `pdf-processor`、`pdf-organizer`、`
 - 外部 API 和密钥仍由设置页管理；联网 OCR 必须主动确认。
 - 所有处理默认输出新 PDF，不覆盖原始材料。
 
+## DEC-011 Foundation Gate 采用共享契约先行
+
+- 日期：2026-06-02
+- 状态：已采纳
+
+Foundation 分支先落地可运行工程、共享类型、模块边界、基础 Shell 和设置入口，再开放多 worktree 并行。当前落地方式：
+
+- Tauri v2 + React + TypeScript + Vite 作为桌面应用底座。
+- Vitest + Testing Library 覆盖基础 Shell、设置默认值和共享契约。
+- `src/shared/pdf/`、`src/shared/ocr/`、`src/shared/settings/` 承载后续 worker 依赖的核心类型。
+- `src/shared/foundation/modules.ts` 记录 reader、search、annotation、pages、export、ocr、forms、settings 的 owned paths 和验证命令。
+- `src/modules/*/README.md` 只记录模块职责，不把 Agent workflow 塞进 UI 逻辑。
+
+合并 Foundation 后，后续功能分支应从最新 `main` 创建 worktree；如需修改 `package.json`、锁文件、`src-tauri/`、`src/shared/` 或全局布局，应回到 PM 会话统一收口。
+
 ## 工作日志
 
 - 2026-06-02：初始化项目上下文，固定名称、独立项目形态、首版范围、技术选型和安全边界。
@@ -148,3 +163,4 @@ FaroPDF 将吸收本机 `legal-skills` 中 `pdf-processor`、`pdf-organizer`、`
 - 2026-06-02：初始化 Git 仓库并准备推送到 GitHub 私有仓库 `FaroPDF`，本机 skill 符号链接不纳入版本库。
 - 2026-06-02：确定 v0.1 先完成 Foundation Gate，再按 `docs/TASKS.md` 的任务包进行多 worktree 并行开发；设置页、外部 OCR provider、水印、压缩和直接编辑调研已纳入任务源。
 - 2026-06-02：完成 `pdf-processor`、`pdf-organizer`、`img2pdf` 脚本算法梳理，并将算法素材、候选议题和任务归属纳入 `docs/TASKS.md` 唯一任务源。
+- 2026-06-02：在 `feat/foundation-scaffold` 落地 Tauri/React 工程、基础阅读器 Shell、设置入口、共享契约、模块 README 和 fixture 规则，并通过基础验证。

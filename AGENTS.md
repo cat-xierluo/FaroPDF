@@ -70,4 +70,14 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常阅读卷宗、证据�
 
 ## 开发命令
 
-项目当前仅完成上下文初始化。正式 scaffold Tauri 应用后，在这里补充开发、测试、构建和发布命令。
+```bash
+npm install
+npm run dev
+npm run typecheck
+npm test
+npm run lint
+npm run build
+npm run tauri dev
+npm run tauri build
+cd src-tauri && cargo check
+```

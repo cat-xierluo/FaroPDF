@@ -19,15 +19,15 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 ### 0. Foundation Gate
 
-- [ ] 创建可运行应用脚手架和基础阅读器 shell。
-- [ ] 建立共享类型、模块边界和测试 fixture 策略。
-- [ ] 建立设置入口、最近文件和默认保存策略基础。
-- [ ] 明确多 worktree worker 的分支名、文件范围和验收命令。
+- [x] 创建可运行应用脚手架和基础阅读器 shell。
+- [x] 建立共享类型、模块边界和测试 fixture 策略。
+- [x] 建立设置入口、最近文件和默认保存策略基础。
+- [x] 明确多 worktree worker 的分支名、文件范围和验收命令。
 
 ### 1. 项目脚手架
 
-- [ ] 创建 Tauri v2 + React + TypeScript + Vite 应用。
-- [ ] 配置基础测试、类型检查、Lint 和构建脚本。
+- [x] 创建 Tauri v2 + React + TypeScript + Vite 应用。
+- [x] 配置基础测试、类型检查、Lint 和构建脚本。
 - [ ] 接入 macOS/Windows PDF 文件关联。
 - [ ] 建立应用设置持久化和最近文件模型。
 - [ ] 接入透明标题栏、原生窗口拖动和基础自动更新预留。
@@ -116,3 +116,4 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - 2026-06-02：初始化 FaroPDF 项目上下文，固定独立项目定位、技术选型、首版功能范围和文档体系。
 - 2026-06-02：将 v0.1 推进方式调整为先完成 Foundation Gate，再按任务包使用多分支、多 worktree 并行实现完整基础版。
 - 2026-06-02：纳入 `pdf-processor`、`pdf-organizer`、`img2pdf` 的脚本算法来源，新增扫描清洁校正、压缩算法、OCR 质量检查、证据图片编排和文书整理 manifest。
+- 2026-06-02：在 foundation 分支完成 Tauri/React 脚手架、基础阅读器 Shell、共享契约、设置入口和验证命令。
