@@ -260,7 +260,24 @@ ISS-003 第一版采用前端内存搜索会话：打开 PDF 时只读取首屏�
 
 执行方式：从最新 `main` 创建 `feat/pdf-export-engine` 与 `feat/ocr-bridge` 两个 worktree；worker 只修改各自任务范围，文档冲突由 PM 在合并时统一收口。
 
-## DEC-019 OCR bridge 第一版采用安全 command stub
+## DEC-019 PDF 导出第一版采用 bytes-first 引擎和 plan-only 批注策略
+
+- 日期：2026-06-02
+- 状态：已采纳
+
+ISS-005 第一版先建立 `pdfOperationEngine` 抽象：输入 PDF bytes，使用 pdf-lib 在内存中加载、复制页面、执行表单扁平化，并返回新的 PDF bytes。路径型导出放在 `pdfExportService`，读取原始路径后只能写入不同的新输出路径，不能覆盖原始 PDF。
+
+采用方式：
+
+- 共享层新增 `PdfExportRequest`、`PdfExportResult`、`PdfExportOperation` 和导出计划摘要类型，由 UI、服务和后续 Tauri bridge 共用。
+- 批注 sidecar 扁平化第一版只生成 `plan-only` 摘要并写入 PDF 元数据，生成前校验 sidecar 页数、指纹和批注页码，明确表示“有可导出的 sidecar 批注计划”，不声称已经绘制真实高亮、形状、墨迹或图章外观。
+- AcroForm 表单扁平化直接调用 pdf-lib `form.flatten()`，作为第一批真实 PDF 改写能力。
+- 页面操作先以 `plan-only` 入口记录操作 id、类型和页码，并在计划生成前校验页码范围，后续页面整理接入后再实现旋转、删除、重排、裁剪、插入等真实改写。
+- 路径型导出要求绝对 PDF 输出路径，storage 可提供真实路径解析以拦截 symlink/alias 等价路径；输出写入使用 `writeNewFile` 仅新建语义，`exists`、路径解析和写入错误都必须脱敏。
+
+这样可以先固定导出安全边界和可测试接口，同时避免把尚未完成的批注几何绘制或页面操作误报为已完成。
+
+## DEC-020 OCR bridge 第一版采用安全 command stub
 
 - 日期：2026-06-02
 - 状态：已采纳
@@ -269,8 +286,8 @@ ISS-007 第一版只建立 OCR bridge 基础，不在本分支执行真实 OCR�
 
 - 前端共享契约补齐 `OcrRequest`、输出策略、任务进度和质量抽查入口。
 - `ocrBridgeService` 负责 provider 查找、adapter 边界、输入/输出 PDF 校验、默认 `*-ocr.pdf` 输出路径和 bridge 错误脱敏。
-- Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有本次明确 consent、安全 apiKeyRef 和 HTTPS endpoint，本机调试可使用 localhost HTTP；真实密钥串、远端明文 HTTP 和非法 endpoint 一律拒绝。
-- Tauri `start_ocr_job` 只返回 queued stub，并在 Rust 侧重复校验参数和同路径输出；错误信息不包含完整敏感本地路径。
+- Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有本次明确 consent、安全 apiKeyRef 和 HTTPS endpoint，本机调试只允许 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback HTTP；真实密钥串、远端明文 HTTP、伪装成 `127.*` 的域名和非法 endpoint 一律拒绝。
+- Tauri `start_ocr_job` 只返回 queued stub，并在 Rust 侧重复校验参数和同路径输出；错误信息不包含完整敏感本地路径，带逗号或中文标点的 PDF 路径也会脱敏。
 
 原因：
 
@@ -296,6 +313,8 @@ ISS-007 第一版只建立 OCR bridge 基础，不在本分支执行真实 OCR�
 - 2026-06-02：在 `feat/text-search` 完成 `ISS-003` 第一版，新增搜索服务测试、UI 集成测试、按需页文本读取、内存搜索索引、命中结果层、当前页轻量高亮和 OCR 提示。
 - 2026-06-02：处理 `feat/text-search` code review，修正文档切换后旧搜索状态泄露、PDF.js 文本项无空格拼接、纯扫描长卷 OCR 提示滞后和空结果测试覆盖不足。
 - 2026-06-02：完成 PR #2、#3、#4 code review、冲突解决和合并清理；从最新主线启动 `ISS-005` 导出引擎和 `ISS-007` OCR bridge 两条并行任务。
+- 2026-06-02：在 `feat/pdf-export-engine` 完成 `ISS-005` 导出引擎底座第一版：新增共享导出契约、pdf-lib bytes-first 引擎、路径型导出服务、表单 flatten、批注 sidecar plan-only 摘要、页面操作 plan-only 入口和测试覆盖。
+- 2026-06-02：处理 `feat/pdf-export-engine` code review，收紧导出安全边界：输出路径必须绝对、支持 storage 真实路径解析、写入改为 `writeNewFile` 仅新建语义，并补齐 exists/写入脱敏、sidecar 指纹/页数/页码和页面操作页码校验。
 - 2026-06-02：在 `feat/ocr-bridge` 为 `ISS-007` 落地 OCR bridge/stub 第一版：共享请求与任务模型、provider adapter 边界、云端 consent/apiKeyRef 拦截、默认新 PDF 输出路径、路径脱敏、Tauri command stub 和定向测试；真实 OCR 执行、双层 PDF 生成和质量检查继续保留为后续工作。
 - 2026-06-02：处理 `feat/ocr-bridge` code review，收紧云端 provider 安全边界：apiKeyRef 必须是凭证引用或脱敏占位，远端 endpoint 必须使用 HTTPS，本机调试允许 localhost HTTP，并修正质量抽查页码在 normalization 前被静默丢弃的问题。
 - 2026-06-02：继续处理 PR #5 OCR bridge review：前端和 Rust 侧 HTTP 本机调试 endpoint 改为只接受 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback，拒绝 `127.*` 伪装域名；OCR 错误路径脱敏补齐带逗号或中文标点的 PDF 路径；MinerU 云端负向路径补 Rust 回归测试。

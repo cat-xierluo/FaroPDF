@@ -10,6 +10,26 @@ export type {
   PdfViewMode,
   TextLayerStatus,
 } from "./pdf/types";
+export type {
+  PdfAnnotationFlattenPlan,
+  PdfAnnotationFlattenPlanEntry,
+  PdfAnnotationFlattenStrategy,
+  PdfExportDestination,
+  PdfExportFileRequest,
+  PdfExportOperation,
+  PdfExportOperationType,
+  PdfExportRequest,
+  PdfExportResult,
+  PdfExportSource,
+  PdfExportSummary,
+  PdfFlattenAnnotationsOperation,
+  PdfFlattenFormOperation,
+  PdfFormFlatteningSummary,
+  PdfPageOperationExportMode,
+  PdfPageOperationPlan,
+  PdfPageOperationPlanEntry,
+  PdfPageOperationsExportOperation,
+} from "./pdf/export";
 export type { PdfPageText } from "./pdf/text";
 export type {
   AnnotationDocumentRef,

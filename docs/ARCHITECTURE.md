@@ -10,7 +10,7 @@
 | 前端 | React + TypeScript + Vite | 应用界面、状态管理、渲染调度 |
 | PDF 渲染 | PDF.js | 页面渲染、文本层、目录、缩略图、搜索基础 |
 | PDF 操作 | pdf-lib | 页面复制、删除、重排、表单、元数据、导出保存 |
-| PDF 操作引擎 | `pdfOperationEngine` 抽象 + pdf-lib 起步 | 水印、页码、Bates 编号、压缩预设、扁平化导出 |
+| PDF 操作引擎 | `pdfOperationEngine` 抽象 + pdf-lib 起步 | 表单扁平化、批注/页面操作导出计划，后续承载水印、页码、Bates 和压缩 |
 | OCR bridge | 本地命令 / Legal Skills / OCR API | 双层 PDF、扫描件预处理、质量检查 |
 | 扫描预处理 | OpenCV / PyMuPDF / OCR bridge | 清洁校正、方向检测、倾斜校正、裁边、预处理输出 |
 | 设置与凭证 | Tauri command + 本地持久化 / 系统凭证预留 | 最近文件、默认保存策略、OCR provider 配置 |
@@ -60,7 +60,7 @@ PDF.js page.render(canvas) + text layer + annotation overlay
   ↓
 search state / sidecar / page operation queue / export job queue / OCR job queue
   ↓
-导出时由 pdf-lib + OCR 输出文件生成新 PDF
+导出时由 pdfOperationEngine 读取 PDF bytes，用 pdf-lib 生成新 PDF bytes；路径型导出再写入新输出路径
 ```
 
 ## 核心接口
@@ -217,6 +217,8 @@ export interface PdfPageOperation {
 
 ### PdfExportJob
 
+`PdfExportJob` 记录队列型任务状态；实际导出执行使用 `PdfExportRequest` / `PdfExportResult`，确保目标是 bytes 结果或不同于原始文件的新输出路径。
+
 ```ts
 export type PdfExportJobType =
   | 'flatten-annotations'
@@ -241,6 +243,46 @@ export interface PdfExportJob {
   updatedAt: string;
 }
 ```
+
+### PdfExportRequest
+
+```ts
+export type PdfExportDestination =
+  | { type: 'bytes' }
+  | { type: 'file'; outputPath: string };
+
+export type PdfExportOperation =
+  | { id: string; type: 'flatten-annotations'; sidecar: AnnotationSidecar; strategy?: 'plan-only' }
+  | { id: string; type: 'flatten-form' }
+  | { id: string; type: 'page-operations'; operations: PdfPageOperation[]; mode?: 'plan-only' };
+
+export interface PdfExportRequest {
+  id: string;
+  source: {
+    bytes: Uint8Array;
+    path?: string;
+    fingerprint?: string;
+  };
+  destination: PdfExportDestination;
+  operations: PdfExportOperation[];
+  requestedAt: string;
+}
+
+export interface PdfExportResult {
+  id: string;
+  bytes: Uint8Array;
+  destination: PdfExportDestination;
+  summary: PdfExportSummary;
+  completedAt: string;
+}
+```
+
+导出引擎第一版边界：
+
+- `pdfOperationEngine` 不写文件，只返回新 PDF bytes；`pdfExportService` 在路径型导出时拒绝 `outputPath === inputPath`。
+- `flatten-form` 使用 pdf-lib `form.flatten()`，可生成不可编辑表单提交版 bytes。
+- `flatten-annotations` 当前只把 sidecar 批注转换为 `plan-only` 摘要并写入 PDF 元数据，不绘制真实高亮、形状、墨迹、图章或备注外观。
+- `page-operations` 当前只生成 `plan-only` 入口，真实旋转、删除、重排、裁剪和插入仍由页面整理任务接入。
 
 ### OcrJob
 
@@ -439,8 +481,8 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 | `pdfRenderScheduler` | 页面虚拟化、渲染队列、取消不可见页渲染 |
 | `pdfTextService` | 文本层检测、按需全文索引、搜索命中 |
 | `annotationService` | sidecar 批注模型、编辑、导出摘要 |
-| `pdfExportService` | pdf-lib 页面操作、批注扁平化、表单导出 |
-| `pdfOperationEngine` | 抽象 PDF 写入能力，第一版用 pdf-lib 起步，预留更强引擎替换空间 |
+| `pdfExportService` | 路径型导出安全校验、仅新建写入、批注/页面操作计划和表单导出 |
+| `pdfOperationEngine` | 抽象 PDF 写入能力，第一版用 pdf-lib 起步复制 PDF、扁平化表单并生成导出计划，预留更强引擎替换空间 |
 | `pageOrganizerService` | 旋转、删除、重排、插入、提取、合并、编号 |
 | `scanPreprocessService` | 扫描件清洁、90 度方向检测、微倾斜校正、裁边和预处理输出 |
 | `compressionService` | PDF 图像资源重编码、降采样、压缩档位和压缩统计 |

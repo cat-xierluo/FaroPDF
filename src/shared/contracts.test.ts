@@ -11,6 +11,8 @@ import type {
   PdfAnnotation,
   PdfDocumentState,
   PdfExportJob,
+  PdfExportRequest,
+  PdfExportResult,
   PdfPageOperation,
   PdfPageViewport,
   ScanPreprocessJob,
@@ -63,6 +65,57 @@ describe("shared contracts", () => {
       payload: { operations: [operation.id] },
       createdAt: "2026-06-02T00:00:00.000Z",
       updatedAt: "2026-06-02T00:00:00.000Z",
+    };
+    const exportRequest: PdfExportRequest = {
+      id: "export-request-1",
+      source: {
+        bytes: new Uint8Array([37, 80, 68, 70]),
+        path: "/case/file.pdf",
+      },
+      destination: {
+        type: "bytes",
+      },
+      operations: [
+        {
+          id: "flatten-ann-1",
+          type: "flatten-annotations",
+          sidecar: {
+            schemaVersion: 1,
+            document: { fingerprint: "fixture", pageCount: 12 },
+            annotations: [annotation],
+            createdAt: "2026-06-02T00:00:00.000Z",
+            updatedAt: "2026-06-02T00:00:00.000Z",
+          },
+          strategy: "plan-only",
+        },
+      ],
+      requestedAt: "2026-06-02T00:00:00.000Z",
+    };
+    const exportResult: PdfExportResult = {
+      id: exportRequest.id,
+      bytes: new Uint8Array([37, 80, 68, 70]),
+      destination: {
+        type: "bytes",
+      },
+      summary: {
+        inputPageCount: 12,
+        outputPageCount: 12,
+        operationCount: 1,
+        annotationPlan: {
+          strategy: "plan-only",
+          annotationCount: 1,
+          entries: [
+            {
+              annotationId: "ann-1",
+              type: "highlight",
+              pageIndex: 0,
+              rectCount: 1,
+              status: "planned",
+            },
+          ],
+        },
+      },
+      completedAt: "2026-06-02T00:00:00.000Z",
     };
     const provider: OcrProviderConfig = {
       id: "paddle",
@@ -150,6 +203,8 @@ describe("shared contracts", () => {
     expect(viewport.height).toBe(842);
     expect(annotation.type).toBe("highlight");
     expect(exportJob.status).toBe("queued");
+    expect(exportRequest.destination.type).toBe("bytes");
+    expect(exportResult.summary.annotationPlan?.strategy).toBe("plan-only");
     expect(ocrJob.backend).toBe("paddleocr");
     expect(ocrRequest.outputStrategy).toBe("new-layered-pdf");
     expect(ocrProgress.totalPages).toBe(12);
