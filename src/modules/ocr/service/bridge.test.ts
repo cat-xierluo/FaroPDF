@@ -1,0 +1,163 @@
+import { beforeEach, describe, expect, test, vi } from "vitest";
+import type { OcrProviderConfig } from "../../../shared/ocr/types";
+import { createOcrBridgeService, type OcrBridgeBackend } from "./bridge";
+
+const localProvider: OcrProviderConfig = {
+  id: "local-ocrmypdf",
+  type: "local-ocrmypdf",
+  displayName: "本地 OCRmyPDF",
+  enabled: true,
+  requiresNetworkConsent: false,
+};
+
+const paddleProvider: OcrProviderConfig = {
+  id: "paddleocr",
+  type: "paddleocr",
+  displayName: "PaddleOCR",
+  endpoint: "https://ocr.example.test/paddle",
+  apiKeyRef: "keychain:paddle",
+  enabled: true,
+  requiresNetworkConsent: true,
+};
+
+describe("OCR bridge service", () => {
+  let backend: OcrBridgeBackend;
+
+  beforeEach(() => {
+    backend = {
+      startOcr: vi.fn(async (request) => ({
+        id: "ocr-1",
+        inputPath: request.inputPath,
+        outputPath: request.outputPath,
+        pageRange: request.pageRange,
+        backend: request.provider.type,
+        providerId: request.provider.id,
+        status: "queued",
+        outputStrategy: request.outputStrategy,
+        progress: {
+          stage: "queued",
+          completedPages: 0,
+          totalPages: 0,
+        },
+        createdAt: "2026-06-02T00:00:00.000Z",
+        updatedAt: "2026-06-02T00:00:00.000Z",
+      })),
+    };
+  });
+
+  test("starts a local OCRmyPDF request as a queued bridge job", async () => {
+    const service = createOcrBridgeService(backend);
+
+    const job = await service.startOcr(
+      {
+        inputPath: "/tmp/faropdf-fixtures/source.pdf",
+        providerId: "local-ocrmypdf",
+        pageRange: "1,3-5",
+      },
+      { providers: [localProvider] },
+    );
+
+    expect(backend.startOcr).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inputPath: "/tmp/faropdf-fixtures/source.pdf",
+        outputPath: "/tmp/faropdf-fixtures/source-ocr.pdf",
+        outputStrategy: "new-layered-pdf",
+        pageRange: "1,3-5",
+        provider: expect.objectContaining({ id: "local-ocrmypdf", type: "local-ocrmypdf" }),
+      }),
+    );
+    expect(job.status).toBe("queued");
+    expect(job.backend).toBe("local-ocrmypdf");
+    expect(job.outputPath).toBe("/tmp/faropdf-fixtures/source-ocr.pdf");
+    expect(job.progress.stage).toBe("queued");
+  });
+
+  test("rejects cloud OCR without explicit consent before backend invocation", async () => {
+    const service = createOcrBridgeService(backend);
+
+    await expect(
+      service.startOcr(
+        {
+          inputPath: "/tmp/faropdf-fixtures/source.pdf",
+          providerId: "paddleocr",
+        },
+        { providers: [paddleProvider] },
+      ),
+    ).rejects.toThrow("联网 OCR 需要用户明确确认。");
+
+    expect(backend.startOcr).not.toHaveBeenCalled();
+  });
+
+  test("rejects cloud OCR without a configured API key reference", async () => {
+    const service = createOcrBridgeService(backend);
+
+    await expect(
+      service.startOcr(
+        {
+          inputPath: "/tmp/faropdf-fixtures/source.pdf",
+          providerId: "paddleocr",
+          networkConsentGranted: true,
+        },
+        {
+          providers: [
+            {
+              ...paddleProvider,
+              apiKeyRef: "",
+            },
+          ],
+        },
+      ),
+    ).rejects.toThrow("PaddleOCR 需要配置 apiKeyRef。");
+
+    expect(backend.startOcr).not.toHaveBeenCalled();
+  });
+
+  test("rejects output paths that would overwrite the source PDF without leaking the source path", async () => {
+    const service = createOcrBridgeService(backend);
+
+    try {
+      await service.startOcr(
+        {
+          inputPath: "/tmp/faropdf-fixtures/source.pdf",
+          outputPath: "/tmp/faropdf-fixtures/nested/../source.pdf",
+          providerId: "local-ocrmypdf",
+        },
+        { providers: [localProvider] },
+      );
+      expect.fail("expected same-path validation to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain("OCR 参数校验失败");
+      expect((error as Error).message).toContain("输出 PDF 必须是不同于原始 PDF 的新文件。");
+      expect((error as Error).message).not.toContain("/tmp/faropdf-fixtures/source.pdf");
+    }
+
+    expect(backend.startOcr).not.toHaveBeenCalled();
+  });
+
+  test("redacts backend error paths and does not retain the raw path in cause", async () => {
+    vi.mocked(backend.startOcr).mockRejectedValue(
+      new Error("无法读取 /Users/example/Cases/confidential bundle.pdf"),
+    );
+    const service = createOcrBridgeService(backend);
+
+    try {
+      await service.startOcr(
+        {
+          inputPath: "/tmp/faropdf-fixtures/source.pdf",
+          providerId: "local-ocrmypdf",
+        },
+        { providers: [localProvider] },
+      );
+      expect.fail("expected backend failure");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toContain("[path]");
+      expect((error as Error).message).not.toContain("/Users/example/Cases/confidential bundle.pdf");
+      const cause = (error as Error & { cause?: unknown }).cause;
+      expect(cause).toBeInstanceOf(Error);
+      expect((cause as Error).message).toContain("[path]");
+      expect((cause as Error).message).not.toContain("/Users/example/Cases/confidential bundle.pdf");
+    }
+  });
+});

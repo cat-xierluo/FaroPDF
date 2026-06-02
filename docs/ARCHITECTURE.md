@@ -247,14 +247,42 @@ export interface PdfExportJob {
 ```ts
 export type OcrBackend = 'local-ocrmypdf' | 'legal-skills' | 'paddleocr' | 'mineru';
 export type OcrJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type OcrOutputStrategy = 'new-layered-pdf' | 'text-sidecar' | 'quality-check-only';
+
+export interface OcrQualityCheckRequest {
+  enabled: boolean;
+  samplePages: number[];
+  keywords: string[];
+  minTextPageRatio?: number;
+  maxFileSizeRatio?: number;
+}
+
+export interface OcrJobProgress {
+  stage:
+    | 'queued'
+    | 'validating'
+    | 'dispatching-provider'
+    | 'running-provider'
+    | 'writing-output'
+    | 'quality-check'
+    | 'completed'
+    | 'failed';
+  completedPages: number;
+  totalPages: number;
+  message?: string;
+}
 
 export interface OcrJob {
   id: string;
   inputPath: string;
   pageRange?: string;
   backend: OcrBackend;
+  providerId?: string;
   status: OcrJobStatus;
+  outputStrategy?: OcrOutputStrategy;
   outputPath?: string;
+  progress: OcrJobProgress;
+  qualityCheck?: OcrQualityCheckRequest;
   quality?: {
     searchedKeywords: string[];
     matchedKeywords: string[];
@@ -441,11 +469,13 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 
 ## OCR bridge
 
-OCR 不直接内置到前端。第一版 bridge 支持：
+OCR 不直接内置到前端。当前第一版只建立 bridge/stub，不执行真实 OCR、不生成双层 PDF、不发起 PaddleOCR/MinerU 联网请求。已落地边界：
 
-- 本地 Legal Skills 的 PDF Processor / Legal OCR。
-- 本地 `ocrmypdf` 兜底。
-- PaddleOCR / MinerU 云端后端，但必须用户确认后使用。
+- `src/shared/ocr/` 定义 `OcrRequest`、页码范围、`new-layered-pdf` 输出策略、任务进度和质量抽查入口；`text-sidecar`、`quality-check-only` 仅作为后续策略类型，第一版校验会拒绝执行。
+- `src/modules/ocr/service/bridge.ts` 负责准备请求、校验输入/输出 PDF、拒绝覆盖原始 PDF、查找 provider，并通过 adapter 边界区分本地命令和云端 API。
+- Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有用户本次明确 consent、HTTP(S) endpoint 和 apiKeyRef，否则不会调用 Tauri command。
+- `src-tauri/src/lib.rs` 提供 `start_ocr_job` command stub，Rust 侧重复校验 provider、页码范围、输出策略和默认 `*-ocr.pdf` 新输出路径，返回 queued job。
+- 错误信息不包含完整敏感 PDF 路径；API Key 只使用引用或脱敏占位，不写入日志或错误报告。
 
 外部 OCR provider 的 endpoint、模型参数和密钥引用由设置页管理。API Key 不写入公开仓库，不在 UI 中完整展示，不在日志或错误报告中输出。
 
@@ -456,6 +486,8 @@ OCR 不直接内置到前端。第一版 bridge 支持：
 - 输出文件路径。
 - 错误原因或回退路径。
 - OCR 后搜索质量检查结果。
+
+后续真实执行阶段再接入本地 `ocrmypdf` / Legal Skills、PaddleOCR/MinerU 请求、双层 PDF 写入和 ISS-017 质量检查报告。
 
 ## PDF 算法来源
 
