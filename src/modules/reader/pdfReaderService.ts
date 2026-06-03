@@ -42,6 +42,8 @@ export interface LoadedPdfDocument {
   metadata: ReaderLoadedMetadata;
   getPageViewport: (pageIndex: number, scale?: number) => Promise<PdfPageViewport>;
   getPageText: (pageIndex: number) => Promise<PdfPageText>;
+  /** 将指定页渲染到 canvas 上 */
+  renderPageToCanvas: (pageIndex: number, canvas: HTMLCanvasElement, zoom: number) => Promise<void>;
   destroy: () => Promise<void>;
 }
 
@@ -86,6 +88,28 @@ async function readPageViewport(document: PdfJsDocumentLike, pageIndex: number, 
     rotation: normalizeRotation(viewport.rotation ?? page.rotate),
     scale,
   };
+}
+
+/** 将 PDF 页面渲染到 canvas 元素 */
+async function renderPageToCanvas(
+  document: PdfJsDocumentLike,
+  pageIndex: number,
+  canvas: HTMLCanvasElement,
+  zoom: number,
+): Promise<void> {
+  const page = await document.getPage(pageIndex + 1);
+  const viewport = page.getViewport({ scale: zoom });
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return;
+  }
+  // PDF.js 渲染接口：page.render 接受 canvasContext 和 viewport
+  const renderContext = { canvasContext: context, viewport };
+  // page.render() 返回包含 promise 属性的对象
+  const renderResult = (page as unknown as { render(ctx: typeof renderContext): { promise: Promise<void> } }).render(renderContext);
+  await renderResult.promise;
 }
 
 async function readPageText(document: PdfJsDocumentLike, pageIndex: number): Promise<PdfPageText> {
@@ -206,6 +230,7 @@ export async function loadPdfFromBytes(
     },
     getPageViewport: (pageIndex, scale = 1) => readPageViewport(document, pageIndex, scale),
     getPageText: (pageIndex) => readPageText(document, pageIndex),
+    renderPageToCanvas: (pageIndex, canvas, zoom) => renderPageToCanvas(document, pageIndex, canvas, zoom),
     destroy: () => loadingTask.destroy?.() ?? Promise.resolve(),
   };
 }
