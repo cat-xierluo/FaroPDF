@@ -1,5 +1,14 @@
 # FaroPDF 变更记录
 
+## 0.1.0-alpha.6 - 2026-06-03
+
+- 新增 ReaderToolbar 注册表基础设施（DEC-032）：新增 `src/components/layout/toolbarRegistry.ts` 暴露 `ToolbarState` / `ToolbarToolItem` 类型与 `registerModeTools` / `getModeTools` / `_resetToolbarRegistry` 三个函数；`getModeTools` 按 `AppModeId` 命名空间隔离，多次注册累加，**不**自动排序（调用方需 `slice().sort()` 后再渲染，避免污染注册表）。
+- 新增 9 项 `toolbarRegistry` 单元测试，覆盖未注册返回空、追加、跨 mode 隔离、注册顺序保持、`isActive` / `onClick` 收到传入 state、`isDisabled` 可选、reset 清空。
+- `src/components/layout/Toolbar.tsx` 末尾新增 `ModeActiveTools` 组件，挂在 `toolbar__group--modes` 内 4 个常驻 mode 入口按钮（annotate / export / forms / ocr）之后，按 `getModeTools(activeMode).slice().sort()` 渲染当前 mode 工具；4 个常驻 mode 入口按钮保留 Toolbar 内 `modeButtons` 硬编码（不归注册表管）；activeMode="read" / "pages" / "export" 时新区域渲染空 fragment，UI 与重构前完全一致。
+- 后续 W3 Forms / W4 Reader modes worker 在各自模块内 `registerModeTools("<mode>", [...])` 即可接入 mode 工具，不再修改 Toolbar.tsx。
+- 已知限制：`ToolbarState` 当前只暴露 `activeMode / reader / search`；如未来某 mode 工具需要 `onModeChange` / `onUtilityPanelChange` 等额外上下文，再按需扩展。
+- 新增 `docs/DECISIONS.md` DEC-032 记录注册表契约、Toolbar 接入、范围依赖、后续 worker 接入指南与已知限制。
+
 ## 0.1.0-alpha.5 - 2026-06-03
 
 - 真实接入 OCR bridge（ISS-007 第二版）：
