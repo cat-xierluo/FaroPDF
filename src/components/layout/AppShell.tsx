@@ -69,11 +69,17 @@ export function AppShell({
       />
       {showContextToolbar ? <ContextToolbar mode={activeMode} /> : null}
       <div className={showUtilityPanel ? "workspace" : "workspace workspace--full"}>
-        {showUtilityPanel ? <UtilityPanel panel={utilityPanel} reader={reader} settings={settings} annotations={annotations} /> : null}
+        {showUtilityPanel ? <UtilityPanel panel={utilityPanel} reader={reader} search={search} settings={settings} annotations={annotations} /> : null}
         {activeMode === "pages" ? (
           <PageOrganizerWorkspace reader={reader} />
         ) : (
-          <ReaderCanvas onOpenFile={reader.openFile} readerState={reader.state} searchState={search.state} renderPageToCanvas={reader.renderPageToCanvas} />
+          <ReaderCanvas
+            onOpenFile={reader.openFile}
+            onPageVisible={reader.setCurrentPage}
+            readerState={reader.state}
+            renderPageToCanvas={reader.renderPageToCanvas}
+            searchState={search.state}
+          />
         )}
       </div>
       <StatusBar readerState={reader.state} />
@@ -84,11 +90,13 @@ export function AppShell({
 function UtilityPanel({
   panel,
   reader,
+  search,
   settings,
   annotations,
 }: {
   panel: Exclude<UtilityPanelId, "none">;
   reader: ReaderController;
+  search: TextSearchController;
   settings: AppSettings;
   annotations?: PdfAnnotation[];
 }) {
@@ -112,11 +120,25 @@ function UtilityPanel({
 
   return (
     <DocumentSummaryPanel
-      hasDocument={reader.state.document !== null}
       annotations={annotations}
+      currentPage={reader.state.document?.currentPage}
+      hasDocument={reader.state.document !== null}
+      ocrNeeded={reader.state.document?.ocrStatus === "needed"}
       onSelectPage={reader.setCurrentPage}
+      pageCount={reader.state.document?.pageCount}
+      pagesWithHits={collectPagesWithSearchHits(search.state.hits)}
+      renderThumbnail={reader.renderThumbnail}
     />
   );
+}
+
+/** 收集拥有搜索命中的页码集合（1-based） */
+function collectPagesWithSearchHits(hits: ReadonlyArray<{ pageNumber: number }>): Set<number> {
+  const set = new Set<number>();
+  for (const hit of hits) {
+    set.add(hit.pageNumber);
+  }
+  return set;
 }
 
 function ContextToolbar({ mode }: { mode: Exclude<AppModeId, "read" | "pages"> }) {
