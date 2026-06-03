@@ -3,6 +3,7 @@ import { loadPdfFromBytes, loadPdfFromFile, type PdfJsReaderAdapter } from "./pd
 
 function createAdapter() {
   const calls: string[] = [];
+  const renderMock = vi.fn(async () => ({ promise: Promise.resolve() }));
   const getPage = vi.fn(async (pageNumber: number) => ({
     rotate: pageNumber === 2 ? 90 : 0,
     getTextContent: vi.fn(async () => ({
@@ -13,6 +14,7 @@ function createAdapter() {
       height: (pageNumber === 1 ? 792 : 500) * scale,
       rotation: pageNumber === 2 ? 90 : 0,
     }),
+    render: renderMock,
   }));
   const destroy = vi.fn(async () => undefined);
   const document = {
@@ -34,7 +36,7 @@ function createAdapter() {
     }),
   };
 
-  return { adapter, destroy, getPage };
+  return { adapter, destroy, getPage, renderMock };
 }
 
 describe("pdfReaderService", () => {
@@ -108,5 +110,61 @@ describe("pdfReaderService", () => {
     expect(adapter.getDocument).toHaveBeenCalledWith({
       data: expect.any(Uint8Array),
     });
+  });
+
+  test("renderPageToCanvas calls PDF.js page.render with correct parameters", async () => {
+    const { adapter, renderMock } = createAdapter();
+    const data = new Uint8Array([1, 2, 3]);
+
+    const loaded = await loadPdfFromBytes(
+      { data, fileName: "render-test.pdf" },
+      adapter,
+    );
+
+    // 创建模拟 canvas 元素
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(() => ({ fillRect: vi.fn() })),
+    } as unknown as HTMLCanvasElement;
+
+    await loaded.renderPageToCanvas(0, canvas, 1.5);
+
+    // 验证 canvas 尺寸已按 zoom 缩放设置
+    expect(canvas.width).toBe(612 * 1.5);
+    expect(canvas.height).toBe(792 * 1.5);
+    // 验证调用了 getContext('2d')
+    expect(canvas.getContext).toHaveBeenCalledWith("2d");
+    // 验证 PDF.js page.render 被调用
+    expect(renderMock).toHaveBeenCalledOnce();
+    const renderArgs = renderMock.mock.calls[0][0];
+    expect(renderArgs).toHaveProperty("canvasContext");
+    expect(renderArgs).toHaveProperty("viewport");
+    expect(renderArgs.viewport.width).toBe(612 * 1.5);
+    expect(renderArgs.viewport.height).toBe(792 * 1.5);
+
+    await loaded.destroy();
+  });
+
+  test("renderPageToCanvas uses 1-based page numbers for PDF.js", async () => {
+    const { adapter, getPage } = createAdapter();
+    const data = new Uint8Array([1, 2, 3]);
+
+    const loaded = await loadPdfFromBytes(
+      { data, fileName: "page-number-test.pdf" },
+      adapter,
+    );
+
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(() => ({})),
+    } as unknown as HTMLCanvasElement;
+
+    // pageIndex 1 应该调用 getPage(2)
+    await loaded.renderPageToCanvas(1, canvas, 1);
+    expect(getPage).toHaveBeenCalledWith(2);
+
+    await loaded.destroy();
   });
 });

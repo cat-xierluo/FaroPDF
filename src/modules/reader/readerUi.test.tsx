@@ -20,6 +20,7 @@ vi.mock("./pdfReaderService", () => ({
       textLayerStatus: "available",
     },
     getPageViewport: vi.fn(),
+    renderPageToCanvas: vi.fn(async () => undefined),
     destroy: vi.fn(async () => undefined),
   })),
 }));

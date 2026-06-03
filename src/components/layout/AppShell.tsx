@@ -70,7 +70,7 @@ export function AppShell({
         {activeMode === "pages" ? (
           <PageOrganizerWorkspace reader={reader} />
         ) : (
-          <ReaderCanvas onOpenFile={reader.openFile} readerState={reader.state} searchState={search.state} />
+          <ReaderCanvas onOpenFile={reader.openFile} readerState={reader.state} searchState={search.state} renderPageToCanvas={reader.renderPageToCanvas} />
         )}
       </div>
       <StatusBar readerState={reader.state} />

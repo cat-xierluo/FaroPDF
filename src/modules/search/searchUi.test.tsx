@@ -47,6 +47,7 @@ function mockLoadedPdf({
     },
     getPageViewport: vi.fn(),
     getPageText,
+    renderPageToCanvas: vi.fn(async () => undefined),
     destroy: vi.fn(async () => undefined),
   }));
 
@@ -134,6 +135,7 @@ describe("search UI integration", () => {
       },
       getPageViewport: vi.fn(),
       getPageText: file.name === "first.pdf" ? firstGetPageText : secondGetPageText,
+      renderPageToCanvas: vi.fn(async () => undefined),
       destroy: vi.fn(async () => undefined),
     }));
     render(<App />);
