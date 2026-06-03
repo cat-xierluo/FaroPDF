@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ocr_dispatch::OcrDispatchBackend;
 
+#[allow(dead_code)]
 const OCR_JOB_QUEUE_FILE: &str = "ocr-jobs.json";
 const OCR_JOB_QUEUE_VERSION: u32 = 1;
 

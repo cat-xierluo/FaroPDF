@@ -60,16 +60,16 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：OCR
-- 状态：进行中（bridge/stub 第一版已完成，真实 OCR 待接入）
+- 状态：进行中（bridge 真实接入第二版已完成，等待合并 / 后续 UI 接入）
 - 建议分支：`feat/ocr-bridge`
 - 建议 worktree：`.claude/worktrees/tmux-ocr-bridge`
-- 依赖：ISS-003、ISS-014
+- 依赖：ISS-003、ISS-014、ISS-017
 - 范围：`src/modules/ocr/`、`src/shared/ocr/`、`src-tauri/` OCR command、OCR 相关测试
 - 参考算法：`pdf-processor/scripts/pdf-ocr.py`、`pdf_ocr_paddle_api.py`、`pdf_ocr_mineru.py`、`pdf_ocr_layered.py`
 - 目标：建立 OCR 任务模型，优先连接本地 Legal Skills / `ocrmypdf`，并支持 PaddleOCR、MinerU 等外部 OCR API adapter。
 - 验收：纯扫描 PDF 可触发 OCR 任务；任务显示后端、页码范围、进度、输出路径和失败原因；生成双层 PDF 后能做搜索质量抽查；OCR 模式工具条至少覆盖识别文本、输出双层 PDF 和质量检查。
-- 当前进度：已建立 OCR 请求、输出策略、任务进度、质量抽查入口等共享类型；新增 `ocrBridgeService` 和 provider adapter 边界，覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；Tauri `start_ocr_job` command stub 做参数校验、默认 `*-ocr.pdf` 新输出路径和同路径拒绝；云端 provider 未明确 consent、缺少安全 apiKeyRef、使用真实密钥串或远端明文 HTTP endpoint 时拒绝，本机调试只允许 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback HTTP；OCR 错误脱敏覆盖带逗号或中文标点的 PDF 路径。当前不会执行真实 OCR、不会生成双层 PDF、不会发起联网请求，也不会做真实质量检查。
-- 下一步：接入本地 `ocrmypdf` / Legal Skills 后台执行、PaddleOCR/MinerU API 凭证读取与调用、双层 PDF 生成、任务队列持久化、OCR 模式工具条和 ISS-017 质量检查报告。
+- 当前进度：bridge 真实接入第二版已完成。后端 `start_ocr_job` 按 provider 分发到 `ocrmypdf` 本地子进程（`local-ocrmypdf` / `legal-skills`）或 `curl + HTTPS` 云端 OCR（PaddleOCR / MinerU），错误信息脱敏并写回 job 进度；任务队列持久化到 `app_config_dir/ocr-jobs.json`，启动时回收残留 running 任务为 cancelled；新增 `list_ocr_jobs` / `poll_ocr_job` / `cancel_ocr_job` / `extract_ocr_text` 四个 command；OCR 完成后 `pdftotext` 提取页面文本喂给 ISS-017 `ocrQualityCheckService` 生成可检索页比例、关键词命中和体积比报告。前端 `createTauriOcrJobController` 包装新 command；`createOcrPostProcessor` 把后端提取的文本转换成 `OcrQualityReport`；`OcrModeToolbar` / `OcrJobList` / `OcrQualityReportView` 作为独立 React 组件覆盖识别文本、输出双层 PDF 和质量检查三个按钮以及任务列表 / 质量报告视图；新组件未接入 `src/App.tsx`，由后续 layout worker 接入 context toolbar。云端 apiKeyRef 当前仅接受 `env:` 形式（其他 `keychain:` / `credential:` / `credential-ref:` / `api-key-ref:` 暂时返回明确错误，提示用户改用 `env:`）；本机需安装 `ocrmypdf` / `pdftotext` / `curl` 才能跑通 OCR 真实路径。
+- 下一步：把 OCR 模式工具条接入 `AppShell` context toolbar、真实 PDF 端到端联调（提供 fixture 验证 `*-ocr.pdf` 输出 + 质量检查）、`keychain:` 凭证引用形式与 OS Keychain 集成、根据 `legal-skills` 实际可用脚本收敛 fallback 逻辑。
 
 ### ISS-008 表单填写与签署
 
@@ -226,6 +226,7 @@ Agent 可根据本文件自行判断：
 只保留最近 5 条；更早的条目在 `docs/DECISIONS.md` 工作日志。
 
 - 2026-06-03：部署 doc-curator 文档瘦身 subagent：在 `.claude/skills/doc-curator/` 落 SKILL.md / LICENSE.txt / CHANGELOG.md / config/faropdf.yaml / state.json / scripts/{scan,first-baseline,maintenance-pr}.sh / lib/{common,check-tasks,check-decisions,check-files}.sh；`.claude/agents/doc-curator.md` 注册自定义 Agent；`AGENTS.md` Skill 强制调用表新增 doc-curator 行；`docs/TASKS.md` 新增 ISS-024，`docs/DECISIONS.md` 新增 DEC-028，`docs/ARCHITECTURE.md` 补角色说明，`.claude/skills/git-workflow/SKILL.md` 升级 v1.3.0 加 PR 创建后 / 合并后 post-action 触发小节；触发采用 Agent 主动调起，**不依赖 hooks**。
+- 2026-06-03：在 `feat/ocr-bridge` 推进 ISS-007 真实接入第二版：后端按 provider 分发到 `ocrmypdf` / `curl + HTTPS`、任务队列持久化、`pdftotext` 联动质量检查；前端 controller + 模式工具条 / 任务列表 / 质量报告组件；OCR 模式工具条作为独立组件交付，由后续 layout worker 接入 `AppShell`。
 - 2026-06-03：在 `feat/reader-thumbnails` 推进 ISS-002 阅读深化第三步：`pdfReaderService` 暴露 `renderThumbnail`、Sidebar 接入 PDF.js 真实缩略图、`PdfPage` 用 IntersectionObserver 同步当前页；通过 PR #14 合并到 main。
 - 2026-06-03：合并 `feat/ocr-quality`（ISS-017）和 `feat/evidence-image-pack`（ISS-018）到 `main`；ISS-017 质量检查报告和 ISS-018 A4 编排计划器第一版完成。
 - 2026-06-03：从前一个到达上下文上限的 session 接手，创建 `docs/HANDOFF.md` 交接文件。
