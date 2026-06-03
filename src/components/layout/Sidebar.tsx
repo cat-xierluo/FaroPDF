@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PdfAnnotation, PdfAnnotationType } from "../../shared/pdf/annotation";
-import type { PdfViewMode } from "../../shared/pdf/types";
+import type { PdfViewMode, ZoomPresetId } from "../../shared/pdf/types";
+import { ZOOM_PRESETS } from "../../shared/pdf/types";
 
 /** 缩略图渲染函数（来自 reader controller） */
 export type RenderThumbnailFn = (
@@ -15,6 +16,7 @@ const viewModeOptions: Array<{ id: PdfViewMode; label: string }> = [
   { id: "continuous", label: "连续" },
   { id: "single", label: "单页" },
   { id: "double", label: "双页" },
+  { id: "fit-width", label: "适合宽度" },
 ];
 
 /** 缩略图默认渲染宽度，约束最长边像素 */
@@ -456,19 +458,37 @@ function truncateText(text: string, maxLength: number): string {
 interface ViewSettingsPanelProps {
   canChangeViewMode: boolean;
   onViewModeChange: (viewMode: PdfViewMode) => void;
+  onZoomPresetChange: (presetId: ZoomPresetId) => void;
+  onRotate: (direction: "clockwise" | "counter-clockwise") => void;
   viewMode: PdfViewMode;
+  /** 当前缩放预设 id；若当前 zoom 不匹配任何预设则为 undefined */
+  activeZoomPresetId?: ZoomPresetId;
+  /** 是否在 fit-width 视图模式下（影响 activeZoomPreset 展示） */
+  isFitWidth?: boolean;
 }
 
-export function ViewSettingsPanel({ canChangeViewMode, onViewModeChange, viewMode }: ViewSettingsPanelProps) {
+export function ViewSettingsPanel({
+  activeZoomPresetId,
+  canChangeViewMode,
+  isFitWidth,
+  onRotate,
+  onViewModeChange,
+  onZoomPresetChange,
+  viewMode,
+}: ViewSettingsPanelProps) {
+  // fit-width 视图模式下强制高亮 "fit-width" 缩放预设
+  const resolvedActiveZoomPreset: ZoomPresetId | undefined = isFitWidth ? "fit-width" : activeZoomPresetId;
+
   return (
     <aside className="utility-panel view-settings" aria-label="视图设置">
       <h2>布局选项</h2>
       <section aria-label="页面布局">
         <p className="utility-label">页面布局</p>
-        <div className="choice-grid choice-grid--three">
+        <div className="choice-grid choice-grid--four" data-testid="view-mode-grid">
           {viewModeOptions.map((option) => (
             <button
               aria-pressed={viewMode === option.id}
+              data-view-mode={option.id}
               disabled={!canChangeViewMode}
               key={option.id}
               onClick={() => onViewModeChange(option.id)}
@@ -477,6 +497,46 @@ export function ViewSettingsPanel({ canChangeViewMode, onViewModeChange, viewMod
               {option.label}
             </button>
           ))}
+        </div>
+      </section>
+      <section aria-label="缩放预设">
+        <p className="utility-label">缩放预设</p>
+        <div className="choice-grid choice-grid--four" data-testid="zoom-preset-grid">
+          {ZOOM_PRESETS.map((preset) => (
+            <button
+              aria-pressed={resolvedActiveZoomPreset === preset.id}
+              data-zoom-preset={preset.id}
+              disabled={!canChangeViewMode}
+              key={preset.id}
+              onClick={() => onZoomPresetChange(preset.id)}
+              type="button"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </section>
+      <section aria-label="旋转">
+        <p className="utility-label">旋转</p>
+        <div className="choice-grid choice-grid--two" data-testid="rotate-grid">
+          <button
+            aria-label="逆时针旋转 90 度"
+            data-rotate-direction="counter-clockwise"
+            disabled={!canChangeViewMode}
+            onClick={() => onRotate("counter-clockwise")}
+            type="button"
+          >
+            逆时针 90°
+          </button>
+          <button
+            aria-label="顺时针旋转 90 度"
+            data-rotate-direction="clockwise"
+            disabled={!canChangeViewMode}
+            onClick={() => onRotate("clockwise")}
+            type="button"
+          >
+            顺时针 90°
+          </button>
         </div>
       </section>
       <section aria-label="分屏视图">

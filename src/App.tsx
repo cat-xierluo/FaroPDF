@@ -5,10 +5,14 @@ import { AnnotationService } from "./modules/annotation";
 import { createMemoryAnnotationStorage } from "./modules/annotation";
 import { AnnotationRepository } from "./modules/annotation";
 import { useReaderController } from "./modules/reader";
+import { registerReadModeTools } from "./modules/reader/readerModeTools";
 import { useTextSearchController } from "./modules/search";
 import type { PdfAnnotation } from "./shared";
 import { createDefaultAppSettings } from "./shared/settings/defaults";
 import "./styles/app.css";
+
+/** 在应用启动时一次性注册阅读模式工具集（旋转 + 适合页面）。 */
+registerReadModeTools();
 
 function App() {
   const settings = useMemo(() => createDefaultAppSettings(), []);
