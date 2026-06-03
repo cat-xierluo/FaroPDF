@@ -244,7 +244,7 @@ describe("useFormController", () => {
     const reader = makeFakeReader();
     const service = makeFakeService({
       readFormFields: vi.fn(async () => SAMPLE_FORM_STATE),
-      fillFormField: vi.fn(async (bytes, input) => new Uint8Array([9, 9, 9])),
+      fillFormField: vi.fn(async () => new Uint8Array([9, 9, 9])),
     });
 
     const { result } = renderHook(() => useFormController(reader as ReaderController, { service }));
@@ -342,17 +342,19 @@ describe("useFormController", () => {
   test("applyBatchAndSave 调 applyFormOperations + saveUpdatedBytes", async () => {
     const reader = makeFakeReader();
     const service = makeFakeService({
-      applyFormOperations: vi.fn(async () => ({
-        id: "batch",
-        bytes: new Uint8Array([6, 6]),
-        appliedCount: 2,
-        failedCount: 0,
-        results: [
-          { id: "op-1", type: "fill", status: "applied", fieldId: "name_field", value: "x" },
-          { id: "op-2", type: "flatten", status: "applied", summary: { fieldCountBeforeFlatten: 1, fieldCountAfterFlatten: 0, flattened: true } },
-        ],
-        completedAt: "2026-06-04T00:00:00.000Z",
-      })),
+      applyFormOperations: vi.fn(
+        async (): Promise<import("../../shared/pdf/form").PdfFormBatchResult> => ({
+          id: "batch",
+          bytes: new Uint8Array([6, 6]),
+          appliedCount: 2,
+          failedCount: 0,
+          results: [
+            { id: "op-1", type: "fill", status: "applied", fieldId: "name_field", value: "x" },
+            { id: "op-2", type: "flatten", status: "applied", summary: { fieldCountBeforeFlatten: 1, fieldCountAfterFlatten: 0, flattened: true } },
+          ],
+          completedAt: "2026-06-04T00:00:00.000Z",
+        }),
+      ),
       readFormFields: vi.fn(async () => ({ fields: [], fieldCount: 0, fillable: false })),
     });
 
@@ -376,17 +378,19 @@ describe("useFormController", () => {
   test("applyBatchAndSave 部分失败时写 errorMessage 包含失败原因", async () => {
     const reader = makeFakeReader();
     const service = makeFakeService({
-      applyFormOperations: vi.fn(async () => ({
-        id: "batch",
-        bytes: new Uint8Array([6, 6]),
-        appliedCount: 1,
-        failedCount: 1,
-        results: [
-          { id: "op-1", type: "fill", status: "applied", fieldId: "x", value: "y" },
-          { id: "op-2", type: "fill", status: "failed", errorMessage: "field missing" },
-        ],
-        completedAt: "2026-06-04T00:00:00.000Z",
-      })),
+      applyFormOperations: vi.fn(
+        async (): Promise<import("../../shared/pdf/form").PdfFormBatchResult> => ({
+          id: "batch",
+          bytes: new Uint8Array([6, 6]),
+          appliedCount: 1,
+          failedCount: 1,
+          results: [
+            { id: "op-1", type: "fill", status: "applied", fieldId: "x", value: "y" },
+            { id: "op-2", type: "fill", status: "failed", errorMessage: "field missing" },
+          ],
+          completedAt: "2026-06-04T00:00:00.000Z",
+        }),
+      ),
       readFormFields: vi.fn(async () => ({ fields: [], fieldCount: 0, fillable: false })),
     });
 
