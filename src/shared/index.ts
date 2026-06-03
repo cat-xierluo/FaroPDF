@@ -89,6 +89,21 @@ export type {
   PreparedOcrRequest,
 } from "./ocr/types";
 export type {
+  OcrQualityCheckInput,
+  OcrQualityCheckName,
+  OcrQualityCheckResult,
+  OcrQualityKeywordHit,
+  OcrQualityPageInput,
+  OcrQualityProblemPage,
+  OcrQualityReport,
+  OcrQualityThresholds,
+} from "./ocr/quality";
+export {
+  createDefaultOcrQualityThresholds,
+  normalizeOcrQualityThresholds,
+  validateOcrQualityInput,
+} from "./ocr/quality";
+export type {
   OcrNetworkConsentDecision,
   OcrPrivacyAuditRecord,
   OcrPrivacyConsentStatus,

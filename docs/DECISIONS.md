@@ -340,6 +340,20 @@ ISS-013 第一版把水印、普通页码、Bates 编号和压缩预设纳入导
 
 原因：水印、页码和 Bates 编号可以在现有 bytes-first 导出引擎内安全落地；压缩则涉及图像资源重编码、文字层/批注/书签保留和体积质量统计，直接用 pdf-lib 伪装压缩会误导用户，必须留给后续后台 bridge 或更强 PDF 引擎实现。
 
+## DEC-024 OCR 质量检查第一版采用抽象报告服务
+
+- 日期：2026-06-02
+- 状态：已采纳
+
+ISS-017 第一版先建立 OCR 质量检查的共享契约和纯逻辑服务，不在本分支接入真实 PDF 解析、真实 OCR provider 或联网请求：
+
+- `src/shared/ocr/quality.ts` 定义质量检查输入、默认阈值、阈值检查项、问题页、关键词命中和报告模型。
+- `src/modules/ocr/quality/qualityCheckService.ts` 基于页面文本、关键词、输入/输出体积、耗时和可选参考文本生成质量报告。
+- 报告覆盖可检索页比例、关键词命中率、文件体积比、耗时和可选 CER；未达阈值时保留具体检查项和问题页原因。
+- 输入校验要求有明确页数、页面文本输入和合法页级阈值，避免把空输入或 OCR provider 脏返回误判为质量通过。
+
+原因：OCR bridge 当前仍是 queued stub，直接在前端或本分支读取真实 PDF 会把 PDF 解析、OCR 后台执行和质量展示耦合在一起。先固定报告模型和服务边界，可以让后续本地 `ocrmypdf`、Legal Skills、PaddleOCR/MinerU 和 UI 工具条复用同一质量结果。
+
 ## 工作日志
 
 - 2026-06-02：初始化项目上下文，固定名称、独立项目形态、首版范围、技术选型和安全边界。
@@ -367,3 +381,4 @@ ISS-013 第一版把水印、普通页码、Bates 编号和压缩预设纳入导
 - 2026-06-02：在 `feat/page-organizer` 为 `ISS-006` 落地页面整理第一版底座：新增页面整理状态类型、旋转/删除/重排/恢复/撤销服务、默认 `*-organized.pdf` plan-only 导出请求和安全输出路径测试；真实页面改写和完整 UI 后续接入。
 - 2026-06-02：在 `feat/privacy-safety` 完成 `ISS-010` 第一版：新增联网 OCR 隐私 notice、consent decision、脱敏 audit record、`ocrPrivacyConsentGuard` 和 bridge audit 衔接；随后按 code review 收紧为本次 notice/consent 双匹配、输入文件指纹、nonce、有效期和 Rust audit 复验，旧布尔 consent 不能单独放行云端 OCR；真实 PaddleOCR/MinerU 调用和完整 UI 弹窗继续留给后续任务。
 - 2026-06-02：在 `feat/pdf-output-tools` 完成 `ISS-013` 第一版：新增水印、页码、Bates 和压缩预设导出 operation，支持 `*-delivery.pdf` 安全输出请求；文字/图片水印、页码和 Bates 用 pdf-lib 写入新 PDF，压缩保持 plan-only 并记录后续真实处理边界。
+- 2026-06-02：通过 Claude Code tmux worker 启动 `feat/ocr-quality` 推进 ISS-017；PM 接管修正测试和边界后，形成 OCR 质量报告共享契约、纯服务和定向测试。
