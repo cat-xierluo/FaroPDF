@@ -451,3 +451,57 @@ ISS-017 第一版先建立 OCR 质量检查的共享契约和纯逻辑服务，�
 - 2026-06-03：在 `feat/reader-thumbnails` 推进 ISS-002 阅读深化第三步：`pdfReaderService` 暴露 `renderThumbnail(pageIndex, canvas, maxWidth)` 并按最长边等比缩放，1px 兜底避免 `maxWidth<=0` 时除零；`useReaderController` 透出该方法供 Sidebar 调用；`DocumentSummaryPanel` 用 IntersectionObserver 懒加载每个缩略图，未提供 `renderThumbnail` 时回退占位；`PdfPage` 用 `IntersectionObserver`（阈值 0.5）回调 `onPageVisible` 同步 `currentPage`；AppShell 把 `reader.setCurrentPage` 透传给 `ReaderCanvas`。
 - 2026-06-03：`searchUi.test.tsx` 中"第 N 页"按钮名原先只匹配搜索结果列表，新增缩略图按钮后改为通过 `within(searchResults)` 作用域，避免在多个候选上抛 `getMultipleElementsFoundError`。
 - 2026-06-03：按用户反馈中文化 git-workflow 描述部分：PR body 模板的 `## Summary` / `## Test plan` 改为 `## 摘要` / `## 测试计划`，PR 正文最低要求表区块改为「摘要」「测试计划」「Agent 归属」「关联任务」「风险」，references 中"Multi-Skill"改为"多 Skill"；保留英文类型前缀和通用 Git 术语。Skill 升级为 v1.2.0，并在 skill 自身和项目级 DECISIONS 同步记录。
+
+## DEC-026 ISS-007 OCR bridge 真实接入方案
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联任务：ISS-007、ISS-010、ISS-016、ISS-017
+
+承接 DEC-020 stub 阶段，本决策记录 OCR bridge 从 stub 推进到真实接入的边界，确认沿用第一版的请求/任务模型、provider adapter 边界和云端 consent/apiKeyRef/HTTPS endpoint 安全规则，**不**修改共享契约的类型字段，只在 `src/shared/ocr/` 内增加新 helper 类型和进度/凭证引用工具。
+
+### 执行链路
+
+- `start_ocr_job` command 不再返回 queued stub，而是按 provider 类型分发：
+  - `local-ocrmypdf` → 调用本机 `ocrmypdf` 二进制（`std::process::Command`），传入 `--output-type pdf --skip-text` 等参数；如果用户提供的 `pageRange` 非空，附加 `-r` 页码范围参数。
+  - `legal-skills` → 解析 `FAROPDF_LEGAL_SKILLS_BIN` 或默认 `pdf-ocr.py`（不强制存在；缺失时回退到与 `local-ocrmypdf` 相同的 ocrmypdf 路径并标记 fallback reason）。
+  - `paddleocr` / `mineru` → 通过 `curl` POST 上传 PDF 到 `provider.endpoint`（HttpsEndpoint 或 loopback HTTP），请求头 `Authorization: Bearer <resolved-key>`；返回的 JSON 包含 `text` 或 `pdf` 字段；二进制 PDF 响应写入 `outputPath`，文本响应配合前端 PDF.js 渲染为新 layered PDF。
+- Rust 侧把 ocrmypdf 进程 stdout/stderr 收敛到 job 的 `progress.message`，stderr 抛错时归类到 `OcrJobStatus=failed` 并把 `errorMessage` 脱敏后返回。
+- OCR job 启动后通过 `tauri::async_runtime::spawn` 派发到后台，命令本身立即返回 `running` 状态的 job；前端用 `poll_ocr_job`/`list_ocr_jobs` 拉取最新进度。
+
+### 任务队列持久化
+
+- 应用配置目录下新增 `ocr-jobs.json`，schema version 1，记录每个 job 的 `id`、`inputPath`、`outputPath`、`backend`、`providerId`、`status`、`progress`、`quality`、`errorMessage`、`createdAt`、`updatedAt`、`completedAt`。
+- 启动时 `list_ocr_jobs` 读出 `running` 的 job（崩溃恢复场景）并把残留任务标记为 `cancelled`，避免幽灵任务；`status=completed|failed|cancelled` 的历史 job 完整保留供 UI 展示。
+- `cancel_ocr_job` 通过 PID 终止本地子进程，并把 job 状态置为 `cancelled`；PaddleOCR/MinerU 取消依赖 provider 端实现，当前仅做客户端标记。
+- 持久化层不记录 `privacyAuditRecord`、API key 引用、真实本地 PDF 路径，仅保留脱敏路径摘要（沿用 `summarizeLocalPathForAudit`）。
+
+### 凭证引用解析
+
+- `apiKeyRef` 严格遵循第一版的安全规则：只接受 `keychain:`, `env:`, `credential:`, `credential-ref:`, `api-key-ref:` 前缀的引用或 `***...***`/`...` 脱敏占位；明文 key 已被 `isSafeApiKeyRef` 拦截。
+- Rust 侧 `resolve_api_key_ref` 把 `env:<NAME>` 映射到 `std::env::var`；`keychain:<NAME>` 暂未接入系统 Keychain（不引入 OS 依赖），返回明确错误并提示用户改用 `env:`；其他引用在 OCR job 的 `progress.message` 中显示「凭证引用已就绪，不在日志中展开」。
+- 任何凭证解析失败必须让 job 失败而不是继续运行，避免把 `Bearer undefined` 之类的脏请求发到云端。
+
+### 文本提取与质量检查联动
+
+- OCR 完成后通过 Tauri command `extract_ocr_text` 调用本机 `pdftotext -layout`（poppler-utils；缺失时返回明确错误），把 PDF 拆成 `Array<{ pageIndex, text }>` 返回。
+- 前端 `ocrPostProcessor` 接收 `OcrJob` + 提取的页面文本 + 关键词，调 `createOcrQualityCheckService` 生成 `OcrQualityReport`；结果保存到 job 的 `quality` 字段供 UI 展示。
+- 质量检查是异步可选：job `qualityCheck.enabled=false` 时跳过；开启但 `pdftotext` 不可用时回退为 `quality.skipped=true` 并在 `errorMessage` 写明原因，不让 OCR 整体失败。
+
+### UI 工具条
+
+- 新增 `src/modules/ocr/ui/OcrModeToolbar.tsx` 组件，覆盖"识别文本"、"输出双层 PDF"、"质量检查"按钮；通过 props 接收 `onStartOcr`、`onOpenQualityReport`、`currentJob?`，由后续 worker 在 AppShell context toolbar 接入。
+- 本任务**不**修改 `src/App.tsx` 或全局样式，只交付可独立运行的 toolbar 组件和单元测试，避免与 `feat/pdf-expert-shell-ia` 的 UI 收口冲突。
+- 工具条配套 `OcrJobList`（任务队列视图）、`OcrQualityReportView`（报告视图）和 `useOcrJobController`（订阅 progress/lifecycle 的 hook），供后续 layout worker 接入。
+
+### 范围与依赖
+
+- 仅修改：`src/modules/ocr/**`、`src/shared/ocr/**`、`src-tauri/**`（含 `Cargo.toml`）和相关测试；不修改 `package.json`、锁文件、`src/shared/` 其他目录、`src/App.tsx`、全局样式、路由。
+- 不引入新 crate；HTTP 使用 `curl` 外部命令，PDF 文本提取使用 `pdftotext` 外部命令，OCR 使用 `ocrmypdf` 外部命令，避免污染 `Cargo.toml` 依赖图。
+- 共享契约字段保持兼容；新增的 `quality.skipped`、`completedAt`、`cancelledAt` 等可选字段在 Rust 端 serialize 为 `Option<...>`，旧前端可忽略。
+
+### 已知限制
+
+- 用户必须在本机装好 `ocrmypdf`（含 tesseract 数据）和 `pdftotext`（poppler-utils）才能跑通本地 OCR 和质量检查；缺失时 toolbar 会显示明确错误并保留 queued job 状态。
+- `keychain:` 引用当前不接受，需要用户改用 `env:<NAME>`；后续若 OS Keychain 集成落地再扩展 `resolve_api_key_ref`。
+- PaddleOCR/MinerU 的 provider 端取消协议依赖各自实现，本地只能做客户端标记。
