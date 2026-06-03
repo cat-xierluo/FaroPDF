@@ -3,6 +3,9 @@ import { FAROPDF_MODULES, getModuleBoundary } from "./foundation/modules";
 import { createDefaultOcrQualityThresholds } from "./index";
 import type {
   AppSettings,
+  ImagePackInputItem,
+  ImagePackPlan,
+  ImagePackSummary,
   OcrJobProgress,
   OcrOutputStrategy,
   OcrQualityCheckRequest,
@@ -19,6 +22,7 @@ import type {
   PdfPageViewport,
   ScanPreprocessJob,
 } from "./index";
+import { A4_LANDSCAPE_SIZE_PT, A4_PORTRAIT_SIZE_PT } from "./index";
 
 describe("shared contracts", () => {
   test("models PDF state, operations, OCR jobs, and settings as worker-safe data", () => {
@@ -247,6 +251,61 @@ describe("shared contracts", () => {
     expect(ocrQualityReport.checks[0].threshold).toBe(ocrQualityThresholds.minSearchablePageRatio);
     expect(preprocessJob.options.outputMode).toBe("preprocess-only");
     expect(settings.defaultSavePolicy).toBe("always-export-copy");
+  });
+
+  test("models evidence image pack plans as worker-safe data", () => {
+    const inputItems: ImagePackInputItem[] = [
+      { id: "img-1", source: "image", sourcePath: "/case/photo-1.png", width: 600, height: 800 },
+      { id: "img-2", source: "image", sourcePath: "/case/photo-2.png", width: 800, height: 600 },
+    ];
+    const summary: ImagePackSummary = {
+      inputItemCount: 2,
+      outputPageCount: 2,
+      itemsPerPage: 1,
+      portraitItemCount: 1,
+      landscapeItemCount: 1,
+      squareItemCount: 0,
+      orientationPageCounts: { portrait: 1, landscape: 1 },
+      selectedOrientation: "auto",
+      selectedItemsPerPageOption: "auto",
+    };
+    const plan: ImagePackPlan = {
+      id: "image-pack-contract",
+      items: inputItems,
+      options: {
+        itemsPerPage: 1,
+        itemsPerPageOption: "auto",
+        orientation: "auto",
+        margin: 25,
+        sort: "name",
+      },
+      outputPath: "/case/photo-1-evidence-pack.pdf",
+      pages: [
+        {
+          pageNumber: 1,
+          width: A4_PORTRAIT_SIZE_PT.width,
+          height: A4_PORTRAIT_SIZE_PT.height,
+          orientation: "portrait",
+          cells: [],
+        },
+        {
+          pageNumber: 2,
+          width: A4_LANDSCAPE_SIZE_PT.width,
+          height: A4_LANDSCAPE_SIZE_PT.height,
+          orientation: "landscape",
+          cells: [],
+        },
+      ],
+      summary,
+      warnings: [],
+      createdAt: "2026-06-02T00:00:00.000Z",
+    };
+
+    expect(plan.summary.inputItemCount).toBe(2);
+    expect(plan.summary.itemsPerPage).toBe(1);
+    expect(plan.pages[0].orientation).toBe("portrait");
+    expect(plan.pages[1].orientation).toBe("landscape");
+    expect(plan.options.itemsPerPageOption).toBe("auto");
   });
 
   test("declares stable module boundaries for future worktrees", () => {

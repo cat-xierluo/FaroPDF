@@ -344,7 +344,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：页面管理 / 证据材料
-- 状态：待处理
+- 状态：待 PR review（第一版 plan-only 底座已完成；真实目录拾取、像素渲染、image/PDF I/O 待后续 worktree）
 - 建议分支：`feat/evidence-image-pack`
 - 建议 worktree：`.claude/worktrees/tmux-evidence-image-pack`
 - 依赖：ISS-005、ISS-006
@@ -352,6 +352,7 @@ Agent 可根据本文件自行判断：
 - 参考算法：`img2pdf/scripts/img_to_pdf.py`
 - 目标：支持图片目录、多个图片或已有 PDF 页面按 A4 1/2/3/4 张每页编排为新 PDF。
 - 验收：竖版截图可自动 3 张/页，横版截图可自动 1 张/页；支持边距、排序和横竖版选择；原始图片和 PDF 不变。
+- 当前进度：新增 `src/shared/pdf/imagePack.ts` 共享契约和 `src/modules/pages/imagePack/imagePackPlanner.ts` 纯函数 planner；`imagePackPlanner.test.ts` 覆盖 19 项核心行为（auto 3/auto 1/平手回落、显式 2/4、逐项方向、固定方向、单元格纵横比与页边距、默认 margin、输出路径建议与安全、空 items / 越界 / 负 margin / 零或 NaN 尺寸 / `sort=name` / 混合 image+pdf-page）。第一版不读取真实图片/PDF、不渲染像素、不引入新依赖、不修改 package 或 lock 文件。
 
 ### ISS-019 文书整理 manifest 与规范命名
 

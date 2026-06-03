@@ -39,6 +39,27 @@ Folia 继续聚焦 Markdown 阅读、编辑和 Word/HTML 导出。FaroPDF 后续
 - 阅读区采用页面虚拟化，只渲染可见页和邻近页。
 - OCR 不进入前端主线程，不阻塞打开文档。
 
+## DEC-005 ISS-018 证据图片 A4 编排第一版采用 plan-only 纯函数底座
+
+- 日期：2026-06-02
+- 状态：已采纳
+- 关联任务：ISS-018
+
+决定：
+
+- 第一版只交付 `src/shared/pdf/imagePack.ts` 共享契约 + `src/modules/pages/imagePack/imagePackPlanner.ts` 纯函数 planner + 单测，不读取真实图片/PDF、不渲染像素、不引入新依赖、不修改 package 或 lock 文件。
+- 输出计划包含 `pages` / `cells` / `summary`（输入条目数、输出页数、itemsPerPage、横竖版条目计数、每页方向计数、`selectedOrientation` / `selectedItemsPerPageOption`），但当前不向导出引擎提交实际 operation。
+- `itemsPerPage=auto` 时竖版多数 → 3/页、横版多数 → 1/页（平手回落竖版 3/页）。
+- `orientation=auto` 时 `itemsPerPage=1` 按条目方向逐页取方向，`itemsPerPage>=2` 时固定 landscape（与 `img2pdf/scripts/img_to_pdf.py` 的 `pick_page_size` 行为一致）。
+- `suggestImagePackOutputPath` 默认生成 `*-evidence-pack.pdf`；输出路径必须为绝对路径、以 `.pdf` 结尾且不能等于任何输入 `sourcePath`（`../` 等等价路径会被归一化后拒绝）。
+- 单元格按 aspect-ratio 保持缩放并居中放置在 margin 内：1/页占满 `a4 - 2*margin`；2/3/4/页采用 `cols=perPage` 单行布局，`cell_w = (a4_w - (cols+1)*gap) / cols`，`cell_h = a4_h - 2*margin`。
+- `sort=time` 当前保持输入顺序（plan-only 模型未携带 mtime），后续真实文件扫描时再补 `modifiedAt` / 排序时间戳。
+
+不采纳（本期暂缓）：
+
+- 真实目录拾取、image/PDF 页面尺寸读取、PDF 写出执行、UI 编排对话框、多页预览：交由后续 worktree 单独推进，避免在 foundation 收口前修改脚手架和共享导出引擎。
+- 行布局（per_page=4 拆成 2×2）：第一版先与 `img2pdf` 脚本的单行算法对齐，必要时再升级到 row-major。
+
 ## DEC-004 v0.1 直接做完整基础版
 
 - 日期：2026-06-02

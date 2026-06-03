@@ -15,3 +15,4 @@ export type {
   ReorderOrganizerPagesInput,
   RotateOrganizerPagesInput,
 } from "./pageOrganizer";
+export { createImagePackPlan, suggestImagePackOutputPath } from "./imagePack";
