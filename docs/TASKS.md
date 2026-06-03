@@ -329,9 +329,8 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：OCR / 质量
-- 状态：待 PR review
-- 建议分支：`feat/ocr-quality`
-- 建议 worktree：`.claude/worktrees/tmux-ocr-quality`
+- 状态：已完成（质量检查报告第一版；真实 PDF 解析和 OCR 执行待后续接入）
+- 建议分支：`feat/ocr-quality`（已合并）
 - 依赖：ISS-003、ISS-007
 - 范围：`src/modules/ocr/quality/`、`src/shared/ocr/quality*`、OCR 质量相关测试
 - 参考算法：`pdf-processor/scripts/pdf-ocr-quality-check.py`
@@ -344,9 +343,8 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：页面管理 / 证据材料
-- 状态：待 PR review（第一版 plan-only 底座已完成；真实目录拾取、像素渲染、image/PDF I/O 待后续 worktree）
-- 建议分支：`feat/evidence-image-pack`
-- 建议 worktree：`.claude/worktrees/tmux-evidence-image-pack`
+- 状态：已完成（第一版 plan-only 编排计划器；真实目录拾取、像素渲染、image/PDF I/O 待后续接入）
+- 建议分支：`feat/evidence-image-pack`（已合并）
 - 依赖：ISS-005、ISS-006
 - 范围：`src/modules/pages/imagePack/`、`src/shared/pdf/imagePack*`、图片编排相关测试
 - 参考算法：`img2pdf/scripts/img_to_pdf.py`
@@ -403,3 +401,4 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：完成 `ISS-003` 第一版：搜索模块按需读取 PDF.js 页文本并建立内存索引，Toolbar 展示命中列表和 OCR 提示，Reader 区展示轻量当前命中标记。
 - 2026-06-02：从最新 `main` 启动下一批并行主线任务：`ISS-005` 使用 `feat/pdf-export-engine` 推进导出/扁平化底座，`ISS-007` 使用 `feat/ocr-bridge` 推进 OCR bridge；`ISS-006` 页面整理等待导出引擎稳定后再开。
 - 2026-06-02：`ISS-005` 在 `feat/pdf-export-engine` 完成导出引擎底座第一版：共享导出契约、pdf-lib 复制导出、表单 flatten、批注 sidecar plan-only 计划、页面操作 plan-only 入口和单元测试；真实批注绘制与页面操作改写继续后续任务。
+- 2026-06-03：合并 `feat/ocr-quality`（ISS-017）和 `feat/evidence-image-pack`（ISS-018）到 `main`；ISS-017 质量检查报告和 ISS-018 A4 编排计划器第一版完成。
