@@ -51,6 +51,8 @@ Agent 可根据本文件自行判断：
 - `feat/pdf-output-tools`：ISS-005、ISS-013，可在导出引擎稳定后合并推进。
 - `feat/ocr-pipeline`：ISS-007、ISS-016、ISS-017，可在设置页和文本层完成后合并推进。
 - `feat/page-organizer-suite`：ISS-006、ISS-018、ISS-019，可在阅读底座和导出引擎完成后合并推进。
+- `feat/app-distribution`：ISS-021，单独推进收口后再合并，避免与设置页 UI 互相阻塞。
+- `feat/settings-page`：ISS-022、ISS-023，建议合并推进，集中在 `src/components/settings/` 和 `src/modules/settings/`，避免与 ISS-021 同时改 `src-tauri/`。
 
 ## 活跃任务
 
@@ -96,6 +98,84 @@ Agent 可根据本文件自行判断：
 - 下一步：继续推进阅读态真实 PDF 打开后的视觉 polish、搜索结果层、页面管理多选/撤销/风险提示，以及扫描/OCR 任务参数区；先补测试，再实现，最后用浏览器截图检查无重叠。
 - 设计差距速查：见 `docs/DESIGN.md` 「当前设计差距」一节。
 
+### ISS-021 全平台打包与自动更新
+
+- 优先级：P1
+- 类型：发布 / 工程
+- 状态：待处理
+- 建议分支：`feat/app-distribution`
+- 建议 worktree：`.claude/worktrees/tmux-app-distribution`
+- 依赖：ISS-001、ISS-009
+- 范围：`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、`.github/workflows/release.yml`（新增）、`scripts/create-updater-manifest.mjs`（新增或参考 folia）、`src/modules/settings/`（更新入口）、`src/shared/update/`（新增 update service）、`src/components/settings/AboutSection.tsx`（更新检查 UI）、`docs/RELEASE.md`（新增）
+- 参考实现：`folia/src-tauri/Cargo.toml`（`tauri-plugin-updater` 依赖）、`folia/src-tauri/tauri.conf.json`（`plugins.updater.endpoints` + `pubkey` + `bundle.createUpdaterArtifacts = true`）、`folia/.github/workflows/release.yml`、`folia/scripts/create-updater-manifest.mjs`、`folia/src/services/updateService.ts`、`folia/src/services/autoUpdateScheduler.ts`
+- 目标：让 FaroPDF 具备和 folia 同等的全平台桌面打包与自动更新能力，覆盖 macOS / Windows / Linux；接入 `tauri-plugin-updater` 与 GitHub release updater manifest，建立签名密钥对、`latest.json` 生成和应用内「检查更新」入口。
+- 验收：
+  - `src-tauri/Cargo.toml` 加入 `tauri-plugin-updater`；`tauri.conf.json` 配置 `plugins.updater.endpoints` + `pubkey`，`bundle.createUpdaterArtifacts = true`。
+  - 桌面三平台 `tauri build` 产出 `.app` / `.msi` / `.AppImage` / `.deb` 及对应签名 updater artifact。
+  - `.github/workflows/release.yml` 在 `v*` tag push 时跨平台矩阵构建、生成 `latest.json` 与签名、自动发布到 GitHub Releases。
+  - 应用内 `checkForAppUpdate` 走 `tauri-plugin-updater`，能拉到新版本并支持下载安装；`autoUpdateCheck` 设置项可关闭自动检查。
+  - 更新密钥通过本地 `tauri signer generate` 生成，私钥不入库，公钥写入 `tauri.conf.json`。
+  - 增量更新失败时回退到完整重装路径，不阻塞用户阅读。
+  - 移动端（Android / iOS）打包在 v0.3 评估范围，先在 `docs/RELEASE.md` 记录限制与后续计划，不在 ISS-021 内强制实现。
+
+### ISS-022 设置页面 UI 整合
+
+- 优先级：P1
+- 类型：UI
+- 状态：待处理
+- 建议分支：`feat/settings-page`
+- 建议 worktree：`.claude/worktrees/tmux-settings-page`
+- 依赖：ISS-014、ISS-021
+- 范围：`src/components/SettingsPage.tsx`（新增）、`src/components/settings/`（新增分组目录）、`src/modules/settings/SettingsPanel.tsx`（拆分到各 section）、`src/styles/`、`docs/DESIGN.md`（设置浮层视觉补遗）
+- 参考实现：`folia/src/components/SettingsPage.tsx`、`folia/src/components/settings/GeneralSection.tsx` / `AppearanceSection.tsx` / `ShortcutsSection.tsx`、`folia/src/hooks/useSettings.ts`、`folia/src/services/settingsService.ts`
+- 目标：把现有扁平的 `SettingsPanel.tsx` 改造成左侧导航 + 右侧多 section 的浮层设置页，至少包含「常规 / 阅读 / OCR provider / 快捷键 / 关于」五个 section；遵循 `docs/DESIGN.md` 的视觉系统。
+- 验收：
+  - 设置入口在主工具栏触发浮层，Esc 关闭、点遮罩关闭、焦点管理符合 `docs/DESIGN.md`。
+  - 左侧导航在窄屏视口下能折叠为顶部 tabs 或下拉。
+  - 五个 section 全部可访问；非首屏 section 走 `lazy` 减少首屏体积。
+  - 现有 `AppSettings`、`OcrProviderConfig` 契约和 `useSettings` 不破坏。
+  - 单元测试覆盖导航切换、Esc 关闭、section 懒加载和验证错误展示。
+  - 与 `docs/DESIGN.md` 的色板、字号、控件密度和暗色模式保持一致。
+
+### ISS-023 关于页面与作者页
+
+- 优先级：P1
+- 类型：UI / 品牌
+- 状态：待处理
+- 建议分支：`feat/settings-page`（可与 ISS-022 同 worktree 顺序推进）
+- 建议 worktree：`.claude/worktrees/tmux-settings-page`
+- 依赖：ISS-021、ISS-022
+- 范围：`src/components/settings/AboutSection.tsx`（新增）、`src/components/settings/AuthorCard.tsx`（新增或合并在 About 内）、`src/assets/`（应用 icon、微信二维码占位）、`docs/about/`（作者信息、二维码说明）、`docs/DESIGN.md`（作者卡视觉补遗）
+- 参考实现：`folia/src/components/settings/AboutSection.tsx`（应用 icon、版本、update check、作者名 / GitHub / 微信二维码）、`folia/src/services/updateService.ts`（`getCurrentAppVersion` + `checkForAppUpdate` + `FALLBACK_APP_VERSION`）
+- 目标：在设置页增加「关于」section，展示 FaroPDF 应用 icon、产品名、定位、版本、官网 / GitHub 链接、当前更新状态；同 section 或独立子卡展示作者信息（姓名、GitHub 链接、微信公众号二维码和说明）；「检查更新」按钮接入 ISS-021 的 update service。
+- 验收：
+  - 关于 section 显示应用 icon、产品名「FaroPDF」+ 定位句、版本号（取自 `getCurrentAppVersion`，回退 `FALLBACK_APP_VERSION`）、官网 / GitHub 链接和「检查更新」按钮。
+  - 「检查更新」按钮触发 `checkForAppUpdate`，显示 idle / checking / latest / available / unsupported / error 六种文案；自动更新开关读取 `settings.autoUpdateCheck`。
+  - 作者卡显示作者姓名、GitHub 个人页链接、微信公众号二维码图片和扫码说明。
+  - 二维码图片走 `src/assets/` 静态资源或文档附件，不内置账号 / 密码 / Token 等敏感信息。
+  - 关于 section 在 900px 窄屏视口下不被裁切，关键信息不重叠。
+
+### ISS-024 文档瘦身 subagent（doc-curator）
+
+- 优先级：P1
+- 类型：开发协作 / 工具链
+- 状态：进行中（首版部署中；体检脚本与 subagent 定义已落盘，待 git add -f 跟踪与首跑建基线）
+- 建议分支：`chore/doc-curator-bootstrap`（首版直接推 main 后不再开分支）
+- 建议 worktree：无（项目级 skill，直接在主目录 commit）
+- 依赖：—
+- 范围：`.claude/skills/doc-curator/`（新增项目级 skill）、`.claude/agents/doc-curator.md`（新增 Agent 注册）、`docs/TASKS.md` / `docs/DECISIONS.md`（同步任务与决策记录）、`AGENTS.md`（Skill 强制调用表加 doc-curator 行）、`.claude/skills/git-workflow/SKILL.md`（加 post-action 触发说明）
+- 目标：把 FaroPDF 的项目级文档膨胀与归档一致性纳入自动检查：监控 `docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADMAP.md` / `docs/DESIGN.md` / `docs/ARCHITECTURE.md` / `CHANGELOG.md` / `README.md` / `AGENTS.md` 的硬性、自适应、软提示项；触发时机为 PR 创建后与 PR 合并后（Agent 主动调起，非 hooks 门禁），必要时自动提 maintenance PR。
+- 验收：
+  - `.claude/skills/doc-curator/scripts/scan.sh` 输出 JSON 行 + markdown 报告，退出码 0 / 1 / 2 / 3 区分全部 ok / hard / adaptive / soft。
+  - `.claude/skills/doc-curator/scripts/first-baseline.sh` 测量各文件大小并写入 `state.json`。
+  - `.claude/skills/doc-curator/scripts/maintenance-pr.sh` 在工作区干净时创建 `chore/doc-curator-<date>` 分支、推、`gh pr create`，标签 `automated,docs,maintenance`。
+  - `.claude/agents/doc-curator.md` 注册自定义 Agent，工具范围 `Read, Grep, Glob, Bash, Edit, Write`。
+  - `.claude/skills/git-workflow/SKILL.md` 升级到 v1.3.0，在「## 4. PR 工作流」末尾增加「PR 创建后：调起 doc-curator 体检」与「PR 合并后：调起 doc-curator 体检」两个 post-action 小节。
+  - 不修改 `src/` / `src-tauri/` / `tests/`；不写 `CHANGELOG.md`（由 `release-workflow` 负责）；不直接 push 到 main，所有 PR 走 PR 流程。
+  - 触发流程不依赖 hooks；Agent 在 `gh pr create` / `gh pr merge` 成功后主动调起 subagent。
+- 当前进度：首版在 `.claude/skills/doc-curator/` 完成 SKILL.md / LICENSE.txt / CHANGELOG.md / config/faropdf.yaml / state.json / scripts/scan.sh / scripts/first-baseline.sh / scripts/maintenance-pr.sh / lib/*；`.claude/agents/doc-curator.md` 已落盘；`AGENTS.md` Skill 强制调用表新增 doc-curator 行；`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ARCHITECTURE.md` / `.claude/skills/git-workflow/SKILL.md` 同步。
+- 下一步：`.claude/skills/` 默认被 `.gitignore` 忽略，需用 `git add -f` 强制跟踪该子目录；按 git-workflow 多模块规则拆 commit；推 main 后跑首跑基线脚本；观察一轮 PR 行为再调阈值。
+
 ## 暂缓任务
 
 ### ISS-015 直接编辑 PDF 原有文字、图片和链接
@@ -132,6 +212,7 @@ Agent 可根据本文件自行判断：
 
 只保留最近 5 条；更早的条目在 `docs/DECISIONS.md` 工作日志。
 
+- 2026-06-03：部署 doc-curator 文档瘦身 subagent：在 `.claude/skills/doc-curator/` 落 SKILL.md / LICENSE.txt / CHANGELOG.md / config/faropdf.yaml / state.json / scripts/{scan,first-baseline,maintenance-pr}.sh / lib/{common,check-tasks,check-decisions,check-files}.sh；`.claude/agents/doc-curator.md` 注册自定义 Agent；`AGENTS.md` Skill 强制调用表新增 doc-curator 行；`docs/TASKS.md` 新增 ISS-024，`docs/DECISIONS.md` 新增 DEC-028，`docs/ARCHITECTURE.md` 补角色说明，`.claude/skills/git-workflow/SKILL.md` 升级 v1.3.0 加 PR 创建后 / 合并后 post-action 触发小节；触发采用 Agent 主动调起，**不依赖 hooks**。
 - 2026-06-03：在 `feat/reader-thumbnails` 推进 ISS-002 阅读深化第三步：`pdfReaderService` 暴露 `renderThumbnail`、Sidebar 接入 PDF.js 真实缩略图、`PdfPage` 用 IntersectionObserver 同步当前页；通过 PR #14 合并到 main。
 - 2026-06-03：合并 `feat/ocr-quality`（ISS-017）和 `feat/evidence-image-pack`（ISS-018）到 `main`；ISS-017 质量检查报告和 ISS-018 A4 编排计划器第一版完成。
 - 2026-06-03：从前一个到达上下文上限的 session 接手，创建 `docs/HANDOFF.md` 交接文件。
