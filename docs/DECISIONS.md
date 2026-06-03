@@ -423,6 +423,25 @@ ISS-017 第一版先建立 OCR 质量检查的共享契约和纯逻辑服务，�
 - 移动端（Android / iOS）打包与自动更新能力：Tauri v2 移动端更新链路与桌面不同，先在 `docs/RELEASE.md` 记录限制和后续计划，本期不进入 ISS-021 验收。
 - 关于页内的「贡献者」「第三方协议」子区：等 ISS-022 浮层稳定后再单独评估。
 
+## DEC-028 v0.3 优先基础 PDF / PaddleOCR / 倾斜矫正 / 压缩，agent 集成延后
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联设计：`docs/plans/2026-06-03-agent-integration-design.md`
+- 关联任务：ISS-025
+
+决定：
+
+- v0.3 阶段继续按现有 ISS 列表推进基础能力，agent 集成不进入 v0.3 关键路径。
+- 优先级明确的初版任务：基础 PDF 功能（阅读、检索、批注、页面整理、导出、表单）、PaddleOCR 双层 PDF（ISS-007 真实调用）、扫描预处理倾斜矫正（ISS-016 真实处理）、压缩（ISS-013 真实压缩）。
+- 上述基础能力对应的 ISS（007/013/016/008/005/006 等）的「真实处理 / 真实调用 / UI 接入」待续项是初版收口重点，不开新的 agent 任务。
+- agent 集成的设计上下文完整保存在 `docs/plans/2026-06-03-agent-integration-design.md`，不丢；后续回到这个方向时从该文档 §6 / §7 / §8 切入。
+
+不采纳（本期暂缓）：
+
+- agent 能力立即进入 v0.3 实施：会让基础 PDF / OCR / 倾斜矫正 / 压缩的「真实处理」工作被挤压。
+- 长期 sidecar、MCP 桥接、per-call consent 弹窗、文档级白名单等更复杂的 agent 接线方案：v0 起步以一次性 spawn + 全局开关为主，避免无谓复杂度。
+
 ## DEC-027 清理合并残留分支并启动 3 wave 多 worktree 推进
 
 - 日期：2026-06-03
@@ -491,6 +510,49 @@ PM 在主目录 `main` 重构 `src/components/layout/ReaderToolbar`，把当前�
 - W4 依赖 PM 重构 ReaderToolbar，Wave 2 不能并发启动。
 - 任何 wave 内 worker 发现需要改共享契约，回到 PM 等决策后再继续。
 
+## DEC-028 部署 doc-curator 文档瘦身 subagent（post-action 触发，不依赖 hooks）
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联任务：ISS-024
+- 关联 Skill：`.claude/skills/doc-curator/`、`.claude/agents/doc-curator.md`、`.claude/skills/git-workflow/SKILL.md`
+
+### 背景
+
+FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADMAP.md` / `docs/DESIGN.md` / `docs/ARCHITECTURE.md` 等）在多 ISS 并行推进时不断膨胀：进度日志堆叠、归档条目散落、ISS 编号与 DEC 编号容易跳号、活跃任务卡和已完成任务的边界模糊。当前完成 ISS 后的归档、进度日志 trim、归档指针维护全靠人手动，缺乏自动机制。
+
+### 决定
+
+部署一个项目级 doc-curator subagent，覆盖体检、报告、maintenance PR 提交流程。
+
+- **放置位置**：`.claude/skills/doc-curator/`（项目级 skill，强制跟踪到版本库）；`.claude/agents/doc-curator.md`（自定义 Agent 注册）。`codex/skills` 通过 `../.claude/skills` 软链接到本目录，对 Codex 自动可见。
+- **运行模式**：报告 + 自动提 PR。Agent 在 `gh pr create` / `gh pr merge` 成功后主动调起 subagent 跑体检；体检发现 hard / adaptive 告警时，若工作区干净则自动跑 `maintenance-pr.sh` 提一个 `chore/doc-curator-<date>` 分支的 maintenance PR。
+- **阈值策略**：首跑通过 `first-baseline.sh` 测量各文件大小建基线；后续按 `基线 × 1.5` 作为自适应告警阈值，硬性阈值（进度日志 ≤ 5、ISS 归档条目升序、DEC 编号连续、归档指针指向 DECISIONS.md）单向只检查不缩。
+- **触发时机**：PR 创建后 + PR 合并后。**不依赖 hooks**，由 Agent 在 git-workflow 的 `## 4. PR 工作流` 末尾的两个 post-action 小节（`PR 创建后：调起 doc-curator 体检` / `PR 合并后：调起 doc-curator 体检`）主动调起。
+- **子模块边界**：doc-curator 只读 + 维护 `docs/`，不改 `src/` / `src-tauri/` / `tests/`；不写 `CHANGELOG.md`（CHANGELOG 由 `release-workflow` 维护）；不直接 push 到 main，所有 PR 走 PR 流程。
+- **git 跟踪**：`.claude/skills/` 默认被 `.gitignore` 忽略；doc-curator 目录需用 `git add -f` 强制跟踪；按 git-workflow 多模块规则拆 commit（`chore(skill): 新增 doc-curator` / `chore(agents): 注册 doc-curator subagent` / `docs(skill): git-workflow 集成 doc-curator post-action` 等）。
+
+### 不采纳
+
+- **hooks 触发**：用户明确反对（"我觉得触发不用hooks，可以再提交pr胡总和合并pr后去进行文档清理"），hooks 会让 maintenance 与工作 PR 抢节奏；Agent 主动调起更可控。
+- **pre-PR 门禁**：当前不阻断 PR 创建流程；post-action 体检发现问题由 maintenance PR 单独提，不影响当前 PR 进入 review。
+- **CHANGELOG 写入**：CHANGELOG 由 `release-workflow` 维护；doc-curator 只对 CHANGELOG 做软提示（最近 release entry 缺失），不修改。
+- **OCR / PDF 处理 / API 集成**：doc-curator 严格只做文档级维护，不调用任何 PDF 引擎、OCR 引擎或外部 API；不读取 OCR 脚本或 PDF 处理脚本。
+
+### 风险与回退
+
+- **冲突风险**：maintenance PR 与正在推进的工作 PR 可能并行；缓解：自动提 PR 前检查 `git status` 干净度，不干净则只报告不自动 PR。
+- **误改风险**：自适应阈值可能误判；缓解：硬性规则单向只检查不缩；首跑基线在 doc-curator 自己改完文件后重算，避免阈值永远追不上膨胀。
+- **rollback**：删除 `.claude/skills/doc-curator/`、`.claude/agents/doc-curator.md`、`.claude/skills/git-workflow/SKILL.md` 中 doc-curator 引用、AGENTS.md Skill 强制调用表对应行；不影响项目其它功能。
+
+### 验证
+
+- `bash .claude/skills/doc-curator/scripts/first-baseline.sh`：建基线并写入 `state.json`。
+- `bash .claude/skills/doc-curator/scripts/scan.sh`：跑体检，输出 JSON 行 + markdown 报告。
+- 模拟「进度日志 6 条」：跑 `maintenance-pr.sh` 验证自动 trim + PR 创建。
+- `ls -la .codex/skills/doc-curator`：确认 Codex 端可读。
+- `git ls-files .claude/skills/doc-curator/`：确认新 skill 已被跟踪。
+
 ## ISS 任务归档
 
 `docs/TASKS.md` 收敛为活跃/暂缓任务入口；已完成 ISS 的详细任务卡迁移到本节，保留为单行摘要。后续如需恢复为正式 ISS，先在本节追加"恢复"标注，再回到 `docs/TASKS.md` 新增。
@@ -544,3 +606,4 @@ PM 在主目录 `main` 重构 `src/components/layout/ReaderToolbar`，把当前�
 - 2026-06-03：在 `feat/reader-thumbnails` 推进 ISS-002 阅读深化第三步：`pdfReaderService` 暴露 `renderThumbnail(pageIndex, canvas, maxWidth)` 并按最长边等比缩放，1px 兜底避免 `maxWidth<=0` 时除零；`useReaderController` 透出该方法供 Sidebar 调用；`DocumentSummaryPanel` 用 IntersectionObserver 懒加载每个缩略图，未提供 `renderThumbnail` 时回退占位；`PdfPage` 用 `IntersectionObserver`（阈值 0.5）回调 `onPageVisible` 同步 `currentPage`；AppShell 把 `reader.setCurrentPage` 透传给 `ReaderCanvas`。
 - 2026-06-03：`searchUi.test.tsx` 中"第 N 页"按钮名原先只匹配搜索结果列表，新增缩略图按钮后改为通过 `within(searchResults)` 作用域，避免在多个候选上抛 `getMultipleElementsFoundError`。
 - 2026-06-03：按用户反馈中文化 git-workflow 描述部分：PR body 模板的 `## Summary` / `## Test plan` 改为 `## 摘要` / `## 测试计划`，PR 正文最低要求表区块改为「摘要」「测试计划」「Agent 归属」「关联任务」「风险」，references 中"Multi-Skill"改为"多 Skill"；保留英文类型前缀和通用 Git 术语。Skill 升级为 v1.2.0，并在 skill 自身和项目级 DECISIONS 同步记录。
+- 2026-06-03：部署 doc-curator 项目级文档瘦身 subagent：`.claude/skills/doc-curator/`（SKILL.md / LICENSE.txt / CHANGELOG.md / config/faropdf.yaml / state.json / scripts/scan.sh / first-baseline.sh / maintenance-pr.sh / lib/{common,check-tasks,check-decisions,check-files}.sh）+ `.claude/agents/doc-curator.md`（自定义 Agent 注册，工具 Read/Grep/Glob/Bash/Edit/Write）；`AGENTS.md` Skill 强制调用表新增 doc-curator 行；`docs/TASKS.md` 新增 ISS-024，`docs/DECISIONS.md` 新增 DEC-028，`docs/ARCHITECTURE.md` 补角色说明，`.claude/skills/git-workflow/SKILL.md` 升级 v1.3.0 加 PR 创建后 / 合并后 post-action 触发小节；按用户反馈"再提交pr胡总和合并pr后去进行文档清理"采用 Agent 主动调起，不依赖 hooks。
