@@ -137,11 +137,12 @@ describe("pdfReaderService", () => {
     expect(canvas.getContext).toHaveBeenCalledWith("2d");
     // 验证 PDF.js page.render 被调用
     expect(renderMock).toHaveBeenCalledOnce();
-    const renderArgs = renderMock.mock.calls[0][0];
-    expect(renderArgs).toHaveProperty("canvasContext");
-    expect(renderArgs).toHaveProperty("viewport");
-    expect(renderArgs.viewport.width).toBe(612 * 1.5);
-    expect(renderArgs.viewport.height).toBe(792 * 1.5);
+    const renderArgs = renderMock.mock.calls[0] as unknown as [{ canvasContext: unknown; viewport: { width: number; height: number } }];
+    expect(renderArgs[0]).toBeDefined();
+    expect(renderArgs[0].canvasContext).toBeDefined();
+    expect(renderArgs[0].viewport).toBeDefined();
+    expect(renderArgs[0].viewport.width).toBe(612 * 1.5);
+    expect(renderArgs[0].viewport.height).toBe(792 * 1.5);
 
     await loaded.destroy();
   });

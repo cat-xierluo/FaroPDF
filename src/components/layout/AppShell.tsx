@@ -1,3 +1,4 @@
+import type { PdfAnnotation } from "../../shared";
 import type { AppSettings } from "../../shared";
 import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
@@ -10,6 +11,7 @@ import type { AppModeId, UtilityPanelId } from "./types";
 
 interface AppShellProps {
   activeMode: AppModeId;
+  annotations?: PdfAnnotation[];
   onModeChange: (mode: AppModeId) => void;
   onUtilityPanelChange: (panel: UtilityPanelId) => void;
   reader: ReaderController;
@@ -44,6 +46,7 @@ const contextualToolbarLabels: Record<Exclude<AppModeId, "read" | "pages">, stri
 
 export function AppShell({
   activeMode,
+  annotations,
   onModeChange,
   onUtilityPanelChange,
   reader,
@@ -66,7 +69,7 @@ export function AppShell({
       />
       {showContextToolbar ? <ContextToolbar mode={activeMode} /> : null}
       <div className={showUtilityPanel ? "workspace" : "workspace workspace--full"}>
-        {showUtilityPanel ? <UtilityPanel panel={utilityPanel} reader={reader} settings={settings} /> : null}
+        {showUtilityPanel ? <UtilityPanel panel={utilityPanel} reader={reader} settings={settings} annotations={annotations} /> : null}
         {activeMode === "pages" ? (
           <PageOrganizerWorkspace reader={reader} />
         ) : (
@@ -82,10 +85,12 @@ function UtilityPanel({
   panel,
   reader,
   settings,
+  annotations,
 }: {
   panel: Exclude<UtilityPanelId, "none">;
   reader: ReaderController;
   settings: AppSettings;
+  annotations?: PdfAnnotation[];
 }) {
   if (panel === "view") {
     return (
@@ -105,7 +110,13 @@ function UtilityPanel({
     );
   }
 
-  return <DocumentSummaryPanel />;
+  return (
+    <DocumentSummaryPanel
+      hasDocument={reader.state.document !== null}
+      annotations={annotations}
+      onSelectPage={reader.setCurrentPage}
+    />
+  );
 }
 
 function ContextToolbar({ mode }: { mode: Exclude<AppModeId, "read" | "pages"> }) {
