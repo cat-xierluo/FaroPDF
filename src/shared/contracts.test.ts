@@ -52,6 +52,7 @@ describe("shared contracts", () => {
       currentPage: 1,
       zoom: 1,
       viewMode: "continuous",
+      rotation: 0,
       dirty: false,
       textLayerStatus: "unknown",
       ocrStatus: "needed",

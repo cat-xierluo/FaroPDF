@@ -4,7 +4,7 @@ import type { PdfViewMode } from "../pdf/types";
 import type { AppSettings, DefaultSavePolicy, RecentPdfFile } from "./types";
 
 const DEFAULT_RECENT_FILE_LIMIT = 20;
-const allowedViewModes = new Set<PdfViewMode>(["continuous", "single", "double"]);
+const allowedViewModes = new Set<PdfViewMode>(["continuous", "single", "double", "fit-width"]);
 const allowedSavePolicies = new Set<DefaultSavePolicy>([
   "always-export-copy",
   "ask-each-time",

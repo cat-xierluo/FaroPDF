@@ -23,6 +23,7 @@ const viewModeLabels: Record<PdfViewMode, string> = {
   continuous: "连续",
   single: "单页",
   double: "双页",
+  "fit-width": "适合宽度",
 };
 
 export function SettingsPanel({ settings, onSettingsChange }: SettingsPanelProps) {
