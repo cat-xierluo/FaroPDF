@@ -404,3 +404,5 @@ ISS-017 第一版先建立 OCR 质量检查的共享契约和纯逻辑服务，�
 - 2026-06-02：在 `feat/pdf-output-tools` 完成 `ISS-013` 第一版：新增水印、页码、Bates 和压缩预设导出 operation，支持 `*-delivery.pdf` 安全输出请求；文字/图片水印、页码和 Bates 用 pdf-lib 写入新 PDF，压缩保持 plan-only 并记录后续真实处理边界。
 - 2026-06-02：通过 Claude Code tmux worker 启动 `feat/ocr-quality` 推进 ISS-017；PM 接管修正测试和边界后，形成 OCR 质量报告共享契约、纯服务和定向测试。
 - 2026-06-03：合并 `feat/ocr-quality`（ISS-017）和 `feat/evidence-image-pack`（ISS-018）到 `main`，27 测试文件、172 测试全部通过。
+- 2026-06-03：在 `feat/reader-thumbnails` 推进 ISS-002 阅读深化第三步：`pdfReaderService` 暴露 `renderThumbnail(pageIndex, canvas, maxWidth)` 并按最长边等比缩放，1px 兜底避免 `maxWidth<=0` 时除零；`useReaderController` 透出该方法供 Sidebar 调用；`DocumentSummaryPanel` 用 IntersectionObserver 懒加载每个缩略图，未提供 `renderThumbnail` 时回退占位；`PdfPage` 用 `IntersectionObserver`（阈值 0.5）回调 `onPageVisible` 同步 `currentPage`；AppShell 把 `reader.setCurrentPage` 透传给 `ReaderCanvas`。
+- 2026-06-03：`searchUi.test.tsx` 中"第 N 页"按钮名原先只匹配搜索结果列表，新增缩略图按钮后改为通过 `within(searchResults)` 作用域，避免在多个候选上抛 `getMultipleElementsFoundError`。
