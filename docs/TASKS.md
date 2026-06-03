@@ -247,3 +247,4 @@ Agent 可根据本文件自行判断：
 - 2026-06-03：合并 `feat/ocr-quality`（ISS-017）和 `feat/evidence-image-pack`（ISS-018）到 `main`；ISS-017 质量检查报告和 ISS-018 A4 编排计划器第一版完成。
 - 2026-06-03：从前一个到达上下文上限的 session 接手，创建 `docs/HANDOFF.md` 交接文件。
 - 2026-06-03：合并 `feat/reader-canvas-render-clean` 和 `feat/annotation-sidebar-list` 的 canvas 渲染 + 批注侧边栏 UI 到 main；创建 PR #12 走正式合并流程；清理重复分支和 worktree。
+- 2026-06-03：在 `feat/page-organizer-suite` 推进 ISS-006 + ISS-018 第二阶段：`pdfOperationEngine` 在 `mode=execute` 下用 pdf-lib 真实改写 PDF 页面顺序/旋转/删除；`imagePackItemResolver` JPEG SOF 偏移修正 + `imagePackRenderer` 把 `copyPages` 换成 `embedPdf`；新增 `imagePackExecutor` 端到端执行器（plan 校验 + 路径安全 + 渲染 + 写入）；修正 `index.ts` 中 `ImagePackFileReader` / `ImagePackRenderer` 误放 `imagePackItemResolver` 的导出；45 测试文件 / 350 测试 / typecheck / build / cargo check 全绿；新增 DEC-032、CHANGELOG 0.1.0-alpha.6。

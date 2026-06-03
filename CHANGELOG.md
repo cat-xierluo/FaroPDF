@@ -1,5 +1,3 @@
-# FaroPDF 变更记录
-
 ## 0.1.0-alpha.6 - 2026-06-03
 
 - 新增 ReaderToolbar 注册表基础设施（DEC-032）：新增 `src/components/layout/toolbarRegistry.ts` 暴露 `ToolbarState` / `ToolbarToolItem` 类型与 `registerModeTools` / `getModeTools` / `_resetToolbarRegistry` 三个函数；`getModeTools` 按 `AppModeId` 命名空间隔离，多次注册累加，**不**自动排序（调用方需 `slice().sort()` 后再渲染，避免污染注册表）。
@@ -7,7 +5,13 @@
 - `src/components/layout/Toolbar.tsx` 末尾新增 `ModeActiveTools` 组件，挂在 `toolbar__group--modes` 内 4 个常驻 mode 入口按钮（annotate / export / forms / ocr）之后，按 `getModeTools(activeMode).slice().sort()` 渲染当前 mode 工具；4 个常驻 mode 入口按钮保留 Toolbar 内 `modeButtons` 硬编码（不归注册表管）；activeMode="read" / "pages" / "export" 时新区域渲染空 fragment，UI 与重构前完全一致。
 - 后续 W3 Forms / W4 Reader modes worker 在各自模块内 `registerModeTools("<mode>", [...])` 即可接入 mode 工具，不再修改 Toolbar.tsx。
 - 已知限制：`ToolbarState` 当前只暴露 `activeMode / reader / search`；如未来某 mode 工具需要 `onModeChange` / `onUtilityPanelChange` 等额外上下文，再按需扩展。
-- 新增 `docs/DECISIONS.md` DEC-032 记录注册表契约、Toolbar 接入、范围依赖、后续 worker 接入指南与已知限制。
+- 同步 `docs/DECISIONS.md` DEC-032（ReaderToolbar 注册表契约）+ DEC-033（page-organizer-suite 第二阶段方案，DEC 编号从原 PR #21 写的 032 改为 033 释放 PR #20 已占用的编号）；`docs/TASKS.md` 进度日志追加对应记录。
+
+- 页面整理真实改写（ISS-006 第二阶段）：`pdfOperationEngine` 在 `mode=execute` 下用 pdf-lib 真实改写 PDF —— 按 `reorder.pageIndexes` 拷贝源页、过滤 `delete.pageIndexes`、对 `rotate` 操作写入 PDF page `Rotate` 字典；`pageOperationPlan.mode = "execute"`，`entries.status` 全部 `applied`；plan-only 模式仍可由调用方显式指定，仅记录计划并把 `*-organized.pdf` 当作占位输出。补齐 `pageOrganizer.export.test.ts` 4 个端到端用例覆盖 execute / plan-only / 缺页 / 空操作四种行为。
+- 证据图片 A4 编排真实拾取 + 像素渲染 + 写入新 PDF（ISS-018 第二阶段）：`imagePackItemResolver` JPEG SOF marker 偏移从 `offset+3/+5` 修正为 `offset+5/+7`（marker 后还有 2 字节 length + 1 字节 precision）；`imagePackRenderer` 在 PDF 页面渲染路径上把 `copyPages` 替换为 `embedPdf` —— pdf-lib 1.17.1 + vitest 4 下 `copyPages` 返回 `PDFPage[]` 不能喂给 `drawPage`，会抛 `embeddedPage must be of type PDFEmbeddedPage, but was actually of type NaN`。
+- 新增 `src/modules/pages/imagePack/imagePackExecutor.ts`：端到端执行器，承担 plan 校验 + 路径安全（绝对路径、`.pdf`、与 `plan.items[].sourcePath` 不同、storage 不存在 `outputPath`）+ `createImagePackRenderer.renderPlan` 渲染 + `PdfExportStorage.writeNewFile` 写入；错误统一经 `sanitizePdfExportError` 脱敏。补 10 个端到端测试覆盖 PNG 真实拾取 + 渲染 + 写入、PDF 页面真实嵌入、路径与 plan 校验和兜底同源检测。
+- 修正 `src/modules/pages/imagePack/index.ts` 的导出分类：把 `ImagePackFileReader` / `ImagePackRenderer` / `RenderImagePackPlanInput` / `RenderImagePackPlanResult` 移到 `imagePackRenderer` 子模块导出；`index.ts` 之前把它们误放在 `imagePackItemResolver` 下，导致 typecheck 失败和外部消费者拿不到正确类型。
+- 新增 `docs/DECISIONS.md` DEC-033 `page-organizer-suite` 第二阶段方案（DEC 编号 PM rebase 时从 032 改为 033 释放 PR #20 已占用的 032）；`docs/TASKS.md` 进度日志追加对应记录。
 
 ## 0.1.0-alpha.5 - 2026-06-03
 

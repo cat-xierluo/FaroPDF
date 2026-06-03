@@ -755,3 +755,28 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 - 2026-06-03：解耦 `docs/TASKS.md`：把 PDF Expert UI 探索素材池和品牌与视觉资产搬到 `docs/DESIGN.md`，把 PDF 算法素材池搬到 `docs/ARCHITECTURE.md`；完成态 ISS 任务卡缩成单行摘要并归档到 `docs/DECISIONS.md`「ISS 任务归档」；活跃任务和进度日志精简在 TASKS.md。
 - 2026-06-03：首次跑 doc-curator first-baseline.sh：把 AGENTS.md / README.md / docs/{ROADMAP,ARCHITECTURE,DESIGN,DECISIONS,TASKS}.md / CHANGELOG.md 的真实行数与 TASKS.md 活跃任务卡数 9 写入 state.json baselines；后续 scan.sh 用基线 × 1.5 作为自适应告警阈值。同步修复 first-baseline.sh bug：原版把 `\n` 字面量写进 JSON 导致 state.json 不是合法 JSON，改用 `printf` 拼装 baselines 与外层结构。
 - 2026-06-03：在 `feat/reader-toolbar-refactor` 推进 DEC-032 ReaderToolbar 注册表基础设施：新增 `src/components/layout/toolbarRegistry.ts`（`ToolbarState` / `ToolbarToolItem` 类型 + `registerModeTools` / `getModeTools` / `_resetToolbarRegistry` 函数）和 9 项单元测试；`Toolbar.tsx` 末尾新增 `ModeActiveTools` 组件，挂在 `toolbar__group--modes` 内 4 个 mode 入口按钮之后，按 `getModeTools(activeMode).slice().sort()` 渲染当前 mode 工具；activeMode="read" 时为 `[]`，UI 与重构前一致；typecheck / 332 项测试 / build 三件套全绿。后续 W3 Forms / W4 Reader modes worker 在各自模块内 `registerModeTools("<mode>", [...])` 即可接入 mode 工具，不再改 Toolbar.tsx。
+- 2026-06-03：在 `feat/page-organizer-suite` 推进 DEC-033 page-organizer-suite 第二阶段（ISS-006 + ISS-018 真实改写）：原 PR #21 commit 63220eb 写的 DEC-032 段与 PR #20 冲突（PR #20 的 DEC-032 已被 reader-toolbar 占用），PM rebase 时改为 DEC-033。
+
+## DEC-033 page-organizer-suite 第二阶段（ISS-006 + ISS-018 真实改写）
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联任务：ISS-006、ISS-018
+- 分支：`feat/page-organizer-suite`
+- DEC 编号说明：原 PR #21 commit 63220eb 写时用 `DEC-032`（base 是 ed39160 拉的无此编号），与 PR #20（DEC-032 ReaderToolbar）冲突；PM rebase 时改为 `DEC-033` 释放已占用编号。
+
+决定：
+
+- ISS-006 页面整理第一版（DEC-005 / 2026-06-02 工作日志）只完成状态机底座，导出请求维持 plan-only。第二阶段把 `pdfOperationEngine.page-operations` 在 `mode=execute` 下用 pdf-lib `copyPages` 真实改写 PDF：先按 `reorder.pageIndexes` 拷贝页面，删去 `delete.pageIndexes`，再对每个 rotate 操作把 `Rotate` 字典项写到 `PDFPage.node`；`pageOperationPlan.mode = "execute"`，`entries.status` 全部 `applied`。
+- ISS-018 证据图片 A4 编排从 plan-only 推进到真实拾取 + 像素渲染 + 写入新 PDF。`imagePackItemResolver` 已经在第一版实现 PNG/JPEG 头部和 PDF 页面尺寸读取，仅 JPEG SOF marker 偏移写错（`offset+3` / `offset+5` 应当是 `offset+5` / `offset+7`，因为 marker 后还有 2 字节 length + 1 字节 precision 才到 height/width）；`imagePackRenderer` 在 drawPage 路径上把 `copyPages` 替换为 `embedPdf` —— 前者返回 `PDFPage[]` 不能喂给 `drawPage`，后者返回 `PDFEmbeddedPage[]` 才是正确类型（pdf-lib 1.17.1 在 vitest 4 下 `copyPages` 实际抛 `embeddedPage must be of type PDFEmbeddedPage, but was actually of type NaN`）。
+- 新增 `src/modules/pages/imagePack/imagePackExecutor.ts` 作为端到端执行器：plan 校验 + 路径安全（绝对路径、`.pdf`、与 `plan.items[].sourcePath` 不同、storage 不存在 `outputPath`） + `createImagePackRenderer.renderPlan` 渲染 + `PdfExportStorage.writeNewFile` 写入；`src/modules/pages/imagePack/index.ts` 修正原有 `ImagePackFileReader` / `ImagePackRenderer` / `RenderImagePackPlanInput` / `RenderImagePackPlanResult` 误放到 `imagePackItemResolver` 的导出错误。
+- 验证：45 个测试文件 / 350 个测试全部通过；`npm run typecheck` / `npm run build` / `cargo check --offline` 全部干净（仅遗留的 `OcrJobQueue::file_path` / `snapshot_by_backend` dead_code warning 与本期无关）。
+- 共享 execute 模式：ISS-006 与 ISS-018 都遵循"plan 校验 → 路径安全 → 引擎执行 → storage 写入"四步式，错误统一经 `sanitizePdfExportError` 脱敏。
+- 范围：仅 `src/modules/pages/imagePack/` + `src/modules/pages/pageOrganizer.ts` + `src/modules/export/pdfOperationEngine.ts` + 对应单测；**不动** `src/components/layout/Toolbar.tsx` / `src/App.tsx` / 全局样式 / 路由 / `package.json` / 锁文件 / `src-tauri/`（无新 crate 引入）。
+
+不采纳（本期暂缓）：
+
+- ISS-018 行布局（per_page=4 拆成 2×2）按 DEC-005 决定继续保留单行算法。
+- 真实目录拾取 / 文件对话框：仍由后续 UI worker 接入 toolbar，本分支只暴露 executor 给前端的 `createImagePackExportRequest`（后续 PR 提）。
+- OCR / 扫描模块、Tauri command、PR 推送：本期按 worker 协议不推送，待 PM 合 review 后再发。
+>>>>>>> cc53cd9 (chore(docs): DEC-032 + CHANGELOG 0.1.0-alpha.6 + TASKS 进度日志)
