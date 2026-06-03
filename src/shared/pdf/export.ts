@@ -63,7 +63,7 @@ export interface PdfPageOperationsExportOperation {
   mode?: PdfPageOperationExportMode;
 }
 
-export type PdfPageOperationExportMode = "plan-only";
+export type PdfPageOperationExportMode = "plan-only" | "execute";
 
 export interface PdfWatermarkOperation {
   id: string;
@@ -181,7 +181,7 @@ export interface PdfPageOperationPlanEntry {
   operationId: string;
   type: PdfPageOperationType;
   pageIndexes: number[];
-  status: "planned";
+  status: "planned" | "applied";
 }
 
 export interface PdfOutputToolPlan {

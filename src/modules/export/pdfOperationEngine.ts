@@ -1,4 +1,4 @@
-import { degrees, PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
+import { degrees, PDFDocument, PDFName, PDFNumber, rgb, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
 import type {
   PdfBatesNumberOperation,
   PdfCompressionOperation,
@@ -45,6 +45,8 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
       };
       const warnings: string[] = [];
       const outputToolEntries: PdfOutputToolPlanEntry[] = [];
+      let pageOrder: number[] | null = null;
+      let pageRotations: Map<number, number> | null = null;
 
       for (const operation of request.operations) {
         if (operation.type === "flatten-annotations") {
@@ -64,8 +66,18 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
           continue;
         }
 
-        summary.pageOperationPlan = buildPageOperationPlan(operation, inputPageCount);
-        warnings.push(PAGE_OPERATIONS_PLAN_ONLY_WARNING);
+        if (operation.type === "page-operations") {
+          if ((operation.mode ?? "plan-only") === "execute") {
+            const result = resolvePageOperations(operation, inputPageCount);
+            summary.pageOperationPlan = result.plan;
+            pageOrder = result.pageOrder;
+            pageRotations = result.rotations;
+          } else {
+            summary.pageOperationPlan = buildPageOperationPlan(operation, inputPageCount);
+            warnings.push(PAGE_OPERATIONS_PLAN_ONLY_WARNING);
+          }
+          continue;
+        }
       }
 
       if (outputToolEntries.length > 0) {
@@ -78,7 +90,12 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
         summary.warnings = Array.from(new Set(warnings));
       }
 
-      const outputPdf = await copyPdfDocument(workingPdf);
+      let outputPdf: PDFDocument;
+      if (pageOrder !== null) {
+        outputPdf = await buildOutputPdf(workingPdf, pageOrder, pageRotations ?? new Map());
+      } else {
+        outputPdf = await copyPdfDocument(workingPdf);
+      }
       applyExportMetadata(outputPdf, summary);
       summary.outputPageCount = outputPdf.getPageCount();
 
@@ -193,6 +210,88 @@ function buildPageOperationPlan(
       status: "planned",
     })),
   };
+}
+
+interface PageOperationExecutionResult {
+  plan: PdfPageOperationPlan;
+  pageOrder: number[];
+  rotations: Map<number, number>;
+}
+
+function resolvePageOperations(
+  operation: Extract<PdfExportRequest["operations"][number], { type: "page-operations" }>,
+  inputPageCount: number,
+): PageOperationExecutionResult {
+  if (
+    operation.operations.some((pageOp) =>
+      pageOp.pageIndexes.some((pageIndex) => !isPageIndexInRange(pageIndex, inputPageCount)),
+    )
+  ) {
+    throw new Error("页面操作页码超出源 PDF 页数。");
+  }
+
+  const reorderOp = operation.operations.find((op) => op.type === "reorder");
+  const deleteOp = operation.operations.find((op) => op.type === "delete");
+  const rotateOps = operation.operations.filter((op) => op.type === "rotate");
+
+  let pageOrder: number[];
+  if (reorderOp) {
+    pageOrder = [...reorderOp.pageIndexes];
+  } else {
+    pageOrder = Array.from({ length: inputPageCount }, (_, i) => i);
+  }
+
+  if (deleteOp) {
+    const deletedSet = new Set(deleteOp.pageIndexes);
+    pageOrder = pageOrder.filter((pi) => !deletedSet.has(pi));
+  }
+
+  const rotations = new Map<number, number>();
+  for (const rotateOp of rotateOps) {
+    const angle = typeof rotateOp.payload.angle === "number" ? rotateOp.payload.angle : 0;
+    if (angle === 0) continue;
+    for (const pageIndex of rotateOp.pageIndexes) {
+      const prev = rotations.get(pageIndex) ?? 0;
+      rotations.set(pageIndex, (prev + angle) % 360);
+    }
+  }
+
+  const plan: PdfPageOperationPlan = {
+    mode: "execute",
+    operationCount: operation.operations.length,
+    entries: operation.operations.map((pageOp) => ({
+      operationId: pageOp.id,
+      type: pageOp.type,
+      pageIndexes: [...pageOp.pageIndexes],
+      status: "applied" as const,
+    })),
+  };
+
+  return { plan, pageOrder, rotations };
+}
+
+function setPageRotation(page: PDFPage, rotationDegrees: number): void {
+  page.node.set(PDFName.of("Rotate"), PDFNumber.of(rotationDegrees));
+}
+
+async function buildOutputPdf(
+  sourcePdf: PDFDocument,
+  pageOrder: number[],
+  rotations: Map<number, number>,
+): Promise<PDFDocument> {
+  const outputPdf = await PDFDocument.create();
+  const copiedPages = await outputPdf.copyPages(sourcePdf, pageOrder);
+
+  copiedPages.forEach((page, newPageIndex) => {
+    outputPdf.addPage(page);
+    const originalIndex = pageOrder[newPageIndex];
+    const rotation = rotations.get(originalIndex);
+    if (rotation) {
+      setPageRotation(page, rotation);
+    }
+  });
+
+  return outputPdf;
 }
 
 async function applyOutputToolOperation(

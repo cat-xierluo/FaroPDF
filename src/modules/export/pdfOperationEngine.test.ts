@@ -566,6 +566,335 @@ describe("pdf operation engine", () => {
       }),
     ).rejects.toThrow("PDF 交付工具第一版暂不支持非 Latin-1 文本。");
   });
+
+  // ==================== execute 模式测试 ====================
+
+  test("execute 模式 reorder：重排页面顺序", async () => {
+    // 创建 4 页 PDF，每页用不同宽度标记页码（页 0=200, 页 1=210, 页 2=220, 页 3=230）
+    const inputBytes = await createPdfWithLabeledPages(4);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "execute-reorder-1",
+      source: { bytes: inputBytes },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "page-ops-reorder",
+          type: "page-operations",
+          operations: [
+            {
+              id: "reorder-1",
+              type: "reorder",
+              pageIndexes: [2, 0, 1, 3],
+              payload: {},
+              createdAt: "2026-06-03T00:00:00.000Z",
+            },
+          ],
+          mode: "execute",
+        },
+      ],
+      requestedAt: "2026-06-03T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+
+    // 输出 PDF 应有 4 页
+    expect(outputPdf.getPageCount()).toBe(4);
+    // 页序应为 [2, 0, 1, 3]，即宽度依次为 220, 200, 210, 230
+    expect(outputPdf.getPage(0).getWidth()).toBe(220);
+    expect(outputPdf.getPage(1).getWidth()).toBe(200);
+    expect(outputPdf.getPage(2).getWidth()).toBe(210);
+    expect(outputPdf.getPage(3).getWidth()).toBe(230);
+    // 计划应标记为 applied
+    expect(result.summary.pageOperationPlan?.mode).toBe("execute");
+    expect(result.summary.pageOperationPlan?.entries[0].status).toBe("applied");
+  });
+
+  test("execute 模式 delete：删除指定页面", async () => {
+    // 创建 5 页 PDF，删除页 1 和页 3
+    const inputBytes = await createPdfWithLabeledPages(5);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "execute-delete-1",
+      source: { bytes: inputBytes },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "page-ops-delete",
+          type: "page-operations",
+          operations: [
+            {
+              id: "delete-1",
+              type: "delete",
+              pageIndexes: [1, 3],
+              payload: {},
+              createdAt: "2026-06-03T00:00:00.000Z",
+            },
+          ],
+          mode: "execute",
+        },
+      ],
+      requestedAt: "2026-06-03T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+
+    // 输出 PDF 应只有 3 页（页 0, 2, 4）
+    expect(outputPdf.getPageCount()).toBe(3);
+    // 页序应为 [0, 2, 4]，即宽度依次为 200, 220, 240
+    expect(outputPdf.getPage(0).getWidth()).toBe(200);
+    expect(outputPdf.getPage(1).getWidth()).toBe(220);
+    expect(outputPdf.getPage(2).getWidth()).toBe(240);
+    expect(result.summary.pageOperationPlan?.entries[0].status).toBe("applied");
+  });
+
+  test("execute 模式 rotate：旋转指定页面", async () => {
+    // 创建 2 页 PDF，旋转页 0 角度 90
+    const inputBytes = await createPdfWithLabeledPages(2);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "execute-rotate-1",
+      source: { bytes: inputBytes },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "page-ops-rotate",
+          type: "page-operations",
+          operations: [
+            {
+              id: "rotate-1",
+              type: "rotate",
+              pageIndexes: [0],
+              payload: { angle: 90 },
+              createdAt: "2026-06-03T00:00:00.000Z",
+            },
+          ],
+          mode: "execute",
+        },
+      ],
+      requestedAt: "2026-06-03T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+
+    // 页数不变
+    expect(outputPdf.getPageCount()).toBe(2);
+    // 计划标记为 applied
+    expect(result.summary.pageOperationPlan?.entries[0].status).toBe("applied");
+    // 页 0 应有 Rotate=90，页 1 无旋转（Rotate 不存在或为 0）
+    const page0Rotation = outputPdf.getPage(0).getRotation().angle;
+    const page1Rotation = outputPdf.getPage(1).getRotation().angle;
+    expect(page0Rotation).toBe(90);
+    expect(page1Rotation).toBe(0);
+  });
+
+  test("execute 模式 reorder + delete + rotate 组合操作", async () => {
+    // 创建 6 页 PDF（页 0-5，宽度 200-250）
+    // reorder 为 [5, 4, 3, 2, 1, 0]（倒序）
+    // delete 页 0 和页 5（从 reorder 结果中过滤掉原始页 0 和 5）
+    // rotate 页 1（原始页 1，角度 180）
+    // 最终页序：从 [5,4,3,2,1,0] 过滤掉 0 和 5 → [4,3,2,1]
+    const inputBytes = await createPdfWithLabeledPages(6);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "execute-combo-1",
+      source: { bytes: inputBytes },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "page-ops-combo",
+          type: "page-operations",
+          operations: [
+            {
+              id: "reorder-combo",
+              type: "reorder",
+              pageIndexes: [5, 4, 3, 2, 1, 0],
+              payload: {},
+              createdAt: "2026-06-03T00:00:00.000Z",
+            },
+            {
+              id: "delete-combo",
+              type: "delete",
+              pageIndexes: [0, 5],
+              payload: {},
+              createdAt: "2026-06-03T00:00:00.000Z",
+            },
+            {
+              id: "rotate-combo",
+              type: "rotate",
+              pageIndexes: [1],
+              payload: { angle: 180 },
+              createdAt: "2026-06-03T00:00:00.000Z",
+            },
+          ],
+          mode: "execute",
+        },
+      ],
+      requestedAt: "2026-06-03T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+
+    // 最终页序 [4, 3, 2, 1]，宽度依次 240, 230, 220, 210
+    expect(outputPdf.getPageCount()).toBe(4);
+    expect(outputPdf.getPage(0).getWidth()).toBe(240);
+    expect(outputPdf.getPage(1).getWidth()).toBe(230);
+    expect(outputPdf.getPage(2).getWidth()).toBe(220);
+    expect(outputPdf.getPage(3).getWidth()).toBe(210);
+    // 原始页 1（输出中第 3 页，宽度 210）应被旋转 180 度
+    expect(outputPdf.getPage(3).getRotation().angle).toBe(180);
+    // 其他页无旋转
+    expect(outputPdf.getPage(0).getRotation().angle).toBe(0);
+    expect(outputPdf.getPage(1).getRotation().angle).toBe(0);
+    expect(outputPdf.getPage(2).getRotation().angle).toBe(0);
+    // 三个操作都标记为 applied
+    expect(result.summary.pageOperationPlan?.entries).toHaveLength(3);
+    expect(result.summary.pageOperationPlan?.entries.every((e) => e.status === "applied")).toBe(true);
+  });
+
+  test("execute 模式空操作：operations 为空时输出与输入一致", async () => {
+    const inputBytes = await createPdfWithLabeledPages(2);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "execute-empty-1",
+      source: { bytes: inputBytes },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "page-ops-empty",
+          type: "page-operations",
+          operations: [],
+          mode: "execute",
+        },
+      ],
+      requestedAt: "2026-06-03T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+
+    // 输出应与输入完全一致：2 页，顺序不变
+    expect(outputPdf.getPageCount()).toBe(2);
+    expect(outputPdf.getPage(0).getWidth()).toBe(200);
+    expect(outputPdf.getPage(1).getWidth()).toBe(210);
+    // 计划存在但操作数为 0
+    expect(result.summary.pageOperationPlan?.mode).toBe("execute");
+    expect(result.summary.pageOperationPlan?.operationCount).toBe(0);
+    expect(result.summary.pageOperationPlan?.entries).toHaveLength(0);
+  });
+
+  test("execute 模式页码越界：正确报错", async () => {
+    const inputBytes = await createPdfWithBlankPages(3);
+    const engine = createPdfOperationEngine();
+
+    // delete 操作引用不存在的页码
+    await expect(
+      engine.exportPdf({
+        id: "execute-oob-delete",
+        source: { bytes: inputBytes },
+        destination: { type: "bytes" },
+        operations: [
+          {
+            id: "page-ops-oob-delete",
+            type: "page-operations",
+            operations: [
+              {
+                id: "delete-oob",
+                type: "delete",
+                pageIndexes: [0, 5],
+                payload: {},
+                createdAt: "2026-06-03T00:00:00.000Z",
+              },
+            ],
+            mode: "execute",
+          },
+        ],
+        requestedAt: "2026-06-03T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("页面操作页码超出源 PDF 页数。");
+
+    // rotate 操作引用不存在的页码
+    await expect(
+      engine.exportPdf({
+        id: "execute-oob-rotate",
+        source: { bytes: inputBytes },
+        destination: { type: "bytes" },
+        operations: [
+          {
+            id: "page-ops-oob-rotate",
+            type: "page-operations",
+            operations: [
+              {
+                id: "rotate-oob",
+                type: "rotate",
+                pageIndexes: [3],
+                payload: { angle: 90 },
+                createdAt: "2026-06-03T00:00:00.000Z",
+              },
+            ],
+            mode: "execute",
+          },
+        ],
+        requestedAt: "2026-06-03T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("页面操作页码超出源 PDF 页数。");
+
+    // reorder 操作引用不存在的页码
+    await expect(
+      engine.exportPdf({
+        id: "execute-oob-reorder",
+        source: { bytes: inputBytes },
+        destination: { type: "bytes" },
+        operations: [
+          {
+            id: "page-ops-oob-reorder",
+            type: "page-operations",
+            operations: [
+              {
+                id: "reorder-oob",
+                type: "reorder",
+                pageIndexes: [0, 1, 99],
+                payload: {},
+                createdAt: "2026-06-03T00:00:00.000Z",
+              },
+            ],
+            mode: "execute",
+          },
+        ],
+        requestedAt: "2026-06-03T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("页面操作页码超出源 PDF 页数。");
+
+    // 负数页码
+    await expect(
+      engine.exportPdf({
+        id: "execute-oob-negative",
+        source: { bytes: inputBytes },
+        destination: { type: "bytes" },
+        operations: [
+          {
+            id: "page-ops-oob-negative",
+            type: "page-operations",
+            operations: [
+              {
+                id: "rotate-negative",
+                type: "rotate",
+                pageIndexes: [-1],
+                payload: { angle: 90 },
+                createdAt: "2026-06-03T00:00:00.000Z",
+              },
+            ],
+            mode: "execute",
+          },
+        ],
+        requestedAt: "2026-06-03T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("页面操作页码超出源 PDF 页数。");
+  });
 });
 
 async function createPdfWithBlankPages(pageCount: number): Promise<Uint8Array> {
@@ -573,6 +902,21 @@ async function createPdfWithBlankPages(pageCount: number): Promise<Uint8Array> {
 
   for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
     pdf.addPage([200, 200]);
+  }
+
+  return pdf.save();
+}
+
+/**
+ * 创建每页宽度不同的 PDF，方便通过宽度识别页码。
+ * 页 i 的宽度为 200 + i * 10，高度固定 200。
+ */
+async function createPdfWithLabeledPages(pageCount: number): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+    const width = 200 + pageIndex * 10;
+    pdf.addPage([width, 200]);
   }
 
   return pdf.save();
