@@ -7,6 +7,7 @@ import type {
 import { sortAnnotations } from "./sidecar";
 import type { AnnotationRepository } from "./repository";
 import { buildAnnotationSummary } from "./summary";
+import { searchAnnotations, type AnnotationSearchOptions } from "./search";
 
 interface AnnotationServiceOptions {
   repository: AnnotationRepository;
@@ -94,6 +95,15 @@ export class AnnotationService {
     const sidecar = await this.repository.load(document);
 
     return sortAnnotations(sidecar.annotations);
+  }
+
+  /** 综合 query/types/pageNumbers/color 过滤批注，结果按 sortAnnotations 排序 */
+  async searchAnnotations(
+    document: AnnotationDocumentRef,
+    options: AnnotationSearchOptions = {},
+  ): Promise<PdfAnnotation[]> {
+    const sidecar = await this.repository.load(document);
+    return searchAnnotations(sidecar.annotations, options);
   }
 
   async buildSummary(document: AnnotationDocumentRef, exportedAt = this.now()) {
