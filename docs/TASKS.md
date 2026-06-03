@@ -75,13 +75,15 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：表单
-- 状态：待处理
+- 状态：进行中（第一版契约 + formService execute 升级 + reader 扩展 + useFormController + FormsPanel 浮层 + 4 件套验证已落 `feat/forms-signing`）
 - 建议分支：`feat/forms-signing`
 - 建议 worktree：`.claude/worktrees/tmux-forms-signing`
 - 依赖：ISS-002、ISS-005
-- 范围：`src/modules/forms/`、`src/shared/pdf/form*`、表单签署相关测试
+- 范围：`src/modules/forms/`、`src/shared/pdf/form*`、表单签署相关测试 + `src/modules/reader/useReaderController.ts`（加 3 个方法，不破坏 API 形状）
 - 目标：支持 AcroForm 字段识别、填写、签名图片、手写签名、日期、勾号、叉号、图章、图片和扁平化导出。
 - 验收：常见 PDF 表单可填写并导出为不可编辑提交版；填写和签名模式工具条覆盖文本、签名、日期、勾号、叉号、图章、图片和导出为压平。
+- 当前进度：在 `feat/forms-signing` 完成第一版（DEC-035）：`src/shared/pdf/form.ts` 扩展 `PdfFormOperation` / `PdfFormBatchRequest` / `PdfFormBatchResult` / `PdfFormFlattenSummary` + helper；`formService` 真实 `pageIndex`（PDFDict → pageIndex 查找表）+ `flattenForm` + `applyFormOperations` 批量入口；`useReaderController` 暴露 `getFileBytes` / `getCurrentFileName` / `saveUpdatedBytes`（浏览器 `<a download>`，不依赖 Tauri）；`useFormController` 13 个动作维护 formState / panelMode / 草稿 / 签名图片，文档切换 reset；`activeFormController` 模块级桥让 mode 工具 onClick 拿到 controller；`registerFormsToolbarTools` 按 DEC-032 §"W3 Forms" 注册 4 个 forms mode 工具（refresh / fill / signature / flatten）到 `registerModeTools("forms", [...])`；`FormProvider` + `FormsPanel` 浮层在 `activeMode === "forms"` 时挂载，独立 `FormsPanel.css` 不污染全局样式。`src/components/layout/Toolbar.tsx` / `src/App.tsx` / 全局样式 / 路由 / `package.json` / 锁文件 / `src-tauri/Cargo.toml` **未修改**。82 项新测试通过；总测试 419 / 419；`npm run typecheck` / `npm run build` / `npm test -- --run` / `cargo check --manifest-path src-tauri/Cargo.toml --offline` 全绿。
+- 下一步：FormsPanel 浮层在窄屏（< 360px）会与主工具栏重叠，需要 layout worker 在 `feat/pdf-expert-shell-ia` 收口时把 forms 改走 utility panel 路径；签名图片限定 PNG / JPG（pdf-lib embed 限制）；批量填写 / 字段校验规则引擎 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件待后续 worker 推进。
 
 ### ISS-009 设计系统落地
 
@@ -245,6 +247,7 @@ Agent 可根据本文件自行判断：
 - 2026-06-03：在 `feat/ocr-bridge` 推进 ISS-007 真实接入第二版：后端按 provider 分发到 `ocrmypdf` / `curl + HTTPS`、任务队列持久化、`pdftotext` 联动质量检查；前端 controller + 模式工具条 / 任务列表 / 质量报告组件；OCR 模式工具条作为独立组件交付，由后续 layout worker 接入 `AppShell`。
 - 2026-06-03：在 `feat/annotation-tools` 推进 ISS-026 批注深化第一版：几何规整（normalizeRect/unionRects/lineToRect/inkStrokesToRect 等 11 个工具）、搜索过滤（4 个 helper + searchAnnotations）、5 套 SVG 图章模板、9 工具描述 + 6 色色板 + 5 reducer 工具条 model；AnnotationOverlay 覆盖 9 批注 × 3 交互，AnnotationToolbar 受控组件 + 11 项测试；Overlay/Toolbar 暂未挂 AppShell，由后续 layout worker 接入。
 - 2026-06-03：在 `feat/reader-thumbnails` 推进 ISS-002 阅读深化第三步：`pdfReaderService` 暴露 `renderThumbnail`、Sidebar 接入 PDF.js 真实缩略图、`PdfPage` 用 IntersectionObserver 同步当前页；通过 PR #14 合并到 main。
+- 2026-06-04：在 `feat/forms-signing` 推进 ISS-008 表单填写与签署第一版：契约扩展（`PdfFormOperation` 联合 + `PdfFormBatchRequest/Result` + `PdfFormFlattenSummary` + helper）+ `formService` 真实 `pageIndex`（PDFDict → pageIndex 查找表，`page.node.Annots()` 是 PDFRef 需 `context.lookup` 解析）+ `flattenForm` + `applyFormOperations` 批量入口 + `useReaderController` 暴露 `getFileBytes` / `saveUpdatedBytes`（浏览器 `<a download>`）+ `useFormController` 13 个动作 + `activeFormController` 模块级桥 + `registerFormsToolbarTools` 按 DEC-032 §"W3 Forms" 注册 4 个 forms mode 工具 + `FormProvider` + `FormsPanel` 浮层（独立 CSS 不污染 `src/styles/app.css`）。`Toolbar.tsx` / `App.tsx` / 全局样式 / `package.json` / 锁文件 / `Cargo.toml` **未修改**。82 项新测试，总测试 419 / 419 通过；typecheck / build / cargo check --offline 全绿。DEC-035 + CHANGELOG 0.1.0-alpha.7 已落。
 - 2026-06-03：合并 `feat/ocr-quality`（ISS-017）和 `feat/evidence-image-pack`（ISS-018）到 `main`；ISS-017 质量检查报告和 ISS-018 A4 编排计划器第一版完成。
 - 2026-06-03：从前一个到达上下文上限的 session 接手，创建 `docs/HANDOFF.md` 交接文件。
 - 2026-06-03：合并 `feat/reader-canvas-render-clean` 和 `feat/annotation-sidebar-list` 的 canvas 渲染 + 批注侧边栏 UI 到 main；创建 PR #12 走正式合并流程；清理重复分支和 worktree。

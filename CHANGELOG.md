@@ -14,6 +14,21 @@
 - 兼容修订：`src/shared/pdf/types.ts` 的 `Record<PdfViewMode, string>` 标签字典加 `fit-width`；`src/modules/settings/SettingsPanel.tsx` 同样加 `fit-width`；`src/shared/contracts.test.ts` 的 `PdfDocumentState` 加上 `rotation: 0`；`src/shared/settings/defaults.ts` 的 `allowedViewModes` 集合加 `fit-width`。
 - 验证：53 个测试文件 / 435 个测试全部通过；`npm run typecheck` 干净；`npm run build` 成功。
 - 同步 `docs/DECISIONS.md` DEC-034 阅读模式深化方案；`docs/TASKS.md` 进度日志追加对应记录。
+- 表单填写与签署第一版（DEC-035 / ISS-008）：在 `feat/forms-signing` 落 `src/shared/pdf/form.ts` 契约扩展 + `formService` execute 能力升级 + reader `getFileBytes` / `saveUpdatedBytes` 扩展 + forms mode 工具按 DEC-032 §"W3 Forms" 指南通过 `registerModeTools("forms", [...])` 注册 + `useFormController` + `FormsPanel` 浮层。
+  - 契约新增 `PdfFormOperation` 联合（`fill` / `sign` / `flatten`）、`PdfFormBatchRequest` / `PdfFormBatchResult`、`PdfFormFlattenSummary`、helper `isPdfFormOperationType` / `isPdfFormOperation` / `validateFormBatchRequest`；保留旧 `PdfFormField` / `PdfFormState` / `PdfFormFillingInput` / `PdfSignatureInput` 字段。
+  - `formService.mapFormField` 修 `pageIndex` 硬编码 0：构造 `PDFDict → pageIndex` 查找表，`page.node.Annots()` 是 `PDFRef`、需 `context.lookup(ref, PDFDict)` 解析后才能与 `widget.dict` 比较引用相等。
+  - `formService.flattenForm(pdfBytes) → { bytes, summary }`：调用 pdf-lib `form.flatten()`，产出 before / after 字段数。
+  - `formService.applyFormOperations(request)` 批量入口：单次 `PDFDocument.load` 后按顺序执行 operation，单条失败封装为 `status: "failed"` 不中断后续；输出 `PdfFormBatchResult { bytes, appliedCount, failedCount, results, completedAt }`。
+  - reader `useReaderController` 新增 `getFileBytes()` / `getCurrentFileName()` / `saveUpdatedBytes(bytes, suggestedFileName)`：源 bytes 在 `openFile` 时缓存，导出走浏览器原生 `<a download>`，不依赖 Tauri command。
+  - `src/modules/forms/activeFormController.ts` 模块级 set / get controller 桥：让 mode 工具按钮 onClick 闭包拿到当前 controller，避免修改 `ToolbarState` 类型。
+  - `src/modules/forms/registerFormsToolbarTools.ts` 注册 4 个 forms mode 工具（`forms.refresh` / `forms.fill` / `forms.signature` / `forms.flatten`），按 `order` 升序渲染，全部 `isDisabled: (state) => !state.reader.state.document`。
+  - `src/modules/forms/useFormController.ts` 维护 formState / loading / errorMessage / successMessage / panelMode / selectedFieldId / draftValue / signatureImageBytes / signatureImageType；提供 refresh / openPanel / closePanel / selectField / setDraftValue / setSignatureImage / clearSignatureImage / applyFieldEdit / applySignature / flattenAndSave / applyBatchAndSave / setErrorMessage / clearMessages 13 个动作；reader 切换 document 时 reset 全部状态。
+  - `src/modules/forms/FormProvider.tsx` 顶层 Provider：注册 controller 到模块级桥 + 在 `activeMode === "forms"` 时调 `registerFormsToolbarTools()` + 渲染 children + 仅在 forms mode 挂载 `FormsPanel`。
+  - `src/modules/forms/ui/FormsPanel.tsx` + `ui/FormsPanel.css` 浮层 panel：按字段类型分组渲染 + 填值编辑器（text / dropdown / checkbox / radio）+ 签名图片选择（PNG / JPG），错误 / 成功提示走独立 alert / status 区域；CSS 独立文件不污染 `src/styles/app.css`。
+- 新增 82 项测试：form 契约 16 + formService 21 + activeFormController 4 + registerFormsToolbarTools 9 + useFormController 16 + FormsPanel 16；总测试 419 / 419 通过。
+- 4 件套验证：`npm run typecheck` / `npm run build` / `npm test -- --run` / `cargo check --manifest-path src-tauri/Cargo.toml --offline` 全绿。
+- 已知限制：FormsPanel 是绝对定位浮层（fixed top:72 right:16），在窄屏（< 360px）会与主工具栏重叠；签名图片必须 PNG / JPG；扁平化后源 PDF 仍保留 `textLayerStatus: "missing"` 不会重新标记；浏览器 `<a download>` 一次只触发一个文件。
+- 同步 `docs/DECISIONS.md` DEC-035（ISS-008 表单填写与签署第一版方案，DEC 编号承接 DEC-034 阅读模式深化后 +1）；`docs/TASKS.md` 进度日志追加对应记录。
 
 ## 0.1.0-alpha.6 - 2026-06-03
 
