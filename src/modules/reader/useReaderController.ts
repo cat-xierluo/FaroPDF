@@ -70,6 +70,17 @@ export function useReaderController(settings: AppSettings) {
     return loadedDocument.getPageText(pageIndex);
   }, []);
 
+  /** 将 PDF 页面渲染到 canvas 元素 */
+  const renderPageToCanvas = useCallback(async (pageIndex: number, canvas: HTMLCanvasElement, zoom: number) => {
+    const loadedDocument = loadedDocumentRef.current;
+
+    if (!loadedDocument) {
+      return;
+    }
+
+    return loadedDocument.renderPageToCanvas(pageIndex, canvas, zoom);
+  }, []);
+
   return {
     state,
     openFile,
@@ -77,6 +88,7 @@ export function useReaderController(settings: AppSettings) {
     setZoom,
     setViewMode,
     getPageText,
+    renderPageToCanvas,
   };
 }
 
