@@ -1,43 +1,18 @@
 {
   "version": "1",
-  "first_run": true,
-  "first_run_at": null,
-  "last_scan_at": null,
+  "first_run": false,
+  "first_run_at": "2026-06-03",
+  "last_scan_at": "2026-06-03",
   "multiplier": 1.5,
   "baselines": {
-    "docs/TASKS.md": {
-      "line_count": 139,
-      "active_task_count": 3,
-      "measured_at": "2026-06-03"
-    },
-    "docs/DECISIONS.md": {
-      "line_count": 453,
-      "measured_at": "2026-06-03"
-    },
-    "docs/ROADMAP.md": {
-      "line_count": 129,
-      "measured_at": "2026-06-03"
-    },
-    "docs/DESIGN.md": {
-      "line_count": 192,
-      "measured_at": "2026-06-03"
-    },
-    "docs/ARCHITECTURE.md": {
-      "line_count": 663,
-      "measured_at": "2026-06-03"
-    },
-    "CHANGELOG.md": {
-      "line_count": 63,
-      "measured_at": "2026-06-03"
-    },
-    "README.md": {
-      "line_count": 68,
-      "measured_at": "2026-06-03"
-    },
-    "AGENTS.md": {
-      "line_count": 101,
-      "measured_at": "2026-06-03"
-    }
+    "AGENTS.md": {"line_count": 102, "measured_at": "2026-06-03"},
+    "README.md": {"line_count": 68, "measured_at": "2026-06-03"},
+    "docs/ROADMAP.md": {"line_count": 139, "measured_at": "2026-06-03"},
+    "docs/ARCHITECTURE.md": {"line_count": 733, "measured_at": "2026-06-03"},
+    "docs/DESIGN.md": {"line_count": 192, "measured_at": "2026-06-03"},
+    "docs/DECISIONS.md": {"line_count": 611, "measured_at": "2026-06-03"},
+    "CHANGELOG.md": {"line_count": 63, "measured_at": "2026-06-03"},
+    "docs/TASKS.md": {"line_count": 232, "active_task_count": 9, "measured_at": "2026-06-03"}
   },
   "history": []
 }
