@@ -607,6 +607,52 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 - `keychain:` 引用当前不接受，需要用户改用 `env:<NAME>`；后续若 OS Keychain 集成落地再扩展 `resolve_api_key_ref`。
 - PaddleOCR/MinerU 的 provider 端取消协议依赖各自实现，本地只能做客户端标记。
 
+## DEC-031 批注深化第一版采用几何/搜索/图章模板/工具条 model + Overlay/Toolbar UI 组合
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联分支：`feat/annotation-tools`
+- 关联任务：ISS-026
+
+承接 DEC-015 批注 sidecar 第一版，本决策记录批注深化第一版的边界，在不破坏现有 `PdfAnnotation` / sidecar schema 的前提下加入几何规整、搜索过滤、SVG 图章模板、工具条 model 和 Overlay/Toolbar UI：
+
+### 几何规整与裁剪
+
+- `src/modules/annotation/geometry.ts` 暴露纯函数 `normalizeRect` / `pointsToRect` / `unionRects` / `inkStrokesToRect` / `lineToRect` / `recomputeLineRects` / `recomputeInkRects` / `sanitizeRects` / `isRectWithinBounds` / `clampRectToBounds` / `annotationBoundingRect`，所有坐标以页面 PDF 用户空间（origin 左下、y 向上）记录；`sanitizeRects` 把 NaN / 负宽高 / 零面积矩形规整为可绘制矩形或丢弃。
+- `lineToRect` 把两点直线扩展为 `thickness` 宽的矩形；`inkStrokesToRect` 用所有点的 union 矩形 + 笔画宽 / 2 的边距作为最终矩形。
+- 边界裁剪用 `clampRectToBounds` 把矩形限制在 `[0, pageWidth] × [0, pageHeight]`，越界部分截断而非抛错；`isRectWithinBounds` 判定是否完全在页内。
+
+### 搜索过滤
+
+- `search.ts` 暴露 `collectAnnotationSearchHaystack`（按 type/page/color/author 构造搜索索引）+ `matchesQuery` / `matchesPageFilter` / `matchesTypeFilter` / `matchesColorFilter` 四个纯函数 helper；`searchAnnotations` 把这些 helper 组合，按 `query` / `types` / `pageNumbers` / `color` 条件过滤 sidecar 内容。
+- `AnnotationService` 暴露 `searchAnnotations`，让 UI 过滤 sidecar 内容而不必重新实现过滤逻辑。
+- 搜索是纯函数、无副作用，便于在 Overlay/Toolbar 内联调用。
+
+### 图章 SVG 模板
+
+- `stamps.ts` 内置 5 套模板：`reviewed`（已阅，方形带勾）、`important`（重点，方形带叹号）、`todo`（待核，椭圆带问号）、`evidence`（证据，方形带 E）、`custom`（自定义，圆角矩形占位）。
+- 所有模板共用 `4:1` viewBox（宽 400 × 高 100），支持 4 种 shape：rect / rounded-rect / ellipse / banner。
+- `renderStampSvg(template, { label, color })` 输出 XML-escaped SVG 字符串，颜色和文字 label 都走 `escapeXml` 防 XSS；hex 颜色字符串本身安全，暂不做非 hex 颜色的额外 escape。
+
+### 工具条 model
+
+- `toolbarModel.ts` 暴露 `ANNOTATION_TOOL_LIST`（9 工具：`highlight` / `underline` / `strikeout` / `note` / `textbox` / `rect` / `arrow` / `ink` / `stamp`）+ `ANNOTATION_TOOL_MAP`（按 id 索引的工具描述）+ `ANNOTATION_COLOR_SWATCHES`（6 色调色板）+ `AnnotationToolState`（受控 state shape）。
+- 5 个不可变 reducer：`armTool` / `disarmTool` / `setColor` / `setStampName` / `setStampLabel`，全部返回新 state 不修改入参；stamp 模板切换时回填 `defaultLabel`。
+- 工具条组件完全受控：state 由父组件传入，组件内只派发不可变 next state；stamp 子区段仅在 `activeToolType === "stamp"` 时整体渲染。
+
+### Overlay 与 Toolbar UI
+
+- `AnnotationOverlay` 覆盖 9 种批注的点击/拖拽/手写 3 种交互模式；草稿通过 `onAnnotationDraft` 派发不可变 `AnnotationDraftInput`；预览走 `id: "preview"` 占位 annotation 并通过不同 id 避免与现有批注 id 冲突。
+- 6 种批注 glyph 渲染：rect（矩形）/underline（高亮）/strikeout（删除线）/ink（手写 stroke）/arrow（箭头）/stamp（图章 SVG 注入）。
+- `AnnotationToolbar` 是 9 工具按钮 + 6 色色板 + 5 模板子区段 + 图章文字输入的受控组件；组件只接受 `state` 和 `onStateChange` props。
+- 测试用 `ToolbarHarness` 把 `onStateChange` 桥接到 `setState` 模拟父组件持有 state；11 项测试覆盖 9 工具按钮渲染、arm/disarm、工具切换、颜色更新、图章选项可见性、图章文字修改、图章模板切换回填 `defaultLabel` 和 disabled 行为。
+
+### 范围与依赖
+
+- 修改：`src/modules/annotation/**`（新增 geometry/search/stamps/toolbarModel + 增强 service/index/README）、`src/components/layout/AnnotationOverlay.tsx`、`src/components/layout/AnnotationToolbar.tsx`、`src/components/layout/AnnotationToolbar.test.tsx`。
+- 不修改：`src/shared/pdf/annotation.ts`（sidecar schema 不变）、`package.json`、锁文件、`src/App.tsx`、全局样式、路由、其他模块（reader / pages / export / ocr / forms / settings）。
+- 已知限制：Overlay/Toolbar 是独立组件，未挂到 `AppShell`；接入时需要批注模式新增 armed state 并把 `activeToolType` / `activeColor` / `activeStampName` / `activeStampLabel` 透传给 Overlay，由后续 layout worker 在 `feat/pdf-expert-shell-ia` 或新建分支实现。
+
 ## ISS 任务归档
 
 `docs/TASKS.md` 收敛为活跃/暂缓任务入口；已完成 ISS 的详细任务卡迁移到本节，保留为单行摘要。后续如需恢复为正式 ISS，先在本节追加"恢复"标注，再回到 `docs/TASKS.md` 新增。

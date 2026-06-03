@@ -176,6 +176,20 @@ Agent 可根据本文件自行判断：
 - 当前进度：首版在 `.claude/skills/doc-curator/` 完成 SKILL.md / LICENSE.txt / CHANGELOG.md / config/faropdf.yaml / state.json / scripts/scan.sh / scripts/first-baseline.sh / scripts/maintenance-pr.sh / lib/*；`.claude/agents/doc-curator.md` 已落盘；`AGENTS.md` Skill 强制调用表新增 doc-curator 行；`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ARCHITECTURE.md` / `.claude/skills/git-workflow/SKILL.md` 同步。
 - 下一步：`.claude/skills/` 默认被 `.gitignore` 忽略，需用 `git add -f` 强制跟踪该子目录；按 git-workflow 多模块规则拆 commit；推 main 后跑首跑基线脚本；观察一轮 PR 行为再调阈值。
 
+### ISS-026 批注深化（高亮/手写/图章/搜索）
+
+- 优先级：P0
+- 类型：批注
+- 状态：进行中（第一版 UI 与 model 已落盘，等待合并 / 后续 AppShell 接入）
+- 建议分支：`feat/annotation-tools`
+- 建议 worktree：`.claude/worktrees/tmux-annotation-tools`
+- 依赖：ISS-004
+- 范围：`src/modules/annotation/`、`src/components/layout/AnnotationOverlay.tsx`、`src/components/layout/AnnotationToolbar.tsx`
+- 目标：在批注 sidecar 之上完成几何规整、搜索过滤、SVG 图章模板、工具条 model 和 Overlay/Toolbar UI，覆盖高亮/下划线/删除线/备注/文本框/矩形/箭头/手写/图章 9 种批注。
+- 验收：常见 PDF 可在 Overlay 上点击/拖拽/手写创建 9 种批注；工具条 9 工具按钮可 arm/disarm；6 色色板可切换颜色；图章 5 模板可选择并填入文字；批注搜索可按作者、类型、页码、文本过滤；视觉验证 Overlay/Toolbar 与 `docs/DESIGN.md` 风格一致且不阻塞阅读区。
+- 当前进度：在 `feat/annotation-tools` 完成几何规整（normalizeRect/pointsToRect/unionRects/inkStrokesToRect/lineToRect/recomputeLineRects/recomputeInkRects/sanitizeRects/isRectWithinBounds/clampRectToBounds/annotationBoundingRect）、搜索过滤（collectAnnotationSearchHaystack + matchesQuery/matchesPageFilter/matchesTypeFilter/matchesColorFilter）、图章 SVG 模板（5 套模板、4:1 viewBox、4 种 shape、escapeXml 注入）、工具条 model（ANNOTATION_TOOL_LIST/ANNOTATION_TOOL_MAP/ANNOTATION_COLOR_SWATCHES/AnnotationToolState + 5 个不可变 reducer）、AnnotationOverlay（9 批注 × 3 交互）、AnnotationToolbar（9 工具按钮 + 6 色色板 + 5 图章模板子区段 + 11 项受控组件测试）。`AnnotationService` 暴露 `searchAnnotations` 供 UI 过滤 sidecar 内容。Overlay/Toolbar 暂未挂到 AppShell，本分支先固化可测试边界；接入 AppShell 时只需在批注模式新增 armed state 并把 `activeToolType`/`activeColor`/`activeStampName`/`activeStampLabel` 透传给 Overlay。
+- 下一步：把 AnnotationOverlay/AnnotationToolbar 接入 `AppShell` context toolbar 槽位、补批注侧边栏搜索/筛选接入、图章模板预览增强、导出引擎批注真实绘制；用浏览器截图检查无重叠。
+
 ## 暂缓任务
 
 ### ISS-015 直接编辑 PDF 原有文字、图片和链接
@@ -227,6 +241,7 @@ Agent 可根据本文件自行判断：
 
 - 2026-06-03：部署 doc-curator 文档瘦身 subagent：在 `.claude/skills/doc-curator/` 落 SKILL.md / LICENSE.txt / CHANGELOG.md / config/faropdf.yaml / state.json / scripts/{scan,first-baseline,maintenance-pr}.sh / lib/{common,check-tasks,check-decisions,check-files}.sh；`.claude/agents/doc-curator.md` 注册自定义 Agent；`AGENTS.md` Skill 强制调用表新增 doc-curator 行；`docs/TASKS.md` 新增 ISS-024，`docs/DECISIONS.md` 新增 DEC-028，`docs/ARCHITECTURE.md` 补角色说明，`.claude/skills/git-workflow/SKILL.md` 升级 v1.3.0 加 PR 创建后 / 合并后 post-action 触发小节；触发采用 Agent 主动调起，**不依赖 hooks**。
 - 2026-06-03：在 `feat/ocr-bridge` 推进 ISS-007 真实接入第二版：后端按 provider 分发到 `ocrmypdf` / `curl + HTTPS`、任务队列持久化、`pdftotext` 联动质量检查；前端 controller + 模式工具条 / 任务列表 / 质量报告组件；OCR 模式工具条作为独立组件交付，由后续 layout worker 接入 `AppShell`。
+- 2026-06-03：在 `feat/annotation-tools` 推进 ISS-026 批注深化第一版：几何规整（normalizeRect/unionRects/lineToRect/inkStrokesToRect 等 11 个工具）、搜索过滤（4 个 helper + searchAnnotations）、5 套 SVG 图章模板、9 工具描述 + 6 色色板 + 5 reducer 工具条 model；AnnotationOverlay 覆盖 9 批注 × 3 交互，AnnotationToolbar 受控组件 + 11 项测试；Overlay/Toolbar 暂未挂 AppShell，由后续 layout worker 接入。
 - 2026-06-03：在 `feat/reader-thumbnails` 推进 ISS-002 阅读深化第三步：`pdfReaderService` 暴露 `renderThumbnail`、Sidebar 接入 PDF.js 真实缩略图、`PdfPage` 用 IntersectionObserver 同步当前页；通过 PR #14 合并到 main。
 - 2026-06-03：合并 `feat/ocr-quality`（ISS-017）和 `feat/evidence-image-pack`（ISS-018）到 `main`；ISS-017 质量检查报告和 ISS-018 A4 编排计划器第一版完成。
 - 2026-06-03：从前一个到达上下文上限的 session 接手，创建 `docs/HANDOFF.md` 交接文件。
