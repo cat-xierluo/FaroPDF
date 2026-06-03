@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import App from "../../App";
@@ -48,6 +48,7 @@ function mockLoadedPdf({
     getPageViewport: vi.fn(),
     getPageText,
     renderPageToCanvas: vi.fn(async () => undefined),
+    renderThumbnail: vi.fn(async () => undefined),
     destroy: vi.fn(async () => undefined),
   }));
 
@@ -81,10 +82,11 @@ describe("search UI integration", () => {
 
     await user.type(screen.getByRole("searchbox", { name: "全文搜索" }), "合同");
 
-    expect(await screen.findByRole("region", { name: "搜索结果" })).toBeInTheDocument();
+    const searchResults = await screen.findByRole("region", { name: "搜索结果" });
+    expect(searchResults).toBeInTheDocument();
     expect(screen.getByText("命中 2 处")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /第 1 页/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /第 3 页/ })).toBeInTheDocument();
+    expect(within(searchResults).getByRole("button", { name: /第 1 页/ })).toBeInTheDocument();
+    expect(within(searchResults).getByRole("button", { name: /第 3 页/ })).toBeInTheDocument();
     expect(screen.getByText("当前页高亮：合同")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "下一个命中" }));
@@ -136,6 +138,7 @@ describe("search UI integration", () => {
       getPageViewport: vi.fn(),
       getPageText: file.name === "first.pdf" ? firstGetPageText : secondGetPageText,
       renderPageToCanvas: vi.fn(async () => undefined),
+      renderThumbnail: vi.fn(async () => undefined),
       destroy: vi.fn(async () => undefined),
     }));
     render(<App />);
