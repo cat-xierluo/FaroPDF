@@ -398,6 +398,161 @@ ISS-017 第一版先建立 OCR 质量检查的共享契约和纯逻辑服务，�
 - 同步在 skill 自身的 `CHANGELOG.md`、`DECISIONS.md`、`TASKS.md` 记录。
 - 当前不修改根目录 `CHANGELOG.md`：那是产品功能变更日志，skill 维护变更不打断版本号；如后续需要版本对齐，由 PM 在下一次发版时一并处理。
 
+## DEC-026 借鉴 folia 的发布与设置体验
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联任务：ISS-021、ISS-022、ISS-023
+
+决定：
+
+- v0.3 阶段将 FaroPDF 的发布能力对齐到 folia 同等水平：全平台桌面打包、GitHub release 自动发布、`tauri-plugin-updater` 自动更新签名验证。
+- v0.3 阶段将设置页从当前的扁平 `SettingsPanel` 升级为左侧导航 + 右侧多 section 的浮层，与 folia 的 `SettingsPage` 信息架构对齐，至少包含「常规 / 阅读 / OCR provider / 快捷键 / 关于」五个 section。
+- 在「关于」section 内增加作者卡，复用 folia 的「作者名 / GitHub / 微信二维码」三段式展示。
+
+参考实现：
+
+- `folia/src-tauri/Cargo.toml` 的 `tauri-plugin-updater` 依赖。
+- `folia/src-tauri/tauri.conf.json` 的 `plugins.updater.endpoints` + `pubkey` + `bundle.createUpdaterArtifacts = true`。
+- `folia/.github/workflows/release.yml` 跨平台矩阵发布流程。
+- `folia/src/components/SettingsPage.tsx` 与 `src/components/settings/*Section.tsx` 浮层布局。
+- `folia/src/components/settings/AboutSection.tsx` 关于 + 作者卡布局。
+
+不采纳（本期暂缓）：
+
+- 移动端（Android / iOS）打包与自动更新能力：Tauri v2 移动端更新链路与桌面不同，先在 `docs/RELEASE.md` 记录限制和后续计划，本期不进入 ISS-021 验收。
+- 关于页内的「贡献者」「第三方协议」子区：等 ISS-022 浮层稳定后再单独评估。
+
+## DEC-029 v0.3 优先基础 PDF / PaddleOCR / 倾斜矫正 / 压缩，agent 集成延后
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联设计：`docs/plans/2026-06-03-agent-integration-design.md`
+- 关联任务：ISS-025
+
+决定：
+
+- v0.3 阶段继续按现有 ISS 列表推进基础能力，agent 集成不进入 v0.3 关键路径。
+- 优先级明确的初版任务：基础 PDF 功能（阅读、检索、批注、页面整理、导出、表单）、PaddleOCR 双层 PDF（ISS-007 真实调用）、扫描预处理倾斜矫正（ISS-016 真实处理）、压缩（ISS-013 真实压缩）。
+- 上述基础能力对应的 ISS（007/013/016/008/005/006 等）的「真实处理 / 真实调用 / UI 接入」待续项是初版收口重点，不开新的 agent 任务。
+- agent 集成的设计上下文完整保存在 `docs/plans/2026-06-03-agent-integration-design.md`，不丢；后续回到这个方向时从该文档 §6 / §7 / §8 切入。
+
+不采纳（本期暂缓）：
+
+- agent 能力立即进入 v0.3 实施：会让基础 PDF / OCR / 倾斜矫正 / 压缩的「真实处理」工作被挤压。
+- 长期 sidecar、MCP 桥接、per-call consent 弹窗、文档级白名单等更复杂的 agent 接线方案：v0 起步以一次性 spawn + 全局开关为主，避免无谓复杂度。
+
+## DEC-027 清理合并残留分支并启动 3 wave 多 worktree 推进
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联任务：ISS-007、ISS-008、ISS-009、ROADMAP §2 §4
+
+### 清理
+
+合并 `feat/reader-canvas-render-clean`、`feat/annotation-sidebar-list`（PR #12）、`feat/forms-signing`（PR #13）、`feat/reader-thumbnails`（PR #14）和 docs 整理等提交到 `main` 后，4 个本地 feat 分支和 1 个远端 stale 分支残留为合并残留：
+
+- 本地 `feat/forms-signing`、`feat/reader-canvas-and-annotation-sidebar`、`feat/reader-thumbnails`：squash merge 不创建 merge edge，`git branch -d` 拒绝删除（"没有完全合并"）；这些分支上的提交在 `main` 已通过 PR #12/13/14 squash 重新生成 commit hash，功能代码在主线，仅失去分支 ref。
+- 远端 `origin/feat/reader-canvas-render`：`git push --delete` 删除，是 PR #12 合并前的旧 head ref，落后 `main` 9 个 commit。
+
+执行：
+
+- `git branch -D` 强制删除 3 个本地 feat 分支（`feat/reader-canvas-render` 用 `-d` 已删）。
+- `git push origin --delete feat/reader-canvas-render` 删除远端 stale ref。
+- 保留 `git reflog` 一周以上以备恢复：reflog 中的 commit SHA 仍可重建被删分支。
+
+不采纳（本期暂缓）：
+
+- 把"合并残留"做成自动化 git 钩子：现在一个 PM agent 即可手工清理，自动化收益不抵复杂度。
+
+### 3 wave 推进方案
+
+Foundation Gate 已完成（DEC-008），`docs/TASKS.md` 已明确 worker 范围限制和共享契约收口规则。v0.1 完整基础版剩余任务按 3 个 wave 并行推进：
+
+#### Wave 1（首批 2 个 worker，模块完全独立）
+
+- **W1 / ocr-worker**：ISS-007 OCR bridge 真实接入 — `feat/ocr-bridge` / `.claude/worktrees/tmux-ocr-bridge`
+  - 范围：`src/modules/ocr/`、`src/shared/ocr/`、`src-tauri/` OCR command、相关测试
+  - 内容：本地 `ocrmypdf` / Legal Skills 真实执行、PaddleOCR/MinerU API 凭证读取与调用、双层 PDF 生成、任务队列持久化、OCR 模式工具条
+- **W2 / annotation-worker**：批注深化（ROADMAP §4） — `feat/annotation-tools` / `.claude/worktrees/tmux-annotation-tools`
+  - 范围：`src/modules/annotation/`、AnnotationSidebar
+  - 内容：文本选择高亮/下划线/删除线、矩形/箭头/手写、常用图章（已阅/重点/待核/证据）、批注搜索与跳转
+
+两 worker 范围零冲突（modules/ocr vs modules/annotation，shared/ocr vs annotation 内部），可同时推进。
+
+#### Wave 2（前置：PM 重构 ReaderToolbar 为 mode 注册表）
+
+PM 在主目录 `main` 重构 `src/components/layout/ReaderToolbar`，把当前直接列 mode 改为"各 mode 注册 tool items"模式，让 W3（Forms）和 W4（Reader 模式）能并行不冲突。
+
+- **W3 / forms-worker**：ISS-008 表单签署扩展 — `feat/forms-signing` / `.claude/worktrees/tmux-forms-signing`
+  - 范围：`src/modules/forms/`、`src/shared/pdf/form*`
+  - 内容：手写签名、签名位置调整、图章、扁平化导出
+- **W4 / reader-modes-worker**：阅读模式深化（ROADMAP §2） — `feat/reader-modes` / `.claude/worktrees/tmux-reader-modes`
+  - 范围：`src/modules/reader/`（用注册表模式添加新 mode）
+  - 内容：连续/单页/双页/适合宽度、缩放/旋转、键盘翻页、恢复上次页码
+
+#### Wave 3（Wave 1+2 完成后）
+
+- **W5 / ui-worker**：ISS-009 设计系统 polish — `feat/pdf-expert-shell-ia` / `.claude/worktrees/tmux-pdf-expert-shell-ia`
+  - 范围：`src/components/`、`src/styles/`、各模块视觉整合
+  - 等所有 mode 落地后做视觉收口
+
+### 推进约束
+
+- 每个 worker 严格按 `docs/TASKS.md`「并行执行规则」限定修改范围。
+- 改共享契约（`src/shared/`、`package.json`、`src-tauri/`、路由、App.tsx、全局样式）前必须先回 PM 确认。
+- 每个 worker 在自己的 worktree 内提交、推送、创建 PR；PM 检查 diff 范围、验证结果和文档同步后再合并。
+- 不在 `main` 推进未审阅代码。
+
+### 风险点
+
+- W1 和 W3 都在 `src-tauri/` 加 command，需约定命名空间或按 wave 推进避免冲突。
+- W4 依赖 PM 重构 ReaderToolbar，Wave 2 不能并发启动。
+- 任何 wave 内 worker 发现需要改共享契约，回到 PM 等决策后再继续。
+
+## DEC-028 部署 doc-curator 文档瘦身 subagent（post-action 触发，不依赖 hooks）
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联任务：ISS-024
+- 关联 Skill：`.claude/skills/doc-curator/`、`.claude/agents/doc-curator.md`、`.claude/skills/git-workflow/SKILL.md`
+
+### 背景
+
+FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADMAP.md` / `docs/DESIGN.md` / `docs/ARCHITECTURE.md` 等）在多 ISS 并行推进时不断膨胀：进度日志堆叠、归档条目散落、ISS 编号与 DEC 编号容易跳号、活跃任务卡和已完成任务的边界模糊。当前完成 ISS 后的归档、进度日志 trim、归档指针维护全靠人手动，缺乏自动机制。
+
+### 决定
+
+部署一个项目级 doc-curator subagent，覆盖体检、报告、maintenance PR 提交流程。
+
+- **放置位置**：`.claude/skills/doc-curator/`（项目级 skill，强制跟踪到版本库）；`.claude/agents/doc-curator.md`（自定义 Agent 注册）。`codex/skills` 通过 `../.claude/skills` 软链接到本目录，对 Codex 自动可见。
+- **运行模式**：报告 + 自动提 PR。Agent 在 `gh pr create` / `gh pr merge` 成功后主动调起 subagent 跑体检；体检发现 hard / adaptive 告警时，若工作区干净则自动跑 `maintenance-pr.sh` 提一个 `chore/doc-curator-<date>` 分支的 maintenance PR。
+- **阈值策略**：首跑通过 `first-baseline.sh` 测量各文件大小建基线；后续按 `基线 × 1.5` 作为自适应告警阈值，硬性阈值（进度日志 ≤ 5、ISS 归档条目升序、DEC 编号连续、归档指针指向 DECISIONS.md）单向只检查不缩。
+- **触发时机**：PR 创建后 + PR 合并后。**不依赖 hooks**，由 Agent 在 git-workflow 的 `## 4. PR 工作流` 末尾的两个 post-action 小节（`PR 创建后：调起 doc-curator 体检` / `PR 合并后：调起 doc-curator 体检`）主动调起。
+- **子模块边界**：doc-curator 只读 + 维护 `docs/`，不改 `src/` / `src-tauri/` / `tests/`；不写 `CHANGELOG.md`（CHANGELOG 由 `release-workflow` 维护）；不直接 push 到 main，所有 PR 走 PR 流程。
+- **git 跟踪**：`.claude/skills/` 默认被 `.gitignore` 忽略；doc-curator 目录需用 `git add -f` 强制跟踪；按 git-workflow 多模块规则拆 commit（`chore(skill): 新增 doc-curator` / `chore(agents): 注册 doc-curator subagent` / `docs(skill): git-workflow 集成 doc-curator post-action` 等）。
+
+### 不采纳
+
+- **hooks 触发**：用户明确反对（"我觉得触发不用hooks，可以再提交pr胡总和合并pr后去进行文档清理"），hooks 会让 maintenance 与工作 PR 抢节奏；Agent 主动调起更可控。
+- **pre-PR 门禁**：当前不阻断 PR 创建流程；post-action 体检发现问题由 maintenance PR 单独提，不影响当前 PR 进入 review。
+- **CHANGELOG 写入**：CHANGELOG 由 `release-workflow` 维护；doc-curator 只对 CHANGELOG 做软提示（最近 release entry 缺失），不修改。
+- **OCR / PDF 处理 / API 集成**：doc-curator 严格只做文档级维护，不调用任何 PDF 引擎、OCR 引擎或外部 API；不读取 OCR 脚本或 PDF 处理脚本。
+
+### 风险与回退
+
+- **冲突风险**：maintenance PR 与正在推进的工作 PR 可能并行；缓解：自动提 PR 前检查 `git status` 干净度，不干净则只报告不自动 PR。
+- **误改风险**：自适应阈值可能误判；缓解：硬性规则单向只检查不缩；首跑基线在 doc-curator 自己改完文件后重算，避免阈值永远追不上膨胀。
+- **rollback**：删除 `.claude/skills/doc-curator/`、`.claude/agents/doc-curator.md`、`.claude/skills/git-workflow/SKILL.md` 中 doc-curator 引用、AGENTS.md Skill 强制调用表对应行；不影响项目其它功能。
+
+### 验证
+
+- `bash .claude/skills/doc-curator/scripts/first-baseline.sh`：建基线并写入 `state.json`。
+- `bash .claude/skills/doc-curator/scripts/scan.sh`：跑体检，输出 JSON 行 + markdown 报告。
+- 模拟「进度日志 6 条」：跑 `maintenance-pr.sh` 验证自动 trim + PR 创建。
+- `ls -la .codex/skills/doc-curator`：确认 Codex 端可读。
+- `git ls-files .claude/skills/doc-curator/`：确认新 skill 已被跟踪。
+
 ## ISS 任务归档
 
 `docs/TASKS.md` 收敛为活跃/暂缓任务入口；已完成 ISS 的详细任务卡迁移到本节，保留为单行摘要。后续如需恢复为正式 ISS，先在本节追加"恢复"标注，再回到 `docs/TASKS.md` 新增。
@@ -451,3 +606,6 @@ ISS-017 第一版先建立 OCR 质量检查的共享契约和纯逻辑服务，�
 - 2026-06-03：在 `feat/reader-thumbnails` 推进 ISS-002 阅读深化第三步：`pdfReaderService` 暴露 `renderThumbnail(pageIndex, canvas, maxWidth)` 并按最长边等比缩放，1px 兜底避免 `maxWidth<=0` 时除零；`useReaderController` 透出该方法供 Sidebar 调用；`DocumentSummaryPanel` 用 IntersectionObserver 懒加载每个缩略图，未提供 `renderThumbnail` 时回退占位；`PdfPage` 用 `IntersectionObserver`（阈值 0.5）回调 `onPageVisible` 同步 `currentPage`；AppShell 把 `reader.setCurrentPage` 透传给 `ReaderCanvas`。
 - 2026-06-03：`searchUi.test.tsx` 中"第 N 页"按钮名原先只匹配搜索结果列表，新增缩略图按钮后改为通过 `within(searchResults)` 作用域，避免在多个候选上抛 `getMultipleElementsFoundError`。
 - 2026-06-03：按用户反馈中文化 git-workflow 描述部分：PR body 模板的 `## Summary` / `## Test plan` 改为 `## 摘要` / `## 测试计划`，PR 正文最低要求表区块改为「摘要」「测试计划」「Agent 归属」「关联任务」「风险」，references 中"Multi-Skill"改为"多 Skill"；保留英文类型前缀和通用 Git 术语。Skill 升级为 v1.2.0，并在 skill 自身和项目级 DECISIONS 同步记录。
+- 2026-06-03：部署 doc-curator 项目级文档瘦身 subagent：`.claude/skills/doc-curator/`（SKILL.md / LICENSE.txt / CHANGELOG.md / config/faropdf.yaml / state.json / scripts/scan.sh / first-baseline.sh / maintenance-pr.sh / lib/{common,check-tasks,check-decisions,check-files}.sh）+ `.claude/agents/doc-curator.md`（自定义 Agent 注册，工具 Read/Grep/Glob/Bash/Edit/Write）；`AGENTS.md` Skill 强制调用表新增 doc-curator 行；`docs/TASKS.md` 新增 ISS-024，`docs/DECISIONS.md` 新增 DEC-028，`docs/ARCHITECTURE.md` 补角色说明，`.claude/skills/git-workflow/SKILL.md` 升级 v1.3.0 加 PR 创建后 / 合并后 post-action 触发小节；按用户反馈"再提交pr胡总和合并pr后去进行文档清理"采用 Agent 主动调起，不依赖 hooks。
+- 2026-06-03：解耦 `docs/TASKS.md`：把 PDF Expert UI 探索素材池和品牌与视觉资产搬到 `docs/DESIGN.md`，把 PDF 算法素材池搬到 `docs/ARCHITECTURE.md`；完成态 ISS 任务卡缩成单行摘要并归档到 `docs/DECISIONS.md`「ISS 任务归档」；活跃任务和进度日志精简在 TASKS.md。
+- 2026-06-03：首次跑 doc-curator first-baseline.sh：把 AGENTS.md / README.md / docs/{ROADMAP,ARCHITECTURE,DESIGN,DECISIONS,TASKS}.md / CHANGELOG.md 的真实行数与 TASKS.md 活跃任务卡数 9 写入 state.json baselines；后续 scan.sh 用基线 × 1.5 作为自适应告警阈值。同步修复 first-baseline.sh bug：原版把 `\n` 字面量写进 JSON 导致 state.json 不是合法 JSON，改用 `printf` 拼装 baselines 与外层结构。

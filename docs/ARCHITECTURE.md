@@ -661,3 +661,73 @@ FaroPDF 可复用本机 `legal-skills` 中成熟 PDF 脚本的算法，但不直
 - UI 层只调用统一 job model，不直接解析脚本 stdout。
 - 外部 API 和密钥由设置页管理；联网 OCR 必须主动确认。
 - 所有处理默认输出新 PDF，不覆盖原始材料。
+
+## 文档健康监控（doc-curator）
+
+FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADMAP.md` / `docs/DESIGN.md` / `docs/ARCHITECTURE.md` / `CHANGELOG.md` / `README.md` / `AGENTS.md`）在多 ISS 并行推进时容易膨胀：进度日志堆叠、归档条目散落、ISS 与 DEC 编号跳号、活跃任务与已完成任务边界模糊。`doc-curator` 是部署在 `.claude/skills/doc-curator/` 的项目级文档瘦身 subagent。
+
+### 角色
+
+- **体检**：定期扫描上述文件，输出 JSON 行 + markdown 报告；覆盖硬性（hard）、自适应（adaptive）、软提示（soft）三档。
+- **维护**：发现 `docs/TASKS.md` 进度日志 > 5 条、ISS 归档条目未升序、DEC 编号跳号、各文件行数超过基线 × 1.5 等情况，自动 trim / 补指针 / 提 maintenance PR。
+- **隔离**：不修改 `src/` / `src-tauri/` / `tests/`；不写 `CHANGELOG.md`（由 `release-workflow` 维护）；不直接 push 到 main。
+
+### 触发流程
+
+```text
+Agent 流程（git-workflow）
+  ↓
+gh pr create / gh pr merge 成功
+  ↓
+Agent 主动调起 doc-curator subagent
+  ↓
+scan.sh → JSON 行 + markdown 报告
+  ↓
+解析报告：
+  ├─ 全部 ok → 结束
+  ├─ soft 提示 → 写入 PR 描述跟进项，不动作
+  └─ hard / adaptive 告警 →
+       ├─ 工作区干净 → maintenance-pr.sh
+       │     ├─ 创建 chore/doc-curator-<date> 分支
+       │     ├─ 机械 trim / 补指针
+       │     ├─ 推 + gh pr create（标签 automated,docs,maintenance）
+       │     └─ 结束
+       └─ 工作区不干净 → 仅报告，让用户处理
+```
+
+触发时机（详见 `.claude/skills/git-workflow/SKILL.md` v1.3.0「## 4. PR 工作流」末尾两个小节）：
+
+- `gh pr create` 成功后：调起 subagent 关注「本次变更带来的影响」。
+- `gh pr merge` 成功后：调起 subagent 关注「main 整体健康度」。
+
+### 阈值与基线
+
+- **硬性规则**（不缩）：进度日志 ≤ 5、ISS 归档条目升序、DEC 编号连续、归档指针必须指向 `DECISIONS.md`。
+- **自适应规则**：`docs/TASKS.md` 活跃任务数、`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADMAP.md` / `docs/DESIGN.md` / `docs/ARCHITECTURE.md` / `AGENTS.md` 的总行数；阈值 = 首跑基线 × 1.5。
+- **软提示**：`CHANGELOG.md` 最近 release entry 是否存在、`README.md`「当前状态」段是否同步。
+- 首跑由 `first-baseline.sh` 测量各文件大小并写入 `state.json`；后续 scan 自动按新基线判定。
+
+### 与其他 Skill 的关系
+
+| Skill | 关系 |
+| --- | --- |
+| `git-workflow` v1.3.0 | 在 `gh pr create` / `gh pr merge` 成功后由 Agent 主动调起 doc-curator；不依赖 hooks。 |
+| `release-workflow` | `CHANGELOG.md` 由该 Skill 维护；doc-curator 对 CHANGELOG 只做软提示。 |
+| `cross-agent-coordination` / `multi-agent-orchestration` | maintenance PR 的归属和状态由这些 Skill 协调。 |
+| `git-batch-commit` | maintenance PR 的 commit 标题和拆分粒度遵循该 Skill 的 `chore` 规则。 |
+
+### 退出码
+
+| 退出码 | 含义 | 调用方处理 |
+| --- | --- | --- |
+| 0 | 全部 ok | 不动作 |
+| 1 | hard 失败 | 必须提 maintenance PR |
+| 2 | adaptive 警告 | 建议提 maintenance PR |
+| 3 | soft 提示 | 可忽略 |
+
+### 配置文件
+
+- 监控文件清单与阈值：`.claude/skills/doc-curator/config/faropdf.yaml`。
+- 基线与历史：`.claude/skills/doc-curator/state.json`。
+- 修改阈值：编辑 `config/faropdf.yaml`，下次 scan 自动生效。
+- 重置基线：删除 `state.json` 的 `baselines` 字段后跑 `first-baseline.sh`。

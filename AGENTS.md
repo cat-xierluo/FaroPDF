@@ -70,6 +70,7 @@ FaroPDF 的协作依赖 `.claude/skills/` 下的 Skill 统一协议、门禁和�
 | 多 Agent / subagent / worktree 并行 / 跨会话交接 | `multi-agent-orchestration`、`cross-agent-coordination` | worker 文件范围边界、PM 派工、跨平台归属与交接 |
 | `docs/TASKS.md` 任务领取、状态更新、归档迁移 | `cross-agent-coordination` | 任务状态机、归属和归档入口由该 Skill 管理 |
 | 发布与版本变更 | `release-workflow` | 版本号、CHANGELOG 与发版流程 |
+| 文档膨胀 / 归档不一致 / PR 创建后 / PR 合并后 | `doc-curator` | 文档瘦身 subagent 跑体检，必要时自动提 maintenance PR；post-action 触发，不阻断 PR |
 
 通用原则：
 
