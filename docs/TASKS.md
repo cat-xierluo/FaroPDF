@@ -190,6 +190,19 @@ Agent 可根据本文件自行判断：
 - 目标：调研 PDF Expert 类直接编辑文字、图片、链接和对象的实现成本，以及是否需要商业 SDK、Rust 后端或其他 PDF 引擎。
 - 验收：形成技术取舍记录；不在 v0.1 阻塞阅读、批注、OCR、页面整理和导出工具。
 
+### ISS-025 Agent 集成（Q&A 抽屉 + OCR 后处理 + 跨卷宗分析）
+
+- 优先级：P2
+- 类型：Agent / 工程
+- 状态：暂缓（v0.3 不进入关键路径；设计已归档到 `docs/plans/2026-06-03-agent-integration-design.md`）
+- 建议分支：`feat/agent-integration`
+- 建议 worktree：`.claude/worktrees/tmux-agent-integration`
+- 依赖：ISS-007、ISS-009、ISS-021、ISS-022
+- 范围（预留）：`src/modules/agent/`、`src/shared/agent/`、`src-tauri/src/agent/`、`src/components/agent/AgentDrawer.tsx`、设置页 Agent section
+- 目标：把本机 Claude Code CLI 作为 sidecar 一次性 spawn，提供 PDF 问答 / 摘要、OCR 后处理 / 文字层修正、跨文档案卷分析 / 证据链整理三类能力；批注在左、agent 抽屉在右，遵循 PDF Expert 风格无常驻 Inspector；走全局开关 consent。
+- 回归条件：ISS-007 真实双层 PDF 落地、ISS-013 真实压缩落地、ISS-022 设置浮层合并，或 v0.3 整体收口。
+- 不在 v0.3 实施；后续回到这个方向时从设计文档 §6 / §7 / §8 切入。
+
 ## 归档任务索引
 
 已合并到 main 或第一版已发布的功能，详细任务卡归档在 `docs/DECISIONS.md` 的「ISS 任务归档」一节。索引按领域分组：
