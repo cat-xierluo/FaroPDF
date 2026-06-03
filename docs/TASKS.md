@@ -110,6 +110,20 @@ Agent 可根据本文件自行判断：
 - 目标：调研 PDF Expert 类直接编辑文字、图片、链接和对象的实现成本，以及是否需要商业 SDK、Rust 后端或其他 PDF 引擎。
 - 验收：形成技术取舍记录；不在 v0.1 阻塞阅读、批注、OCR、页面整理和导出工具。
 
+### ISS-021 批注深化（高亮/手写/图章）
+
+- 优先级：P0
+- 类型：批注
+- 状态：进行中（几何/搜索/图章模板/工具条 model 与 Overlay/Toolbar UI 第一版已落地，导出引擎批注绘制与侧边栏筛选接入待后续）
+- 建议分支：`feat/annotation-tools`
+- 建议 worktree：`.claude/worktrees/tmux-annotation-tools`
+- 依赖：ISS-002、ISS-004
+- 范围：`src/modules/annotation/`、`src/components/layout/AnnotationOverlay.tsx`、`src/components/layout/AnnotationToolbar.tsx`、相关测试
+- 目标：在批注 sidecar 基础上接入几何坐标、搜索过滤、图章 SVG 模板、工具条状态机和 PDF 页面之上的批注 overlay（点击/拖拽/手写三种交互）。
+- 验收：批注模式上下文工具条可选择 9 种工具、6 色色板和 5 套图章模板（含自定义文字），Overlay 支持高亮/下划线/删除线/矩形/箭头拖拽、备注/文本框/图章点击、手写连续绘制；批注几何由 `geometry` 统一规整并允许在 viewport 内钳制；批注搜索按页码/类型/颜色/关键词四类过滤组合；图章 SVG 由模板渲染并按 4:1 viewBox 缩放。
+- 当前进度：已在 `feat/annotation-tools` 落地 geometry（normalizeRect、pointsToRect、unionRects、inkStrokesToRect、lineToRect、recomputeLineRects、recomputeInkRects、sanitizeRects、isRectWithinBounds、clampRectToBounds、annotationBoundingRect）、search（collectAnnotationSearchHaystack、matchesQuery/matchesPageFilter/matchesTypeFilter/matchesColorFilter、searchAnnotations 与默认空白选项）、stamps（5 套模板 STAMP_TEMPLATES/STAMP_TEMPLATE_LIST、resolveStampTemplate 兜底、renderStampSvg 输出 4:1 viewBox 矩形/圆角/椭圆/横幅 4 种 shape 的 SVG 子树）、toolbarModel（ANNOTATION_TOOL_LIST/ANNOTATION_TOOL_MAP、ANNOTATION_COLOR_SWATCHES、AnnotationToolState 与 armAnnotationTool/disarmAnnotationTool/setAnnotationColor/setAnnotationStampName/setAnnotationStampLabel reducer）。本次提交新增 AnnotationOverlay（点击/拖拽/手写 3 种交互、6 种批注 glyph 渲染、draft/preview 流）、AnnotationToolbar（9 工具按钮、6 色色板、stamp 子区段）和 11 项 toolbar 单元测试。
+- 下一步：在 `AppShell` 把 Overlay 与 Toolbar 接入批注模式上下文；把搜索过滤接入侧边栏；把图章模板预览接入图章子区段；把 geometry/sidecar 串通到导出引擎做真实批注绘制。
+
 ## 归档任务索引
 
 已合并到 main 或第一版已发布的功能，详细任务卡归档在 `docs/DECISIONS.md` 的「ISS 任务归档」一节。索引按领域分组：
@@ -117,7 +131,7 @@ Agent 可根据本文件自行判断：
 - **工程基础**：ISS-001、ISS-011、ISS-012
 - **阅读核心**：ISS-002
 - **检索**：ISS-003
-- **批注**：ISS-004
+- **批注**：ISS-004、ISS-021
 - **导出 / 法律材料**：ISS-005、ISS-013
 - **页面管理 / 证据材料**：ISS-006、ISS-018
 - **OCR / 质量**：ISS-010、ISS-017
@@ -132,8 +146,8 @@ Agent 可根据本文件自行判断：
 
 只保留最近 5 条；更早的条目在 `docs/DECISIONS.md` 工作日志。
 
+- 2026-06-03：在 `feat/annotation-tools` 推进 ISS-021 批注深化第一版：补齐 AnnotationOverlay（点击/拖拽/手写 3 种交互、6 种批注 glyph 渲染、draft/preview 流）、AnnotationToolbar（9 工具按钮、6 色色板、stamp 子区段）和 11 项 toolbar 单元测试；后续接入 AppShell 与侧边栏筛选。
 - 2026-06-03：在 `feat/reader-thumbnails` 推进 ISS-002 阅读深化第三步：`pdfReaderService` 暴露 `renderThumbnail`、Sidebar 接入 PDF.js 真实缩略图、`PdfPage` 用 IntersectionObserver 同步当前页；通过 PR #14 合并到 main。
 - 2026-06-03：合并 `feat/ocr-quality`（ISS-017）和 `feat/evidence-image-pack`（ISS-018）到 `main`；ISS-017 质量检查报告和 ISS-018 A4 编排计划器第一版完成。
 - 2026-06-03：从前一个到达上下文上限的 session 接手，创建 `docs/HANDOFF.md` 交接文件。
 - 2026-06-03：合并 `feat/reader-canvas-render-clean` 和 `feat/annotation-sidebar-list` 的 canvas 渲染 + 批注侧边栏 UI 到 main；创建 PR #12 走正式合并流程；清理重复分支和 worktree。
-- 2026-06-03：解耦 `docs/TASKS.md`：把 PDF Expert UI 探索素材池和品牌与视觉资产搬到 `docs/DESIGN.md`，把 PDF 算法素材池搬到 `docs/ARCHITECTURE.md`；完成态 ISS 任务卡缩成单行摘要并归档到 `docs/DECISIONS.md`「ISS 任务归档」；活跃任务和进度日志精简在 TASKS.md。

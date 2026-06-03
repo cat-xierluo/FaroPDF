@@ -398,6 +398,32 @@ ISS-017 第一版先建立 OCR 质量检查的共享契约和纯逻辑服务，�
 - 同步在 skill 自身的 `CHANGELOG.md`、`DECISIONS.md`、`TASKS.md` 记录。
 - 当前不修改根目录 `CHANGELOG.md`：那是产品功能变更日志，skill 维护变更不打断版本号；如后续需要版本对齐，由 PM 在下一次发版时一并处理。
 
+## DEC-026 批注深化第一版采用几何/搜索/图章模板/工具条 model + Overlay/Toolbar UI 组合
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联分支：`feat/annotation-tools`
+- 关联 ISS：ISS-021
+
+ISS-021 第一版在批注 sidecar 模型（ISS-004）之上，把批注从 JSON 持久化扩展为可交互的批注工具，采用几何规整、搜索过滤、图章 SVG 模板、工具条状态机和 PDF 页面 overlay 的组合方案：
+
+- 几何坐标统一以 `{ x, y, width, height }` 规整表达：normalizeRect/pointsToRect 用于拖拽矩形和两点矩形，lineToRect/recomputeLineRects 统一箭头线段的单 rect，inkStrokesToRect/recomputeInkRects 把多笔手写 strokes 收成单 rect，unionRects/sanitizeRects 处理多 rect 合并与退化清理，isRectWithinBounds/clampRectToBounds/annotationBoundingRect 给 PDF 视口钳制边界。所有几何纯函数接受不可入参并返回新对象，便于 redux 风格的 reducer 化处理。
+- 批注搜索用 haystack 字符串一次性 collect 批注 id、type、pageIndex、color、quote、content 和 stamp.label，再走 matchesQuery（大小写不敏感、空白折叠）/matchesPageFilter/matchesTypeFilter/matchesColorFilter 四类过滤；searchAnnotations 默认空白选项返回所有批注，避免 UI 过滤条件未填时显示空列表。
+- 图章 SVG 模板用 4:1 viewBox（400×100）固定尺寸和"矩形/圆角/椭圆/横幅"4 种 shape，renderStampSvg 输出不含外层 `<svg>` 的子树，给 React 走 `dangerouslySetInnerHTML` 注入；stamp 文字经 escapeXml 防 XSS，缺失 label/颜色时回退到 `defaultLabel`/`defaultColor`。
+- 工具条 model 采用不可变 reducer：`armAnnotationTool` 在同工具再次点击时返回 `activeToolType: null`（保持显式取消语义），stamp 工具会顺手回填 `stampLabel` 为当前 stampName 的默认文字；`setAnnotationStampName` 切换 stamp 模板时也强制把 label 重置为模板 defaultLabel，避免出现"已阅 + 重点"这种串味组合。
+- PDF overlay 设计为"零自管理状态 + 不可变 draft"：drag 由 useRef 持有 start/current 两点，ink 用 ref 累积 strokes，所有状态在 pointerup 时一次性 build 不可变 AnnotationDraftInput 上抛，preview 也走 build 路径但写入 `id: "preview"` 的占位 annotation；这样 Overlay 可以无副作用地重新挂载，也方便和未来的撤销/重做栈对接。
+- Toolbar 严格受控：state 由父组件传入，组件内只调用 `onStateChange` 派发不可变 next state，工具条本身不持有任何会与父组件脱钩的内部 state；stamp 子区段在 activeToolType !== "stamp" 时整体不渲染，避免无关工具下出现图章 UI 噪音。
+- Overlay 与 Toolbar 通过 typed `onAnnotationDraft` 回调衔接：Overlay 不知道工具条存在，Toolbar 也不知道 Overlay 存在，连接由 AppShell 持有 AnnotationToolState 并把 activeToolType/activeColor/activeStampName/activeStampLabel 透传给 Overlay。
+
+原因：批注深化涉及几何、SVG 渲染、PointerEvent 状态机和受控 UI 多条独立的技术决策，必须各自固定边界，避免出现"几何返回可变对象"、"search 误把 type=ink 排除在外"、"stamp label 串味"、"overlay 自管理状态污染受控父级"这类跨分支难以复现的边角 bug。第一版把可测试的纯函数/不可变 reducer/typed 回调一次性建好，后续接入侧边栏筛选、撤销栈和导出引擎绘制可以继续在同一边界内推进。
+
+影响：
+
+- `src/modules/annotation/geometry.ts`、`search.ts`、`stamps.ts`、`toolbarModel.ts` 是纯逻辑层，可被 Overlay、Toolbar、侧边栏、导出引擎批注绘制和未来 undo/redo 共享。
+- `src/components/layout/AnnotationOverlay.tsx` 和 `AnnotationToolbar.tsx` 暂未挂到 AppShell；接入时只需要在 AppShell 新增 armed state 并把 activeToolType/activeColor/activeStampName/activeStampLabel 透传，无需修改 Overlay/Toolbar 内部结构。
+- 图章 SVG 通过 dangerouslySetInnerHTML 注入，label/颜色输入边界已在 `resolveStampTemplate` 和 `renderStampSvg` 内做 escape 与回退；后续接入颜色选择器时需要确保颜色也走 escape 路径（目前 hex 字符串本身安全）。
+- 不修改 `src/shared/pdf/annotation.ts`：annotation type 第一版已固定，不在本批注深化范围内调整。
+
 ## ISS 任务归档
 
 `docs/TASKS.md` 收敛为活跃/暂缓任务入口；已完成 ISS 的详细任务卡迁移到本节，保留为单行摘要。后续如需恢复为正式 ISS，先在本节追加"恢复"标注，再回到 `docs/TASKS.md` 新增。
@@ -451,3 +477,4 @@ ISS-017 第一版先建立 OCR 质量检查的共享契约和纯逻辑服务，�
 - 2026-06-03：在 `feat/reader-thumbnails` 推进 ISS-002 阅读深化第三步：`pdfReaderService` 暴露 `renderThumbnail(pageIndex, canvas, maxWidth)` 并按最长边等比缩放，1px 兜底避免 `maxWidth<=0` 时除零；`useReaderController` 透出该方法供 Sidebar 调用；`DocumentSummaryPanel` 用 IntersectionObserver 懒加载每个缩略图，未提供 `renderThumbnail` 时回退占位；`PdfPage` 用 `IntersectionObserver`（阈值 0.5）回调 `onPageVisible` 同步 `currentPage`；AppShell 把 `reader.setCurrentPage` 透传给 `ReaderCanvas`。
 - 2026-06-03：`searchUi.test.tsx` 中"第 N 页"按钮名原先只匹配搜索结果列表，新增缩略图按钮后改为通过 `within(searchResults)` 作用域，避免在多个候选上抛 `getMultipleElementsFoundError`。
 - 2026-06-03：按用户反馈中文化 git-workflow 描述部分：PR body 模板的 `## Summary` / `## Test plan` 改为 `## 摘要` / `## 测试计划`，PR 正文最低要求表区块改为「摘要」「测试计划」「Agent 归属」「关联任务」「风险」，references 中"Multi-Skill"改为"多 Skill"；保留英文类型前缀和通用 Git 术语。Skill 升级为 v1.2.0，并在 skill 自身和项目级 DECISIONS 同步记录。
+- 2026-06-03：在 `feat/annotation-tools` 完成 ISS-021 批注深化第一版：新增 `AnnotationOverlay`（点击/拖拽/手写 3 种交互、6 种批注 glyph 渲染、draft/preview 流）、`AnnotationToolbar`（9 工具按钮、6 色色板、stamp 子区段）和 11 项 toolbar 单元测试；新增 DEC-026 固定几何/搜索/图章 SVG 模板/工具条 model 的边界。typecheck/test/build 三件套通过（292 测试）。
