@@ -1,6 +1,7 @@
 import type {
   PdfExportFileRequest,
   PdfPageOperation,
+  PdfPageOperationExportMode,
   PdfPageOrganizerAction,
   PdfPageOrganizerDocument,
   PdfPageOrganizerPage,
@@ -35,6 +36,16 @@ export interface PageOrganizerExportRequestInput {
   outputPath?: string;
   requestedAt?: string;
   fingerprint?: string;
+  /**
+   * 页面操作导出模式：
+   * - `execute`（默认，第二阶段）：导出引擎使用 pdf-lib 真实改写 PDF 页面顺序、旋转与删除；
+   * - `plan-only`（第一版）：仅在 summary 中记录计划，不真实改写字节。
+   *
+   * 切换为 `execute` 时，调用方需保证传入的 inputPath 在前端是绝对路径并可由
+   * `createPdfExportService` 读取，否则 `pdfExportService.exportToPath` 会因
+   * 路径或读不到文件抛出明确错误。
+   */
+  mode?: PdfPageOperationExportMode;
 }
 
 export function createPageOrganizerState(input: CreatePageOrganizerStateInput): PdfPageOrganizerState {
@@ -216,7 +227,7 @@ export function createPageOrganizerExportRequest(
       {
         id: `${id}-page-operations`,
         type: "page-operations",
-        mode: "plan-only",
+        mode: input.mode ?? "execute",
         operations: buildPageOperations(state, id, requestedAt),
       },
     ],

@@ -207,7 +207,7 @@ describe("page organizer", () => {
     ).toThrow("只能恢复已删除页面。");
   });
 
-  test("builds a plan-only export request with a safe organized output path", () => {
+  test("builds an execute export request by default with a safe organized output path", () => {
     const initial = createPageOrganizerState({
       id: "organizer-1",
       pageCount: 3,
@@ -245,7 +245,7 @@ describe("page organizer", () => {
         expect.objectContaining({
           id: "export-pages-1-page-operations",
           type: "page-operations",
-          mode: "plan-only",
+          mode: "execute",
         }),
       ],
     });
@@ -258,6 +258,28 @@ describe("page organizer", () => {
       { angle: 90, rotation: 90 },
       { deleted: true },
     ]);
+  });
+
+  test("keeps plan-only mode when caller explicitly overrides it", () => {
+    const state = createPageOrganizerState({
+      pageCount: 2,
+      sourcePath: "/case/source.pdf",
+      createdAt: FIXED_TIME,
+    });
+    const rotated = rotateOrganizerPages(state, {
+      pageIds: ["page-1"],
+      angle: 90,
+      createdAt: FIXED_TIME,
+    });
+
+    const request = createPageOrganizerExportRequest(rotated, {
+      id: "export-pages-plan-only",
+      mode: "plan-only",
+      requestedAt: FIXED_TIME,
+    });
+
+    const pageOperation = request.operations[0] as PdfPageOperationsExportOperation;
+    expect(pageOperation.mode).toBe("plan-only");
   });
 
   test("rejects destructive export paths that resolve to the source PDF", () => {
