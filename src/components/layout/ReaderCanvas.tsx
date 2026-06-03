@@ -17,6 +17,8 @@ interface ReaderCanvasProps {
   searchState?: TextSearchState;
   /** 由 reader controller 提供的 canvas 渲染方法 */
   renderPageToCanvas?: RenderPageToCanvasFn;
+  /** 滚动时检测当前可见页并同步到 reader state；可选，未提供时不启用滚动同步 */
+  onPageVisible?: (pageNumber: number) => void;
 }
 
 const fileInputStyle: CSSProperties = {
@@ -28,7 +30,7 @@ const fileInputStyle: CSSProperties = {
 
 const recentPlaceholders = ["卷宗材料.pdf", "合同附件.pdf", "扫描件.pdf"];
 
-export function ReaderCanvas({ onOpenFile, readerState, searchState, renderPageToCanvas }: ReaderCanvasProps) {
+export function ReaderCanvas({ onOpenFile, onPageVisible, readerState, searchState, renderPageToCanvas }: ReaderCanvasProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const document = readerState.document;
 
@@ -129,6 +131,7 @@ export function ReaderCanvas({ onOpenFile, readerState, searchState, renderPageT
         {readerState.renderRange.pageNumbers.map((pageNumber) => (
           <PdfPage
             key={pageNumber}
+            onVisible={onPageVisible}
             pageNumber={pageNumber}
             pageWidth={pageWidth}
             pageHeight={pageHeight}
@@ -162,6 +165,8 @@ interface PdfPageProps {
   highlights: Array<{ id: string; active: boolean; matchText: string }>;
   textLayerStatus: TextLayerStatus;
   renderPageToCanvas?: RenderPageToCanvasFn;
+  /** 页面进入视口时通知父组件，用于同步 currentPage */
+  onVisible?: (pageNumber: number) => void;
 }
 
 function PdfPage({
@@ -173,8 +178,10 @@ function PdfPage({
   highlights,
   textLayerStatus,
   renderPageToCanvas,
+  onVisible,
 }: PdfPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
   // 渲染失败标记，用于决定是否隐藏 fallback
   const [renderFailed, setRenderFailed] = useState(false);
 
@@ -207,12 +214,36 @@ function PdfPage({
     };
   }, [pageNumber, zoom, renderPageToCanvas]);
 
+  // 滚动同步：页面进入视口 50% 以上时通知父组件，用于更新 currentPage
+  useEffect(() => {
+    const node = sectionRef.current;
+    if (!node || typeof IntersectionObserver === "undefined" || !onVisible) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            onVisible(pageNumber);
+            break;
+          }
+        }
+      },
+      { threshold: [0.5] },
+    );
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+    };
+  }, [pageNumber, onVisible]);
+
   const showCanvas = !!renderPageToCanvas && !renderFailed;
   // fallback 始终存在于 DOM 中（保持测试兼容），canvas 成功时通过 CSS 隐藏
   const fallbackHidden = showCanvas;
 
   return (
-    <section className="pdf-page" aria-label={`第 ${pageNumber} 页`} style={pageStyle}>
+    <section className="pdf-page" aria-label={`第 ${pageNumber} 页`} ref={sectionRef} style={pageStyle}>
       <div className="page-container" style={{ width: pageWidth, height: pageHeight, position: "relative" }}>
         {/* 真实 PDF canvas 渲染层 */}
         {showCanvas && (

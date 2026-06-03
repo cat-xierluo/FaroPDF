@@ -168,4 +168,81 @@ describe("pdfReaderService", () => {
 
     await loaded.destroy();
   });
+
+  test("renderThumbnail 将页面按 maxWidth 缩放后写入 canvas", async () => {
+    const { adapter, renderMock } = createAdapter();
+    const data = new Uint8Array([1, 2, 3]);
+
+    const loaded = await loadPdfFromBytes(
+      { data, fileName: "thumbnail-test.pdf" },
+      adapter,
+    );
+
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(() => ({ fillRect: vi.fn() })),
+    } as unknown as HTMLCanvasElement;
+
+    // 第 1 页 baseViewport = 612x792；maxWidth=240 → scale ≈ 0.392
+    await loaded.renderThumbnail(0, canvas, 240);
+
+    const expectedScale = 240 / 612;
+    const expectedWidth = Math.round(612 * expectedScale);
+    const expectedHeight = Math.round(792 * expectedScale);
+    expect(canvas.width).toBe(expectedWidth);
+    expect(canvas.height).toBe(expectedHeight);
+    expect(canvas.getContext).toHaveBeenCalledWith("2d");
+    expect(renderMock).toHaveBeenCalled();
+    const renderArgs = renderMock.mock.calls[0] as unknown as [{ canvasContext: unknown; viewport: { width: number; height: number } }];
+    // PDF.js viewport 是浮点；canvas.width/height 已四舍五入，viewport 维度可以更精确
+    expect(renderArgs[0].viewport.width).toBeCloseTo(expectedWidth, 0);
+    expect(renderArgs[0].viewport.height).toBeCloseTo(expectedHeight, 0);
+
+    await loaded.destroy();
+  });
+
+  test("renderThumbnail 使用 1-based PDF.js 页码", async () => {
+    const { adapter, getPage } = createAdapter();
+    const data = new Uint8Array([1, 2, 3]);
+
+    const loaded = await loadPdfFromBytes(
+      { data, fileName: "thumbnail-page-number.pdf" },
+      adapter,
+    );
+
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(() => ({})),
+    } as unknown as HTMLCanvasElement;
+
+    await loaded.renderThumbnail(1, canvas, 100);
+    expect(getPage).toHaveBeenCalledWith(2);
+
+    await loaded.destroy();
+  });
+
+  test("renderThumbnail 在 maxWidth<=0 时使用 1px 兜底而非除零", async () => {
+    const { adapter } = createAdapter();
+    const data = new Uint8Array([1, 2, 3]);
+
+    const loaded = await loadPdfFromBytes(
+      { data, fileName: "thumbnail-zero.pdf" },
+      adapter,
+    );
+
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(() => ({})),
+    } as unknown as HTMLCanvasElement;
+
+    // 不抛错即可；canvas 尺寸保持 1px 兜底
+    await expect(loaded.renderThumbnail(0, canvas, 0)).resolves.toBeUndefined();
+    expect(canvas.width).toBeGreaterThanOrEqual(1);
+    expect(canvas.height).toBeGreaterThanOrEqual(1);
+
+    await loaded.destroy();
+  });
 });

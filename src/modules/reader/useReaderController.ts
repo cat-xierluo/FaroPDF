@@ -81,6 +81,17 @@ export function useReaderController(settings: AppSettings) {
     return loadedDocument.renderPageToCanvas(pageIndex, canvas, zoom);
   }, []);
 
+  /** 将指定页以缩略图尺寸渲染到 canvas，maxWidth 约束最长边像素。文档未打开时 no-op。 */
+  const renderThumbnail = useCallback(async (pageIndex: number, canvas: HTMLCanvasElement, maxWidth: number) => {
+    const loadedDocument = loadedDocumentRef.current;
+
+    if (!loadedDocument) {
+      return;
+    }
+
+    return loadedDocument.renderThumbnail(pageIndex, canvas, maxWidth);
+  }, []);
+
   return {
     state,
     openFile,
@@ -89,6 +100,7 @@ export function useReaderController(settings: AppSettings) {
     setViewMode,
     getPageText,
     renderPageToCanvas,
+    renderThumbnail,
   };
 }
 

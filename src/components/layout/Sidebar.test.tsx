@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { PdfAnnotation } from "../../shared/pdf/annotation";
-import { DocumentSummaryPanel } from "./Sidebar";
+import { DocumentSummaryPanel, type RenderThumbnailFn } from "./Sidebar";
 
 /** 创建测试用批注 */
 function createTestAnnotation(overrides: Partial<PdfAnnotation> & { id: string; pageIndex: number }): PdfAnnotation {
@@ -137,5 +137,154 @@ describe("DocumentSummaryPanel 批注列表", () => {
     // 没有内容摘要的 span
     const button = screen.getByRole("button", { name: /矩形 - 第 1 页$/ });
     expect(button).toBeInTheDocument();
+  });
+});
+
+describe("DocumentSummaryPanel 缩略图", () => {
+  // IntersectionObserver 在 jsdom 中不可用，组件内已做兜底直接显示 canvas 占位
+  // 这里只需要关注组件逻辑，无需 mock IO
+
+  beforeEach(() => {
+    vi.useRealTimers();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test("未打开文档时显示占位提示", () => {
+    render(<DocumentSummaryPanel hasDocument={false} pageCount={0} />);
+
+    expect(screen.getByText("打开 PDF 后显示缩略图")).toBeInTheDocument();
+  });
+
+  test("打开文档后渲染全部页码的缩略图条目", () => {
+    render(<DocumentSummaryPanel hasDocument={true} pageCount={3} currentPage={1} />);
+
+    const list = screen.getByTestId("thumbnail-list");
+    const items = within(list).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    expect(items[0]).toHaveAttribute("data-page-number", "1");
+    expect(items[2]).toHaveAttribute("data-page-number", "3");
+  });
+
+  test("当前页的缩略图有 thumbnail-item--current 标记和 aria-current", () => {
+    render(<DocumentSummaryPanel hasDocument={true} pageCount={5} currentPage={3} />);
+
+    const currentItem = screen.getByTestId("thumbnail-list").querySelector('[data-page-number="3"]');
+    expect(currentItem).not.toBeNull();
+    expect(currentItem).toHaveAttribute("aria-current", "page");
+    expect(currentItem).toHaveClass("thumbnail-item--current");
+  });
+
+  test("点击缩略图调用 onSelectPage 并传入 0-based pageIndex", async () => {
+    const user = userEvent.setup();
+    const onSelectPage = vi.fn();
+    const renderThumbnail = vi.fn<RenderThumbnailFn>(async () => undefined);
+
+    render(
+      <DocumentSummaryPanel
+        currentPage={1}
+        hasDocument={true}
+        onSelectPage={onSelectPage}
+        pageCount={4}
+        renderThumbnail={renderThumbnail}
+      />,
+    );
+
+    const fourthPageButton = screen.getByRole("button", { name: "第 4 页" });
+    await user.click(fourthPageButton);
+
+    expect(onSelectPage).toHaveBeenCalledTimes(1);
+    expect(onSelectPage).toHaveBeenCalledWith(3);
+  });
+
+  test("提供 renderThumbnail 时为每个页码渲染一个 canvas 元素", () => {
+    const renderThumbnail = vi.fn<RenderThumbnailFn>(async () => undefined);
+
+    render(
+      <DocumentSummaryPanel
+        currentPage={1}
+        hasDocument={true}
+        pageCount={3}
+        renderThumbnail={renderThumbnail}
+      />,
+    );
+
+    // 三个页码应分别有 canvas 元素
+    expect(screen.getByTestId("thumbnail-canvas-1")).toBeInTheDocument();
+    expect(screen.getByTestId("thumbnail-canvas-2")).toBeInTheDocument();
+    expect(screen.getByTestId("thumbnail-canvas-3")).toBeInTheDocument();
+  });
+
+  test("pagesWithHits 中的页码显示命中标记", () => {
+    render(
+      <DocumentSummaryPanel
+        currentPage={1}
+        hasDocument={true}
+        pageCount={4}
+        pagesWithHits={new Set([2, 4])}
+      />,
+    );
+
+    // 第 2 页和第 4 页有命中标记
+    const page2 = screen.getByTestId("thumbnail-list").querySelector('[data-page-number="2"]') as HTMLElement;
+    const page4 = screen.getByTestId("thumbnail-list").querySelector('[data-page-number="4"]') as HTMLElement;
+    const page1 = screen.getByTestId("thumbnail-list").querySelector('[data-page-number="1"]') as HTMLElement;
+
+    expect(within(page2).getByText("命中")).toBeInTheDocument();
+    expect(within(page4).getByText("命中")).toBeInTheDocument();
+    expect(within(page1).queryByText("命中")).not.toBeInTheDocument();
+  });
+
+  test("有批注的页码显示批注标记", () => {
+    const annotations: PdfAnnotation[] = [
+      createTestAnnotation({ id: "ann-1", pageIndex: 0, type: "highlight" }),
+      createTestAnnotation({ id: "ann-2", pageIndex: 1, type: "note" }),
+    ];
+
+    render(
+      <DocumentSummaryPanel
+        annotations={annotations}
+        currentPage={1}
+        hasDocument={true}
+        pageCount={3}
+      />,
+    );
+
+    const page1 = screen.getByTestId("thumbnail-list").querySelector('[data-page-number="1"]') as HTMLElement;
+    const page2 = screen.getByTestId("thumbnail-list").querySelector('[data-page-number="2"]') as HTMLElement;
+    const page3 = screen.getByTestId("thumbnail-list").querySelector('[data-page-number="3"]') as HTMLElement;
+
+    expect(within(page1).getByText("批注")).toBeInTheDocument();
+    expect(within(page2).getByText("批注")).toBeInTheDocument();
+    expect(within(page3).queryByText("批注")).not.toBeInTheDocument();
+  });
+
+  test("ocrNeeded=true 时所有页码显示 OCR 标记", () => {
+    render(
+      <DocumentSummaryPanel
+        currentPage={1}
+        hasDocument={true}
+        ocrNeeded={true}
+        pageCount={3}
+      />,
+    );
+
+    const ocrMarkers = screen.getAllByText("OCR");
+    expect(ocrMarkers).toHaveLength(3);
+  });
+
+  test("ocrNeeded=false 时不显示 OCR 标记", () => {
+    render(
+      <DocumentSummaryPanel
+        currentPage={1}
+        hasDocument={true}
+        ocrNeeded={false}
+        pageCount={3}
+      />,
+    );
+
+    expect(screen.queryByText("OCR")).not.toBeInTheDocument();
   });
 });
