@@ -1,3 +1,20 @@
+## 0.1.0-alpha.7 - 2026-06-04
+
+- 阅读模式深化（DEC-034）：4 种 view mode（连续 / 单页 / 双页 / **适合宽度**）切换，缩放预设 8 项（50/75/100/125/150/200% / 适合宽度 / 适合页面），旋转 90° 步进（顺/逆时针），键盘翻页（PageUp/PageDown/方向键/Space/Home/End），阅读位置本地恢复（localStorage 持久化 fingerprint + currentPage + zoom + viewMode + rotation）。
+- 数据模型扩展：`PdfViewMode` 增加 `fit-width`；`PdfDocumentState` 增加 `rotation: 0 | 90 | 180 | 270`；新增 `ZOOM_PRESETS` 清单、`ReaderSession` 持久化类型、`PageRotation` 别名。
+- 新增 `src/modules/reader/viewMode.ts`：`calculateFitWidthZoom`（按容器宽度等比缩放，16px padding 防水平滚动条）、`calculateFitPageZoom`（取宽高限制较小值）、`resolveEffectiveZoom`（fit-width 模式下用容器宽度覆盖 manualZoom）、`applyZoomPresetId`（8 预设 id → viewMode + zoom）；纯函数覆盖 13 项单测。
+- 新增 `src/modules/reader/readerSessionStorage.ts`：`ReaderSessionStorage` 接口 + `createLocalStorageReaderSessionStorage`（生产）+ `createMemoryReaderSessionStorage`（测试）+ `normalizeReaderSession`（字段全校验） + 默认探测（localStorage 不可用时回退内存版）；key 命名空间 `faropdf:reader-session:<fingerprint>`；覆盖 13 项单测。
+- `useReaderController` 新增 `rotateClockwise / rotateCounterClockwise / setRotation / setZoomPreset / zoomIn / zoomOut / goToNextPage / goToPreviousPage / goToFirstPage / goToLastPage` 10 个动作；通过 `useEffect` 在 `fingerprint` 匹配时自动从 sessionStorage 恢复 `currentPage / zoom / viewMode / rotation`，并在状态变化后写回；首轮加载完成前不写回避免覆盖；新增 `useReaderControllerOptions.sessionStorage` 注入用于测试；新增 9 项 controller 单测覆盖旋转/翻页/缩放预设/session 加载/写回。
+- `readerReducer` 新增 `setRotation` / `rotate`（累加 90 度，跨 360 回 0） / `applySession`（fingerprint 不匹配时跳过）3 个 actions；`loadSucceeded` 初始 `rotation = 0`；`setZoom` 把 [0.25, 4] 夹紧抽成 `clampZoom` 工具；`readerReducer` 测试覆盖从 3 个扩到 10 个。
+- 新增 `useReaderKeyboard` hook：PageDown/Space/ArrowDown/ArrowRight 推进，PageUp/ArrowUp/ArrowLeft 回退，Home/End 跳首尾；double 模式下 Arrow 步进 2 页；input/textarea/contenteditable 元素内和 Cmd/Ctrl/Alt 组合键不拦截；覆盖 11 项单测。
+- `ReaderCanvas` 抽出 `DocumentReader` 子组件，`ResizeObserver` 监听容器宽度，fit-width 模式实时计算 effectiveZoom；rotation 90/270 时交换宽高参与计算；double 模式 `flexDirection: row` 并排；`PdfPage` 在单/双页模式下点击页边空白翻页（左半上一页、右半下一页）；暴露 `data-view-mode` / `data-page-number` / `data-rotation` 属性。`data-testid="reader-status-footer"` 给后续 StatusBar 接入。9 项 ReaderCanvas 单测覆盖 4 mode / rotation / 键盘 / renderPageToCanvas 调用。
+- `Sidebar.tsx` 的 `ViewSettingsPanel` 扩展为 4 视图按钮 + 8 缩放预设 + 顺/逆时针 90° 旋转按钮；`isFitWidth` 时强制高亮「适合宽度」缩放预设；`data-testid="view-mode-grid"` / `data-testid="zoom-preset-grid"` / `data-testid="rotate-grid"` 暴露。8 项 ViewSettingsPanel 单测覆盖 4 视图 + 8 预设 + 旋转 + 禁用态。
+- `AppShell` 接线：`reader.rotateClockwise / rotateCounterClockwise` 包装为 onRotate 回调；`reader.setZoomPreset` 包装为 onZoomPresetChange；按 0.01 容差把当前 zoom 推断为 `ZoomPresetId`（fit-width / fit-page 由 viewMode 决定，不由 zoom 匹配）。
+- 新增 `registerReadModeTools()` 通过 `registerModeTools("read", [...])` 注册 3 个 mode 工具：顺时针 / 逆时针 / 适合页面快捷；自动出现在 `Toolbar.tsx` 的 `ModeActiveTools` 区域（PR #20 DEC-032 注册表）；`App.tsx` 启动时一次性调用。**未直接修改 `Toolbar.tsx`**。6 项 readerModeTools 单测覆盖注册/disabled/3 个工具的 onClick 行为。
+- 兼容修订：`src/shared/pdf/types.ts` 的 `Record<PdfViewMode, string>` 标签字典加 `fit-width`；`src/modules/settings/SettingsPanel.tsx` 同样加 `fit-width`；`src/shared/contracts.test.ts` 的 `PdfDocumentState` 加上 `rotation: 0`；`src/shared/settings/defaults.ts` 的 `allowedViewModes` 集合加 `fit-width`。
+- 验证：53 个测试文件 / 435 个测试全部通过；`npm run typecheck` 干净；`npm run build` 成功。
+- 同步 `docs/DECISIONS.md` DEC-034 阅读模式深化方案；`docs/TASKS.md` 进度日志追加对应记录。
+
 ## 0.1.0-alpha.6 - 2026-06-03
 
 - 新增 ReaderToolbar 注册表基础设施（DEC-032）：新增 `src/components/layout/toolbarRegistry.ts` 暴露 `ToolbarState` / `ToolbarToolItem` 类型与 `registerModeTools` / `getModeTools` / `_resetToolbarRegistry` 三个函数；`getModeTools` 按 `AppModeId` 命名空间隔离，多次注册累加，**不**自动排序（调用方需 `slice().sort()` 后再渲染，避免污染注册表）。
