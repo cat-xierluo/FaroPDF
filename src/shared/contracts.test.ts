@@ -3,6 +3,10 @@ import { FAROPDF_MODULES, getModuleBoundary } from "./foundation/modules";
 import { createDefaultOcrQualityThresholds } from "./index";
 import type {
   AppSettings,
+  DocumentBoundary,
+  DocumentManifest,
+  DocumentManifestPage,
+  DocumentNamingSuggestion,
   ImagePackInputItem,
   ImagePackPlan,
   ImagePackSummary,
@@ -22,7 +26,7 @@ import type {
   PdfPageViewport,
   ScanPreprocessJob,
 } from "./index";
-import { A4_LANDSCAPE_SIZE_PT, A4_PORTRAIT_SIZE_PT } from "./index";
+import { A4_LANDSCAPE_SIZE_PT, A4_PORTRAIT_SIZE_PT, createTextSnippet, validateManifestInput } from "./index";
 
 describe("shared contracts", () => {
   test("models PDF state, operations, OCR jobs, and settings as worker-safe data", () => {
@@ -323,5 +327,37 @@ describe("shared contracts", () => {
     expect(getModuleBoundary("preprocess").sharedContracts).toContain("src/shared/preprocess");
     expect(getModuleBoundary("ocr").sharedContracts).toContain("src/shared/ocr");
     expect(getModuleBoundary("reader").ownedPaths).toContain("src/modules/reader");
+  });
+
+  test("models document organizer manifest as worker-safe data", () => {
+    const boundary: DocumentBoundary = {
+      betweenPageIndex: 2,
+      confidence: 0.85,
+      signals: ["blank-page"],
+    };
+    const manifestPage: DocumentManifestPage = {
+      pageIndex: 0,
+      textSnippet: createTextSnippet("合同正文内容"),
+      textLength: 6,
+      detectedBoundaries: [0],
+    };
+    const namingSuggestion: DocumentNamingSuggestion = {
+      startPage: 0,
+      endPage: 2,
+      suggestedName: "合同正文内容",
+      confidence: 0.7,
+    };
+    const manifest: DocumentManifest = {
+      id: "doc-manifest-test",
+      pages: [manifestPage],
+      suggestedBoundaries: [boundary],
+      suggestedNames: [namingSuggestion],
+      createdAt: "2026-06-03T00:00:00.000Z",
+    };
+
+    expect(manifest.pages[0].textSnippet).toBe("合同正文内容");
+    expect(manifest.suggestedBoundaries[0].confidence).toBe(0.85);
+    expect(manifest.suggestedNames[0].startPage).toBe(0);
+    expect(validateManifestInput({ pageTexts: ["a", "b"] }).valid).toBe(true);
   });
 });
