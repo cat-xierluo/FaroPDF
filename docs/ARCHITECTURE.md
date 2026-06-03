@@ -1,6 +1,6 @@
 # FaroPDF 架构文档
 
-> Last updated: 2026-06-02
+> Last updated: 2026-06-03
 
 ## 技术栈
 
@@ -641,4 +641,23 @@ FaroPDF 可复用本机 `legal-skills` 中成熟 PDF 脚本的算法，但不直
 - `pdf-organizer`：文字层检测、页级检查、文书边界 manifest、A4 标准化。
 - `img2pdf`：证据图片和 PDF 页面 A4 多图编排。
 
-产品实现上，UI 只调用统一 job model；Python 脚本或外部命令只能作为 Tauri 后台 bridge、sidecar 或未来算法移植来源。
+### 复用脚本与归属
+
+下表列出每个来源提供的关键脚本、可复用能力和当前归属的 ISS。脚本不直接进产品，只作为 Tauri 后台 bridge、sidecar 或未来算法移植来源；UI 只调用统一 job model。
+
+| 来源 | 重点脚本 | 可复用能力 | 当前归属 |
+| --- | --- | --- | --- |
+| `pdf-processor` | `pdf-preprocess-core.py`、`pdf_preprocess_skew.py`、`pdf-preprocess-ocr.py` | 扫描清洁、90 度方向检测、微倾斜校正、裁边、分块/并行预处理 | ISS-016 |
+| `pdf-processor` | `pdf-compress.py` | PyMuPDF 图像资源重编码、降采样、保留文字层/批注/书签的压缩统计 | ISS-013 |
+| `pdf-processor` | `pdf-ocr.py`、`pdf_ocr_paddle_api.py`、`pdf_ocr_mineru.py`、`pdf_ocr_layered.py` | PaddleOCR / MinerU / ocrmypdf provider、双层 PDF 叠层、API fallback | ISS-007、ISS-014 |
+| `pdf-processor` | `pdf-ocr-quality-check.py` | 可检索页比例、关键词命中率、体积比、耗时、可选 CER | ISS-017 |
+| `pdf-organizer` | `pdf_organizer.py` | 文字层检测、页级检查、文书边界信号、manifest、A4 标准化、拆分/合并/命名 | ISS-006、ISS-019 |
+| `img2pdf` | `img_to_pdf.py` | 图片或 PDF 页面按 A4 1/2/3/4 张每页编排 | ISS-018 |
+
+产品化原则：
+
+- 纯算法能力优先拆入 FaroPDF 模块，例如压缩、A4 编排、页码/Bates、水印、文字层检测、页级 manifest。
+- 重依赖能力走后台 bridge，例如 OpenCV 预处理、`ocrmypdf`、PaddleOCR API、MinerU API。
+- UI 层只调用统一 job model，不直接解析脚本 stdout。
+- 外部 API 和密钥由设置页管理；联网 OCR 必须主动确认。
+- 所有处理默认输出新 PDF，不覆盖原始材料。
