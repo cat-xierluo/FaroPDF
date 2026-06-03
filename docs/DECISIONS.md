@@ -398,7 +398,7 @@ ISS-017 第一版先建立 OCR 质量检查的共享契约和纯逻辑服务，�
 - 同步在 skill 自身的 `CHANGELOG.md`、`DECISIONS.md`、`TASKS.md` 记录。
 - 当前不修改根目录 `CHANGELOG.md`：那是产品功能变更日志，skill 维护变更不打断版本号；如后续需要版本对齐，由 PM 在下一次发版时一并处理。
 
-## DEC-026 批注深化第一版采用几何/搜索/图章模板/工具条 model + Overlay/Toolbar UI 组合
+## DEC-031 批注深化第一版采用几何/搜索/图章模板/工具条 model + Overlay/Toolbar UI 组合
 
 - 日期：2026-06-03
 - 状态：已采纳
