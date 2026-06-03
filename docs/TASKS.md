@@ -356,9 +356,8 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：法律材料整理
-- 状态：待处理
-- 建议分支：`feat/document-organizer-manifest`
-- 建议 worktree：`.claude/worktrees/tmux-document-organizer-manifest`
+- 状态：已完成（第一版 manifest 服务；真实 PDF 解析和 UI 接入待后续）
+- 建议分支：`feat/document-organizer-manifest`（已合并）
 - 依赖：ISS-003、ISS-006
 - 范围：`src/modules/organizer/`、`src/shared/organizer/`、文书整理相关测试
 - 参考算法：`pdf-organizer/scripts/pdf_organizer.py`
