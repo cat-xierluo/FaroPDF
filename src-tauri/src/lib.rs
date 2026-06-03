@@ -1,15 +1,31 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{
+    env,
     fs,
     net::IpAddr,
     path::{Path, PathBuf},
+    sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, State};
 use url::Url;
 
+mod ocr_credentials;
+mod ocr_dispatch;
+mod ocr_queue;
+mod ocr_text_extract;
+
+use ocr_credentials::{resolve_credential_reference, CredentialResolution};
+use ocr_dispatch::{dispatch_ocr, OcrDispatchBackend, OcrDispatchError, OcrDispatchRequest};
+use ocr_queue::{
+    current_iso_timestamp, empty_path_summary, redact_path, OcrJobQueue, OcrJobQueueState,
+    OcrStoredJob, OcrStoredProgress, OcrStoredQualityCheck, OcrStoredQualitySummary,
+};
+use ocr_text_extract::{extract_pdf_text, file_size_or_zero, summarize_extracted_pages};
+
 const SETTINGS_FILE_NAME: &str = "settings.json";
+const OCR_JOB_QUEUE_FILE: &str = "ocr-jobs.json";
 
 #[tauri::command]
 fn read_app_settings(app_handle: AppHandle) -> Result<Option<Value>, String> {
@@ -90,43 +106,185 @@ fn start_scan_preprocess_job(
 }
 
 #[tauri::command]
-fn start_ocr_job(request: OcrCommandRequest) -> Result<OcrCommandJob, String> {
+fn start_ocr_job(
+    request: OcrCommandRequest,
+    state: State<'_, OcrJobQueueState>,
+) -> Result<OcrCommandJob, String> {
     validate_ocr_request(&request)?;
+
+    let backend = OcrDispatchBackend::from_str(&request.provider.provider_type)
+        .ok_or_else(|| "OCR Provider 类型无效。".to_string())?;
 
     let input_path = PathBuf::from(request.input_path.trim());
     let output_path = resolve_ocr_output_path(
-        input_path,
+        input_path.clone(),
         request
             .output_path
             .as_ref()
             .map(|path| PathBuf::from(path.trim())),
     )?;
     let output_path_string = output_path.to_string_lossy().to_string();
-    let now = current_timestamp_string();
     let quality_check = request
         .quality_check
+        .clone()
         .unwrap_or_else(default_ocr_quality_check);
+    let now = current_iso_timestamp();
+    let id = format!("ocr-{now}");
 
-    Ok(OcrCommandJob {
-        id: format!("ocr-stub-{now}"),
-        input_path: request.input_path,
-        output_path: output_path_string,
-        page_range: request.page_range,
-        backend: request.provider.provider_type.clone(),
-        provider_id: request.provider.id,
-        status: "queued".to_string(),
-        output_strategy: request.output_strategy,
-        progress: OcrCommandProgress {
-            stage: "queued".to_string(),
+    let api_key = if matches!(backend, OcrDispatchBackend::PaddleOcr | OcrDispatchBackend::MinerU) {
+        match resolve_credential_reference(
+            request.provider.api_key_ref.as_deref().unwrap_or(""),
+        ) {
+            CredentialResolution::Resolved => {
+                resolve_api_key_for_dispatch(request.provider.api_key_ref.as_deref())?
+            }
+            CredentialResolution::MissingEnvVar(slot) => {
+                return Err(format!(
+                    "{} 凭证不可用：环境变量 {slot} 未设置。",
+                    ocr_provider_display_name(&request.provider)
+                ));
+            }
+            CredentialResolution::UnsupportedScheme(scheme) => {
+                return Err(format!(
+                    "{} 凭证不可用：{scheme} 暂未集成，请改用 env:&lt;NAME&gt;。",
+                    ocr_provider_display_name(&request.provider)
+                ));
+            }
+            CredentialResolution::NotResolvable(_) => {
+                return Err(format!(
+                    "{} 凭证不可用：apiKeyRef 不是可解析的引用。",
+                    ocr_provider_display_name(&request.provider)
+                ));
+            }
+        }
+    } else {
+        None
+    };
+
+    let stored = OcrStoredJob {
+        id: id.clone(),
+        input_path: request.input_path.clone(),
+        input_path_summary: redact_path(&request.input_path),
+        output_path: output_path_string.clone(),
+        output_path_summary: redact_path(&output_path_string),
+        page_range: request.page_range.clone(),
+        backend: backend.as_str().to_string(),
+        provider_id: request.provider.id.clone(),
+        status: "running".to_string(),
+        output_strategy: request.output_strategy.clone(),
+        progress: OcrStoredProgress {
+            stage: "dispatching-provider".to_string(),
             completed_pages: 0,
             total_pages: 0,
-            message: Some(
-                "等待后台 OCR bridge 接入，当前不会执行真实 OCR 或联网请求。".to_string(),
-            ),
+            message: Some(format!(
+                "{} 正在准备派发到 {}。",
+                ocr_provider_display_name(&request.provider),
+                backend_label(backend)
+            )),
         },
-        quality_check,
+        quality_check: OcrStoredQualityCheck {
+            enabled: quality_check.enabled,
+            sample_pages: quality_check.sample_pages.clone(),
+            keywords: quality_check.keywords.clone(),
+        },
+        quality: None,
+        error_message: None,
         created_at: now.clone(),
-        updated_at: now,
+        updated_at: now.clone(),
+        started_at: Some(now.clone()),
+        completed_at: None,
+    };
+    let queue_state = state.inner().clone();
+    state
+        .inner()
+        .0
+        .lock()
+        .expect("ocr job queue mutex poisoned")
+        .upsert(stored.clone())?;
+
+    let dispatch_request = OcrDispatchRequest {
+        backend,
+        input_path: request.input_path.clone(),
+        output_path: output_path_string.clone(),
+        page_range: request.page_range.clone(),
+        endpoint: request.provider.endpoint.clone(),
+        api_key,
+    };
+
+    let queue = queue_state;
+    let job_id = id.clone();
+    let provider_label = ocr_provider_display_name(&request.provider);
+    let quality_check_for_task = stored.quality_check.clone();
+    tauri::async_runtime::spawn(async move {
+        run_ocr_job(queue, job_id, dispatch_request, quality_check_for_task, provider_label).await;
+    });
+
+    Ok(stored_to_command_job(&stored, &request))
+}
+
+#[tauri::command]
+fn list_ocr_jobs(state: State<'_, OcrJobQueueState>) -> Result<Vec<OcrCommandJob>, String> {
+    let jobs = state
+        .inner()
+        .0
+        .lock()
+        .expect("ocr job queue mutex poisoned")
+        .list();
+    Ok(jobs
+        .into_iter()
+        .map(|job| stored_to_command_job(&job, &OcrCommandRequest::from_stored(&job)))
+        .collect())
+}
+
+#[tauri::command]
+fn poll_ocr_job(
+    job_id: String,
+    state: State<'_, OcrJobQueueState>,
+) -> Result<Option<OcrCommandJob>, String> {
+    let job = state
+        .inner()
+        .0
+        .lock()
+        .expect("ocr job queue mutex poisoned")
+        .get(&job_id);
+    Ok(job.map(|stored| {
+        let request = OcrCommandRequest::from_stored(&stored);
+        stored_to_command_job(&stored, &request)
+    }))
+}
+
+#[tauri::command]
+fn cancel_ocr_job(
+    job_id: String,
+    state: State<'_, OcrJobQueueState>,
+) -> Result<Option<OcrCommandJob>, String> {
+    let cancelled = state
+        .inner()
+        .0
+        .lock()
+        .expect("ocr job queue mutex poisoned")
+        .cancel(&job_id)?;
+    Ok(cancelled.map(|stored| {
+        let request = OcrCommandRequest::from_stored(&stored);
+        stored_to_command_job(&stored, &request)
+    }))
+}
+
+#[tauri::command]
+fn extract_ocr_text(pdf_path: String) -> Result<OcrTextExtractionResponse, String> {
+    let path = PathBuf::from(pdf_path.trim());
+    let pages = extract_pdf_text(&path).map_err(|error| error.short_message())?;
+    let summary = summarize_extracted_pages(&pages);
+    Ok(OcrTextExtractionResponse {
+        pages: pages
+            .into_iter()
+            .map(|page| OcrTextExtractionPage {
+                page_index: page.page_index,
+                text: page.text,
+            })
+            .collect(),
+        total_pages: summary.total_pages,
+        searchable_pages: summary.searchable_pages,
     })
 }
 
@@ -134,14 +292,32 @@ fn start_ocr_job(request: OcrCommandRequest) -> Result<OcrCommandJob, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            let queue = OcrJobQueue::new(ocr_job_queue_path(&app.handle())?);
+            app.manage(OcrJobQueueState(std::sync::Arc::new(Mutex::new(queue))));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             read_app_settings,
             write_app_settings,
             start_scan_preprocess_job,
-            start_ocr_job
+            start_ocr_job,
+            list_ocr_jobs,
+            poll_ocr_job,
+            cancel_ocr_job,
+            extract_ocr_text
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn ocr_job_queue_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    let mut app_config_dir = app_handle
+        .path()
+        .app_config_dir()
+        .map_err(|_| "无法定位应用设置目录。".to_string())?;
+    app_config_dir.push(OCR_JOB_QUEUE_FILE);
+    Ok(app_config_dir)
 }
 
 fn settings_file_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
@@ -247,6 +423,202 @@ fn is_sensitive_key(key: &str) -> bool {
     )
 }
 
+async fn run_ocr_job(
+    queue: OcrJobQueueState,
+    job_id: String,
+    dispatch_request: OcrDispatchRequest,
+    quality_check: OcrStoredQualityCheck,
+    provider_label: String,
+) {
+    let started_at_ms = current_unix_millis();
+    let dispatch_result = tauri::async_runtime::spawn_blocking(move || {
+        dispatch_ocr(&dispatch_request)
+    })
+    .await;
+
+    let mut guard = queue.0.lock().expect("ocr job queue mutex poisoned");
+    let _ = &mut guard;
+    let Some(mut job) = guard.get(&job_id) else {
+        return;
+    };
+
+    match dispatch_result {
+        Ok(Ok(result)) => {
+            job.status = "completed".to_string();
+            job.progress.stage = "completed".to_string();
+            job.progress.message = Some(format!(
+                "{} 完成双层 PDF 生成，输出大小 {} 字节。",
+                provider_label, result.output_size_bytes
+            ));
+            job.progress.completed_pages = result.total_pages;
+            let now = current_iso_timestamp();
+            job.updated_at = now.clone();
+            job.completed_at = Some(now);
+            job.error_message = None;
+
+            if quality_check.enabled {
+                let output_size = file_size_or_zero(Path::new(&job.output_path));
+                let input_size = file_size_or_zero(Path::new(&job.input_path));
+                let elapsed_ms = current_unix_millis().saturating_sub(started_at_ms);
+                match extract_pdf_text(Path::new(&job.output_path)) {
+                    Ok(pages) => {
+                        let summary = summarize_extracted_pages(&pages);
+                        let keywords = quality_check.keywords.clone();
+                        let matched = compute_matched_keywords(&pages, &keywords);
+                        let ratio = if input_size > 0 {
+                            Some(output_size as f64 / input_size as f64)
+                        } else {
+                            None
+                        };
+                        job.quality = Some(OcrStoredQualitySummary {
+                            searched_keywords: keywords,
+                            matched_keywords: matched,
+                            text_pages: summary.searchable_pages,
+                            empty_text_pages: summary.total_pages.saturating_sub(summary.searchable_pages),
+                            file_size_ratio: ratio,
+                            elapsed_ms: Some(elapsed_ms),
+                        });
+                        job.progress.message = Some(format!(
+                            "{} 完成 OCR 质量抽查：可检索页 {} / {}。",
+                            provider_label, summary.searchable_pages, summary.total_pages
+                        ));
+                    }
+                    Err(error) => {
+                        job.progress.message = Some(format!(
+                            "{} OCR 完成，但质量抽查不可用：{}",
+                            provider_label,
+                            error.short_message()
+                        ));
+                    }
+                }
+            }
+
+            let _ = guard.upsert(job.clone());
+        }
+        Ok(Err(error)) => {
+            job.status = "failed".to_string();
+            job.progress.stage = "failed".to_string();
+            job.error_message = Some(sanitize_dispatch_error(&error));
+            job.progress.message = Some(sanitize_dispatch_error(&error));
+            let now = current_iso_timestamp();
+            job.updated_at = now.clone();
+            if job.completed_at.is_none() {
+                job.completed_at = Some(now);
+            }
+            let _ = guard.upsert(job.clone());
+        }
+        Err(join_error) => {
+            job.status = "failed".to_string();
+            job.progress.stage = "failed".to_string();
+            job.error_message = Some(format!("OCR 任务派发失败：{join_error}"));
+            job.progress.message = Some(format!("OCR 任务派发失败：{join_error}"));
+            let now = current_iso_timestamp();
+            job.updated_at = now.clone();
+            if job.completed_at.is_none() {
+                job.completed_at = Some(now);
+            }
+            let _ = guard.upsert(job.clone());
+        }
+    }
+}
+
+fn compute_matched_keywords(pages: &[ocr_text_extract::OcrExtractedPage], keywords: &[String]) -> Vec<String> {
+    let full_text = pages
+        .iter()
+        .map(|page| page.text.clone())
+        .collect::<Vec<_>>()
+        .join("\n")
+        .to_lowercase();
+    keywords
+        .iter()
+        .filter(|keyword| full_text.contains(&keyword.to_lowercase()))
+        .cloned()
+        .collect()
+}
+
+fn sanitize_dispatch_error(error: &OcrDispatchError) -> String {
+    let message = error.short_message();
+    redact_path_in_message(&message)
+}
+
+fn redact_path_in_message(message: &str) -> String {
+    message
+        .replace(
+            &request_target_redaction(),
+            "[path]",
+        )
+}
+
+fn request_target_redaction() -> String {
+    // 占位：实际不依赖调用方路径，但保留 hook 给后续接入更精确的脱敏。
+    String::new()
+}
+
+fn backend_label(backend: OcrDispatchBackend) -> &'static str {
+    match backend {
+        OcrDispatchBackend::LocalOcrMyPdf => "本地 ocrmypdf",
+        OcrDispatchBackend::LegalSkills => "Legal Skills",
+        OcrDispatchBackend::PaddleOcr => "PaddleOCR API",
+        OcrDispatchBackend::MinerU => "MinerU API",
+    }
+}
+
+fn resolve_api_key_for_dispatch(api_key_ref: Option<&str>) -> Result<Option<String>, String> {
+    let Some(reference) = api_key_ref else {
+        return Ok(None);
+    };
+    if let Some(rest) = reference.trim().strip_prefix("env:") {
+        match env::var(rest) {
+            Ok(value) if !value.trim().is_empty() => return Ok(Some(value)),
+            _ => {
+                return Err(format!(
+                    "环境变量 {rest} 未设置或为空，请配置 apiKeyRef 后重试。"
+                ));
+            }
+        }
+    }
+    // 其他引用（keychain / credential: / credential-ref:）不在 Tauri 进程内
+    // 解析；调用方必须确保已接入对应解析器或改用 env:。
+    Err("当前仅支持 env:&lt;NAME&gt; 形式的 API Key 引用。".to_string())
+}
+
+fn stored_to_command_job(stored: &OcrStoredJob, request: &OcrCommandRequest) -> OcrCommandJob {
+    OcrCommandJob {
+        id: stored.id.clone(),
+        input_path: stored.input_path.clone(),
+        output_path: stored.output_path.clone(),
+        page_range: stored.page_range.clone(),
+        backend: stored.backend.clone(),
+        provider_id: stored.provider_id.clone(),
+        status: stored.status.clone(),
+        output_strategy: stored.output_strategy.clone(),
+        progress: OcrCommandProgress {
+            stage: stored.progress.stage.clone(),
+            completed_pages: stored.progress.completed_pages,
+            total_pages: stored.progress.total_pages,
+            message: stored.progress.message.clone(),
+        },
+        quality_check: OcrCommandQualityCheckRequest {
+            enabled: stored.quality_check.enabled,
+            sample_pages: stored.quality_check.sample_pages.clone(),
+            keywords: stored.quality_check.keywords.clone(),
+        },
+        quality: stored.quality.clone(),
+        error_message: stored.error_message.clone(),
+        created_at: stored.created_at.clone(),
+        updated_at: stored.updated_at.clone(),
+        started_at: stored.started_at.clone(),
+        completed_at: stored.completed_at.clone(),
+        input_path_summary: stored.input_path_summary.clone(),
+        output_path_summary: stored.output_path_summary.clone(),
+        network_consent_granted: request.network_consent_granted,
+        privacy_audit_redacted: request
+            .privacy_audit_record
+            .as_ref()
+            .map(|record| record.consent_status.clone()),
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ScanPreprocessCommandRequest {
@@ -330,6 +702,36 @@ struct OcrCommandRequest {
     quality_check: Option<OcrCommandQualityCheckRequest>,
 }
 
+impl OcrCommandRequest {
+    fn from_stored(stored: &OcrStoredJob) -> Self {
+        Self {
+            input_path: stored.input_path.clone(),
+            output_path: Some(stored.output_path.clone()),
+            page_range: stored.page_range.clone(),
+            provider: OcrCommandProvider {
+                id: stored.provider_id.clone(),
+                provider_type: stored.backend.clone(),
+                display_name: None,
+                endpoint: None,
+                api_key_ref: None,
+                enabled: true,
+                requires_network_consent: matches!(
+                    stored.backend.as_str(),
+                    "paddleocr" | "mineru"
+                ),
+            },
+            output_strategy: stored.output_strategy.clone(),
+            network_consent_granted: stored.privacy_audit_redacted_is_granted(),
+            privacy_audit_record: None,
+            quality_check: Some(OcrCommandQualityCheckRequest {
+                enabled: stored.quality_check.enabled,
+                sample_pages: stored.quality_check.sample_pages.clone(),
+                keywords: stored.quality_check.keywords.clone(),
+            }),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct OcrCommandProvider {
@@ -374,8 +776,18 @@ struct OcrCommandJob {
     output_strategy: String,
     progress: OcrCommandProgress,
     quality_check: OcrCommandQualityCheckRequest,
+    quality: Option<OcrStoredQualitySummary>,
+    error_message: Option<String>,
     created_at: String,
     updated_at: String,
+    started_at: Option<String>,
+    completed_at: Option<String>,
+    #[serde(default)]
+    input_path_summary: ocr_queue::RedactedPathSummary,
+    #[serde(default)]
+    output_path_summary: ocr_queue::RedactedPathSummary,
+    network_consent_granted: bool,
+    privacy_audit_redacted: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -385,6 +797,27 @@ struct OcrCommandProgress {
     completed_pages: u32,
     total_pages: u32,
     message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OcrTextExtractionPage {
+    page_index: u32,
+    text: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OcrTextExtractionResponse {
+    pages: Vec<OcrTextExtractionPage>,
+    total_pages: u32,
+    searchable_pages: u32,
+}
+
+impl OcrStoredJob {
+    fn privacy_audit_redacted_is_granted(&self) -> bool {
+        matches!(self.status.as_str(), "running" | "completed")
+    }
 }
 
 fn validate_scan_preprocess_request(request: &ScanPreprocessCommandRequest) -> Result<(), String> {
@@ -758,11 +1191,19 @@ fn is_valid_page_range(raw: &str) -> bool {
 }
 
 fn current_timestamp_string() -> String {
-    let millis = SystemTime::now()
+    current_unix_millis().to_string()
+}
+
+fn current_unix_millis() -> u64 {
+    SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis())
-        .unwrap_or(0);
-    millis.to_string()
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+#[allow(dead_code)]
+fn empty_redacted_path_summary() -> ocr_queue::RedactedPathSummary {
+    empty_path_summary()
 }
 
 #[cfg(test)]
@@ -788,7 +1229,7 @@ mod ocr_bridge_tests {
             provider_type: "paddleocr".to_string(),
             display_name: Some("PaddleOCR".to_string()),
             endpoint: Some("https://ocr.example.test/paddle".to_string()),
-            api_key_ref: Some("keychain:paddle".to_string()),
+            api_key_ref: Some("env:OCR_PADDLE_TOKEN".to_string()),
             enabled: true,
             requires_network_consent: true,
         }
@@ -800,7 +1241,7 @@ mod ocr_bridge_tests {
             provider_type: "mineru".to_string(),
             display_name: Some("MinerU".to_string()),
             endpoint: Some("https://ocr.example.test/mineru".to_string()),
-            api_key_ref: Some("env:MINERU_API_KEY".to_string()),
+            api_key_ref: Some("env:OCR_MINERU_TOKEN".to_string()),
             enabled: true,
             requires_network_consent: true,
         }
@@ -962,17 +1403,51 @@ mod ocr_bridge_tests {
     }
 
     #[test]
-    fn command_stub_returns_queued_ocr_job_with_safe_output_path() {
+    fn redact_path_summary_keeps_fingerprint_but_hides_value() {
+        let summary = redact_path("/tmp/secret.pdf");
+        assert_eq!(summary.kind, "local-pdf");
+        assert_eq!(summary.redacted, "[path].pdf");
+        assert!(!summary.fingerprint.is_empty());
+    }
+
+    #[test]
+    fn stored_to_command_job_preserves_status_and_progress() {
+        let stored = OcrStoredJob {
+            id: "ocr-1".to_string(),
+            input_path: "/tmp/source.pdf".to_string(),
+            input_path_summary: redact_path("/tmp/source.pdf"),
+            output_path: "/tmp/source-ocr.pdf".to_string(),
+            output_path_summary: redact_path("/tmp/source-ocr.pdf"),
+            page_range: None,
+            backend: "local-ocrmypdf".to_string(),
+            provider_id: "local-ocrmypdf".to_string(),
+            status: "running".to_string(),
+            output_strategy: "new-layered-pdf".to_string(),
+            progress: OcrStoredProgress {
+                stage: "running-provider".to_string(),
+                completed_pages: 0,
+                total_pages: 0,
+                message: Some("执行中".to_string()),
+            },
+            quality_check: OcrStoredQualityCheck {
+                enabled: false,
+                sample_pages: Vec::new(),
+                keywords: Vec::new(),
+            },
+            quality: None,
+            error_message: None,
+            created_at: "1000".to_string(),
+            updated_at: "1000".to_string(),
+            started_at: Some("1000".to_string()),
+            completed_at: None,
+        };
         let request = default_ocr_request();
-
-        let job = start_ocr_job(request).expect("queued OCR job");
-
-        assert_eq!(job.status, "queued");
-        assert_eq!(job.backend, "local-ocrmypdf");
-        assert_eq!(job.output_path, "/tmp/faropdf-fixtures/source-ocr.pdf");
-        assert_eq!(job.progress.stage, "queued");
-        assert_eq!(job.progress.completed_pages, 0);
-        assert_eq!(job.quality_check.enabled, true);
+        let job = stored_to_command_job(&stored, &request);
+        assert_eq!(job.id, "ocr-1");
+        assert_eq!(job.status, "running");
+        assert_eq!(job.progress.stage, "running-provider");
+        assert_eq!(job.started_at, Some("1000".to_string()));
+        assert!(job.completed_at.is_none());
     }
 }
 
