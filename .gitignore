@@ -39,6 +39,8 @@ htmlcov/
 .claude/settings.local.json
 .claude/skills/
 .claude/worktrees/
+.claude/agent-sessions/
 
 # Codex runtime
 .codex/
+.worktree-info/
