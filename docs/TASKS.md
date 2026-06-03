@@ -230,4 +230,3 @@ Agent 可根据本文件自行判断：
 - 2026-06-03：合并 `feat/ocr-quality`（ISS-017）和 `feat/evidence-image-pack`（ISS-018）到 `main`；ISS-017 质量检查报告和 ISS-018 A4 编排计划器第一版完成。
 - 2026-06-03：从前一个到达上下文上限的 session 接手，创建 `docs/HANDOFF.md` 交接文件。
 - 2026-06-03：合并 `feat/reader-canvas-render-clean` 和 `feat/annotation-sidebar-list` 的 canvas 渲染 + 批注侧边栏 UI 到 main；创建 PR #12 走正式合并流程；清理重复分支和 worktree。
-- 2026-06-03：解耦 `docs/TASKS.md`：把 PDF Expert UI 探索素材池和品牌与视觉资产搬到 `docs/DESIGN.md`，把 PDF 算法素材池搬到 `docs/ARCHITECTURE.md`；完成态 ISS 任务卡缩成单行摘要并归档到 `docs/DECISIONS.md`「ISS 任务归档」；活跃任务和进度日志精简在 TASKS.md。
