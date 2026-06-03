@@ -1,5 +1,15 @@
 # FaroPDF 变更记录
 
+## 0.1.0-alpha.5 - 2026-06-03
+
+- 真实接入 OCR bridge（ISS-007 第二版）：
+  - 后端按 provider 分发到本地 `ocrmypdf` 二进制（`local-ocrmypdf` / `legal-skills`）和 `curl + HTTPS endpoint`（PaddleOCR / MinerU）。
+  - 任务队列持久化到 `app_config_dir/ocr-jobs.json`，启动时回收残留 running 任务为 cancelled，支持 `list_ocr_jobs` / `poll_ocr_job` / `cancel_ocr_job` 三个新 command。
+  - 凭证引用解析：仅接受 `env:NAME` 等安全引用形式，明文 API Key 仍被 `isSafeApiKeyRef` 拒绝；`keychain:` 等暂未集成的引用返回明确错误。
+  - OCR 完成后通过 `pdftotext` 提取页面文本，喂给 ISS-017 `ocrQualityCheckService` 生成可检索页比例、关键词命中、体积比和耗时报告。
+  - 新增前端 `createTauriOcrJobController`、`createOcrPostProcessor` 和 `OcrModeToolbar` / `OcrJobList` / `OcrQualityReportView` 组件，识别文本 / 输出双层 PDF / 质量检查三个核心按钮；工具条作为独立组件交付，不改 `src/App.tsx` 和全局样式。
+  - 已知限制：本机需先安装 `ocrmypdf`、`pdftotext`、`curl`；`keychain:` 引用形式需后续 OS Keychain 集成落地。
+
 ## 0.1.0-alpha.4 - 2026-06-03
 
 - 新增阅读器缩略图真实渲染：`pdfReaderService` 暴露 `renderThumbnail`，`useReaderController` 提供对应方法；缩略图按 `maxWidth` 等比缩放并懒加载。

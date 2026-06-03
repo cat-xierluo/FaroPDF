@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ocr_dispatch::OcrDispatchBackend;
 
+#[allow(dead_code)]
 const OCR_JOB_QUEUE_FILE: &str = "ocr-jobs.json";
 const OCR_JOB_QUEUE_VERSION: u32 = 1;
 
@@ -110,6 +111,7 @@ impl OcrJobQueue {
         queue
     }
 
+    #[allow(dead_code)]
     pub fn file_path(&self) -> &PathBuf {
         &self.file_path
     }
@@ -181,6 +183,7 @@ impl OcrJobQueue {
         }
     }
 
+    #[allow(dead_code)]
     pub fn snapshot_by_backend(
         &self,
         backend: OcrDispatchBackend,
