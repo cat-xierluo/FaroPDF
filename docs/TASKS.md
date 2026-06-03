@@ -199,7 +199,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：导出
-- 状态：部分完成（导出引擎底座第一版；真实批注几何绘制、页面操作改写和 UI 接入待后续）
+- 状态：部分完成（导出引擎底座和真实页面操作已实现；批注几何绘制和 UI 接入待后续）
 - 建议分支：`feat/pdf-export-engine`
 - 建议 worktree：`.claude/worktrees/tmux-pdf-export-engine`
 - 依赖：ISS-011、ISS-004
@@ -214,7 +214,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：页面管理
-- 状态：进行中（第一版底座已完成；完整 UI、真实 PDF 页面改写和插入/合并/裁剪等高级操作待后续）
+- 状态：进行中（状态机底座和导出引擎 execute 模式已完成；完整 UI、插入/合并/裁剪等高级操作待后续）
 - 建议分支：`feat/page-organizer`
 - 建议 worktree：`.claude/worktrees/tmux-page-organizer`
 - 依赖：ISS-002、ISS-005
