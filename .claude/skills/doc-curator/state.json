@@ -1,0 +1,43 @@
+{
+  "version": "1",
+  "first_run": true,
+  "first_run_at": null,
+  "last_scan_at": null,
+  "multiplier": 1.5,
+  "baselines": {
+    "docs/TASKS.md": {
+      "line_count": 139,
+      "active_task_count": 3,
+      "measured_at": "2026-06-03"
+    },
+    "docs/DECISIONS.md": {
+      "line_count": 453,
+      "measured_at": "2026-06-03"
+    },
+    "docs/ROADMAP.md": {
+      "line_count": 129,
+      "measured_at": "2026-06-03"
+    },
+    "docs/DESIGN.md": {
+      "line_count": 192,
+      "measured_at": "2026-06-03"
+    },
+    "docs/ARCHITECTURE.md": {
+      "line_count": 663,
+      "measured_at": "2026-06-03"
+    },
+    "CHANGELOG.md": {
+      "line_count": 63,
+      "measured_at": "2026-06-03"
+    },
+    "README.md": {
+      "line_count": 68,
+      "measured_at": "2026-06-03"
+    },
+    "AGENTS.md": {
+      "line_count": 101,
+      "measured_at": "2026-06-03"
+    }
+  },
+  "history": []
+}
