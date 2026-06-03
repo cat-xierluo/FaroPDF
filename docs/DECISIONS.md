@@ -653,6 +653,51 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 - 不修改：`src/shared/pdf/annotation.ts`（sidecar schema 不变）、`package.json`、锁文件、`src/App.tsx`、全局样式、路由、其他模块（reader / pages / export / ocr / forms / settings）。
 - 已知限制：Overlay/Toolbar 是独立组件，未挂到 `AppShell`；接入时需要批注模式新增 armed state 并把 `activeToolType` / `activeColor` / `activeStampName` / `activeStampLabel` 透传给 Overlay，由后续 layout worker 在 `feat/pdf-expert-shell-ia` 或新建分支实现。
 
+## DEC-032 ReaderToolbar 重构为 mode 注册表（toolbarRegistry）
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联分支：`feat/reader-toolbar-refactor`
+- 关联任务：后续 W3 (Forms) / W4 (Reader modes) 接入
+
+承接 DEC-012 基础应用 Shell 与验证夹具中"PDF Expert 风格主工具栏"的硬编码实现，本决策记录把 `src/components/layout/Toolbar.tsx` 的 mode 工具渲染从硬编码列表迁移到注册表驱动模式，为后续各 mode worker（W3 Forms / W4 Reader modes）独立注册 mode 工具铺路。
+
+### 注册表契约
+
+- 新增 `src/components/layout/toolbarRegistry.ts`：
+  - `ToolbarState` 类型包含 `activeMode: AppModeId`、`reader: ReaderController`、`search: TextSearchController` 三个字段，是 ToolbarToolItem 闭包拿到的运行时上下文。
+  - `ToolbarToolItem` 类型包含 `id` / `modeId` / `order` / `icon`（React `ComponentType<{ size?: number }>`）/ `label` / `isActive(state)` / `onClick(state)` / 可选 `isDisabled(state)`，与 `AnnotationToolbar` 工具条 model 的扁平形状对齐，便于后续工具条组件复用同样的 item schema。
+  - `registerModeTools(modeId, items)` 追加 items 到该 mode 的命名空间（多次调用累加），`getModeTools(modeId)` 返回注册顺序的 items 数组（**不**自动排序，调用方负责 `slice().sort()` 后再渲染以避免污染注册表），`_resetToolbarRegistry()` 用于测试清理。
+  - 内部用 `Map<AppModeId, ToolbarToolItem[]>` 持有注册表，按 mode 隔离。
+- 新增 9 项单元测试覆盖：未注册返回空、追加、同 mode 多次累加、跨 mode 隔离、返回注册顺序（不自动 sort）、`isActive` / `onClick` 收到传入 state、`isDisabled` 可选、reset 清空。
+
+### Toolbar.tsx 接入
+
+- 在 `Toolbar` 函数体末尾新增内部组件 `ModeActiveTools`，构造 `state: ToolbarState = { activeMode, reader, search }`、调 `getModeTools(activeMode).slice().sort((a,b)=>a.order-b.order)`（slice 防原地排序污染注册表），按 `ToolbarToolItem` 渲染一组 `tool-button tool-button--icon`。
+- `ModeActiveTools` 挂在 `toolbar__group--modes` 内、4 个 mode 入口按钮**之后**——同 group 内的"模式入口 + 当前 mode 工具"两段式布局。
+- 4 个常驻 mode 入口按钮（annotate / export / forms / ocr）保留 Toolbar 内 `modeButtons` 数组硬编码渲染，不走注册表（这是 Toolbar 自己的事；后续各 mode worker 不应重复注册入口）。
+- 切换模式按钮的点击语义不变（`onModeChange(activeMode === id ? "read" : id)`），新增的 mode 工具渲染在 activeMode 为 "read" / "pages" / "export" 时全部为空（`getModeTools` 返回 `[]`），UI 与重构前完全一致。
+
+### 范围与依赖
+
+- 修改：`src/components/layout/Toolbar.tsx`（接入注册表 + 新增 ModeActiveTools）、`src/components/layout/types.ts`（已存在，未改）、**新增** `src/components/layout/toolbarRegistry.ts`、`src/components/layout/toolbarRegistry.test.ts`。
+- **不**修改各 mode 模块（`src/modules/reader/`、`src/modules/search/`、`src/modules/forms/`、`src/modules/annotation/`、`src/modules/pages/`、`src/modules/ocr/`）——那是各自 worker 的工作。
+- 不修改：`package.json`、锁文件、`src/App.tsx`、全局样式、路由、其他模块。
+
+### 后续各 mode worker 接入指南
+
+- W3 Forms：在 `src/modules/forms/` 下新建 `registerFormsToolbarTools.ts`（或类似），在 module 入口或 AppShell 初始化路径中调 `registerModeTools("forms", [addTextField, addSignature, ...])`；各 `ToolbarToolItem.isActive` 读 `state.activeMode === "forms"`、`onClick` 派发对应 reducer / controller 调用。
+- W4 Reader modes：类似地注册到 `"read"` / `"pages"` / `"export"` 等 mode 命名空间；如需禁用无文档状态，可选 `isDisabled: (state) => !state.reader.state.document`。
+- `isActive` / `onClick` 是闭包，可捕获模块内 state 与 controller；不需要 Toolbar 知道 mode 内部细节。
+- 任何 worker 都**不应**重复注册 4 个常驻 mode 入口按钮（annotate / export / forms / ocr），那是 Toolbar 的责任。
+
+### 已知限制
+
+- 当前 activeMode 工具区紧贴 4 个 mode 入口按钮放在同一 group 内，未做视觉分隔（无分隔条/竖线）；如未来工具过多影响排版，再在 group 内加 `::before` 分隔符或拆成独立 group。
+- `ToolbarState` 当前只暴露 `activeMode / reader / search`；如未来某 mode 工具需要 `onModeChange` / `onUtilityPanelChange` / annotation controller / ocr controller，再按需扩展（保持最小可用面）。
+- `getModeTools` 返回注册表内部引用，调用方应 `slice()` 复制后再排序，避免污染注册表（已写进测试与本决策）。
+- 注册表是模块级单例，热重载/HMR 时不会自动 reset；测试用 `_resetToolbarRegistry` 显式清理，运行时注册是单向的"加项"语义。
+
 ## ISS 任务归档
 
 `docs/TASKS.md` 收敛为活跃/暂缓任务入口；已完成 ISS 的详细任务卡迁移到本节，保留为单行摘要。后续如需恢复为正式 ISS，先在本节追加"恢复"标注，再回到 `docs/TASKS.md` 新增。
@@ -709,3 +754,4 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 - 2026-06-03：部署 doc-curator 项目级文档瘦身 subagent：`.claude/skills/doc-curator/`（SKILL.md / LICENSE.txt / CHANGELOG.md / config/faropdf.yaml / state.json / scripts/scan.sh / first-baseline.sh / maintenance-pr.sh / lib/{common,check-tasks,check-decisions,check-files}.sh）+ `.claude/agents/doc-curator.md`（自定义 Agent 注册，工具 Read/Grep/Glob/Bash/Edit/Write）；`AGENTS.md` Skill 强制调用表新增 doc-curator 行；`docs/TASKS.md` 新增 ISS-024，`docs/DECISIONS.md` 新增 DEC-028，`docs/ARCHITECTURE.md` 补角色说明，`.claude/skills/git-workflow/SKILL.md` 升级 v1.3.0 加 PR 创建后 / 合并后 post-action 触发小节；按用户反馈"再提交pr胡总和合并pr后去进行文档清理"采用 Agent 主动调起，不依赖 hooks。
 - 2026-06-03：解耦 `docs/TASKS.md`：把 PDF Expert UI 探索素材池和品牌与视觉资产搬到 `docs/DESIGN.md`，把 PDF 算法素材池搬到 `docs/ARCHITECTURE.md`；完成态 ISS 任务卡缩成单行摘要并归档到 `docs/DECISIONS.md`「ISS 任务归档」；活跃任务和进度日志精简在 TASKS.md。
 - 2026-06-03：首次跑 doc-curator first-baseline.sh：把 AGENTS.md / README.md / docs/{ROADMAP,ARCHITECTURE,DESIGN,DECISIONS,TASKS}.md / CHANGELOG.md 的真实行数与 TASKS.md 活跃任务卡数 9 写入 state.json baselines；后续 scan.sh 用基线 × 1.5 作为自适应告警阈值。同步修复 first-baseline.sh bug：原版把 `\n` 字面量写进 JSON 导致 state.json 不是合法 JSON，改用 `printf` 拼装 baselines 与外层结构。
+- 2026-06-03：在 `feat/reader-toolbar-refactor` 推进 DEC-032 ReaderToolbar 注册表基础设施：新增 `src/components/layout/toolbarRegistry.ts`（`ToolbarState` / `ToolbarToolItem` 类型 + `registerModeTools` / `getModeTools` / `_resetToolbarRegistry` 函数）和 9 项单元测试；`Toolbar.tsx` 末尾新增 `ModeActiveTools` 组件，挂在 `toolbar__group--modes` 内 4 个 mode 入口按钮之后，按 `getModeTools(activeMode).slice().sort()` 渲染当前 mode 工具；activeMode="read" 时为 `[]`，UI 与重构前一致；typecheck / 332 项测试 / build 三件套全绿。后续 W3 Forms / W4 Reader modes worker 在各自模块内 `registerModeTools("<mode>", [...])` 即可接入 mode 工具，不再改 Toolbar.tsx。

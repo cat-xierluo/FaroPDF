@@ -19,6 +19,7 @@ import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
 import { formatZoom, viewModeLabels } from "../../modules/reader/readerLabels";
 import type { PdfViewMode } from "../../shared/pdf/types";
+import { getModeTools, type ToolbarState } from "./toolbarRegistry";
 import type { AppModeId, UtilityPanelId } from "./types";
 
 interface ToolbarProps {
@@ -204,6 +205,11 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
             <span>{label}</span>
           </button>
         ))}
+        <ModeActiveTools
+          activeMode={activeMode}
+          reader={reader}
+          search={search}
+        />
       </div>
       <div className="toolbar__group toolbar__group--right" aria-label="搜索和设置">
         <div className="toolbar-search-wrap">
@@ -232,6 +238,40 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
         </button>
       </div>
     </header>
+  );
+}
+
+function ModeActiveTools({
+  activeMode,
+  reader,
+  search,
+}: {
+  activeMode: AppModeId;
+  reader: ReaderController;
+  search: TextSearchController;
+}) {
+  const state: ToolbarState = { activeMode, reader, search };
+  const items = getModeTools(activeMode)
+    .slice()
+    .sort((a, b) => a.order - b.order);
+
+  return (
+    <>
+      {items.map((item) => (
+        <button
+          aria-pressed={item.isActive(state)}
+          className="tool-button tool-button--icon"
+          disabled={item.isDisabled?.(state) ?? false}
+          key={item.id}
+          onClick={() => item.onClick(state)}
+          title={item.label}
+          type="button"
+        >
+          <item.icon size={16} />
+          <span>{item.label}</span>
+        </button>
+      ))}
+    </>
   );
 }
 
