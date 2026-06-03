@@ -44,6 +44,8 @@ export interface LoadedPdfDocument {
   getPageText: (pageIndex: number) => Promise<PdfPageText>;
   /** 将指定页渲染到 canvas 上 */
   renderPageToCanvas: (pageIndex: number, canvas: HTMLCanvasElement, zoom: number) => Promise<void>;
+  /** 将指定页以缩略图尺寸渲染到 canvas；maxWidth 约束最长边。失败时抛出错误。 */
+  renderThumbnail: (pageIndex: number, canvas: HTMLCanvasElement, maxWidth: number) => Promise<void>;
   destroy: () => Promise<void>;
 }
 
@@ -108,6 +110,30 @@ async function renderPageToCanvas(
   // PDF.js 渲染接口：page.render 接受 canvasContext 和 viewport
   const renderContext = { canvasContext: context, viewport };
   // page.render() 返回包含 promise 属性的对象
+  const renderResult = (page as unknown as { render(ctx: typeof renderContext): { promise: Promise<void> } }).render(renderContext);
+  await renderResult.promise;
+}
+
+/** 将指定页以缩略图尺寸渲染到 canvas，maxWidth 约束最长边像素。
+ *  scale = maxWidth / pageViewport.width；canvas 的 width/height 同步设置。 */
+async function renderThumbnail(
+  document: PdfJsDocumentLike,
+  pageIndex: number,
+  canvas: HTMLCanvasElement,
+  maxWidth: number,
+): Promise<void> {
+  const page = await document.getPage(pageIndex + 1);
+  const baseViewport = page.getViewport({ scale: 1 });
+  const safeMaxWidth = Math.max(1, maxWidth);
+  const scale = safeMaxWidth / Math.max(1, baseViewport.width);
+  const viewport = page.getViewport({ scale });
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return;
+  }
+  const renderContext = { canvasContext: context, viewport };
   const renderResult = (page as unknown as { render(ctx: typeof renderContext): { promise: Promise<void> } }).render(renderContext);
   await renderResult.promise;
 }
@@ -231,6 +257,7 @@ export async function loadPdfFromBytes(
     getPageViewport: (pageIndex, scale = 1) => readPageViewport(document, pageIndex, scale),
     getPageText: (pageIndex) => readPageText(document, pageIndex),
     renderPageToCanvas: (pageIndex, canvas, zoom) => renderPageToCanvas(document, pageIndex, canvas, zoom),
+    renderThumbnail: (pageIndex, canvas, maxWidth) => renderThumbnail(document, pageIndex, canvas, maxWidth),
     destroy: () => loadingTask.destroy?.() ?? Promise.resolve(),
   };
 }
