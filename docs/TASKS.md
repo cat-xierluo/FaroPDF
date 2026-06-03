@@ -160,14 +160,14 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：阅读核心
-- 状态：已完成
-- 建议分支：`feat/reader-core`
+- 状态：已完成（底座 + canvas 渲染）
+- 建议分支：`feat/reader-core` → `feat/reader-canvas-render-clean`
 - 建议 worktree：`.claude/worktrees/tmux-reader-core`
 - 依赖：ISS-001、ISS-011、ISS-012
 - 范围：`src/modules/reader/`、`src/shared/pdf/reader*`、阅读相关测试
 - 目标：接入 PDF.js，支持打开本地 PDF、worker 渲染、页面虚拟化、缩放、页码跳转、连续阅读、单页和双页视图。
 - 验收：几百页 PDF 打开后只渲染可见页附近；滚动和缩放不卡住主界面；阅读状态可被搜索、批注、页面整理模块复用。
-- 验证：`npm run typecheck`、`npm test`、`npm run lint`、`npm run build`、`cd src-tauri && cargo check`。当前实现已接入 PDF.js 加载、worker chunk、文件输入、阅读状态、缩放/视图模式和虚拟化范围计算；真实 canvas 渲染调度留给后续阅读深化。
+- 验证：`npm run typecheck`、`npm test`、`npm run lint`、`npm run build`、`cd src-tauri && cargo check`。当前实现已接入 PDF.js 加载、worker chunk、文件输入、阅读状态、缩放/视图模式、虚拟化范围计算和真实 canvas 渲染；连续滚动交互、缩略图、键盘翻页和上次页码恢复待后续阅读深化。
 
 ### ISS-003 文本层检测与全文搜索
 
@@ -187,7 +187,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：批注
-- 状态：已完成（sidecar 模型第一版；UI 列表和点击跳转后续接入）
+- 状态：已完成（sidecar 模型 + 侧边栏批注列表 UI + 点击跳转）
 - 建议分支：`feat/annotations-sidecar`
 - 建议 worktree：`.claude/worktrees/tmux-annotations-sidecar`
 - 依赖：ISS-002、ISS-011
@@ -401,3 +401,5 @@ Agent 可根据本文件自行判断：
 - 2026-06-02：从最新 `main` 启动下一批并行主线任务：`ISS-005` 使用 `feat/pdf-export-engine` 推进导出/扁平化底座，`ISS-007` 使用 `feat/ocr-bridge` 推进 OCR bridge；`ISS-006` 页面整理等待导出引擎稳定后再开。
 - 2026-06-02：`ISS-005` 在 `feat/pdf-export-engine` 完成导出引擎底座第一版：共享导出契约、pdf-lib 复制导出、表单 flatten、批注 sidecar plan-only 计划、页面操作 plan-only 入口和单元测试；真实批注绘制与页面操作改写继续后续任务。
 - 2026-06-03：合并 `feat/ocr-quality`（ISS-017）和 `feat/evidence-image-pack`（ISS-018）到 `main`；ISS-017 质量检查报告和 ISS-018 A4 编排计划器第一版完成。
+- 2026-06-03：从前一个到达上下文上限的 session 接手，创建 `docs/HANDOFF.md` 交接文件。
+- 2026-06-03：合并 `feat/reader-canvas-render-clean` 和 `feat/annotation-sidebar-list` 的 canvas 渲染 + 批注侧边栏 UI 到 main；创建 PR #12 走正式合并流程；清理重复分支和 worktree。
