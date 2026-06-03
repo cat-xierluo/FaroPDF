@@ -22,11 +22,24 @@ import type {
   PdfExportJob,
   PdfExportRequest,
   PdfExportResult,
+  PdfFormFillingInput,
+  PdfFormField,
+  PdfFormState,
   PdfPageOperation,
   PdfPageViewport,
+  PdfSignatureField,
+  PdfSignatureInput,
   ScanPreprocessJob,
 } from "./index";
-import { A4_LANDSCAPE_SIZE_PT, A4_PORTRAIT_SIZE_PT, createTextSnippet, validateManifestInput } from "./index";
+import {
+  A4_LANDSCAPE_SIZE_PT,
+  A4_PORTRAIT_SIZE_PT,
+  createTextSnippet,
+  isPdfFormFieldType,
+  validateFormFillingInput,
+  validateSignatureInput,
+  validateManifestInput,
+} from "./index";
 
 describe("shared contracts", () => {
   test("models PDF state, operations, OCR jobs, and settings as worker-safe data", () => {
@@ -359,5 +372,50 @@ describe("shared contracts", () => {
     expect(manifest.suggestedBoundaries[0].confidence).toBe(0.85);
     expect(manifest.suggestedNames[0].startPage).toBe(0);
     expect(validateManifestInput({ pageTexts: ["a", "b"] }).valid).toBe(true);
+  });
+
+  test("models PDF form fields, state, filling input and signature as worker-safe data", () => {
+    const formField: PdfFormField = {
+      id: "姓名",
+      name: "姓名",
+      type: "text",
+      pageIndex: 0,
+      value: "",
+      defaultValue: "",
+      required: true,
+      readOnly: false,
+      choices: [],
+      rect: { x: 50, y: 700, width: 200, height: 24 },
+    };
+    const formState: PdfFormState = {
+      fields: [formField],
+      fieldCount: 1,
+      fillable: true,
+    };
+    const fillingInput: PdfFormFillingInput = {
+      fieldId: "姓名",
+      value: "张三",
+    };
+    const signatureField: PdfSignatureField = {
+      fieldId: "signature-1",
+      pageIndex: 0,
+      rect: { x: 100, y: 100, width: 150, height: 50 },
+      imageType: "png",
+    };
+    const signatureInput: PdfSignatureInput = {
+      fieldId: "signature-1",
+      imageBytes: new Uint8Array([137, 80, 78, 71]),
+      imageType: "png",
+    };
+
+    expect(formField.type).toBe("text");
+    expect(formState.fieldCount).toBe(1);
+    expect(formState.fillable).toBe(true);
+    expect(fillingInput.value).toBe("张三");
+    expect(signatureField.imageType).toBe("png");
+    expect(isPdfFormFieldType("text")).toBe(true);
+    expect(isPdfFormFieldType("unknown")).toBe(false);
+    expect(validateFormFillingInput(fillingInput)).toBe(true);
+    expect(validateSignatureInput(signatureInput)).toBe(true);
   });
 });

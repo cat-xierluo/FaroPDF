@@ -71,6 +71,21 @@ export type {
 } from "./pdf/export";
 export type { PdfPageText } from "./pdf/text";
 export type {
+  PdfFormFieldType,
+  PdfFormField,
+  PdfFormState,
+  PdfFormFillingInput,
+  PdfSignatureField,
+  PdfSignatureImageType,
+  PdfSignatureInput,
+} from "./pdf/form";
+export {
+  PDF_FORM_FIELD_TYPES,
+  isPdfFormFieldType,
+  validateFormFillingInput,
+  validateSignatureInput,
+} from "./pdf/form";
+export type {
   AnnotationDocumentRef,
   AnnotationSidecar,
   AnnotationSidecarDocumentRef,
