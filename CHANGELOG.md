@@ -9,6 +9,11 @@
   - OCR 完成后通过 `pdftotext` 提取页面文本，喂给 ISS-017 `ocrQualityCheckService` 生成可检索页比例、关键词命中、体积比和耗时报告。
   - 新增前端 `createTauriOcrJobController`、`createOcrPostProcessor` 和 `OcrModeToolbar` / `OcrJobList` / `OcrQualityReportView` 组件，识别文本 / 输出双层 PDF / 质量检查三个核心按钮；工具条作为独立组件交付，不改 `src/App.tsx` 和全局样式。
   - 已知限制：本机需先安装 `ocrmypdf`、`pdftotext`、`curl`；`keychain:` 引用形式需后续 OS Keychain 集成落地。
+- 新增批注深化第一版（ISS-026）：在批注 sidecar 之上加入几何规整（normalizeRect/pointsToRect/unionRects/inkStrokesToRect/lineToRect/recomputeLineRects/recomputeInkRects/sanitizeRects/isRectWithinBounds/clampRectToBounds/annotationBoundingRect）、搜索过滤（collectAnnotationSearchHaystack + matchesQuery/matchesPageFilter/matchesTypeFilter/matchesColorFilter）、图章 SVG 模板（5 套模板、4:1 viewBox、矩形/圆角/椭圆/横幅 4 种 shape、escapeXml 注入）、工具条 model（ANNOTATION_TOOL_LIST/ANNOTATION_TOOL_MAP/ANNOTATION_COLOR_SWATCHES/AnnotationToolState + 5 个不可变 reducer）。
+- 新增 `AnnotationOverlay`：覆盖高亮/下划线/删除线/备注/文本框/矩形/箭头/手写/图章 9 种批注的点击/拖拽/手写 3 种交互模式，预览走 `id: "preview"` 占位 annotation 并通过 `onAnnotationDraft` 派发不可变 draft。
+- 新增 `AnnotationToolbar`：9 工具按钮 + 6 色色板 + 图章 5 模板子区段 + 图章文字输入，受控组件模式（外部 state + onStateChange）。
+- 新增 11 项 `AnnotationToolbar` 单元测试：覆盖 9 工具按钮渲染、arm/disarm、工具切换、颜色更新、图章选项可见性、图章文字修改、图章模板切换回填 defaultLabel 和 disabled 行为。
+- 新增 `docs/DECISIONS.md` DEC-031 记录批注深化的几何/搜索/图章/工具条边界；新增 `docs/TASKS.md` ISS-026 批注深化活跃任务卡和归档索引。
 
 ## 0.1.0-alpha.4 - 2026-06-03
 
