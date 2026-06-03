@@ -398,6 +398,27 @@ ISS-017 第一版先建立 OCR 质量检查的共享契约和纯逻辑服务，�
 - 同步在 skill 自身的 `CHANGELOG.md`、`DECISIONS.md`、`TASKS.md` 记录。
 - 当前不修改根目录 `CHANGELOG.md`：那是产品功能变更日志，skill 维护变更不打断版本号；如后续需要版本对齐，由 PM 在下一次发版时一并处理。
 
+## ISS 任务归档
+
+`docs/TASKS.md` 收敛为活跃/暂缓任务入口；已完成 ISS 的详细任务卡迁移到本节，保留为单行摘要。后续如需恢复为正式 ISS，先在本节追加"恢复"标注，再回到 `docs/TASKS.md` 新增。
+
+- **ISS-001 初始化 Tauri 应用脚手架**（P0，工程基础，已完成）— `feat/foundation-scaffold`：建立 Tauri v2 + React + TS + Vite 应用，补齐 `typecheck`/测试/构建脚本。
+- **ISS-002 PDF.js 快速阅读底座**（P0，阅读核心，已完成底座+canvas 渲染+缩略图+滚动同步）— `feat/reader-core` → `feat/reader-canvas-render-clean` → `feat/reader-thumbnails`：PDF.js 加载、worker chunk、虚拟化、真实 canvas、PDF.js 缩略图懒加载、阅读区滚动同步当前页。连续滚动/键盘翻页/缩放预设/页码恢复待后续。
+- **ISS-003 文本层检测与全文搜索**（P0，检索，已完成第一版）— `feat/text-search`：内存搜索会话、按批次页文本索引、命中列表、上下一个命中、当前页轻量高亮、文字层缺失/质量差 OCR 提示。真实几何高亮留阅读渲染深化。
+- **ISS-004 批注 sidecar 模型**（P0，批注，已完成 sidecar+侧边栏列表 UI+点击跳转）— `feat/annotations-sidecar`：`PdfAnnotation` 模型、sidecar 持久化（默认 `.faropdf/annotations/*.annotations.json`）、批注列表 UI 和跳转。
+- **ISS-005 PDF 导出与批注扁平化**（P0，导出，部分完成）— `feat/pdf-export-engine`：`pdfOperationEngine` 抽象、pdf-lib 复制/扁平化表单、批注与页面操作 plan-only 计划、绝对新 PDF 路径。批注几何绘制和 UI 接入待后续。
+- **ISS-006 页面整理工作台**（P0，页面管理，进行中）— `feat/page-organizer`：`PdfPageOrganizerState` 状态机、旋转/删除/重排/恢复/撤销、plan-only 导出请求。完整 UI、插入/合并/裁剪、A4 标准化、页级 manifest、Bates 编号待后续。
+- **ISS-010 法律材料隐私与联网 OCR 提示**（P0，安全，已完成第一版）— `feat/privacy-safety`：notice/consent 模型、`ocrPrivacyConsentGuard` 绑定指纹+nonce+有效期、API key 引用脱敏、bridge audit 衔接。真实 PaddleOCR/MinerU 调用和完整 UI 弹窗待后续。
+- **ISS-011 共享契约与模块边界**（P0，工程基础，已完成）— `feat/shared-contracts`：`PdfDocumentState`/`PdfPageViewport`/`PdfAnnotation`/`PdfPageOperation`/`PdfExportJob`/`OcrProviderConfig`/`OcrJob`/`AppSettings` 共享契约与 `FAROPDF_MODULES` 模块边界。
+- **ISS-012 基础应用 Shell 与验证夹具**（P0，UI/工程基础，已完成）— `feat/app-shell-foundation`：PDF Expert 风格主工具栏/按需左侧工具区/上下文工具条/页面管理工作台/状态栏/设置入口、测试 fixture 规则。
+- **ISS-013 水印、页码、Bates 编号与压缩**（P0，导出/法律材料，已完成交付工具导出底座第一版）— `feat/pdf-output-tools`：watermark/page-number/bates-number 导出 operation、`outputToolPlan` 摘要、`*-delivery.pdf` 安全输出请求、内置 Helvetica 文字水印（中文待字体）。压缩当前 plan-only。
+- **ISS-014 设置页与外部 OCR Provider 配置**（P0，设置/OCR，已完成）— `feat/settings-ocr-providers`：设置 service、Tauri read/write command、provider 校验、API Key 脱敏、设置页编辑。系统 Keychain 集成待后续。
+- **ISS-016 扫描清洁与校正 pipeline**（P0，扫描预处理，已完成 bridge 基础第一版）— `feat/scan-preprocess`：preprocess-only 任务契约、保守默认参数、参数校验、路径脱敏、前端 service、Tauri command bridge stub、queued 进度状态和测试。真实 OpenCV/PyMuPDF 处理和扫描/OCR 工具条接入待后续。
+- **ISS-017 OCR 质量检查**（P0，OCR/质量，已完成质量检查报告第一版）— `feat/ocr-quality`：`OcrQualityReport` 契约、默认阈值、输入校验、`ocrQualityCheckService` 纯函数。第一版不解析真实 PDF/不执行真实 OCR/不调用 PaddleOCR/MinerU。
+- **ISS-018 证据图片 A4 编排**（P1，页面管理/证据材料，已完成第一版 plan-only 编排计划器）— `feat/evidence-image-pack`：`imagePackPlanner` 纯函数规划器（auto 3/auto 1/平手回落/显式 2/4/逐项方向/固定方向/单元格纵横比/页边距/输出路径安全/空 items/越界/负 margin/零或 NaN 尺寸/`sort=name`/混合 image+pdf-page）。真实目录拾取、像素渲染、image/PDF I/O 待后续。
+- **ISS-019 文书整理 manifest 与规范命名**（P1，法律材料整理，已完成第一版 manifest 服务）— `feat/document-organizer-manifest`：页级检查索引、文书边界建议、拆分/合并 manifest、规范命名建议。真实 PDF 解析和 UI 接入待后续。
+- **ISS-020 临时应用图标**（P1，品牌/UI，已完成）— 暂用最初生成的灯塔图标，覆盖 `src-tauri/icons/` 和 `public/favicon.png`；后续正式品牌图标再继续简化。
+
 ## 工作日志
 
 - 2026-06-02：初始化项目上下文，固定名称、独立项目形态、首版范围、技术选型和安全边界。
