@@ -59,6 +59,24 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常阅读卷宗、证据�
 - 文件范围重叠、共享依赖多或存在强依赖链的任务可以同组；会争抢脚手架、锁文件、`src-tauri/`、`src/shared/` 或全局布局的任务必须谨慎拆分。
 - 分支和 worktree 命名遵循 `git-workflow` 与 `multi-agent-orchestration`：分支名写任务语义，worktree 路径可写本地执行来源前缀。
 
+## Skill 强制调用
+
+FaroPDF 的协作依赖 `.claude/skills/` 下的 Skill 统一协议、门禁和工作流规范。下面场景必须先调用对应 Skill 再行动，避免漏掉协议、提交门禁或交接约束：
+
+| 触发场景 | 必须先调用 | 调用的理由 |
+| --- | --- | --- |
+| git 提交、批量提交、commit message 拆分与归并 | `git-batch-commit` | 拆分粒度、commit 格式、PR 编号后缀由该 Skill 统一 |
+| 分支创建、PR、merge、worktree 切换、push 前安全检查 | `git-workflow` | 安全门禁、Monorepo 目录级 checkout、fail-closed 合并条件 |
+| 多 Agent / subagent / worktree 并行 / 跨会话交接 | `multi-agent-orchestration`、`cross-agent-coordination` | worker 文件范围边界、PM 派工、跨平台归属与交接 |
+| `docs/TASKS.md` 任务领取、状态更新、归档迁移 | `cross-agent-coordination` | 任务状态机、归属和归档入口由该 Skill 管理 |
+| 发布与版本变更 | `release-workflow` | 版本号、CHANGELOG 与发版流程 |
+
+通用原则：
+
+- 凡是「看起来可能要调用某个 Skill」的场景（即使只有 1% 概率），先调用再决定是否沿用。
+- Skill 加载后必须按其清单和门禁执行，不允许「看个大概就跳过」。
+- 触发表随项目 Skill 增删同步更新；新增 Skill 时必须在本节追加触发场景。
+
 ## 完成标准
 
 1. 功能或文档变更已完整落地。
