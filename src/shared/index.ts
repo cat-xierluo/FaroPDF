@@ -135,6 +135,31 @@ export {
   validateOcrQualityInput,
 } from "./ocr/quality";
 export type {
+  OcrCommandJob,
+  OcrJobFilter,
+  OcrStoredJob,
+  OcrStoredProgress,
+  OcrStoredQualityCheck,
+  OcrStoredQualitySummary,
+  OcrStoredRedactedPathSummary,
+  OcrTextExtractionPage,
+  OcrTextExtractionResponse,
+} from "./ocr/jobQueue";
+export {
+  formatOcrBackendLabel,
+  formatOcrStatusLabel,
+  isActiveOcrStatus,
+  isTerminalOcrStatus,
+} from "./ocr/jobQueue";
+export type {
+  CredentialReferenceInfo,
+  CredentialReferenceKind,
+} from "./ocr/credentialRef";
+export {
+  parseCredentialReference,
+  summarizeCredentialReference,
+} from "./ocr/credentialRef";
+export type {
   OcrNetworkConsentDecision,
   OcrPrivacyAuditRecord,
   OcrPrivacyConsentStatus,
