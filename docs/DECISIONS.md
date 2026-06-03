@@ -398,6 +398,99 @@ ISS-017 第一版先建立 OCR 质量检查的共享契约和纯逻辑服务，�
 - 同步在 skill 自身的 `CHANGELOG.md`、`DECISIONS.md`、`TASKS.md` 记录。
 - 当前不修改根目录 `CHANGELOG.md`：那是产品功能变更日志，skill 维护变更不打断版本号；如后续需要版本对齐，由 PM 在下一次发版时一并处理。
 
+## DEC-026 借鉴 folia 的发布与设置体验
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联任务：ISS-021、ISS-022、ISS-023
+
+决定：
+
+- v0.3 阶段将 FaroPDF 的发布能力对齐到 folia 同等水平：全平台桌面打包、GitHub release 自动发布、`tauri-plugin-updater` 自动更新签名验证。
+- v0.3 阶段将设置页从当前的扁平 `SettingsPanel` 升级为左侧导航 + 右侧多 section 的浮层，与 folia 的 `SettingsPage` 信息架构对齐，至少包含「常规 / 阅读 / OCR provider / 快捷键 / 关于」五个 section。
+- 在「关于」section 内增加作者卡，复用 folia 的「作者名 / GitHub / 微信二维码」三段式展示。
+
+参考实现：
+
+- `folia/src-tauri/Cargo.toml` 的 `tauri-plugin-updater` 依赖。
+- `folia/src-tauri/tauri.conf.json` 的 `plugins.updater.endpoints` + `pubkey` + `bundle.createUpdaterArtifacts = true`。
+- `folia/.github/workflows/release.yml` 跨平台矩阵发布流程。
+- `folia/src/components/SettingsPage.tsx` 与 `src/components/settings/*Section.tsx` 浮层布局。
+- `folia/src/components/settings/AboutSection.tsx` 关于 + 作者卡布局。
+
+不采纳（本期暂缓）：
+
+- 移动端（Android / iOS）打包与自动更新能力：Tauri v2 移动端更新链路与桌面不同，先在 `docs/RELEASE.md` 记录限制和后续计划，本期不进入 ISS-021 验收。
+- 关于页内的「贡献者」「第三方协议」子区：等 ISS-022 浮层稳定后再单独评估。
+
+## DEC-027 清理合并残留分支并启动 3 wave 多 worktree 推进
+
+- 日期：2026-06-03
+- 状态：已采纳
+- 关联任务：ISS-007、ISS-008、ISS-009、ROADMAP §2 §4
+
+### 清理
+
+合并 `feat/reader-canvas-render-clean`、`feat/annotation-sidebar-list`（PR #12）、`feat/forms-signing`（PR #13）、`feat/reader-thumbnails`（PR #14）和 docs 整理等提交到 `main` 后，4 个本地 feat 分支和 1 个远端 stale 分支残留为合并残留：
+
+- 本地 `feat/forms-signing`、`feat/reader-canvas-and-annotation-sidebar`、`feat/reader-thumbnails`：squash merge 不创建 merge edge，`git branch -d` 拒绝删除（"没有完全合并"）；这些分支上的提交在 `main` 已通过 PR #12/13/14 squash 重新生成 commit hash，功能代码在主线，仅失去分支 ref。
+- 远端 `origin/feat/reader-canvas-render`：`git push --delete` 删除，是 PR #12 合并前的旧 head ref，落后 `main` 9 个 commit。
+
+执行：
+
+- `git branch -D` 强制删除 3 个本地 feat 分支（`feat/reader-canvas-render` 用 `-d` 已删）。
+- `git push origin --delete feat/reader-canvas-render` 删除远端 stale ref。
+- 保留 `git reflog` 一周以上以备恢复：reflog 中的 commit SHA 仍可重建被删分支。
+
+不采纳（本期暂缓）：
+
+- 把"合并残留"做成自动化 git 钩子：现在一个 PM agent 即可手工清理，自动化收益不抵复杂度。
+
+### 3 wave 推进方案
+
+Foundation Gate 已完成（DEC-008），`docs/TASKS.md` 已明确 worker 范围限制和共享契约收口规则。v0.1 完整基础版剩余任务按 3 个 wave 并行推进：
+
+#### Wave 1（首批 2 个 worker，模块完全独立）
+
+- **W1 / ocr-worker**：ISS-007 OCR bridge 真实接入 — `feat/ocr-bridge` / `.claude/worktrees/tmux-ocr-bridge`
+  - 范围：`src/modules/ocr/`、`src/shared/ocr/`、`src-tauri/` OCR command、相关测试
+  - 内容：本地 `ocrmypdf` / Legal Skills 真实执行、PaddleOCR/MinerU API 凭证读取与调用、双层 PDF 生成、任务队列持久化、OCR 模式工具条
+- **W2 / annotation-worker**：批注深化（ROADMAP §4） — `feat/annotation-tools` / `.claude/worktrees/tmux-annotation-tools`
+  - 范围：`src/modules/annotation/`、AnnotationSidebar
+  - 内容：文本选择高亮/下划线/删除线、矩形/箭头/手写、常用图章（已阅/重点/待核/证据）、批注搜索与跳转
+
+两 worker 范围零冲突（modules/ocr vs modules/annotation，shared/ocr vs annotation 内部），可同时推进。
+
+#### Wave 2（前置：PM 重构 ReaderToolbar 为 mode 注册表）
+
+PM 在主目录 `main` 重构 `src/components/layout/ReaderToolbar`，把当前直接列 mode 改为"各 mode 注册 tool items"模式，让 W3（Forms）和 W4（Reader 模式）能并行不冲突。
+
+- **W3 / forms-worker**：ISS-008 表单签署扩展 — `feat/forms-signing` / `.claude/worktrees/tmux-forms-signing`
+  - 范围：`src/modules/forms/`、`src/shared/pdf/form*`
+  - 内容：手写签名、签名位置调整、图章、扁平化导出
+- **W4 / reader-modes-worker**：阅读模式深化（ROADMAP §2） — `feat/reader-modes` / `.claude/worktrees/tmux-reader-modes`
+  - 范围：`src/modules/reader/`（用注册表模式添加新 mode）
+  - 内容：连续/单页/双页/适合宽度、缩放/旋转、键盘翻页、恢复上次页码
+
+#### Wave 3（Wave 1+2 完成后）
+
+- **W5 / ui-worker**：ISS-009 设计系统 polish — `feat/pdf-expert-shell-ia` / `.claude/worktrees/tmux-pdf-expert-shell-ia`
+  - 范围：`src/components/`、`src/styles/`、各模块视觉整合
+  - 等所有 mode 落地后做视觉收口
+
+### 推进约束
+
+- 每个 worker 严格按 `docs/TASKS.md`「并行执行规则」限定修改范围。
+- 改共享契约（`src/shared/`、`package.json`、`src-tauri/`、路由、App.tsx、全局样式）前必须先回 PM 确认。
+- 每个 worker 在自己的 worktree 内提交、推送、创建 PR；PM 检查 diff 范围、验证结果和文档同步后再合并。
+- 不在 `main` 推进未审阅代码。
+
+### 风险点
+
+- W1 和 W3 都在 `src-tauri/` 加 command，需约定命名空间或按 wave 推进避免冲突。
+- W4 依赖 PM 重构 ReaderToolbar，Wave 2 不能并发启动。
+- 任何 wave 内 worker 发现需要改共享契约，回到 PM 等决策后再继续。
+
 ## ISS 任务归档
 
 `docs/TASKS.md` 收敛为活跃/暂缓任务入口；已完成 ISS 的详细任务卡迁移到本节，保留为单行摘要。后续如需恢复为正式 ISS，先在本节追加"恢复"标注，再回到 `docs/TASKS.md` 新增。
