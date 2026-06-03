@@ -51,6 +51,22 @@ async function createPdfWithMultipleFields(): Promise<Uint8Array> {
   return pdf.save();
 }
 
+/** 创建一个 2 页 PDF：第 1 页 1 个文本字段 + 第 2 页 1 个复选框 */
+async function createPdfWithFieldsOnMultiplePages(): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  const page1 = pdf.addPage([595, 842]);
+  const page2 = pdf.addPage([595, 842]);
+  const form = pdf.getForm();
+
+  const nameField = form.createTextField("name_on_page1");
+  nameField.addToPage(page1, { x: 50, y: 750, width: 200, height: 24 });
+
+  const agreeBox = form.createCheckBox("agree_on_page2");
+  agreeBox.addToPage(page2, { x: 50, y: 700, width: 16, height: 16 });
+
+  return pdf.save();
+}
+
 async function createEmptyPdf(): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.addPage([595, 842]);
@@ -63,7 +79,7 @@ async function createEmptyPdf(): Promise<Uint8Array> {
 
 function createTestFormService(): FormService {
   const engine = createPdfOperationEngine();
-  return createFormService({ engine });
+  return createFormService({ engine, now: () => "2026-06-04T00:00:00.000Z" });
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +130,18 @@ describe("表单服务", () => {
     expect(state.fillable).toBe(false);
   });
 
+  test("读取多页表单时 pageIndex 反映字段真实所在页（0-based）", async () => {
+    const pdfBytes = await createPdfWithFieldsOnMultiplePages();
+    const state = await service.readFormFields(pdfBytes);
+
+    expect(state.fieldCount).toBe(2);
+    const nameField = state.fields.find((field) => field.name === "name_on_page1");
+    const agreeField = state.fields.find((field) => field.name === "agree_on_page2");
+
+    expect(nameField?.pageIndex).toBe(0);
+    expect(agreeField?.pageIndex).toBe(1);
+  });
+
   test("填写文本字段成功", async () => {
     const pdfBytes = await createPdfWithTextField("name_field");
     const updatedBytes = await service.fillFormField(pdfBytes, {
@@ -121,7 +149,6 @@ describe("表单服务", () => {
       value: "test-value",
     });
 
-    // 验证写入后的 PDF 包含新值
     const state = await service.readFormFields(updatedBytes);
     expect(state.fields).toHaveLength(1);
     expect(state.fields[0].value).toBe("test-value");
@@ -140,12 +167,10 @@ describe("表单服务", () => {
 
   test("填写复选框成功（取消勾选）", async () => {
     const pdfBytes = await createPdfWithCheckBox("agree");
-    // 先勾选
     const checkedBytes = await service.fillFormField(pdfBytes, {
       fieldId: "agree",
       value: "true",
     });
-    // 再取消
     const uncheckedBytes = await service.fillFormField(checkedBytes, {
       fieldId: "agree",
       value: "false",
@@ -203,5 +228,102 @@ describe("表单服务", () => {
         imageType: "png",
       }),
     ).rejects.toThrow("签名输入不合法");
+  });
+
+  test("flattenForm 把字段压平并返回新 PDF bytes", async () => {
+    const pdfBytes = await createPdfWithMultipleFields();
+    const { bytes, summary } = await service.flattenForm(pdfBytes);
+
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.length).toBeGreaterThan(0);
+    expect(bytes).not.toEqual(pdfBytes);
+    expect(summary.flattened).toBe(true);
+    expect(summary.fieldCountBeforeFlatten).toBe(2);
+    expect(summary.fieldCountAfterFlatten).toBe(0);
+
+    // 重新读取应该没有字段
+    const state = await service.readFormFields(bytes);
+    expect(state.fieldCount).toBe(0);
+    expect(state.fillable).toBe(false);
+  });
+
+  test("flattenForm 对无字段 PDF 也返回正常结果", async () => {
+    const pdfBytes = await createEmptyPdf();
+    const { bytes, summary } = await service.flattenForm(pdfBytes);
+
+    expect(summary.flattened).toBe(true);
+    expect(summary.fieldCountBeforeFlatten).toBe(0);
+    expect(bytes.length).toBeGreaterThan(0);
+  });
+
+  test("flattenForm 空 PDF bytes 时报错", async () => {
+    await expect(service.flattenForm(new Uint8Array(0))).rejects.toThrow("PDF bytes 不能为空");
+  });
+
+  test("applyFormOperations 按顺序执行 fill + flatten 并返回逐条结果", async () => {
+    const pdfBytes = await createPdfWithMultipleFields();
+    const result = await service.applyFormOperations({
+      id: "batch-1",
+      pdfBytes,
+      operations: [
+        { id: "op-1", type: "fill", fieldId: "name_field", value: "Alice" },
+        { id: "op-2", type: "fill", fieldId: "agree_checkbox", value: "true" },
+        { id: "op-3", type: "flatten" },
+      ],
+      requestedAt: "2026-06-04T00:00:00.000Z",
+    });
+
+    expect(result.id).toBe("batch-1");
+    expect(result.appliedCount).toBe(3);
+    expect(result.failedCount).toBe(0);
+    expect(result.results).toHaveLength(3);
+    expect(result.results[0]).toMatchObject({ id: "op-1", type: "fill", status: "applied", value: "Alice" });
+    expect(result.results[1]).toMatchObject({ id: "op-2", type: "fill", status: "applied" });
+    expect(result.results[2]).toMatchObject({ id: "op-3", type: "flatten", status: "applied" });
+
+    // 后续读取时字段已被压平
+    const state = await service.readFormFields(result.bytes);
+    expect(state.fieldCount).toBe(0);
+  });
+
+  test("applyFormOperations 失败 operation 不会中断后续 operation", async () => {
+    const pdfBytes = await createPdfWithTextField("name_field");
+    const result = await service.applyFormOperations({
+      id: "batch-2",
+      pdfBytes,
+      operations: [
+        { id: "op-1", type: "fill", fieldId: "nonexistent", value: "x" },
+        { id: "op-2", type: "fill", fieldId: "name_field", value: "Bob" },
+      ],
+      requestedAt: "2026-06-04T00:00:00.000Z",
+    });
+
+    expect(result.appliedCount).toBe(1);
+    expect(result.failedCount).toBe(1);
+    expect(result.results[0].status).toBe("failed");
+    expect(result.results[1]).toMatchObject({ id: "op-2", type: "fill", status: "applied" });
+  });
+
+  test("applyFormOperations 空 operations 抛错", async () => {
+    const pdfBytes = await createPdfWithTextField("name_field");
+    await expect(
+      service.applyFormOperations({
+        id: "batch-empty",
+        pdfBytes,
+        operations: [],
+        requestedAt: "2026-06-04T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("至少需要一条 operation");
+  });
+
+  test("applyFormOperations 空 PDF bytes 抛错", async () => {
+    await expect(
+      service.applyFormOperations({
+        id: "batch-no-bytes",
+        pdfBytes: new Uint8Array(0),
+        operations: [{ id: "op-1", type: "flatten" }],
+        requestedAt: "2026-06-04T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("PDF bytes 不能为空");
   });
 });

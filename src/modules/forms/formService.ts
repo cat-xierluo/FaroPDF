@@ -1,24 +1,32 @@
 /**
  * 表单填写与签署服务
  *
- * 使用 pdf-lib 读取、填写 AcroForm 字段，嵌入签名图片。
+ * 使用 pdf-lib 读取、填写 AcroForm 字段，嵌入签名图片并把表单扁平化。
  * 依赖 pdfOperationEngine 做底层 PDF 操作，配合 pdf-lib 提供表单专用 API。
  */
 
 import {
   PDFButton,
   PDFCheckBox,
+  PDFDict,
   PDFDropdown,
   PDFDocument,
   PDFRadioGroup,
+  PDFRef,
   PDFTextField,
   type PDFField,
+  type PDFPage,
 } from "pdf-lib";
 import type { PdfOperationEngine } from "../export/pdfOperationEngine";
 import type {
+  PdfFormBatchRequest,
+  PdfFormBatchResult,
   PdfFormField,
   PdfFormFieldType,
   PdfFormFillingInput,
+  PdfFormFlattenSummary,
+  PdfFormOperation,
+  PdfFormOperationResult,
   PdfFormState,
   PdfSignatureInput,
 } from "../../shared/pdf/form";
@@ -40,6 +48,12 @@ export interface FormService {
 
   /** 在签名字段上嵌入签名图片，返回更新后的 PDF bytes */
   signField(pdfBytes: Uint8Array, input: PdfSignatureInput): Promise<Uint8Array>;
+
+  /** 扁平化表单（执行 pdf-lib `form.flatten()`），返回新 PDF bytes + 摘要 */
+  flattenForm(pdfBytes: Uint8Array): Promise<{ bytes: Uint8Array; summary: PdfFormFlattenSummary }>;
+
+  /** 按顺序批量执行 fill/sign/flatten operation 列表 */
+  applyFormOperations(request: PdfFormBatchRequest): Promise<PdfFormBatchResult>;
 }
 
 // ---------------------------------------------------------------------------
@@ -47,14 +61,15 @@ export interface FormService {
 // ---------------------------------------------------------------------------
 
 interface FormServiceOptions {
-  /** pdfOperationEngine 用于未来扩展（如 flatten-form），目前保留依赖 */
+  /** pdfOperationEngine 保留依赖（与 `flatten-form` operation 复用同一 PDF 库底座） */
   engine: PdfOperationEngine;
+  /** 时间源（用于 PdfFormBatchResult.completedAt） */
+  now?: () => string;
 }
 
-export function createFormService(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _options: FormServiceOptions,
-): FormService {
+export function createFormService(options: FormServiceOptions): FormService {
+  const now = options.now ?? (() => new Date().toISOString());
+
   return {
     async readFormFields(pdfBytes) {
       validatePdfBytes(pdfBytes);
@@ -67,11 +82,12 @@ export function createFormService(
         return { fields: [], fieldCount: 0, fillable: false };
       }
 
+      const pageIndexMap = buildPageIndexMap(pdf);
       const fields: PdfFormField[] = [];
 
       for (const rawField of rawFields) {
         try {
-          const mapped = mapFormField(rawField);
+          const mapped = mapFormField(rawField, pageIndexMap);
           if (mapped) {
             fields.push(mapped);
           }
@@ -140,49 +156,85 @@ export function createFormService(
         throw new Error(`签名字段不存在：${input.fieldId}`);
       }
 
-      // 获取字段所在页和位置
       const widget = targetField.acroField.getWidgets()[0];
       if (!widget) {
         throw new Error(`签名字段 "${input.fieldId}" 没有可视控件，无法嵌入图片。`);
       }
 
+      const pageIndexMap = buildPageIndexMap(pdf);
+      const pageIndex = pageIndexMap.get(widget.dict) ?? 0;
+      const page = pdf.getPages()[pageIndex];
+
       const rectObj = widget.getRectangle();
-      const fieldRect = {
-        x: rectObj.x,
-        y: rectObj.y,
-        width: rectObj.width,
-        height: rectObj.height,
-      };
-
-      // 找到字段所在页面
-      const pages = pdf.getPages();
-      let pageIndex = 0;
-      for (let i = 0; i < pages.length; i++) {
-        const annots = pages[i].node.Annots();
-        if (annots) {
-          for (const annot of annots.asArray()) {
-            if (annot === widget.dict) {
-              pageIndex = i;
-              break;
-            }
-          }
-        }
-      }
-
-      const page = pages[pageIndex];
       const image =
         input.imageType === "png"
           ? await pdf.embedPng(input.imageBytes)
           : await pdf.embedJpg(input.imageBytes);
 
       page.drawImage(image, {
-        x: fieldRect.x,
-        y: fieldRect.y,
-        width: fieldRect.width,
-        height: fieldRect.height,
+        x: rectObj.x,
+        y: rectObj.y,
+        width: rectObj.width,
+        height: rectObj.height,
       });
 
       return pdf.save();
+    },
+
+    async flattenForm(pdfBytes) {
+      validatePdfBytes(pdfBytes);
+
+      const pdf = await PDFDocument.load(pdfBytes, { updateMetadata: false });
+      const form = pdf.getForm();
+      const fieldCountBeforeFlatten = form.getFields().length;
+
+      form.flatten();
+
+      const bytes = await pdf.save();
+
+      return {
+        bytes,
+        summary: {
+          fieldCountBeforeFlatten,
+          fieldCountAfterFlatten: 0,
+          flattened: true,
+        },
+      };
+    },
+
+    async applyFormOperations(request) {
+      validatePdfBytes(request.pdfBytes);
+      if (!Array.isArray(request.operations) || request.operations.length === 0) {
+        throw new Error("批量表单操作至少需要一条 operation。");
+      }
+
+      const pdf = await PDFDocument.load(request.pdfBytes, { updateMetadata: false });
+      const form = pdf.getForm();
+      const results: PdfFormOperationResult[] = [];
+      let appliedCount = 0;
+      let failedCount = 0;
+
+      for (const operation of request.operations) {
+        const result = await applySingleOperation(pdf, form, operation);
+        results.push(result);
+
+        if (result.status === "applied") {
+          appliedCount += 1;
+        } else {
+          failedCount += 1;
+        }
+      }
+
+      const bytes = await pdf.save();
+
+      return {
+        id: request.id,
+        bytes,
+        appliedCount,
+        failedCount,
+        results,
+        completedAt: now(),
+      };
     },
   };
 }
@@ -197,44 +249,55 @@ function validatePdfBytes(bytes: Uint8Array): void {
   }
 }
 
+/** 构建 widget PDFDict → pageIndex 的查找表；Annots 数组里是 PDFRef，需要 lookup 成 PDFDict 才能与 widget.dict 比较引用相等 */
+function buildPageIndexMap(pdf: PDFDocument): Map<PDFDict, number> {
+  const map = new Map<PDFDict, number>();
+  const pages = pdf.getPages();
+
+  pages.forEach((page, pageIndex) => {
+    const annots = page.node.Annots();
+    if (!annots) return;
+    for (const entry of annots.asArray()) {
+      if (entry instanceof PDFRef) {
+        const dict = pdf.context.lookup(entry, PDFDict);
+        if (dict) {
+          map.set(dict, pageIndex);
+        }
+      }
+    }
+  });
+
+  return map;
+}
+
 /**
  * 将 pdf-lib 原生字段映射为 PdfFormField。
  * 返回 null 表示无法识别的字段类型。
+ * pageIndex 优先取 widget.dict 真实所在页，找不到时回退 0。
  */
-function mapFormField(rawField: PDFField): PdfFormField | null {
+function mapFormField(rawField: PDFField, pageIndexMap: Map<PDFDict, number>): PdfFormField | null {
   const name = rawField.getName();
   const fieldType = detectFieldType(rawField);
 
   if (!fieldType) return null;
 
-  // 获取字段值
-  const value = getFieldStringValue(rawField);
-  const defaultValue = "";
-
-  // 获取位置
   const widget = rawField.acroField.getWidgets()[0];
   const rectObj = widget?.getRectangle();
   const rect = rectObj
     ? { x: rectObj.x, y: rectObj.y, width: rectObj.width, height: rectObj.height }
     : { x: 0, y: 0, width: 0, height: 0 };
-
-  // 判断只读和必填
-  const readOnly = rawField.isReadOnly();
-  const required = rawField.isRequired();
-
-  // 获取选项列表
-  const choices = getFieldChoices(rawField);
+  const pageIndex = widget ? pageIndexMap.get(widget.dict) ?? 0 : 0;
 
   return {
     id: name,
     name,
     type: fieldType,
-    pageIndex: 0,
-    value,
-    defaultValue,
-    required,
-    readOnly,
-    choices,
+    pageIndex,
+    value: getFieldStringValue(rawField),
+    defaultValue: "",
+    required: rawField.isRequired(),
+    readOnly: rawField.isReadOnly(),
+    choices: getFieldChoices(rawField),
     rect,
   };
 }
@@ -291,4 +354,121 @@ function findFieldById(
   fieldId: string,
 ): PDFField | null {
   return form.getFields().find((field) => field.getName() === fieldId) ?? null;
+}
+
+type ResolvedForm = ReturnType<PDFDocument["getForm"]>;
+
+/** 执行单条 operation 并返回结果；调用方保证不抛错（错误封装为 failed 结果） */
+async function applySingleOperation(
+  pdf: PDFDocument,
+  form: ResolvedForm,
+  operation: PdfFormOperation,
+): Promise<PdfFormOperationResult> {
+  try {
+    if (operation.type === "fill") {
+      const field = findFieldById(form, operation.fieldId);
+      if (!field) {
+        return {
+          id: operation.id,
+          type: "fill",
+          status: "failed",
+          errorMessage: `表单字段不存在：${operation.fieldId}`,
+        };
+      }
+      const fieldType = detectFieldType(field);
+      if (fieldType === "text") {
+        form.getTextField(operation.fieldId).setText(operation.value);
+      } else if (fieldType === "checkbox") {
+        const checkBox = form.getCheckBox(operation.fieldId);
+        if (operation.value === "true" || operation.value === "1" || operation.value === "yes") {
+          checkBox.check();
+        } else {
+          checkBox.uncheck();
+        }
+      } else if (fieldType === "dropdown") {
+        form.getDropdown(operation.fieldId).select(operation.value);
+      } else if (fieldType === "radio") {
+        form.getRadioGroup(operation.fieldId).select(operation.value);
+      } else {
+        return {
+          id: operation.id,
+          type: "fill",
+          status: "failed",
+          errorMessage: `字段类型 "${fieldType}" 不支持程序化填写。`,
+        };
+      }
+      return {
+        id: operation.id,
+        type: "fill",
+        status: "applied",
+        fieldId: operation.fieldId,
+        value: operation.value,
+      };
+    }
+
+    if (operation.type === "sign") {
+      const field = findFieldById(form, operation.fieldId);
+      if (!field) {
+        return {
+          id: operation.id,
+          type: "sign",
+          status: "failed",
+          errorMessage: `签名字段不存在：${operation.fieldId}`,
+        };
+      }
+      const widget = field.acroField.getWidgets()[0];
+      if (!widget) {
+        return {
+          id: operation.id,
+          type: "sign",
+          status: "failed",
+          errorMessage: `签名字段 "${operation.fieldId}" 没有可视控件，无法嵌入图片。`,
+        };
+      }
+      const pageIndexMap = buildPageIndexMap(pdf);
+      const pageIndex = pageIndexMap.get(widget.dict) ?? 0;
+      const page: PDFPage = pdf.getPages()[pageIndex];
+      const rectObj = widget.getRectangle();
+      const image =
+        operation.imageType === "png"
+          ? await pdf.embedPng(operation.imageBytes)
+          : await pdf.embedJpg(operation.imageBytes);
+
+      page.drawImage(image, {
+        x: rectObj.x,
+        y: rectObj.y,
+        width: rectObj.width,
+        height: rectObj.height,
+      });
+      return {
+        id: operation.id,
+        type: "sign",
+        status: "applied",
+        fieldId: operation.fieldId,
+        imageType: operation.imageType,
+      };
+    }
+
+    // flatten
+    const fieldCountBeforeFlatten = form.getFields().length;
+    form.flatten();
+    return {
+      id: operation.id,
+      type: "flatten",
+      status: "applied",
+      summary: {
+        fieldCountBeforeFlatten,
+        fieldCountAfterFlatten: 0,
+        flattened: true,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      id: operation.id,
+      type: operation.type,
+      status: "failed",
+      errorMessage: message,
+    };
+  }
 }
