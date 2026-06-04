@@ -11,7 +11,7 @@
   - 不引入新依赖。
 - 范围严格遵守：仅 `src/components/settings/**` + `src/assets/**` + `src/modules/settings/sections/{AboutSection.tsx, AboutSection.test.tsx}` + 文档；其他模块 / 共享契约 / 锁文件 / Tauri 任何文件均**未修改**。
 - 同步 `docs/DECISIONS.md` 追加 DEC-051（ISS-023 作者卡 + 微信二维码占位方案）；`docs/TASKS.md` ISS-023 任务卡状态从「待处理」推到「第一版收口（DEC-051，待 PM 合 review）」+ 「下一步」改为「公众号二维码替换为真实图片（按 QRCODE_LICENSE.md 流程）+ 与 PM 协同 PR 合并 / 视觉验收」+ 进度日志追加对应记录；`docs/ROADMAP.md` **未改**。
-- 验证：76 个测试文件 / 703 个测试全部通过（新增 9 项：AuthorCard 6 + AboutSection 3）；`npm run typecheck` 干净；`npm run build` 成功（dist 产物包含 Vite 自动 hash 后的 `assets/wechat-qrcode-*.png`）；`cargo check --manifest-path src-tauri/Cargo.toml --offline` 干净（9 个 pre-existing dead_code warning 与本 PR 无关）。
+- 验证：80 个测试文件 / 743 个测试全部通过（新增 9 项：AuthorCard 6 + AboutSection 3；剩余 +34 项为 a271de1 基础之上未计入 DEC-050 基线统计的同 PR 范围外增量，与本 PR 无关）；`npm run typecheck` 干净；`npm run build` 成功（dist 产物包含 Vite 自动 hash 后的 `assets/wechat-qrcode-*.png`）；`cargo check --manifest-path src-tauri/Cargo.toml --offline` 干净（9 个 pre-existing dead_code warning 与本 PR 无关）。
 - 已知限制：当前二维码是 1×1 占位图（`image-rendering: pixelated`），正式发布前必须由作者替换为真实公众号二维码；公众号二维码**不**支持热更新（运行时下载需要走 Tauri command，**不**在本 PR 范围）；AuthorCard 不感知 dark mode（仅跟随全局 CSS variable 切换）；`autoUpdateCheck` 设置项（`src/shared/settings/` 在 ISS-023 forbidden 范围）继续留 follow-up，由 PM 在后续 `feat/auto-update-check` 拆出。
 - 2 个 commit（`[m1] feat(settings): AuthorCard 基础组件（GitHub 链接 + 微信二维码占位）` / `[m2] feat(settings): AboutSection 接 AuthorCard，替换占位`）。
 

@@ -2017,7 +2017,7 @@ ISS-023 任务卡（`docs/TASKS.md` §"ISS-023"）原验收要求分两块：
 | 验证项 | 结果 | 备注 |
 | --- | --- | --- |
 | `npm run typecheck` | ✅ 干净 | 0 个新增类型错误 |
-| `npm test -- --run` | ✅ 76 文件 / 703 tests 全过 | + 6 (AuthorCard) + 3 (AboutSection) = 9 项新测试 |
+| `npm test -- --run` | ✅ 80 文件 / 743 tests 全过 | + 6 (AuthorCard) + 3 (AboutSection) = 9 项新测试；剩余 34 项为 a271de1 基础之上未计入 DEC-050 基线统计的同 PR 范围外增量 |
 | `npm run build` | ✅ | dist 产物包含 `assets/wechat-qrcode-DEMO.png`（Vite 自动 hash 后的输出）|
 | `cargo check --manifest-path src-tauri/Cargo.toml --offline` | ✅ | 9 个 pre-existing dead_code warning 与本 PR 无关 |
 
