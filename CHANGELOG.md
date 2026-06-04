@@ -12,6 +12,18 @@
 - 同步 `docs/DECISIONS.md` DEC-040；`docs/TASKS.md` ISS-026 进度日志追加对应记录；`docs/ROADMAP.md` **未改**。
 - 验证：71 个测试文件 / 636 个测试全部通过（新增 15 项：annotationStampFont 7 + AppShell 8）；`npm run typecheck` 干净；`npm run build` 成功；`cargo check --manifest-path src-tauri/Cargo.toml --offline` 干净。
 - 已知限制：窄屏下 annotate 模式 utilityPanel 槽位被 AnnotationSidebar 占满，无法同时看 DocumentSummaryPanel 缩略图（点「文档摘要」按钮可手动切回 summary）；textbox 批注的中文仍是 Helvetica 静默跳过（不属本期范围）；`AnnotationSidebar` 的 `onAnnotationClick` / `activeAnnotationId` 暂未与 `AnnotationOverlay` 联动（Overlay 暂无 controller）；`ContextToolbar` 批注工具按钮仍是死按钮（按 prompt 协议未修改 Toolbar.tsx）。
+- OCR 模式工具条接入 AppShell（DEC-040 / ISS-007 UI）：把已有 `OcrModeToolbar` / `OcrJobList` / `OcrQualityReportView` 三个独立组件挂到 AppShell 的 ocr mode 渲染路径上，并把 OCR 后端调用、任务轮询、选中状态聚合成 `useOcrWorkspaceController` hook 喂给它们。
+  - `src/modules/ocr/ui/useOcrWorkspaceController.ts`：维护 `jobs / currentJob / selectedJobId / busy / hasDocument / hasProvider / errorMessage` 状态；mount 调 `controller.listOcrJobs`、存在 active 任务时按 `pollIntervalMs`（默认 1500ms）轮询；`startOcr` 走 `OcrBridgeService.startOcr`（带 provider 校验 + 隐私 consent）后 `listOcrJobs` 刷新；`outputLayeredPdf` 强制 `new-layered-pdf` 策略；`cancelJob` 走 `controller.cancelOcrJob`；`selectJob` / `openQualityReport` 写 `selectedJobId`；`currentJob` 优先 active job，否则回退到 `selectedJobId`；早期无文档 / 无 provider 错误经 `errorMessage` 暴露给 OcrWorkspace 展示。
+  - `src/modules/ocr/ui/OcrWorkspace.tsx`：左侧 `OcrJobList`（选 / 取消 / 打开报告）+ 右侧 `OcrQualityReportView`（选中任务的报告，无选中显示占位），错误用 `role="alert"` 提示；当前 active job 自动 focus。
+  - `src/modules/ocr/ui/ocrWorkspace.css`：独立 CSS（grid 双列 + 720px 折叠），不动 `ocrModeToolbar.css`。
+  - `src/modules/ocr/index.ts` 追加导出 `OcrWorkspace` / `useOcrWorkspaceController` / `deriveLayeredOutputPath` / 2 个 type。
+  - `src/components/layout/AppShell.tsx`：新增 `ocr?: OcrWorkspaceController` prop；ocr mode 渲染分支：context toolbar 用 `<OcrModeToolbar>` 替换 hardcoded `["增强扫描","拆分页面","裁剪页面","清除空白边","识别文本","内容选定","裁剪"]` 7 个占位按钮；主区域挂 `<OcrWorkspace controller={ocr}>` 替换 `ReaderCanvas`；`utilityPanel` 在 ocr 模式隐藏（OCR 工作区独占主区域，与 pages mode 同策略）；`ContextToolbar` 拆 `ocr` 入参后按 mode 路由。
+  - `src/App.tsx` 追加接线：新增 `useOcrWorkspaceController({ documentPath, providers, providerId, requireNetworkConsent })`，用 `useMemo` 锁入参；传给 AppShell `ocr={ocrController}`。**未**改 Toolbar / 全局样式 / 路由 / 锁文件 / package.json / src-tauri/。
+  - `src/App.test.tsx` OCR mode 断言从 7 个 hardcoded 按钮更新为 OcrModeToolbar 4 个核心按钮（识别文本 / 输出双层 PDF / 质量检查 / 任务列表）+ OcrWorkspace `main` region。
+  - 测试：新增 33 个单测（`useOcrWorkspaceController.test.tsx` 14 + `OcrWorkspace.test.tsx` 6 + `AppShell.test.tsx` 11 + `deriveLayeredOutputPath` 4 + App.test.tsx 调整 1），总测试 72 文件 / 653 通过；`npm run typecheck` 干净；`npm run build` 成功；`cargo check --manifest-path src-tauri/Cargo.toml --offline` 干净。
+  - 已知限制：ocr mode 主区域不会读真实 PDF 渲染（与 pages mode 一致；ReaderCanvas 留给 read / annotate / forms / export 模式）；`documentPath === ""` 时（浏览器 `<input type="file">` 走 PDF.js 加载）`startOcr` 会拒绝并展示明确错误，等 Tauri 文件对话框接线后路径会自动填充；云端 OCR provider（paddleocr / mineru）的 `networkConsentGranted` 在 settings 缺省为 false，privacy guard 会拒绝并把错误回写到 `errorMessage`（不弹 confirm 浮层，由后续 ISS-010 consent flow 补）；`useOcrWorkspaceController` 一次性锁定 controller / bridge（首挂载后不再重新注入），切到 ocr 模式后想替换需要刷新 App。
+- 范围严格遵守：未修改 `package.json` / 锁文件 / `src-tauri/Cargo.toml` / `src/shared/ocr/*` 共享契约 / reader / search / annotation / forms / export / pages / settings 等其他模块；DEC-040 编号承接 DEC-039 导出字体后 +1。
+- 同步 `docs/DECISIONS.md` DEC-040（OCR 模式 UI 接线方案）；`docs/TASKS.md` ISS-007 进度日志追加对应记录；`docs/ROADMAP.md` **未改**。
 
 ## 0.1.0-alpha.8 - 2026-06-04
 ## 0.1.0-alpha.7 - 2026-06-04

@@ -1280,3 +1280,87 @@ ISS-022 把现有扁平的 `SettingsPanel` 升级为左侧导航 + 多 section �
 - 第二版（DEC-037 / PR #24）：`AnnotationSidebar` 4 维度分组 + 真实 PDF 绘制导出
 - 第三版（DEC-041 / 本 PR）：挂 `AppShell` + 中文 stamp 真实字形
 - 后续可选：扁平化导出接入 `pdfOperationEngine` 的 `flatten-annotations` 路径（execute 模式）/ `useAnnotationController` 接入 Overlay active 联动
+## DEC-042 OCR 模式工具条接入 AppShell（ISS-007 UI 接线）
+
+- 日期：2026-06-04
+- 状态：已采纳
+- 关联分支：`feat/ocr-toolbar-integration`
+- 关联任务：ISS-007
+
+承接 DEC-030（OCR bridge 真实接入）和 DEC-032（toolbarRegistry 基础设施）后，ISS-007 v2 三个独立 React 组件（`OcrModeToolbar` / `OcrJobList` / `OcrQualityReportView`）已落 `src/modules/ocr/ui/OcrModeToolbar.tsx` 单文件。本决策记录把它们接入 AppShell ocr mode 渲染路径，并引入一个 workspace 状态聚合 hook。
+
+### 1. 状态聚合：useOcrWorkspaceController
+
+不把 Tauri controller / bridge 直接传给 AppShell，原因是 AppShell 是受控布局壳，Tauri 资源（invoke + privacy guard）应该留在调用方（`App.tsx`）初始化。新建 `src/modules/ocr/ui/useOcrWorkspaceController.ts`：
+
+- 入参：`documentPath?: string` / `providers: ReadonlyArray<OcrProviderConfig>` / `providerId?: string` / `outputStrategy?: OcrOutputStrategy` / `qualityCheck?: OcrQualityCheckRequest` / `requireNetworkConsent?: boolean` / `networkConsentGranted?: boolean` / `controller?: OcrJobController`（测试注入） / `bridge?: OcrBridgeService`（测试注入） / `pollIntervalMs?: number`。
+- 状态：`jobs: ReadonlyArray<OcrCommandJob>` / `currentJob: OcrCommandJob | undefined` / `selectedJobId: string | null` / `busy: boolean` / `hasDocument: boolean` / `hasProvider: boolean` / `errorMessage: string | null`。
+- 动作：`startOcr()` / `outputLayeredPdf()` / `cancelJob(job)` / `selectJob(job)` / `openQualityReport(job)` / `openJobList()` / `refresh()`。
+- currentJob 解析：优先 active（`isActiveOcrStatus`），否则回退到 `selectedJobId` 指向的任务；无选中时为 undefined。
+- 轮询：mount 立即调 `listOcrJobs`；当 jobs 中存在 active 任务时按 `pollIntervalMs`（默认 1500ms）启动 `setInterval`，全部终态后 `clearInterval`。
+- selectedJobId 跟随：用户已选且仍存在则保留；否则回退到 `jobs[0]?.id`（后端按最新在前返回）。
+- controller / bridge 通过 `useRef` 一次性锁定（首挂载后不再重新注入），保证 testability 同时避免每次 render 重建 Tauri 资源。
+- 错误策略：`errorMessage` 只由主动动作（startOcr / outputLayeredPdf / cancelJob / refresh 失败）写；`refresh` 成功时**不**清空 errorMessage，避免 mount 时的并发 `refresh` 把 startOcr 设置的错误覆盖为 null。startOcr / outputLayeredPdf / cancelJob 在 try 开头自行 `setErrorMessage(null)`。
+- 网络 consent：`networkConsentGranted` 缺省 false，云端 provider 的 privacy guard 会被拒绝，错误回写到 `errorMessage`；不做 confirm 弹窗（ISS-010 consent flow 后续单独推进）。
+
+### 2. 工作区容器：OcrWorkspace
+
+新建 `src/modules/ocr/ui/OcrWorkspace.tsx`：
+
+- grid 双列布局（左 360px 任务列表 / 右自适应质量报告），`max-width: 720px` 折叠为单列。
+- 左侧 `<OcrJobList jobs onSelect onOpenQualityReport onCancel selectedJobId>` 直接消费 controller。
+- 右侧 `<OcrQualityReportView job>` 仅当 `selectedJob` 存在时渲染，否则显示占位（"尚未选中 OCR 任务"）。
+- 错误用 `<p class="ocr-workspace__error" role="alert">` 展示；新错误出现时 `jobListRef.current.scrollIntoView?.({ block: "nearest" })`（链式可选调用兜底 jsdom）。
+- 当前 active job 自动 `selectJob(currentJob)`，保证用户启动 OCR 后右侧立刻显示报告。
+- 独立 CSS `src/modules/ocr/ui/ocrWorkspace.css`，不动既有 `ocrModeToolbar.css`。
+
+### 3. AppShell 接线
+
+修改 `src/components/layout/AppShell.tsx`：
+
+- 新增 `ocr?: OcrWorkspaceController` prop。
+- ocr mode 渲染分支：context toolbar 用 `<OcrModeToolbar currentJob busy hasDocument hasProvider onStartOcr onOutputLayeredPdf onOpenQualityReport onOpenJobList onCancelJob>` 替换 hardcoded `contextualTools["ocr"] = ["增强扫描","拆分页面","裁剪页面","清除空白边","识别文本","内容选定","裁剪"]` 7 个占位按钮。
+- 主区域 ocr mode：`<OcrWorkspace controller={ocr}>` 替换 `<ReaderCanvas>`，与 pages mode 同策略（`utilityPanel` 在 ocr / pages 模式隐藏，OcrWorkspace 独占主区域）。
+- `ContextToolbar` 拆 `ocr?: OcrWorkspaceController` 入参，按 `mode` 路由：export → `exportToolGroups`、ocr → `<OcrModeToolbar>`、其他 → `contextualTools[mode]`。
+- ocr 缺控制器时 toolbar 显示"OCR 控制器未就绪"占位，主区域显示"OcrWorkspaceUnavailable"占位，避免崩溃。
+- 类型 `Partial<Record<Exclude<AppModeId, "read" | "pages" | "ocr">, string[]>>` 从 contextualTools 类型中显式排除 ocr，避免遗漏。
+
+### 4. App.tsx 接线
+
+`src/App.tsx` 追加 `useOcrWorkspaceController({ ... })` 调用并把结果传给 `<AppShell ocr={ocrController} ... />`：
+
+```ts
+const ocrController = useOcrWorkspaceController(
+  useMemo(() => ({
+    documentPath: reader.state.document?.path,
+    providers: settings.ocrProviders,
+    providerId: settings.defaultOcrProviderId,
+    requireNetworkConsent: settings.requireNetworkOcrConfirmation,
+  }), [ocrDocumentPath, settings.ocrProviders, settings.defaultOcrProviderId, settings.requireNetworkOcrConfirmation]),
+);
+```
+
+`useMemo` 锁定入参引用，避免 hook 每次 render 重建 options。`App.test.tsx` OCR mode 断言从 hardcoded 按钮改为 OcrModeToolbar 4 个核心按钮 + OcrWorkspace `main` region。
+
+### 5. 范围与依赖
+
+- 修改：`src/App.tsx`（仅追加 hook 调用 + 传 `ocr` prop）/ `src/components/layout/AppShell.tsx`（ocr mode 渲染分支 + ContextToolbar 重构）/ `src/modules/ocr/index.ts`（追加导出）/ `src/App.test.tsx`（断言更新）/ `docs/DECISIONS.md` / `CHANGELOG.md` / `docs/TASKS.md`。
+- 新增：`src/modules/ocr/ui/useOcrWorkspaceController.ts` / `src/modules/ocr/ui/useOcrWorkspaceController.test.tsx` / `src/modules/ocr/ui/OcrWorkspace.tsx` / `src/modules/ocr/ui/OcrWorkspace.test.tsx` / `src/modules/ocr/ui/ocrWorkspace.css` / `src/components/layout/AppShell.test.tsx`。
+- 不修改：`package.json` / 锁文件 / `src-tauri/Cargo.toml` / `src/shared/ocr/*` 共享契约 / `src/components/layout/Toolbar.tsx`（仍走 DEC-032 注册表）/ reader / search / annotation / forms / export / pages / settings 模块。
+- 共享契约字段保持兼容；不引入新依赖；不修改 OCR 后端 5 个 command。
+
+### 6. 验证
+
+- `npm run typecheck` ✅ 干净
+- `npm test -- --run` ✅ 72 文件 / 653 测试（+33 新测试：hook 14 + workspace 6 + AppShell 11 + deriveLayeredOutputPath 4 + App.test.tsx 调整 1）
+- `npm run build` ✅ `dist/assets/index-*.js` 728 KB / 272 KB gz
+- `cargo check --manifest-path src-tauri/Cargo.toml --offline` ✅（1 个 pre-existing dead_code 警告与本次改动无关）
+
+### 7. 已知限制（ISS-007 v0.1 wiring）
+
+- ocr mode 主区域不会读真实 PDF 渲染（与 pages mode 一致；ReaderCanvas 留给 read / annotate / forms / export 模式）。
+- `documentPath === ""` 时（浏览器 `<input type="file">` 走 PDF.js 加载）`startOcr` 会拒绝并展示"请先打开一个带路径的 PDF 文档再启动 OCR"；等 Tauri 文件对话框接线后路径会自动填充。
+- 云端 OCR provider（paddleocr / mineru）的 `networkConsentGranted` 在 settings 缺省 false，privacy guard 会拒绝并把错误回写到 `errorMessage`；不弹 confirm 浮层（ISS-010 consent flow 后续单独推进）。
+- `useOcrWorkspaceController` 一次性锁定 controller / bridge（首挂载后不再重新注入），切到 ocr 模式后想替换需要刷新 App。
+- 任务状态轮询间隔 1500ms 写死；高频 OCR 场景可由后续 worker 把 `pollIntervalMs` 接入设置页。
+- `OcrQualityReportView` 在选中任务无 quality 时显示"尚未生成质量报告"占位（沿用既有组件行为，未新增"质量报告生成中"占位，等 `extract_ocr_text` 联动 UI 单独推进）。
