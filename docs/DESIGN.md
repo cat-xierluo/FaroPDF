@@ -178,6 +178,20 @@ FaroPDF 不复用 Folia 的 Markdown 编辑布局：
 - 搜索只有输入框，没有结果层、命中跳转和文字层/OCR 提示。
 - 页面管理工作台只有壳层网格，没有拖拽、选择、多选、撤销、导出路径和风险确认。
 
+### 2026-06-04 推进（DEC-049 / 0.1.0-alpha.10 / M1-M4）
+
+本轮对差距列表的推进：
+
+- ✅ **M1 阅读态视觉 polish**：`ReaderCanvas` 在 `ocrStatus === "needed"` 时显示醒目的提示条 + 跳转按钮；每个 `PdfPage` 文字层状态徽章（`available` / `missing` / `poor` 颜色区分）；`Toolbar.tsx` `fileSubtitle` 区分"未打开文档" / "打开失败"。
+- ✅ **M2 搜索结果层**：`SearchResultsPopover` 命中索引 `命中 X / N（N 处）` + 索引进度 `索引 X / Y 页` + 命中页码 chip 行 + `active hit` 自动 `scrollIntoView` + `data-active-hit` outline 高亮。
+- ✅ **M3 页面管理多选 / 撤销 / 风险**：`PageOrganizerWorkspace` 独立组件 + 多选 + shift 选区 + 删除/导出风险对话框 + 撤销占位（未接 service 真实 history/undo，留作后续导出 worker）。
+- ✅ **M4 OCR 任务参数区**：`OcrWorkspaceHeader` 展示 provider (含 local/cloud tag) / 页码范围 / 输出策略 / 质量检查 / 网络授权；云端 provider 未授权时显示红色警告。
+- 尚未推进（**下一波**）：
+  - 顶栏密度 / 按钮分组细节（待真实 PDF 截图验证后定）
+  - 导出 / 水印 / 压缩 / Bates 模式拆分（ISS-013 后续 worker）
+  - 空态 PDF Expert 风格打开/拖拽/最近文件缩略图（已部分就位，仍需补 OCR 后端切换入口 + 水印预设）
+  - 左侧缩略图（已接入 PDF.js 缩略图懒加载，仍未接批注/搜索/OCR 标记的视觉化）
+
 ## 品牌与视觉资产
 
 ### ISS-020 临时应用图标

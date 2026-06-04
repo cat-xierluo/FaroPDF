@@ -56,8 +56,18 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
   const pageCount = document?.pageCount ?? 0;
   const zoom = document?.zoom ?? reader.state.defaults.zoom;
   const viewMode = document?.viewMode ?? reader.state.defaults.viewMode;
-  const fileSubtitle =
-    reader.state.status === "loading" ? "正在打开" : document?.name ?? reader.state.errorMessage ?? "等待文件";
+  const fileSubtitle = (() => {
+    if (reader.state.status === "loading") {
+      return "正在打开";
+    }
+    if (document) {
+      return document.name;
+    }
+    if (reader.state.status === "error" && reader.state.errorMessage) {
+      return `打开失败：${reader.state.errorMessage}`;
+    }
+    return "未打开文档";
+  })();
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -283,20 +293,35 @@ function SearchResultsPopover({ search }: { search: TextSearchController }) {
     return null;
   }
 
+  const activeIndex = state.activeHit
+    ? state.hits.findIndex((hit) => hit.id === state.activeHit?.id)
+    : -1;
+  const indexedPages = state.indexedPageIndexes.length;
+  const totalPages = indexedPages + state.pendingPageCount;
+  const hitPages = Array.from(new Set(state.hits.map((hit) => hit.pageNumber))).sort((a, b) => a - b);
+
   return (
     <div className="search-popover" role="region" aria-label="搜索结果">
       <div className="search-popover__summary">
-        <span>命中 {state.hits.length} 处</span>
-        {state.pendingPageCount > 0 ? <small>仍有 {state.pendingPageCount} 页未索引</small> : null}
+        <span>
+          {state.hits.length > 0
+            ? `命中 ${activeIndex + 1} / ${state.hits.length}（${state.hits.length} 处）`
+            : `命中 ${state.hits.length} 处`}
+        </span>
+        {state.pendingPageCount > 0 ? (
+          <small>
+            索引 {indexedPages} / {totalPages} 页
+          </small>
+        ) : null}
       </div>
       <div className="search-popover__nav" role="toolbar" aria-label="搜索命中导航">
         <button className="compact-button" disabled={state.hits.length === 0} onClick={search.selectPreviousHit} type="button">
           <ChevronLeft size={15} />
-          <span>上一个命中</span>
+          <span>上一个</span>
         </button>
         <button className="compact-button" disabled={state.hits.length === 0} onClick={search.selectNextHit} type="button">
           <ChevronRight size={15} />
-          <span>下一个命中</span>
+          <span>下一个</span>
         </button>
         {state.pendingPageCount > 0 ? (
           <button className="context-tool" onClick={search.indexMore} type="button">
@@ -304,6 +329,27 @@ function SearchResultsPopover({ search }: { search: TextSearchController }) {
           </button>
         ) : null}
       </div>
+      {hitPages.length > 0 ? (
+        <div className="search-popover__pages" aria-label="命中页码">
+          {hitPages.map((pageNumber) => (
+            <button
+              aria-pressed={state.activeHit?.pageNumber === pageNumber}
+              className="search-popover__page-chip"
+              data-page-number={pageNumber}
+              key={pageNumber}
+              onClick={() => {
+                const hit = state.hits.find((entry) => entry.pageNumber === pageNumber);
+                if (hit) {
+                  search.selectHit(hit.id);
+                }
+              }}
+              type="button"
+            >
+              p.{pageNumber}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {state.ocrHint?.visible ? (
         <div className="search-ocr-hint">
           <p>{state.ocrHint.message}</p>

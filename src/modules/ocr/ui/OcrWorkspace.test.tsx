@@ -35,6 +35,17 @@ function makeController(overrides: Partial<OcrWorkspaceController> = {}): OcrWor
     openJobList: vi.fn(),
     openQualityReport: vi.fn(),
     outputLayeredPdf: vi.fn(async () => undefined),
+    parameters: {
+      activeProvider: {
+        id: "local-ocrmypdf",
+        label: "本机 ocrmypdf",
+        kind: "local",
+        requiresNetworkConsent: false,
+      },
+      outputStrategy: "new-layered-pdf",
+      qualityCheck: { enabled: false, keywords: [], description: "未启用" },
+      networkConsentRequired: false,
+    },
     refresh: vi.fn(async () => undefined),
     selectJob: vi.fn(),
     selectedJobId: null,

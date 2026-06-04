@@ -7,6 +7,7 @@ import {
   type OcrQualityReportViewProps,
 } from "./OcrModeToolbar";
 import type { OcrWorkspaceController } from "./useOcrWorkspaceController";
+import { OcrWorkspaceHeader } from "./OcrWorkspaceHeader";
 import "./ocrModeToolbar.css";
 import "./ocrWorkspace.css";
 
@@ -23,9 +24,15 @@ import "./ocrWorkspace.css";
 
 export interface OcrWorkspaceProps {
   controller: OcrWorkspaceController;
+  /** 当前打开文档名（脱敏） */
+  documentLabel?: string;
+  /** 当前文档页数（用于参数区显示） */
+  pageCount?: number;
+  /** 全部可用 OCR provider 列表（含 disabled），用于参数区摘要 */
+  availableProviders?: Parameters<typeof OcrWorkspaceHeader>[0]["availableProviders"];
 }
 
-export function OcrWorkspace({ controller }: OcrWorkspaceProps) {
+export function OcrWorkspace({ controller, documentLabel, pageCount, availableProviders }: OcrWorkspaceProps) {
   const jobListRef = useRef<HTMLDivElement | null>(null);
   const {
     cancelJob,
@@ -33,6 +40,7 @@ export function OcrWorkspace({ controller }: OcrWorkspaceProps) {
     errorMessage,
     jobs,
     openQualityReport,
+    parameters,
     refresh,
     selectJob,
     selectedJobId,
@@ -91,6 +99,12 @@ export function OcrWorkspace({ controller }: OcrWorkspaceProps) {
 
   return (
     <main className="ocr-workspace" aria-label="OCR 工作区">
+      <OcrWorkspaceHeader
+        availableProviders={availableProviders}
+        documentLabel={documentLabel}
+        pageCount={pageCount}
+        parameters={parameters}
+      />
       <section className="ocr-workspace__jobs" aria-label="OCR 任务">
         <header className="ocr-workspace__section-header">
           <h2>OCR 任务</h2>

@@ -15,6 +15,7 @@ import { ReaderCanvas } from "./ReaderCanvas";
 import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
 import { AnnotationSidebar } from "./AnnotationSidebar";
 import { AnnotationToolbar } from "./AnnotationToolbar";
+import { PageOrganizerWorkspace } from "./PageOrganizerWorkspace";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 import { SettingsPanel } from "../../modules/settings/SettingsPanel";
@@ -51,6 +52,11 @@ interface AppShellProps {
   onAnnotationDraft?: (input: AnnotationDraftSubmission) => void;
   /** 用户点击已有批注时回调（用于侧边栏跳转等扩展） */
   onAnnotationClick?: (annotationId: string) => void;
+  /**
+   * OCR-needed 状态条"前往 OCR 模式"按钮的回调（ISS-009 M1 / DEC-049）。
+   * 由 App.tsx 注入到 ReaderCanvas，避免阅读态组件直接依赖 mode setter。
+   */
+  onRequestOcr?: () => void;
 }
 
 const contextualTools: Partial<Record<Exclude<AppModeId, "read" | "pages" | "ocr">, string[]>> = {
@@ -86,6 +92,7 @@ export function AppShell({
   onSettingsChange,
   onUtilityPanelChange,
   ocr,
+  onRequestOcr,
   reader,
   search,
   settings,
@@ -139,7 +146,12 @@ export function AppShell({
             <PageOrganizerWorkspace reader={reader} />
           ) : isOcrMode ? (
             ocr ? (
-              <OcrWorkspace controller={ocr} />
+              <OcrWorkspace
+                availableProviders={settings.ocrProviders}
+                controller={ocr}
+                documentLabel={reader.state.document?.name}
+                pageCount={reader.state.document?.pageCount}
+              />
             ) : (
               <OcrWorkspaceUnavailable />
             )
@@ -148,6 +160,7 @@ export function AppShell({
               onOpenFile={reader.openFile}
               onPageNavigate={reader.setCurrentPage}
               onPageVisible={reader.setCurrentPage}
+              onRequestOcr={onRequestOcr}
               readerState={reader.state}
               renderPageToCanvas={reader.renderPageToCanvas}
               searchState={search.state}
@@ -366,43 +379,3 @@ function ContextToolbar({
   );
 }
 
-function PageOrganizerWorkspace({ reader }: { reader: ReaderController }) {
-  const pageCount = reader.state.document?.pageCount ?? 0;
-  const pages = Array.from({ length: Math.min(pageCount, 12) }, (_, index) => index + 1);
-
-  if (!reader.state.document) {
-    return (
-      <main className="page-organizer" aria-label="页面管理工作台">
-        <section className="page-organizer__empty" aria-label="页面管理空态">
-          <div className="open-dropzone__sheet" aria-hidden="true" />
-          <h2>打开 PDF 后管理页面</h2>
-          <p>旋转、摘录、删除和另存操作只会在文档打开后启用。</p>
-        </section>
-      </main>
-    );
-  }
-
-  return (
-    <main className="page-organizer" aria-label="页面管理工作台">
-      <div className="page-organizer__toolbar" role="toolbar" aria-label="页面管理工具条">
-        {["插入页", "附加文件", "旋转", "复制", "粘贴", "摘录", "删除"].map((action) => (
-          <button className="context-tool" disabled={action === "粘贴"} key={action} type="button">
-            {action}
-          </button>
-        ))}
-        <button className="context-tool context-tool--primary" type="button">
-          另存为新 PDF
-        </button>
-      </div>
-      <ol className="page-grid" aria-label="页面网格">
-        {pages.map((page) => (
-          <li className="page-card" key={page}>
-            <div className="page-card__sheet" aria-hidden="true" />
-            <span>第 {page} 页</span>
-            <small>A4 (210 x 297 毫米)</small>
-          </li>
-        ))}
-      </ol>
-    </main>
-  );
-}

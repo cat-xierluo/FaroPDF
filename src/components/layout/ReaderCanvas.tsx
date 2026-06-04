@@ -23,6 +23,8 @@ interface ReaderCanvasProps {
   onPageVisible?: (pageNumber: number) => void;
   /** 键盘翻页回调；可选，未提供时不启用键盘监听 */
   onPageNavigate?: (nextPage: number) => void;
+  /** OCR-needed 状态下点击"前往 OCR 模式"的回调；可选，未提供时按钮禁用 */
+  onRequestOcr?: () => void;
 }
 
 const fileInputStyle: CSSProperties = {
@@ -34,7 +36,7 @@ const fileInputStyle: CSSProperties = {
 
 const recentPlaceholders = ["卷宗材料.pdf", "合同附件.pdf", "扫描件.pdf"];
 
-export function ReaderCanvas({ onOpenFile, onPageNavigate, onPageVisible, readerState, searchState, renderPageToCanvas }: ReaderCanvasProps) {
+export function ReaderCanvas({ onOpenFile, onPageNavigate, onPageVisible, onRequestOcr, readerState, searchState, renderPageToCanvas }: ReaderCanvasProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const document = readerState.document;
 
@@ -125,6 +127,7 @@ export function ReaderCanvas({ onOpenFile, onPageNavigate, onPageVisible, reader
       document={document}
       onPageNavigate={onPageNavigate}
       onPageVisible={onPageVisible}
+      onRequestOcr={onRequestOcr}
       pageViewports={readerState.pageViewports}
       renderPageToCanvas={renderPageToCanvas}
       renderRange={readerState.renderRange}
@@ -141,11 +144,31 @@ interface DocumentReaderProps {
   renderPageToCanvas?: RenderPageToCanvasFn;
   onPageVisible?: (pageNumber: number) => void;
   onPageNavigate?: (nextPage: number) => void;
+  onRequestOcr?: () => void;
 }
 
-function DocumentReader({ document, pageViewports, renderRange, searchState, renderPageToCanvas, onPageVisible, onPageNavigate }: DocumentReaderProps) {
+function DocumentReader({ document, pageViewports, renderRange, searchState, renderPageToCanvas, onPageVisible, onPageNavigate, onRequestOcr }: DocumentReaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const activeHitPageNumber = searchState?.activeHit?.pageNumber;
+  const lastScrolledHitIdRef = useRef<string | null>(null);
+
+  // active 命中切换时，滚动到对应页（单页 / 双页 / 连续都生效；continuous 模式由浏览器自动决定滚动方向）
+  useEffect(() => {
+    if (!searchState?.activeHit || !containerRef.current) {
+      return;
+    }
+    if (lastScrolledHitIdRef.current === searchState.activeHit.id) {
+      return;
+    }
+    const target = containerRef.current.querySelector<HTMLElement>(
+      `[data-page-number="${searchState.activeHit.pageNumber}"][data-active-hit="true"]`,
+    );
+    if (target) {
+      target.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      lastScrolledHitIdRef.current = searchState.activeHit.id;
+    }
+  }, [searchState?.activeHit]);
 
   // 监听容器尺寸变化：fit-width 模式需要实时计算缩放
   useLayoutEffect(() => {
@@ -204,6 +227,22 @@ function DocumentReader({ document, pageViewports, renderRange, searchState, ren
 
   return (
     <main className="reader" aria-label="PDF 阅读区">
+      {document.ocrStatus === "needed" ? (
+        <div className="reader__status-banner reader__status-banner--ocr-needed" role="status" aria-live="polite">
+          <div className="reader__status-banner-body">
+            <strong>本文档需要 OCR 后才能搜索和复制文字。</strong>
+            <span>请在工具栏切换到 OCR 模式以启动识别任务。</span>
+          </div>
+          <button
+            className="tool-button tool-button--primary"
+            disabled={!onRequestOcr}
+            onClick={onRequestOcr}
+            type="button"
+          >
+            前往 OCR 模式
+          </button>
+        </div>
+      ) : null}
       <div
         className="reader__viewport"
         data-view-mode={document.viewMode}
@@ -212,6 +251,7 @@ function DocumentReader({ document, pageViewports, renderRange, searchState, ren
       >
         {renderRange.pageNumbers.map((pageNumber) => (
           <PdfPage
+            activeHit={activeHitPageNumber === pageNumber}
             key={pageNumber}
             highlights={searchState ? getSearchHighlightsForPage(searchState, pageNumber - 1) : []}
             onPageNavigate={onPageNavigate}
@@ -265,6 +305,8 @@ interface PdfPageProps {
   onVisible?: (pageNumber: number) => void;
   /** 单页/双页模式下点击页边时翻页 */
   onPageNavigate?: (nextPage: number) => void;
+  /** 当前页是否为搜索的 active hit；用于外框高亮 + 自动滚动 */
+  activeHit?: boolean;
 }
 
 function PdfPage({
@@ -280,6 +322,7 @@ function PdfPage({
   renderPageToCanvas,
   onVisible,
   onPageNavigate,
+  activeHit = false,
 }: PdfPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
@@ -366,6 +409,7 @@ function PdfPage({
     <section
       aria-label={`第 ${pageNumber} 页`}
       className="pdf-page"
+      data-active-hit={activeHit ? "true" : undefined}
       data-page-number={pageNumber}
       data-rotation={rotation}
       onClick={handlePageClick}
@@ -404,6 +448,13 @@ function PdfPage({
           <p className="empty-state__title">第 {pageNumber} 页</p>
           <p className="empty-state__body">
             {pageWidth} x {pageHeight} · 文字层{textLayerStatusLabels[textLayerStatus]}
+          </p>
+          <p
+            aria-label={`第 ${pageNumber} 页文字层状态`}
+            className={`pdf-page__text-layer-badge pdf-page__text-layer-badge--${textLayerStatus}`}
+            data-testid={`text-layer-badge-${pageNumber}`}
+          >
+            {textLayerStatusLabels[textLayerStatus]}
           </p>
         </div>
       </div>

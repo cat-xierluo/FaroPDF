@@ -1711,3 +1711,111 @@ manifest 脚本设计要点：
   3. 把私钥 / 密码添加到 GitHub Secrets
 - autoUpdateCheck 落地（加 `AppSettings.autoUpdateCheck` + About section mount
   hook）作为独立 PR，从 `feat/app-distribution` 拉出 `feat/auto-update-check`。
+## DEC-049 ISS-009 PDF Expert Shell UI 收口（v0.1 alpha.10）
+
+- 日期：2026-06-04
+- 状态：已采纳
+- 关联任务：ISS-009（设计系统落地）
+- 关联分支：`feat/pdf-expert-shell-ia`
+- 关联 PR：TBD
+- DEC 编号承接 DEC-043（ISS-024 doc-curator symlink 治理）后 +4（044/045/046 由其它 worker 占用 / 暂未使用；本 worker 直接跳到 047 记录 ISS-009 整体收口方案；与 DEC 编号跳号策略保持一致）
+
+承接 DEC-013（应用 Shell 阅读优先任务模式信息架构）、DEC-027（3 wave 多 worktree 推进中的 W5 ui-worker = ISS-009）和 DEC-043 之后的当前 `feat/pdf-expert-shell-ia` 收口需要。本决策记录 ISS-009 视觉 polish 第二阶段的四个 milestone 实现边界 + 一项 baseline unblock。
+
+### 1. tsconfig.json lib 升级 ES2020 → ES2022（baseline unblock）
+
+- `tsconfig.json`：`target` / `lib` 从 `"ES2020"` 升级到 `"ES2022"`。原因：现有 `src/modules/{pages,settings,ocr,preprocess}/...` 已大量使用 `Array.prototype.at()` / `String.prototype.at()`，但 lib 设到 ES2020 时 `.at()` 不在类型中，导致 `npm run typecheck` 报 17 个错误。
+- 这是"lib 字段声明滞后于实际 JS 运行时使用"的 baseline 修复，不修改任何代码语义。target 升级到 ES2022 同步保持一致（Vite + esbuild 已默认 ES2022+ 输出）。
+- 不影响：现有运行行为 / 测试结果 / 构建产物。
+
+### 2. 阅读态视觉 polish（Milestone 1）
+
+- `src/components/layout/ReaderCanvas.tsx`：当 `document.ocrStatus === "needed"` 时，在 `DocumentReader` 顶部显示 `.reader__status-banner` 提示条 + 跳转到 OCR 模式的 `<button>`，调用新增的 `onRequestOcr` 回调。
+- 同一个 `DocumentReader` 在每个 `PdfPage` 的 fallback `.empty-state` 块底部增加 `<p class="pdf-page__text-layer-badge">` 文字层状态徽章（`available` / `missing` / `poor` 颜色区分），用 `data-testid="text-layer-badge-N"` 暴露给 e2e。
+- `src/components/layout/Toolbar.tsx`：`fileSubtitle` 在 document === null 时区分"未打开文档" / "打开失败" 两种中文文案（不再共用"等待文件"）。
+- `src/App.tsx` 注入 `onRequestOcr={() => setActiveMode("ocr")}` → `AppShell` → `ReaderCanvas`。
+- `src/styles/app.css` 新增 `.reader__status-banner` / `.pdf-page__text-layer-badge--{available,missing,poor}` 样式。
+- 4 项 ReaderCanvas 单测覆盖：banner 显示 / 隐藏 / 禁用（无 callback）/ 文字层徽章。
+- 验证：73 文件 / 676 测试（+4）；typecheck / build / cargo check 全绿。
+
+### 3. 搜索结果层（Milestone 2）
+
+- `src/components/layout/Toolbar.tsx` `SearchResultsPopover`：
+  - 头部从 `命中 N 处` 升级为 `命中 X / N（N 处）` 索引计数（有 active hit 时显示索引，否则仅总数）。
+  - 索引进度：`索引 X / Y 页`（替代原本的"仍有 N 页未索引"）。
+  - 命中页码 chip 行 `.search-popover__pages`：每页一个 `.search-popover__page-chip` 按钮（`p.N`），点击直接 `search.selectHit` 跳转到该页的最近一个命中。
+  - 上一/下一按钮文案精简为「上一个」「下一个」。
+- `src/components/layout/ReaderCanvas.tsx`：
+  - `DocumentReader` 接受 `activeHitPageNumber = searchState?.activeHit?.pageNumber`，传给每个 `PdfPage` 的新 `activeHit?: boolean` prop。
+  - `PdfPage` 在 `activeHit` 时设置 `data-active-hit="true"`，CSS 用 `outline: 2px solid var(--accent)` 高亮。
+  - 新增 `useEffect` 在 `activeHit.id` 变化时调 `target.scrollIntoView({ behavior: "smooth", block: "center" })`；jsdom 用可选链兜底（`scrollIntoView?.`）。
+- `src/modules/search/searchUi.test.tsx` 同步更新：`命中 2 处` → 正则 `/命中 1 \/ 2（2 处）/`；"下一个命中" → "下一个"；"命中 1 处" → 正则 `/命中 \d+ 处/`。
+- `src/styles/app.css` 新增 `.pdf-page[data-active-hit="true"]` outline + `.search-popover__page-chip` 样式。
+- 1 项新 ReaderCanvas 单测：active hit 仅高亮对应页。
+- 验证：73 文件 / 677 测试（+1）；typecheck / build / cargo check 全绿。
+
+### 4. 页面管理多选 / 撤销 / 风险（Milestone 3）
+
+- `PageOrganizerWorkspace` 从 `src/components/layout/AppShell.tsx` 内部函数拆出为独立文件 `src/components/layout/PageOrganizerWorkspace.{tsx,css,test.tsx}`，便于维护 + 测试。
+- 多选状态 `selectedPageNumbers: ReadonlySet<number>` + shift+click 区间选择。**关键 bug 修复**：`lastClickedPageRef` 必须在 click handler 同步读取后传给 setState updater，**不能**在 updater 内部读 ref.current（React 可能在 updater 真正运行前已经把 ref 改为新的 pageNumber，导致 shift+click 区间计算错位）。
+- 7 个页面操作按钮按选择态正确启用/禁用（"粘贴"始终禁用，本 PR 无剪贴板集成）。
+- 删除前弹 `RiskConfirmDialog`（role=dialog, aria-modal=true）：列出前 8 个页码 + 总数，明确"另存为新 PDF"前的预览不保留原始文件副本。
+- 另存为新 PDF 弹 `ExportRiskDialog` 风险提示：明确"不会覆盖原始文件" + 设置 → 保存可调整默认目录。
+- 撤销按钮 + 已应用动作计数（占位 UI，**不**接 pageOrganizer service 真实页面变换；后续导出 worker 接入时复用 `usePageOrganizerController`）。
+- 文档切换时清空选择 + 撤销栈 + 风险对话框。
+- 8 项 PageOrganizerWorkspace 单测覆盖：空态 / 默认禁用 / 点选启用 / shift 选区 / 风险确认 / 撤销计数 / 导出风险 / 清除选择。
+- `src/styles/app.css` 保持原样（page-organizer 既有类不动），新 CSS 全部到 `PageOrganizerWorkspace.css`。
+- 验证：74 文件 / 685 测试（+8）；typecheck / build / cargo check 全绿。
+
+### 5. 扫描 / OCR 任务参数区（Milestone 4）
+
+- `OcrWorkspaceController` 扩展 `parameters: OcrWorkspaceParameters` 字段，包含：
+  - `activeProvider: { id, label, kind: "local" | "cloud", requiresNetworkConsent } | null`：用 `classifyProviderKind` 归一化（`local-` 前缀 / `legal-skills` / loopback endpoint 视为本地；其余 https endpoint 视为云端）。
+  - `outputStrategy: OcrOutputStrategy`：当前是 `new-layered-pdf`。
+  - `qualityCheck: { enabled, keywords, description }`：从 `OcrQualityCheckRequest` 派生。
+  - `networkConsentRequired: boolean`：云端 provider + `requireNetworkConsent` + `!networkConsentGranted` 时为 true。
+- 新增 `src/modules/ocr/ui/OcrWorkspaceHeader.tsx` 独立组件，展示 5 行：文档名 / OCR 后端（带 local/cloud tag）/ 页码范围 / 输出策略 / 质量检查；云端 provider 且 `requiresNetworkConsent` 时多展示一行"联网授权"状态。
+- `OcrWorkspace` 顶部挂载 `OcrWorkspaceHeader`，接收 `availableProviders` / `documentLabel` / `pageCount` props。
+- `AppShell` 透传 `settings.ocrProviders` / `reader.state.document?.name` / `pageCount`。
+- 7 项 OcrWorkspaceHeader 单测：无 provider / 本地 / 云端未授权 / 云端已授权 / 质量检查关键词 / 多 provider 计数 / 页码范围。
+- 同步 `AppShell.test.tsx` / `OcrWorkspace.test.tsx` 的 controller mock 补 `parameters` 字段。
+- 验证：75 文件 / 692 测试（+7）；typecheck / build / cargo check 全绿。
+
+### 6. 范围与依赖
+
+- 修改文件（共 17）：
+  - `tsconfig.json`（baseline unblock）
+  - `src/App.tsx`（注入 onRequestOcr 回调）
+  - `src/components/layout/{AppShell,Toolbar,ReaderCanvas,PageOrganizerWorkspace,types}.tsx` + `PageOrganizerWorkspace.css`
+  - `src/modules/ocr/ui/{OcrWorkspace,OcrWorkspaceHeader,useOcrWorkspaceController,ocrWorkspace.css}`
+  - `src/modules/search/searchUi.test.tsx`（同步文案）
+  - `src/styles/app.css`（新增 badge / banner / outline / chip 类）
+- 新增文件（共 4）：
+  - `src/components/layout/PageOrganizerWorkspace.{tsx,css,test.tsx}`
+  - `src/modules/ocr/ui/OcrWorkspaceHeader.{tsx,test.tsx}`
+  - `docs/plans/2026-06-04-pdf-expert-shell-polish.md`（writing-plans skill 产出）
+- 不修改：`src/shared/**` / `src-tauri/**` / `package.json` / 锁文件 / 共享契约 / 现有 service 内部 / 现有 AppShell 之外的 layout 组件（Sidebar.tsx / StatusBar.tsx / AnnotationSidebar.tsx 等未触碰）。
+- 不实现新功能：搜索算法、批注写入、OCR 调用、导出操作、真实页面变换、tsconfig 之外的基础设施变更。
+- 不引入新 npm 包。
+
+### 7. 已知限制
+
+- 页面管理 Undo 是占位 UI（仅 `appliedActionCount` 计数 + 视觉 enabled 切换；未接 pageOrganizer service 的真实 history/undo 状态机）。后续导出 worker 接入 `usePageOrganizerController` 时，本组件只需把 `appliedActionCount` 替换为 `state.history.length`，把 onClick 替换为 `controller.undo()`，UI 形状不变。
+- OCR 参数区是只读展示；用户改 provider / qualityCheck / networkConsent 仍需走「设置 → OCR provider」面板。后续 ISS-022 设置浮层收口时可让 `OcrWorkspaceHeader` 各项点击直接打开对应 section。
+- `tsconfig.json` 升级是全项目影响；其他 worker worktree 切到新 main 后也会看到 lib=ES2022，无破坏性。
+- `/tmp/faropdf-ui-sample.pdf` 在本会话期间不存在；视觉验证以 dev server + 浏览器打开 / `:5173/` 即可，无须 fixture PDF 即可观察空态 + 模式切换。
+
+### 8. 验证汇总
+
+- `npm run typecheck` ✅
+- `npm test -- --run` ✅ 75 文件 / 692 测试（+ 19 新测试：ReaderCanvas 4 + 1 / PageOrganizerWorkspace 8 / OcrWorkspaceHeader 7 — 与上 4 个 milestone 一致；searchUi 文本断言调整 3 处）
+- `npm run build` ✅ 1447 KB JS / 603 KB gz（与 M0 一致，无回归）
+- `cargo check --manifest-path src-tauri/Cargo.toml --offline` ✅（pre-existing 9 dead_code warnings 与本 PR 无关）
+- 4 个 commit（`feat(shell): reader-state visual polish` / `feat(shell): search-results layer hit navigation` / `feat(shell): page-organizer multi-select undo risk` / `feat(shell): ocr parameter area`）。
+
+### 9. 范围原则（不破例）
+
+- 本 PR 不修改 `Toolbar.tsx`（仍按 DEC-032 协议） / `Sidebar.tsx` / `App.tsx` 全局状态机 / 全局路由 / 任何共享契约。
+- 本 PR 不引入新依赖。
+- 本 PR 不调用 Tauri command；OCR 后端逻辑未变（仅在 controller 上新增 `parameters` 派生字段）。
+- 跨 worker 协调：未与其他 worktree 冲突（其它 worker 范围在 `src/modules/{annotation,export,forms,preprocess}/` 等，本 worker 集中在 `src/components/layout/` + `src/modules/ocr/ui/` + `src/styles/app.css` + `tsconfig.json`）。

@@ -35,6 +35,45 @@ import {
  *   `errorMessage` 会展示具体原因（前端不做 confirm 弹窗，留给后续 consent flow）。
  */
 
+export interface OcrWorkspaceParameters {
+  /** 当前选中的 provider（resolved）；无 provider 时为 null */
+  activeProvider: {
+    id: string;
+    label: string;
+    kind: "local" | "cloud";
+    requiresNetworkConsent: boolean;
+  } | null;
+  /** 输出策略（new-layered-pdf 等） */
+  outputStrategy: OcrOutputStrategy;
+  /** 质量检查摘要：未启用 / 已启用（带关键词） */
+  qualityCheck: {
+    enabled: boolean;
+    keywords: ReadonlyArray<string>;
+    description: string;
+  };
+  /** 是否需要联网授权（云端 provider + requireNetworkConsent + 未授权） */
+  networkConsentRequired: boolean;
+}
+
+/**
+ * Provider 类别归一化：根据 id / endpoint / known provider 列表推断 "local" vs "cloud"。
+ * 本地 provider（local-ocrmypdf / legal-skills）走本机二进制；云端 provider
+ * （paddleocr / mineru / 其他 endpoint 形式）需要网络。
+ */
+function classifyProviderKind(provider: OcrProviderConfig | null | undefined): "local" | "cloud" {
+  if (!provider) {
+    return "local";
+  }
+  const id = provider.id.toLowerCase();
+  if (id.startsWith("local-") || id === "legal-skills") {
+    return "local";
+  }
+  if (provider.endpoint && /^https?:\/\//.test(provider.endpoint) && !/localhost|127\.|::1/.test(provider.endpoint)) {
+    return "cloud";
+  }
+  return "cloud";
+}
+
 export interface OcrWorkspaceController {
   jobs: ReadonlyArray<OcrCommandJob>;
   currentJob: OcrCommandJob | undefined;
@@ -43,6 +82,8 @@ export interface OcrWorkspaceController {
   hasDocument: boolean;
   hasProvider: boolean;
   errorMessage: string | null;
+  /** 当前任务参数区展示用的只读摘要（ISS-009 收口用） */
+  parameters: OcrWorkspaceParameters;
   startOcr: () => Promise<void>;
   outputLayeredPdf: () => Promise<void>;
   cancelJob: (job: OcrCommandJob) => Promise<void>;
@@ -316,6 +357,24 @@ export function useOcrWorkspaceController(
     hasDocument,
     hasProvider,
     errorMessage,
+    parameters: {
+      activeProvider: provider
+        ? {
+            id: provider.id,
+            label: provider.displayName,
+            kind: classifyProviderKind(provider),
+            requiresNetworkConsent: provider.requiresNetworkConsent,
+          }
+        : null,
+      outputStrategy,
+      qualityCheck: {
+        enabled: Boolean(qualityCheck),
+        keywords: qualityCheck?.keywords ?? [],
+        description: qualityCheck ? "已启用" : "未启用",
+      },
+      networkConsentRequired:
+        Boolean(provider && provider.requiresNetworkConsent) && !networkConsentGranted,
+    },
     startOcr,
     outputLayeredPdf,
     cancelJob,
