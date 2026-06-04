@@ -184,4 +184,30 @@ describe("ReaderCanvas 阅读深化", () => {
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveClass("pdf-page__text-layer-badge--available");
   });
+
+  test("active hit 对应页加 data-active-hit=true，其他页不加", () => {
+    const state = makeState({ document: { ...baseDocument, viewMode: "single", currentPage: 2 } });
+    const searchState = {
+      query: "foo",
+      normalizedQuery: "foo",
+      status: "ready" as const,
+      hits: [],
+      indexedPageIndexes: [0, 1, 2, 3, 4],
+      pendingPageCount: 0,
+      textLayerStatus: "available" as const,
+      ocrHint: null,
+      activeHitId: "hit-2",
+      activeHit: { id: "hit-2", pageIndex: 1, pageNumber: 2, matchIndex: 0, range: { start: 0, end: 3 }, matchText: "foo", snippet: "foo bar" },
+    };
+    // 使用包含 2 页的 renderRange
+    const stateWith2 = {
+      ...state,
+      renderRange: { endPage: 2, pageNumbers: [1, 2], startPage: 1 },
+    };
+    render(<ReaderCanvas readerState={stateWith2} searchState={searchState} />);
+    const page1 = screen.getByLabelText("第 1 页");
+    const page2 = screen.getByLabelText("第 2 页");
+    expect(page1).not.toHaveAttribute("data-active-hit");
+    expect(page2).toHaveAttribute("data-active-hit", "true");
+  });
 });

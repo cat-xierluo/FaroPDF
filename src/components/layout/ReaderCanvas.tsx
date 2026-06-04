@@ -150,6 +150,25 @@ interface DocumentReaderProps {
 function DocumentReader({ document, pageViewports, renderRange, searchState, renderPageToCanvas, onPageVisible, onPageNavigate, onRequestOcr }: DocumentReaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const activeHitPageNumber = searchState?.activeHit?.pageNumber;
+  const lastScrolledHitIdRef = useRef<string | null>(null);
+
+  // active 命中切换时，滚动到对应页（单页 / 双页 / 连续都生效；continuous 模式由浏览器自动决定滚动方向）
+  useEffect(() => {
+    if (!searchState?.activeHit || !containerRef.current) {
+      return;
+    }
+    if (lastScrolledHitIdRef.current === searchState.activeHit.id) {
+      return;
+    }
+    const target = containerRef.current.querySelector<HTMLElement>(
+      `[data-page-number="${searchState.activeHit.pageNumber}"][data-active-hit="true"]`,
+    );
+    if (target) {
+      target.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      lastScrolledHitIdRef.current = searchState.activeHit.id;
+    }
+  }, [searchState?.activeHit]);
 
   // 监听容器尺寸变化：fit-width 模式需要实时计算缩放
   useLayoutEffect(() => {
@@ -232,6 +251,7 @@ function DocumentReader({ document, pageViewports, renderRange, searchState, ren
       >
         {renderRange.pageNumbers.map((pageNumber) => (
           <PdfPage
+            activeHit={activeHitPageNumber === pageNumber}
             key={pageNumber}
             highlights={searchState ? getSearchHighlightsForPage(searchState, pageNumber - 1) : []}
             onPageNavigate={onPageNavigate}
@@ -285,6 +305,8 @@ interface PdfPageProps {
   onVisible?: (pageNumber: number) => void;
   /** 单页/双页模式下点击页边时翻页 */
   onPageNavigate?: (nextPage: number) => void;
+  /** 当前页是否为搜索的 active hit；用于外框高亮 + 自动滚动 */
+  activeHit?: boolean;
 }
 
 function PdfPage({
@@ -300,6 +322,7 @@ function PdfPage({
   renderPageToCanvas,
   onVisible,
   onPageNavigate,
+  activeHit = false,
 }: PdfPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
@@ -386,6 +409,7 @@ function PdfPage({
     <section
       aria-label={`第 ${pageNumber} 页`}
       className="pdf-page"
+      data-active-hit={activeHit ? "true" : undefined}
       data-page-number={pageNumber}
       data-rotation={rotation}
       onClick={handlePageClick}

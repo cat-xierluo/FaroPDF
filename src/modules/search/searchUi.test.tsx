@@ -84,12 +84,12 @@ describe("search UI integration", () => {
 
     const searchResults = await screen.findByRole("region", { name: "搜索结果" });
     expect(searchResults).toBeInTheDocument();
-    expect(screen.getByText("命中 2 处")).toBeInTheDocument();
+    expect(screen.getByText(/命中 1 \/ 2（2 处）/)).toBeInTheDocument();
     expect(within(searchResults).getByRole("button", { name: /第 1 页/ })).toBeInTheDocument();
     expect(within(searchResults).getByRole("button", { name: /第 3 页/ })).toBeInTheDocument();
     expect(screen.getByText("当前页高亮：合同")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "下一个命中" }));
+    await user.click(screen.getByRole("button", { name: "下一个" }));
 
     expect(await screen.findByText("页码：3 / 3")).toBeInTheDocument();
   });
@@ -160,7 +160,7 @@ describe("search UI integration", () => {
     });
 
     expect(screen.getByRole("searchbox", { name: "全文搜索" })).toHaveValue("");
-    expect(screen.queryByText("命中 1 处")).not.toBeInTheDocument();
+    expect(screen.queryByText(/命中 \d+ 处/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Alpha snippet/)).not.toBeInTheDocument();
     expect(secondGetPageText).not.toHaveBeenCalled();
   });

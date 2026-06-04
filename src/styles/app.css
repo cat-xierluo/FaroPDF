@@ -764,6 +764,31 @@ select.zoom-control {
   font-weight: 650;
 }
 
+.search-popover__pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 8px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-popover__page-chip {
+  min-width: 36px;
+  padding: 2px 6px;
+  font-size: 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.search-popover__page-chip[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .page-organizer {
   display: flex;
   min-height: 0;
