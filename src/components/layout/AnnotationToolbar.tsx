@@ -6,6 +6,7 @@ import {
   STAMP_TEMPLATE_LIST,
   armAnnotationTool,
   disarmAnnotationTool,
+  renderStampPreview,
   setAnnotationColor,
   setAnnotationStampLabel,
   setAnnotationStampName,
@@ -110,6 +111,10 @@ export function AnnotationToolbar({ state, onStateChange, disabled }: Annotation
           <div className="annotation-toolbar-stamp__templates">
             {STAMP_TEMPLATE_LIST.map((template) => {
               const isActive = state.stampName === template.id;
+              const previewInner = renderStampPreview(template.id, {
+                label: template.label,
+                color: template.defaultColor,
+              });
               return (
                 <button
                   aria-pressed={isActive}
@@ -123,7 +128,19 @@ export function AnnotationToolbar({ state, onStateChange, disabled }: Annotation
                   title={template.label}
                   type="button"
                 >
-                  {template.label}
+                  <svg
+                    aria-hidden="true"
+                    className="annotation-stamp-button__preview"
+                    data-testid={`stamp-preview-${template.id}`}
+                    preserveAspectRatio="xMidYMid meet"
+                    viewBox={`0 0 400 100`}
+                    width="100%"
+                    height="32"
+                  >
+                    {/* eslint-disable-next-line react/no-danger */}
+                    <g dangerouslySetInnerHTML={{ __html: previewInner }} />
+                  </svg>
+                  <span className="annotation-stamp-button__label">{template.label}</span>
                 </button>
               );
             })}

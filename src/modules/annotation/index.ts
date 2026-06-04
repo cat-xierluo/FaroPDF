@@ -47,8 +47,8 @@ export {
   searchAnnotations,
 } from "./search";
 export type { AnnotationSearchOptions } from "./search";
-export { STAMP_TEMPLATES, STAMP_TEMPLATE_LIST, renderStampSvg, resolveStampTemplate } from "./stamps";
-export type { StampTemplate } from "./stamps";
+export { STAMP_TEMPLATES, STAMP_TEMPLATE_LIST, renderStampSvg, renderStampPreview, resolveStampTemplate, DEFAULT_STAMP_PREVIEW_HEIGHT, DEFAULT_STAMP_PREVIEW_WIDTH, STAMP_PREVIEW_VIEWBOX_WIDTH, STAMP_PREVIEW_VIEWBOX_HEIGHT } from "./stamps";
+export type { StampTemplate, RenderStampPreviewOptions } from "./stamps";
 export type { AnnotationSummary, AnnotationSummaryGroup, AnnotationSummaryItem } from "./summary";
 export {
   ANNOTATION_SIDEBAR_COLOR_CHOICES,

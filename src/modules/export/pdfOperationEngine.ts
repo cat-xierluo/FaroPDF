@@ -14,6 +14,7 @@ import type {
   PdfPageNumberOperation,
   PdfWatermarkOperation,
 } from "../../shared";
+import { writeAnnotationPdf } from "../annotation/annotationPdfWriter";
 import { isPdfPath, pathsAreSame } from "./pathSafety";
 import { resolveTextFont } from "./fontAwareWatermark";
 import { compressPdf } from "./compressionService";
@@ -36,10 +37,10 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
     async exportPdf(request) {
       validatePdfExportRequest(request);
 
-      const workingPdf = await PDFDocument.load(copyBytes(request.source.bytes), {
+      let workingPdf = await PDFDocument.load(copyBytes(request.source.bytes), {
         updateMetadata: false,
       });
-      const inputPageCount = workingPdf.getPageCount();
+      let inputPageCount = workingPdf.getPageCount();
       const summary: PdfExportSummary = {
         inputPageCount,
         outputPageCount: inputPageCount,
@@ -52,7 +53,31 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
 
       for (const operation of request.operations) {
         if (operation.type === "flatten-annotations") {
-          summary.annotationPlan = buildAnnotationFlattenPlan(operation, request.source.fingerprint, inputPageCount);
+          const strategy = operation.strategy ?? "plan-only";
+          if (strategy === "plan-only") {
+            summary.annotationPlan = buildAnnotationFlattenPlan(operation, request.source.fingerprint, inputPageCount);
+            continue;
+          }
+          // strategy === "draw"：实际绘制批注到 PDF 字节流，替换 workingPdf。
+          // 错误（字体加载、PDF 解析、sidecar 校验）整体抛出并被调用方 catch。
+          const drawResult = await writeAnnotationPdf({
+            sourceBytes: await workingPdf.save({ useObjectStreams: true }),
+            sidecar: operation.sidecar,
+            ...(request.source.fingerprint ? { sourceFingerprint: request.source.fingerprint } : {}),
+          });
+          workingPdf = await PDFDocument.load(drawResult.bytes, { updateMetadata: false });
+          // draw 完成后 inputPageCount 可能变化（但当前 writeAnnotationPdf 不删页，仅绘制），保险重新计算
+          inputPageCount = workingPdf.getPageCount();
+          summary.annotationPlan = buildAnnotationFlattenPlan(
+            operation,
+            request.source.fingerprint,
+            inputPageCount,
+            drawResult.summary,
+          );
+          // 跳过条目（非致命警告）写到 warnings
+          for (const skip of drawResult.summary.skipped) {
+            warnings.push(`批注 ${skip.annotationId}（${skip.type}）未绘制：${skip.reason}`);
+          }
           continue;
         }
 
@@ -142,10 +167,18 @@ function buildAnnotationFlattenPlan(
   operation: Extract<PdfExportRequest["operations"][number], { type: "flatten-annotations" }>,
   sourceFingerprint: string | undefined,
   inputPageCount: number,
+  drawSummary?: {
+    drawnCount: number;
+    skippedCount: number;
+    skipped: Array<{ annotationId: string; type: string; reason: string }>;
+    pageDrawCounts: Record<number, number>;
+    fingerprintChecked: boolean;
+  },
 ): PdfAnnotationFlattenPlan {
   const sidecar = operation.sidecar;
-  if ((operation.strategy ?? "plan-only") !== "plan-only") {
-    throw new Error("批注扁平化第一版只支持 plan-only 策略。");
+  const strategy = operation.strategy ?? "plan-only";
+  if (strategy !== "plan-only" && strategy !== "draw") {
+    throw new Error(`批注扁平化不支持的策略：${strategy}`);
   }
   if (sidecar.document.pageCount !== undefined && sidecar.document.pageCount !== inputPageCount) {
     throw new Error("批注 sidecar 页数与源 PDF 不一致。");
@@ -161,17 +194,36 @@ function buildAnnotationFlattenPlan(
     throw new Error("批注页码超出源 PDF 页数。");
   }
 
-  return {
-    strategy: "plan-only",
-    annotationCount: sidecar.annotations.length,
-    entries: sidecar.annotations.map((annotation) => ({
+  const entries = sidecar.annotations.map((annotation) => {
+    const entry: PdfAnnotationFlattenPlan["entries"][number] = {
       annotationId: annotation.id,
       type: annotation.type,
       pageIndex: annotation.pageIndex,
       rectCount: annotation.rects.length,
       status: "planned",
-    })),
+    };
+    if (strategy === "draw" && drawSummary) {
+      const skip = drawSummary.skipped.find((s) => s.annotationId === annotation.id);
+      entry.status = skip ? "skipped" : "applied";
+    }
+    return entry;
+  });
+
+  const plan: PdfAnnotationFlattenPlan = {
+    strategy,
+    annotationCount: sidecar.annotations.length,
+    entries,
   };
+
+  if (strategy === "draw" && drawSummary) {
+    plan.drawnCount = drawSummary.drawnCount;
+    plan.skippedCount = drawSummary.skippedCount;
+    plan.skipped = drawSummary.skipped.map((s) => ({ annotationId: s.annotationId, type: s.type as never, reason: s.reason }));
+    plan.pageDrawCounts = { ...drawSummary.pageDrawCounts };
+    plan.fingerprintChecked = drawSummary.fingerprintChecked;
+  }
+
+  return plan;
 }
 
 function flattenFormFields(pdf: PDFDocument): PdfFormFlatteningSummary {
@@ -744,8 +796,18 @@ function applyExportMetadata(pdf: PDFDocument, summary: PdfExportSummary): void 
   pdf.setProducer("FaroPDF pdf-lib export engine");
 
   if (summary.annotationPlan) {
-    keywords.push("faropdf:annotation-plan-only", `faropdf:annotation-count:${summary.annotationPlan.annotationCount}`);
-    pdf.setSubject(`FaroPDF annotation plan-only export with ${summary.annotationPlan.annotationCount} sidecar entries`);
+    const plan = summary.annotationPlan;
+    if (plan.strategy === "draw") {
+      keywords.push(
+        "faropdf:annotation-flattened",
+        `faropdf:annotation-count:${plan.annotationCount}`,
+        `faropdf:annotation-drawn:${plan.drawnCount ?? 0}`,
+      );
+      pdf.setSubject(`FaroPDF annotation flattened export with ${plan.drawnCount ?? 0}/${plan.annotationCount} drawn`);
+    } else {
+      keywords.push("faropdf:annotation-plan-only", `faropdf:annotation-count:${plan.annotationCount}`);
+      pdf.setSubject(`FaroPDF annotation plan-only export with ${plan.annotationCount} sidecar entries`);
+    }
   }
 
   if (summary.formFlattening?.flattened) {

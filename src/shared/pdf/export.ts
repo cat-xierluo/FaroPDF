@@ -49,7 +49,9 @@ export interface PdfFlattenAnnotationsOperation {
   strategy?: PdfAnnotationFlattenStrategy;
 }
 
-export type PdfAnnotationFlattenStrategy = "plan-only";
+export type PdfAnnotationFlattenStrategy = "plan-only" | "draw";
+
+export type PdfAnnotationFlattenEntryStatus = "planned" | "applied" | "skipped";
 
 export interface PdfFlattenFormOperation {
   id: string;
@@ -155,6 +157,15 @@ export interface PdfAnnotationFlattenPlan {
   strategy: PdfAnnotationFlattenStrategy;
   annotationCount: number;
   entries: PdfAnnotationFlattenPlanEntry[];
+  /** draw 策略下：实际绘制到 PDF 的批注数（drawnCount === annotationCount - skippedCount） */
+  drawnCount?: number;
+  skippedCount?: number;
+  /** draw 策略下：被跳过的批注 ID + 原因 */
+  skipped?: Array<{ annotationId: string; type: PdfAnnotationType; reason: string }>;
+  /** draw 策略下：每页绘制数量统计（key 为 pageIndex 0-based） */
+  pageDrawCounts?: Record<number, number>;
+  /** draw 策略下：是否做了 sidecar fingerprint 校验 */
+  fingerprintChecked?: boolean;
 }
 
 export interface PdfAnnotationFlattenPlanEntry {
@@ -162,7 +173,7 @@ export interface PdfAnnotationFlattenPlanEntry {
   type: PdfAnnotationType;
   pageIndex: number;
   rectCount: number;
-  status: "planned";
+  status: PdfAnnotationFlattenEntryStatus;
 }
 
 export interface PdfFormFlatteningSummary {
