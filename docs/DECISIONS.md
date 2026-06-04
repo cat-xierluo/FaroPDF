@@ -938,3 +938,64 @@ ISS-013 第一版已在 main（PR 合并见 DEC-013 段 2026-06-02 进度日志 
 - 不影响：PR #22 / PR #23 已合并的 reader-modes / forms-signing 不变；现有导出 operation 不变；压缩仍维持 plan-only 摘要。
 - 后续：若用户要求立即推进，第二阶段 worker prompt 必须显式写"@pdf-lib/fontkit 是 pdf-lib 官方 devDep，可装"，并指明字体协议（OFL / Apache 2.0 / MIT），且 PM 必须提供 `npm install` 后的版本指纹给 user 复核。
 
+## DEC-037 批注深化第二阶段：侧边栏 4 维度分组 + 真实 PDF 绘制导出
+
+- 日期：2026-06-04
+- 状态：已采纳
+- 关联分支：`feat/annotation-stage-2`
+- 关联任务：ISS-026（第二阶段）
+
+承接 DEC-031（第一版底座）+ DEC-015（sidecar 模型）+ DEC-019（plan-only 批注扁平化）+ DEC-032（mode 注册表），本决策记录 ISS-026 第二阶段三件套：批注侧边栏 4 维度分组与搜索/筛选、批注 → PDF 真实绘制导出、AnnotationSidebar 独立组件。
+
+### sidebarGroups 4 维度分组纯函数
+
+- 新增 `src/modules/annotation/sidebarGroups.ts`：
+  - `AnnotationSidebarGroupBy = "page" | "color" | "type" | "label"` 4 维度；`ANNOTATION_SIDEBAR_GROUP_BY_LIST` / `ANNOTATION_SIDEBAR_GROUP_BY_LABELS` 暴露给 UI。
+  - 4 个分组函数 + 1 个通用 `groupAnnotations(annotations, groupBy)`：按页码（1-based 标题）、按颜色（按 6 色色板定义顺序、未知颜色归"其他颜色"末尾）、按类型（按 `PDF_ANNOTATION_TYPES` 固定数组顺序保证 9 类型稳定）、按标签（stamp.label 优先，回退 content/quote 截断到 24 字；保留首次出现顺序）。
+  - `deriveAnnotationLabel` 单一来源：stamp.label > content > quote；空时返回 null。
+  - `applyAnnotationSidebarFilters(annotations, filters)`：组合 query / types / pageNumbers / colors / labels（colors/labels 多选 OR、其他 chip 维度 AND）；底层复用 `searchAnnotations` 的 query/types/pageNumbers + 颜色 hex 归一化比较。
+  - `collectAnnotationLabelChoices` / `ANNOTATION_SIDEBAR_COLOR_CHOICES`（6 色）/ `ANNOTATION_SIDEBAR_TYPE_CHOICES`（9 类型）给 UI 提供筛选 chip 选项。
+  - `sidebarFiltersFromSearch` / `sidebarFiltersToSearch` 在 search options 与 sidebar filters 之间双向转换；colors 多个时不退化为单 `color` 字段。
+  - 28 项单测覆盖 4 维度分组 / 标签提取 / 颜色排序 / 筛选组合 / options 互转。
+
+### annotationPdfWriter 真实 PDF 绘制导出
+
+- 新增 `src/modules/annotation/annotationPdfWriter.ts`：
+  - `writeAnnotationPdf({ sourceBytes, sidecar, sourceFingerprint? })` 入口；输出 `{ bytes, summary, suggestedFileName: "*-annotated.pdf" }`。
+  - 用 `pdf-lib`（已在 dependencies，1.17.1）真实绘制 9 种批注：
+    - highlight / note / textbox：透明填充矩形（opacity 默认 0.35，textbox 用 Helvetica 居中绘制 content）
+    - underline / strikeout：在 rect 底部 / 中部画线
+    - rectangle / note：边框矩形（无填充）
+    - arrow：line + 三角箭头头部（用 `drawLine` 三次）
+    - ink：所有 stroke 串联为 `M x y L x y ...` SVG path，`drawSvgPath` 一次绘出
+    - stamp：drawText 居中绘制 stamp.label（中文 / 非 Latin-1 字符不被 WinAnsi 编码时静默跳过文字、仍画边框）+ 边框矩形；不算入 skipped（"尽力而为"语义）
+  - 颜色解析接受 3 位 / 6 位 hex；非法颜色单批注跳过并记录原因，不影响其他批注。
+  - 越界 rect 走 `clampRectToBounds`（DEC-031 几何裁剪语义），不抛错；clamp 后面积为 0 时该批注被标记为 skipped。
+  - pageIndex 越界、sidecar.pageCount 与源 PDF 不一致、fingerprint 不匹配、schema 版本不匹配、空 source bytes、非法 PDF 字节 — 全部在调用方层尽早抛错并脱敏（`sanitizePdfExportError`）。
+  - 输出 PDF 元数据写入 `faropdf:annotation-flattened` / `faropdf:annotation-count:N` / `faropdf:annotation-drawn:N` 关键字。
+  - `summary` 包含 inputPageCount / outputPageCount / annotationCount / drawnCount / skippedCount / skipped（每条 annotationId + type + reason）/ pageDrawCounts（按 0-based pageIndex 累计）/ fingerprintChecked。
+  - 20 项单测覆盖：9 批注全绘、空 sidecar、越界 rect、颜色非法 / 3 位 hex、空文本框、中文 WinAnsi 跳过、缺 line / ink 字段、pageIndex 越界、pageCount 不一致、指纹不匹配、空 / 非法 PDF、schemaVersion 不匹配、opacity clamp、suggestedFileName、fingerprintChecked。
+
+### AnnotationSidebar 独立组件
+
+- 新增 `src/components/layout/AnnotationSidebar.tsx`（受控组件）+ `AnnotationSidebar.test.tsx`（18 项单测）。
+- Props：`hasDocument` / `annotations` / `currentPage`（1-based，active row 高亮）/ `pageCount` / `onSelectPage(pageIndex: number)`（0-based，与现有 `AnnotationListPanel` 协议一致）/ `activeAnnotationId`（透传 `AnnotationOverlay`）/ `onAnnotationClick(id)`。
+- UI：顶部 segment control 切换 4 维度分组；搜索 input（query）；筛选 chip 区（type 9 chip、color 6 色板、page 1-12 数字 chip、label 来自 `collectAnnotationLabelChoices`）；清除筛选按钮；分组列表（每组 header 显示标题 + 计数）；空态两态（无文档 / 无批注 / 筛选后无结果）。
+- **不挂 AppShell**：组件 self-contained、props 受控；接入由 layout worker 在后续 PR 处理（与第一版 Overlay/Toolbar 同样策略，避免本分支越界修改 Toolbar/AppShell/Reader）。
+- 18 项单测覆盖基础态 / 4 维度分组 / 搜索过滤 / 4 类 chip / 清除筛选 / 跳转 / 选中高亮 / 空态。
+- 复用现有 CSS 命名（`annotation-sidebar` / `annotation-sidebar__*`），未污染全局样式；本分支**不**写 CSS（设计 worker 在 `docs/DESIGN.md` 后续 PR 补齐或现有 utility-panel 样式类复用）。
+
+### 范围与依赖
+
+- 修改：`src/modules/annotation/index.ts`（追加 sidebarGroups / annotationPdfWriter 导出）、`docs/DECISIONS.md`（本节）、`docs/TASKS.md`（ISS-026 进度）、`CHANGELOG.md`（0.1.0-alpha.8 段）。
+- **新增**：`src/modules/annotation/sidebarGroups.ts` + `.test.ts`、`src/modules/annotation/annotationPdfWriter.ts` + `.test.ts`、`src/components/layout/AnnotationSidebar.tsx` + `.test.ts`。
+- **不修改**：`package.json` / 锁文件 / `src/components/layout/Toolbar.tsx` / `src/components/layout/AppShell.tsx` / `src/components/layout/Sidebar.tsx`（已有 `AnnotationListPanel` 不动，新组件独立挂载）/ `src/App.tsx` / 全局样式 / 路由 / `src/modules/reader/` / `src/modules/export/` / `src/modules/forms/` / `src/shared/pdf/annotation.ts`（sidecar schema 不变）/ `src-tauri/Cargo.toml`。
+- 沿用既有 pdf-lib 1.17.1，无新依赖；`pdfOperationEngine.exportPdf` 的 `flatten-annotations` operation 仍保持 plan-only 策略（本决策不修改其行为），后续可让 engine 复用 `writeAnnotationPdf` 作为底层。
+
+### 已知限制
+
+- 批注扁平化导出当前通过 `writeAnnotationPdf` 独立函数暴露，**未**接入 `pdfOperationEngine.exportPdf` 的 `flatten-annotations` 路径。整合方式由后续导出 worker 决定（保持 plan-only summary 字段 / 升级为 execute 二选一，本期不决）。
+- stamp 文字使用 Helvetica 真实绘制 Latin-1 字符；中文 stamp label 静默跳过文字但仍画边框。中文真实字形留待 ISS-013 第二阶段字体方案（DEC-036 延期项）重启后并入。
+- AnnotationSidebar 当前不挂 AppShell，UI 验收需 layout worker 接入后浏览器截图；本分支只保证组件自洽与可测。
+- `*-annotated.pdf` 建议输出名由调用方按 `deriveAnnotationOutputPath` 之类安全路径（DEC-005 输出保护）生成；本期不实现 `deriveAnnotationOutputPath`，由调用方提供绝对新路径。
+

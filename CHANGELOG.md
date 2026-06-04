@@ -1,3 +1,15 @@
+## 0.1.0-alpha.8 - 2026-06-04
+
+- 批注深化第二阶段（DEC-037 / ISS-026）：新增批注侧边栏 4 维度分组与搜索/筛选、批注 → PDF 真实绘制导出、AnnotationSidebar 独立组件。
+  - `src/modules/annotation/sidebarGroups.ts`：`AnnotationSidebarGroupBy = "page" | "color" | "type" | "label"` 4 维度分组纯函数 + `applyAnnotationSidebarFilters` 组合 query / types / pageNumbers / colors / labels 多 chip 筛选 + `deriveAnnotationLabel` 单来源标签提取 + `collectAnnotationLabelChoices` / 6 色 / 9 类型 chip 选项 + `sidebarFiltersFromSearch` / `sidebarFiltersToSearch` 互转；28 项单测覆盖。
+  - `src/modules/annotation/annotationPdfWriter.ts`：`writeAnnotationPdf({ sourceBytes, sidecar, sourceFingerprint? })` 入口用 `pdf-lib` 真实绘制 9 种批注（highlight / underline / strikeout / note / textbox / rectangle / arrow / ink / stamp）；3/6 位 hex 颜色解析；越界 rect 自动 clamp；非法颜色 / 缺字段 / clamp 后面积为 0 / 中文 WinAnsi 字符等单批注跳过并记录原因；pageIndex 越界、pageCount 不一致、fingerprint 不匹配、schemaVersion 不匹配、空 / 非法 PDF 在调用方层抛错并脱敏；输出 PDF 元数据写入 `faropdf:annotation-flattened` 等关键字；`summary` 包含 drawnCount / skippedCount / pageDrawCounts / fingerprintChecked；建议输出名 `*-annotated.pdf`；20 项单测覆盖。
+  - `src/components/layout/AnnotationSidebar.tsx`：受控组件 props（`hasDocument` / `annotations` / `currentPage`（1-based）/ `pageCount` / `onSelectPage(pageIndex)`（0-based 与 `AnnotationListPanel` 协议一致）/ `activeAnnotationId` / `onAnnotationClick`）；UI 含 segment control 4 维度切换 + 搜索 input + 4 类 chip（type 9 + color 6 + page 1-12 + label 来自 `collectAnnotationLabelChoices`）+ 清除筛选按钮 + 分组列表 + 3 态空态；**未挂 AppShell**（与第一版 Overlay/Toolbar 同策略，由 layout worker 后续 PR 接入）；18 项单测。
+  - `src/modules/annotation/index.ts` 追加 sidebarGroups / annotationPdfWriter 全部导出。
+- 范围严格遵守：未修改 `package.json` / 锁文件 / `Toolbar.tsx` / `AppShell.tsx` / `Sidebar.tsx`（已有 `AnnotationListPanel` 不动）/ `App.tsx` / 全局样式 / 路由 / `reader/` / `export/` / `forms/` / `src/shared/pdf/annotation.ts`（sidecar schema 不变）/ `src-tauri/Cargo.toml`；沿用 pdf-lib 1.17.1 无新依赖。
+- 同步 `docs/DECISIONS.md` DEC-037（ISS-026 第二阶段方案，DEC 编号承接 DEC-036 ISS-013 延期后 +1）；`docs/TASKS.md` ISS-026 进度日志追加对应记录。
+- 验证：60 个测试文件 / 561 个测试全部通过（新增 66 项：sidebarGroups 28 + annotationPdfWriter 20 + AnnotationSidebar 18）；`npm run typecheck` 干净；`npm run build` 成功；`cargo check --manifest-path src-tauri/Cargo.toml --offline` 通过。
+- 已知限制：批注扁平化导出未接入 `pdfOperationEngine.exportPdf` 的 `flatten-annotations` 路径（保持 plan-only 摘要），由后续导出 worker 决定是否升级为 execute；stamp 文字使用 Helvetica 真实绘制，中文 stamp label 静默跳过文字但保留边框（中文真实字形等 ISS-013 字体方案重启后并入）；AnnotationSidebar 不挂 AppShell，UI 验收需 layout worker 接入后浏览器截图。
+
 ## 0.1.0-alpha.7 - 2026-06-04
 
 - 阅读模式深化（DEC-034）：4 种 view mode（连续 / 单页 / 双页 / **适合宽度**）切换，缩放预设 8 项（50/75/100/125/150/200% / 适合宽度 / 适合页面），旋转 90° 步进（顺/逆时针），键盘翻页（PageUp/PageDown/方向键/Space/Home/End），阅读位置本地恢复（localStorage 持久化 fingerprint + currentPage + zoom + viewMode + rotation）。
