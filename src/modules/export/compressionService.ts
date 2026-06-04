@@ -91,26 +91,29 @@ function planOnlyImageInventory(pdf: PDFDocument): ImageResamplingDiagnostics {
   };
 
   for (const page of pdf.getPages()) {
-    const resourcesLookup = page.node.lookup(PDFName.of("Resources"), PDFDict);
-    if (!resourcesLookup) continue;
+    const resourcesMaybe = page.node.lookup(PDFName.of("Resources"));
+    if (!(resourcesMaybe instanceof PDFDict)) continue;
+    const resourcesLookup = resourcesMaybe;
 
-    const xobjects = resourcesLookup.lookup(PDFName.of("XObject"), PDFDict);
-    if (!xobjects) continue;
+    const xobjectsMaybe = resourcesLookup.lookup(PDFName.of("XObject"));
+    if (!(xobjectsMaybe instanceof PDFDict)) continue;
+    const xobjects = xobjectsMaybe;
 
     for (const key of xobjects.keys()) {
-      const stream = xobjects.lookup(key, PDFStream);
-      if (!stream) continue;
+      const maybeStream = xobjects.lookup(key);
+      if (!(maybeStream instanceof PDFStream)) continue;
+      const stream = maybeStream;
       const subtype = stream.dict.lookup(PDFName.of("Subtype"));
-      if (!(subtype instanceof PDFName) || subtype.encodedName !== "/Image") {
+      if (!(subtype instanceof PDFName) || subtype.toString() !== "/Image") {
         continue;
       }
 
       inventory.imageCount += 1;
       const filter = stream.dict.lookup(PDFName.of("Filter"));
       if (filter instanceof PDFName) {
-        if (filter.encodedName === "/FlateDecode") {
+        if (filter.toString() === "/FlateDecode") {
           inventory.flateDecodeCount += 1;
-        } else if (filter.encodedName === "/DCTDecode") {
+        } else if (filter.toString() === "/DCTDecode") {
           inventory.dctDecodeCount += 1;
         } else {
           inventory.otherCount += 1;

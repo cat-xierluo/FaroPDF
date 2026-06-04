@@ -1,5 +1,5 @@
 import type { PDFDocument, PDFFont } from "pdf-lib";
-import type * as FontkitModule from "@pdf-lib/fontkit";
+import * as FontkitModule from "@pdf-lib/fontkit";
 import shsFontArrayBuffer from "../../../assets/fonts/SourceHanSansSC-Regular.otf?arraybuffer";
 
 export const DEFAULT_CHINESE_FONT_PATH = "SourceHanSansSC-Regular.otf" as const;
@@ -8,12 +8,23 @@ export interface FontBytesLoader {
   loadFontBytes: (relativePath: string) => Promise<Uint8Array>;
 }
 
-export type FontkitInstance = (typeof FontkitModule)["default"];
+export type FontkitInstance = typeof FontkitModule;
 
 const defaultLoader: FontBytesLoader = {
   async loadFontBytes(relativePath) {
     if (relativePath !== DEFAULT_CHINESE_FONT_PATH) {
       throw new Error(`未识别的字体路径：${relativePath}`);
+    }
+    // vitest 1.x 默认不解析 Vite `?arraybuffer` 资源，会返回空 ArrayBuffer；
+    // 兜底从源文件读真实 OTF。
+    if (shsFontArrayBuffer.byteLength < 1_000_000) {
+      const { readFileSync } = await import("node:fs");
+      const { fileURLToPath } = await import("node:url");
+      const nodePath = await import("node:path");
+      const here = nodePath.dirname(fileURLToPath(import.meta.url));
+      const filePath = nodePath.resolve(here, "../../../assets/fonts/SourceHanSansSC-Regular.otf");
+      const buf = readFileSync(filePath);
+      return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
     }
     return new Uint8Array(shsFontArrayBuffer);
   },
@@ -29,8 +40,7 @@ export async function getFontkit(_loader?: FontBytesLoader): Promise<FontkitInst
   if (cachedFontkit) {
     return cachedFontkit;
   }
-  const module = await import("@pdf-lib/fontkit");
-  cachedFontkit = module.default;
+  cachedFontkit = FontkitModule;
   return cachedFontkit;
 }
 

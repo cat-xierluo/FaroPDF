@@ -28,7 +28,10 @@ function createMockPdfDocument(): PDFDocument & {
   const pdf = PDFDocument.create();
   const embedFont = vi.fn().mockResolvedValue({} as PDFFont);
   const registerFontkit = vi.fn();
-  return Object.assign(pdf, { embedFont, registerFontkit });
+  return Object.assign(pdf, { embedFont, registerFontkit }) as unknown as PDFDocument & {
+    embedFont: ReturnType<typeof vi.fn>;
+    registerFontkit: ReturnType<typeof vi.fn>;
+  };
 }
 
 describe("fontLoader", () => {

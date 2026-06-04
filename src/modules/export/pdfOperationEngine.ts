@@ -1,4 +1,4 @@
-import { degrees, PDFDocument, PDFName, PDFNumber, rgb, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
+import { degrees, PDFDocument, PDFName, PDFNumber, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type {
   PdfBatesNumberOperation,
   PdfCompressionOperation,
@@ -15,6 +15,8 @@ import type {
   PdfWatermarkOperation,
 } from "../../shared";
 import { isPdfPath, pathsAreSame } from "./pathSafety";
+import { resolveTextFont } from "./fontAwareWatermark";
+import { compressPdf } from "./compressionService";
 
 const PAGE_OPERATIONS_PLAN_ONLY_WARNING = "页面操作当前仅生成导出计划，尚未改写页面几何或顺序。";
 const COMPRESSION_PLAN_ONLY_WARNING = "PDF 压缩当前仅生成导出计划，尚未执行图像重编码或降采样。";
@@ -101,7 +103,7 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
 
       return {
         id: request.id,
-        bytes: await outputPdf.save(),
+        bytes: await outputPdf.save({ useObjectStreams: true }),
         destination: request.destination,
         summary,
         completedAt: now(),
@@ -343,8 +345,18 @@ async function applyOutputToolOperation(
     };
   }
 
-  if ((operation.mode ?? "plan-only") !== "plan-only") {
-    throw new Error("PDF 压缩第一版只支持 plan-only 模式。");
+  if ((operation.mode ?? "plan-only") === "apply") {
+    const compressionResult = await applyCompression(pdf, operation, pageIndexes);
+    return {
+      entry: {
+        operationId: operation.id,
+        type: operation.type,
+        pageIndexes,
+        status: "applied",
+        label: compressionResult.label,
+      },
+      warnings: compressionResult.warnings,
+    };
   }
 
   return {
@@ -356,6 +368,44 @@ async function applyOutputToolOperation(
       label: operation.preset,
     },
     warnings: [COMPRESSION_PLAN_ONLY_WARNING],
+  };
+}
+
+interface CompressionApplyResult {
+  label: string;
+  warnings: string[];
+}
+
+async function applyCompression(
+  pdf: PDFDocument,
+  operation: PdfCompressionOperation,
+  pageIndexes: number[],
+): Promise<CompressionApplyResult> {
+  // engine 已在 outputPdf.save({useObjectStreams:true}) 阶段对所有导出应用基础对象流压缩。
+  // 此处调用 compressionService 是为了给用户主动请求的压缩提供：ratio + image inventory
+  // 诊断信息（图像重采样本身仍 plan-only，真实像素重采样由 PyMuPDF bridge 提供）。
+  const presetToQuality: Record<PdfCompressionOperation["preset"], number | undefined> = {
+    screen: 0.5,
+    ebook: 0.7,
+    print: 0.9,
+    "court-upload": 0.6,
+  };
+
+  const beforeBytes = await pdf.save({ useObjectStreams: true });
+  const compressionResult = await compressPdf(beforeBytes, {
+    useObjectStreams: true,
+    imageQuality: presetToQuality[operation.preset],
+  });
+
+  const ratio = compressionResult.ratio;
+  const label = `${operation.preset} (ratio ${ratio.toFixed(2)}×, ${compressionResult.inputBytes}→${compressionResult.outputBytes} bytes, useObjectStreams: ${compressionResult.useObjectStreams}, 图像重采样 plan-only: ${compressionResult.imageResampling.imageCount} 张)`;
+
+  return {
+    label,
+    warnings: [
+      ...compressionResult.warnings,
+      ...(pageIndexes.length === 0 ? ["PDF 压缩作用于全部页面；当前未指定 pageIndexes 时默认覆盖整份文档。"] : []),
+    ],
   };
 }
 
@@ -372,7 +422,7 @@ async function applyWatermark(
       throw new Error("文字水印内容不能为空。");
     }
 
-    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const font = await resolveTextFont(pdf, text);
     const fontSize = normalizePositiveNumber(watermark.fontSize, 32);
     const color = parseHexColor(watermark.color ?? "#404040");
     const opacity = normalizeOpacity(watermark.opacity, 0.18);
@@ -444,7 +494,8 @@ async function applyPageNumbers(
   inputPageCount: number,
 ): Promise<string[]> {
   const startNumber = normalizePageNumberStart(operation.startNumber);
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const sampleLabel = formatPageNumberLabel(operation, startNumber, 0, inputPageCount);
+  const font = await resolveTextFont(pdf, sampleLabel);
   const fontSize = normalizePositiveNumber(operation.fontSize, 10);
   const color = parseHexColor(operation.color ?? "#202020");
   const labels: string[] = [];
@@ -472,11 +523,12 @@ async function applyBatesNumbers(
     throw new Error("Bates 起始号必须是非负整数。");
   }
 
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const digits = normalizeBatesDigits(operation.digits);
+  const sampleLabel = `${operation.prefix ?? ""}${String(operation.startNumber).padStart(digits, "0")}${operation.suffix ?? ""}`;
+  const font = await resolveTextFont(pdf, sampleLabel);
   const fontSize = normalizePositiveNumber(operation.fontSize, 10);
   const color = parseHexColor(operation.color ?? "#202020");
   const labels: string[] = [];
-  const digits = normalizeBatesDigits(operation.digits);
 
   pageIndexes.forEach((pageIndex, sequenceIndex) => {
     const number = operation.startNumber + sequenceIndex;
@@ -547,7 +599,7 @@ function normalizePageNumberStart(value: number | undefined): number {
 
 function normalizeBatesDigits(value: number | undefined): number {
   if (value === undefined) {
-    return 6;
+    return 0;
   }
   if (!Number.isInteger(value) || value < 0 || value > 12) {
     throw new Error("Bates 编号位数必须是 0 到 12 的整数。");
@@ -561,10 +613,11 @@ function measureTextWidth(font: PDFFont, text: string, fontSize: number): number
     return font.widthOfTextAtSize(text, fontSize);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("WinAnsi cannot encode")) {
-      throw Object.assign(new Error("PDF 交付工具第一版暂不支持非 Latin-1 文本。"), {
-        cause: error instanceof Error ? error : new Error(message),
-      });
+    if (message.includes("cannot encode") || message.includes("WinAnsi")) {
+      throw Object.assign(
+        new Error(`PDF 交付工具无法编码字符：所选字体不支持「${text}」中的部分字符。请改用支持目标字符集的字体。`),
+        { cause: error instanceof Error ? error : new Error(message) },
+      );
     }
 
     throw error;

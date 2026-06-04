@@ -124,7 +124,7 @@ export interface PdfBatesNumberOperation {
 }
 
 export type PdfCompressionPreset = "screen" | "ebook" | "print" | "court-upload";
-export type PdfCompressionMode = "plan-only";
+export type PdfCompressionMode = "plan-only" | "apply";
 
 export interface PdfCompressionOperation {
   id: string;

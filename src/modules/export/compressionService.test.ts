@@ -1,6 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, test } from "vitest";
-import { compressPdf, type CompressionOptions } from "./compressionService";
+import { compressPdf } from "./compressionService";
 
 async function createBlankPdfBytes(pageCount: number): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();

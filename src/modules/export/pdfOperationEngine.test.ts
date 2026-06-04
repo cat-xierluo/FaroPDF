@@ -1,7 +1,17 @@
 import { PDFDocument } from "pdf-lib";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import type { AnnotationSidecar, PdfAnnotation, PdfPageOperation } from "../../shared";
 import { createPdfOperationEngine } from "./pdfOperationEngine";
+import { resetFontkitCache } from "../../shared/pdf/fontLoader";
+
+vi.mock("../../../assets/fonts/SourceHanSansSC-Regular.otf?arraybuffer", () => ({
+  default: new ArrayBuffer(0),
+}));
+
+afterEach(() => {
+  resetFontkitCache();
+  vi.restoreAllMocks();
+});
 
 describe("pdf operation engine", () => {
   test("copies PDF bytes into a valid new PDF byte result", async () => {
@@ -438,7 +448,7 @@ describe("pdf operation engine", () => {
     ).rejects.toThrow("页面操作页码超出源 PDF 页数。");
   });
 
-  test("rejects delivery tools with invalid pages or unsafe compression modes", async () => {
+  test("rejects delivery tools with invalid pages", async () => {
     const inputBytes = await createPdfWithBlankPages(1);
     const engine = createPdfOperationEngine();
 
@@ -466,28 +476,45 @@ describe("pdf operation engine", () => {
         requestedAt: "2026-06-02T00:00:00.000Z",
       }),
     ).rejects.toThrow("交付工具页码超出源 PDF 页数。");
+  });
 
-    await expect(
-      engine.exportPdf({
-        id: "export-compress-mode",
-        source: {
-          bytes: inputBytes,
-          path: "/case/source.pdf",
+  test("applies compression preset in apply mode and surfaces ratio + image inventory", async () => {
+    const inputBytes = await createPdfWithBlankPages(2);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-compress-apply",
+      source: {
+        bytes: inputBytes,
+        path: "/case/source.pdf",
+      },
+      destination: {
+        type: "bytes",
+      },
+      operations: [
+        {
+          id: "compress-apply",
+          type: "compress",
+          preset: "court-upload",
+          mode: "apply",
         },
-        destination: {
-          type: "bytes",
-        },
-        operations: [
-          {
-            id: "compress-apply",
-            type: "compress",
-            preset: "court-upload",
-            mode: "apply",
-          } as never,
-        ],
-        requestedAt: "2026-06-02T00:00:00.000Z",
-      }),
-    ).rejects.toThrow("PDF 压缩第一版只支持 plan-only 模式。");
+      ],
+      requestedAt: "2026-06-02T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+    expect(outputPdf.getPageCount()).toBe(2);
+    const compressionEntry = result.summary.outputToolPlan?.entries.find(
+      (entry) => entry.operationId === "compress-apply",
+    );
+    expect(compressionEntry).toMatchObject({
+      operationId: "compress-apply",
+      type: "compress",
+      status: "applied",
+    });
+    expect(compressionEntry?.label ?? "").toMatch(/^court-upload \(ratio /);
+    // apply 模式下不再发 plan-only 警告；只断言无空输出。
+    expect(result.bytes.byteLength).toBeGreaterThan(0);
   });
 
   test("rejects invalid page number and Bates numbering inputs", async () => {
@@ -538,33 +565,101 @@ describe("pdf operation engine", () => {
     ).rejects.toThrow("Bates 编号位数必须是 0 到 12 的整数。");
   });
 
-  test("rejects non-Latin delivery tool text with a product error message", async () => {
+  test("embeds CJK text via the Chinese font path (no longer rejects non-Latin)", async () => {
     const inputBytes = await createPdfWithBlankPages(1);
     const engine = createPdfOperationEngine();
 
-    await expect(
-      engine.exportPdf({
-        id: "export-output-tool-font",
-        source: {
-          bytes: inputBytes,
-          path: "/case/source.pdf",
-        },
-        destination: {
-          type: "bytes",
-        },
-        operations: [
-          {
-            id: "watermark-chinese",
-            type: "watermark",
-            watermark: {
-              kind: "text",
-              text: "机密",
-            },
+    const result = await engine.exportPdf({
+      id: "export-output-tool-cjk",
+      source: {
+        bytes: inputBytes,
+        path: "/case/source.pdf",
+      },
+      destination: {
+        type: "bytes",
+      },
+      operations: [
+        {
+          id: "watermark-chinese",
+          type: "watermark",
+          watermark: {
+            kind: "text",
+            text: "机密文档",
           },
-        ],
-        requestedAt: "2026-06-02T00:00:00.000Z",
-      }),
-    ).rejects.toThrow("PDF 交付工具第一版暂不支持非 Latin-1 文本。");
+        },
+      ],
+      requestedAt: "2026-06-02T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+    expect(outputPdf.getPageCount()).toBe(1);
+    expect(result.summary.outputToolPlan?.entries).toEqual([
+      {
+        operationId: "watermark-chinese",
+        type: "watermark",
+        pageIndexes: [0],
+        status: "applied",
+        label: "机密文档",
+      },
+    ]);
+  });
+
+  test("embeds CJK page number format strings via the Chinese font path", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-page-number-cjk",
+      source: {
+        bytes: inputBytes,
+        path: "/case/source.pdf",
+      },
+      destination: {
+        type: "bytes",
+      },
+      operations: [
+        {
+          id: "page-number-cjk",
+          type: "page-number",
+          format: "第 {page} 页 / 共 {total} 页",
+        },
+      ],
+      requestedAt: "2026-06-02T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+    expect(outputPdf.getPageCount()).toBe(1);
+    expect(result.summary.outputToolPlan?.entries[0].label).toBe("第 1 页 / 共 1 页");
+  });
+
+  test("embeds CJK bates prefix and suffix via the Chinese font path", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-bates-cjk",
+      source: {
+        bytes: inputBytes,
+        path: "/case/source.pdf",
+      },
+      destination: {
+        type: "bytes",
+      },
+      operations: [
+        {
+          id: "bates-cjk",
+          type: "bates-number",
+          prefix: "合同-",
+          suffix: "-号",
+          startNumber: 1,
+        },
+      ],
+      requestedAt: "2026-06-02T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+    expect(outputPdf.getPageCount()).toBe(1);
+    expect(result.summary.outputToolPlan?.entries[0].label).toBe("合同-1-号");
   });
 
   // ==================== execute 模式测试 ====================
