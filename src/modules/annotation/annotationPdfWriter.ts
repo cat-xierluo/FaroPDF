@@ -7,6 +7,7 @@ import {
   type PDFPage,
 } from "pdf-lib";
 import type { AnnotationSidecar, PdfAnnotation, PdfRect } from "../../shared/pdf/annotation";
+import { resolveStampFont } from "./annotationStampFont";
 import { clampRectToBounds } from "./geometry";
 import { sortAnnotations } from "./sidecar";
 
@@ -105,7 +106,7 @@ export async function writeAnnotationPdf(input: WriteAnnotationPdfInput): Promis
 
     let result: { drawn: true } | { drawn: false; reason: string };
     try {
-      result = drawAnnotation(annotation, page, font, bounds);
+      result = await drawAnnotation(annotation, page, font, bounds, workingPdf);
     } catch (error) {
       result = { drawn: false, reason: getErrorMessage(error) };
     }
@@ -145,12 +146,13 @@ export async function writeAnnotationPdf(input: WriteAnnotationPdfInput): Promis
   };
 }
 
-function drawAnnotation(
+async function drawAnnotation(
   annotation: PdfAnnotation,
   page: PDFPage,
   font: PDFFont,
   bounds: PdfRect,
-): { drawn: true } | { drawn: false; reason: string } {
+  workingPdf: PDFDocument,
+): Promise<{ drawn: true } | { drawn: false; reason: string }> {
   const color = parseColorOrWarn(annotation.color);
   if (!color) {
     return { drawn: false, reason: `颜色无法解析：${annotation.color}` };
@@ -175,7 +177,7 @@ function drawAnnotation(
     case "ink":
       return drawInk(page, annotation, bounds, color, opacity);
     case "stamp":
-      return drawStamp(page, annotation, bounds, color, font);
+      return drawStamp(page, annotation, bounds, color, workingPdf);
     default:
       return { drawn: false, reason: `暂不支持的批注类型：${(annotation as { type: string }).type}` };
   }
@@ -399,14 +401,16 @@ function drawInk(
   return { drawn: true };
 }
 
-/** 图章：把 stamp.label 居中绘制为文字（避免画真实 SVG 复杂形状） */
-function drawStamp(
+/** 图章：把 stamp.label 居中绘制为文字（避免画真实 SVG 复杂形状）
+ *  文字字体走 resolveStampFont：CJK 字符用思源黑体 SC（OFL 1.1），Latin-only 用 Helvetica。
+ *  字体加载失败 → 计入 skipped；字体编码失败 → 保留边框（静默吞 drawText 错误）。 */
+async function drawStamp(
   page: PDFPage,
   annotation: PdfAnnotation,
   bounds: PdfRect,
   color: ReturnType<typeof rgb>,
-  font: PDFFont,
-): { drawn: true } | { drawn: false; reason: string } {
+  workingPdf: PDFDocument,
+): Promise<{ drawn: true } | { drawn: false; reason: string }> {
   if (!annotation.stamp) {
     return { drawn: false, reason: "图章批注缺少 stamp 字段" };
   }
@@ -430,20 +434,31 @@ function drawStamp(
     color: rgb(1, 1, 1),
     opacity: 0,
   });
+
+  let font: PDFFont | null = null;
   try {
-    const textWidth = safeTextWidth(font, label, STAMP_FONT_SIZE);
-    const x = rect.x + Math.max(0, (rect.width - textWidth) / 2);
-    const y = rect.y + Math.max(0, (rect.height - STAMP_FONT_SIZE) / 2);
-    page.drawText(label, {
-      x,
-      y,
-      size: STAMP_FONT_SIZE,
-      font,
-      color,
-      opacity: STAMP_BORDER_OPACITY,
-    });
+    font = await resolveStampFont(workingPdf, label);
   } catch {
-    // 文字不可编码（中文 / 非 Latin-1）时不计入 skipped；边框已经画好
+    // 字体加载失败时保留边框（与原行为一致：不计入 skipped）
+    font = null;
+  }
+
+  if (font) {
+    try {
+      const textWidth = safeTextWidth(font, label, STAMP_FONT_SIZE);
+      const x = rect.x + Math.max(0, (rect.width - textWidth) / 2);
+      const y = rect.y + Math.max(0, (rect.height - STAMP_FONT_SIZE) / 2);
+      page.drawText(label, {
+        x,
+        y,
+        size: STAMP_FONT_SIZE,
+        font,
+        color,
+        opacity: STAMP_BORDER_OPACITY,
+      });
+    } catch {
+      // 字体编码异常（极端字符）时保留边框，不计入 skipped
+    }
   }
   return { drawn: true };
 }
