@@ -14,6 +14,7 @@ import type { AnnotationToolState } from "../../modules/annotation";
 import { ReaderCanvas } from "./ReaderCanvas";
 import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
 import { AnnotationSidebar } from "./AnnotationSidebar";
+import { AnnotationToolbar } from "./AnnotationToolbar";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 import { SettingsPanel } from "../../modules/settings/SettingsPanel";
@@ -122,7 +123,15 @@ export function AppShell({
         search={search}
         utilityPanel={utilityPanel}
       />
-      {showContextToolbar ? <ContextToolbar mode={activeMode} ocr={ocr} /> : null}
+      {showContextToolbar ? (
+        <ContextToolbar
+          annotationDisabled={!hasDocument}
+          annotationState={annotationState}
+          mode={activeMode}
+          ocr={ocr}
+          onAnnotationStateChange={annotationArmed?.onStateChange ?? (() => undefined)}
+        />
+      ) : null}
       <div className={showUtilityPanel ? "workspace" : "workspace workspace--full"}>
         {showUtilityPanel ? <UtilityPanel panel={utilityPanel} reader={reader} search={search} annotations={annotations} /> : null}
         <div className="workspace__main" style={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, position: "relative" }}>
@@ -275,12 +284,29 @@ function matchZoomPreset(zoom: number): ZoomPresetId | undefined {
 }
 
 function ContextToolbar({
+  annotationDisabled,
+  annotationState,
   mode,
   ocr,
+  onAnnotationStateChange,
 }: {
+  annotationDisabled: boolean;
+  annotationState: AnnotationToolState;
   mode: Exclude<AppModeId, "read" | "pages">;
   ocr?: OcrWorkspaceController;
+  onAnnotationStateChange: (next: AnnotationToolState) => void;
 }) {
+  if (mode === "annotate") {
+    // stage 4 milestone 2：annotate 模式用真正的 AnnotationToolbar（受控），
+    // 取代 milestone 1 之前 hardcoded 9 工具 + 6 色板 + stamp 模板按钮。
+    // 外层 div 保留 role="toolbar" aria-label="批注工具条" 以保持既有 AppShell 测试契约。
+    return (
+      <div className="context-toolbar context-toolbar--annotation" role="toolbar" aria-label={contextualToolbarLabels[mode]}>
+        <AnnotationToolbar disabled={annotationDisabled} state={annotationState} onStateChange={onAnnotationStateChange} />
+      </div>
+    );
+  }
+
   if (mode === "ocr") {
     if (!ocr) {
       return (

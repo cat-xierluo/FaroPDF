@@ -439,3 +439,91 @@ describe("AppShell annotate overlay wiring (ISS-026 stage 4)", () => {
   });
 });
 
+describe("AppShell annotate toolbar integration (ISS-026 stage 4 milestone 2)", () => {
+  test("annotate mode 的批注工具条内嵌真正的 AnnotationToolbar（9 工具 + 6 色板）", () => {
+    renderAppShell({ activeMode: "annotate", utilityPanel: "annotation" });
+    const toolbar = screen.getByRole("toolbar", { name: "批注工具条" });
+    // AnnotationToolbar 内部的 role=toolbar 名「批注工具」
+    const innerToolbar = within(toolbar).getByRole("toolbar", { name: "批注工具" });
+    for (const label of ["高亮", "下划线", "删除线", "备注", "文本框", "矩形", "箭头", "手写", "图章"]) {
+      expect(within(innerToolbar).getByRole("button", { name: label })).toBeInTheDocument();
+    }
+    for (const swatch of ["黄", "蓝", "红", "绿", "紫", "黑"]) {
+      expect(within(toolbar).getByRole("button", { name: `颜色 ${swatch}` })).toBeInTheDocument();
+    }
+  });
+
+  test("点击 AnnotationToolbar 工具按钮 → 触发 bundle.onStateChange", async () => {
+    const user = userEvent.setup();
+    const onStateChange = vi.fn();
+    const reader = makeReader({
+      state: {
+        status: "ready",
+        defaults: { viewMode: "continuous", zoom: 1 },
+        document: {
+          documentId: "doc-1",
+          path: "test.pdf",
+          fingerprint: "fp-1",
+          name: "test.pdf",
+          currentPage: 1,
+          pageCount: 1,
+          zoom: 1,
+          viewMode: "continuous",
+          rotation: 0,
+          textLayerStatus: "available",
+          ocrStatus: "not-needed",
+          dirty: false,
+        },
+        pageViewports: [{ pageIndex: 0, width: 612, height: 792, rotation: 0, scale: 1 }],
+        renderRange: { startPage: 1, endPage: 1, pageNumbers: [1] },
+        errorMessage: undefined,
+      },
+    });
+    renderAppShell({
+      activeMode: "annotate",
+      annotationArmed: { onStateChange, state: createInitialAnnotationToolState() },
+      reader,
+      utilityPanel: "annotation",
+    });
+    await user.click(screen.getByRole("button", { name: "高亮" }));
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+    const next = (onStateChange.mock.calls.at(-1) as [{ activeToolType: string }])[0];
+    expect(next.activeToolType).toBe("highlight");
+  });
+
+  test("hasDocument=false 时 AnnotationToolbar 全部按钮 disabled", () => {
+    // makeReader 默认 document=null → hasDocument=false
+    renderAppShell({ activeMode: "annotate", utilityPanel: "annotation" });
+    expect(screen.getByRole("button", { name: "高亮" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "颜色 黄" })).toBeDisabled();
+  });
+
+  test("hasDocument=true 时 AnnotationToolbar 按钮可用", () => {
+    const reader = makeReader({
+      state: {
+        status: "ready",
+        defaults: { viewMode: "continuous", zoom: 1 },
+        document: {
+          documentId: "doc-1",
+          path: "test.pdf",
+          fingerprint: "fp-1",
+          name: "test.pdf",
+          currentPage: 1,
+          pageCount: 1,
+          zoom: 1,
+          viewMode: "continuous",
+          rotation: 0,
+          textLayerStatus: "available",
+          ocrStatus: "not-needed",
+          dirty: false,
+        },
+        pageViewports: [{ pageIndex: 0, width: 612, height: 792, rotation: 0, scale: 1 }],
+        renderRange: { startPage: 1, endPage: 1, pageNumbers: [1] },
+        errorMessage: undefined,
+      },
+    });
+    renderAppShell({ activeMode: "annotate", reader, utilityPanel: "annotation" });
+    expect(screen.getByRole("button", { name: "高亮" })).not.toBeDisabled();
+  });
+});
+
