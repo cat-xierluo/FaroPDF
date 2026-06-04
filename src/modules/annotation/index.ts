@@ -81,3 +81,5 @@ export type {
   WriteAnnotationPdfInput,
   WriteAnnotationPdfResult,
 } from "./annotationPdfWriter";
+export { resolveStampFont } from "./annotationStampFont";
+export type { ResolveStampFontOptions } from "./annotationStampFont";

@@ -1,34 +1,19 @@
+## 0.1.0-alpha.9 - 2026-06-04
+
+- 批注深化第三阶段（DEC-040 / ISS-026）：把第二阶段产出的 `AnnotationSidebar` 真正挂到 `AppShell` + 中文 stamp 文字用思源黑体 SC 真实绘制（补 DEC-039 W8 已知限制）。
+  - `src/components/layout/types.ts`：`UtilityPanelId` 新增 `"annotation"` 面板。
+  - `src/components/layout/AppShell.tsx`：`UtilityPanel` 增加 `panel === "annotation"` 分支，渲染 `AnnotationSidebar`（受控组件：annotations / currentPage / pageCount / onSelectPage 全部从 reader 透传）。
+  - `src/App.tsx`：`handleModeChange` 在切到 `annotate` mode 时强制 `setUtilityPanel("annotation")`；从 `annotate` 切到其他 mode 时若 panel 仍是 `annotation` 则回 `summary`。
+  - `src/modules/annotation/annotationStampFont.ts`（新）：`resolveStampFont(pdfDoc, text, options)` 路由 CJK → `embedChineseFont` / Latin-only → `StandardFonts.Helvetica`，与 `fontAwareWatermark.ts` 模式一致；7 项单测覆盖（含 `chineseFontBytes` / `chineseFontLoader` 注入）。
+  - `src/modules/annotation/annotationPdfWriter.ts`：`drawAnnotation` 改 async；`drawStamp` 改用 `await resolveStampFont(workingPdf, label)` 替代统一 Helvetica font；字体加载失败 / 编码失败时静默保留边框（与原行为一致，drawn: true 不计入 skipped）。
+  - `src/components/layout/AppShell.test.tsx`（新）：8 项单测覆盖 utilityPanel=annotation/summary/none 三态 + currentPage / onSelectPage 跳转链 + 中文搜索 + annotate/export 工具条。
+  - `src/modules/annotation/index.ts` 追加 `resolveStampFont` / `ResolveStampFontOptions` 导出。
+- 范围严格遵守：未修改 `package.json` / 锁文件（fontkit + 思源黑体已就位，按 DEC-039 协议）；未修改 `Toolbar.tsx`（仍按 DEC-032 协议由后续 mode 工具 worker 通过 `registerModeTools` 接入）；未修改 `Sidebar.tsx`（`AnnotationListPanel` 保留在 DocumentSummaryPanel 的「批注列表」tab 中作为 read/forms/ocr/export 模式的基础列表）；未修改 `src-tauri/Cargo.toml`；未修改其他模块（reader / forms / export / settings / ocr）。
+- 同步 `docs/DECISIONS.md` DEC-040；`docs/TASKS.md` ISS-026 进度日志追加对应记录；`docs/ROADMAP.md` **未改**。
+- 验证：71 个测试文件 / 636 个测试全部通过（新增 15 项：annotationStampFont 7 + AppShell 8）；`npm run typecheck` 干净；`npm run build` 成功；`cargo check --manifest-path src-tauri/Cargo.toml --offline` 干净。
+- 已知限制：窄屏下 annotate 模式 utilityPanel 槽位被 AnnotationSidebar 占满，无法同时看 DocumentSummaryPanel 缩略图（点「文档摘要」按钮可手动切回 summary）；textbox 批注的中文仍是 Helvetica 静默跳过（不属本期范围）；`AnnotationSidebar` 的 `onAnnotationClick` / `activeAnnotationId` 暂未与 `AnnotationOverlay` 联动（Overlay 暂无 controller）；`ContextToolbar` 批注工具按钮仍是死按钮（按 prompt 协议未修改 Toolbar.tsx）。
+
 ## 0.1.0-alpha.8 - 2026-06-04
-
-- 导出真实压缩 + 中文字体（DEC-039 / ISS-013 第二阶段）：按 DEC-036 重启条件落地，fontkit devDep + 思源黑体 SC（OFL 1.1）+ pdfOperationEngine 集成 CJK 水印 / 中文页码 / 中文 Bates + 真实压缩取代 plan-only。
-  - `src/shared/pdf/fontLoader.ts`：`FontBytesLoader` 抽象 + `embedChineseFont(pdfDoc, options)` + `containsCjk(text)` + `getFontkit()` 懒加载 + `registerFontkitForDocument` + vitest 1.x `readFileSync` fallback；9 项单测。
-  - `assets/fonts/SourceHanSansSC-Regular.otf`（16.5MB，OFL 1.1）+ `assets/fonts/LICENSE-SourceHanSans.txt`（协议全文）；中文字体协议合规。
-  - `@pdf-lib/fontkit` 安装为 devDep（pdf-lib 官方 devDep，README §645 明确要求），自动改 `package.json` + `package-lock.json`。
-  - `src/modules/export/compressionService.ts`：`compressPdf(bytes, options)` 走 `PDFDocument.save({ useObjectStreams: true })`；输出 `{ bytes, ratio, imageInventory }`；图像重采样 plan-only fallback；4 项单测。
-  - `src/modules/export/fontAwareWatermark.ts`：`resolveTextFont(pdfDoc, text, options)` 路由 CJK → `embedChineseFont`、Latin → `StandardFonts.Helvetica`；6 项单测。
-  - `src/modules/export/pdfOperationEngine.ts` 集成：watermark / page-number / bates 全部改走 `resolveTextFont`；compress apply 模式走 `compressPdf`；修 `PDFDict` 防御 + `PDFName.toString()` 改公开 API；`normalizeBatesDigits` 默认 6 → 0。
-  - `src/vite-env.d.ts`：加 `?arraybuffer` 模块声明（vitest 1.x 兼容性）。
-  - 19 项新测试通过；总测试 69 文件 / 621 通过；typecheck / build / cargo check --offline 全绿。
-  - 已知限制：vitest 不解析 Vite `?arraybuffer` 资源（生产正常）；CMYK / JPEG 走原图；stamp 文字 Helvetica 不支持 CJK 静默跳过；fontkit 全局缓存。
-- 批注深化第二阶段（DEC-037 / ISS-026）：新增批注侧边栏 4 维度分组与搜索/筛选、批注 → PDF 真实绘制导出、AnnotationSidebar 独立组件。
-  - `src/modules/annotation/sidebarGroups.ts`：`AnnotationSidebarGroupBy = "page" | "color" | "type" | "label"` 4 维度分组纯函数 + `applyAnnotationSidebarFilters` 组合 query / types / pageNumbers / colors / labels 多 chip 筛选 + `deriveAnnotationLabel` 单来源标签提取 + `collectAnnotationLabelChoices` / 6 色 / 9 类型 chip 选项 + `sidebarFiltersFromSearch` / `sidebarFiltersToSearch` 互转；28 项单测覆盖。
-  - `src/modules/annotation/annotationPdfWriter.ts`：`writeAnnotationPdf({ sourceBytes, sidecar, sourceFingerprint? })` 入口用 `pdf-lib` 真实绘制 9 种批注（highlight / underline / strikeout / note / textbox / rectangle / arrow / ink / stamp）；3/6 位 hex 颜色解析；越界 rect 自动 clamp；非法颜色 / 缺字段 / clamp 后面积为 0 / 中文 WinAnsi 字符等单批注跳过并记录原因；pageIndex 越界、pageCount 不一致、fingerprint 不匹配、schemaVersion 不匹配、空 / 非法 PDF 在调用方层抛错并脱敏；输出 PDF 元数据写入 `faropdf:annotation-flattened` 等关键字；`summary` 包含 drawnCount / skippedCount / pageDrawCounts / fingerprintChecked；建议输出名 `*-annotated.pdf`；20 项单测覆盖。
-  - `src/components/layout/AnnotationSidebar.tsx`：受控组件 props（`hasDocument` / `annotations` / `currentPage`（1-based）/ `pageCount` / `onSelectPage(pageIndex)`（0-based 与 `AnnotationListPanel` 协议一致）/ `activeAnnotationId` / `onAnnotationClick`）；UI 含 segment control 4 维度切换 + 搜索 input + 4 类 chip（type 9 + color 6 + page 1-12 + label 来自 `collectAnnotationLabelChoices`）+ 清除筛选按钮 + 分组列表 + 3 态空态；**未挂 AppShell**（与第一版 Overlay/Toolbar 同策略，由 layout worker 后续 PR 接入）；18 项单测。
-  - `src/modules/annotation/index.ts` 追加 sidebarGroups / annotationPdfWriter 全部导出。
-- 范围严格遵守：未修改 `package.json` / 锁文件 / `Toolbar.tsx` / `AppShell.tsx` / `Sidebar.tsx`（已有 `AnnotationListPanel` 不动）/ `App.tsx` / 全局样式 / 路由 / `reader/` / `export/` / `forms/` / `src/shared/pdf/annotation.ts`（sidecar schema 不变）/ `src-tauri/Cargo.toml`；沿用 pdf-lib 1.17.1 无新依赖。
-- 同步 `docs/DECISIONS.md` DEC-037（ISS-026 第二阶段方案，DEC 编号承接 DEC-036 ISS-013 延期后 +1）；`docs/TASKS.md` ISS-026 进度日志追加对应记录。
-- 验证：60 个测试文件 / 561 个测试全部通过（新增 66 项：sidebarGroups 28 + annotationPdfWriter 20 + AnnotationSidebar 18）；`npm run typecheck` 干净；`npm run build` 成功；`cargo check --manifest-path src-tauri/Cargo.toml --offline` 通过。
-- 已知限制：批注扁平化导出未接入 `pdfOperationEngine.exportPdf` 的 `flatten-annotations` 路径（保持 plan-only 摘要），由后续导出 worker 决定是否升级为 execute；stamp 文字使用 Helvetica 真实绘制，中文 stamp label 静默跳过文字但保留边框（中文真实字形等 ISS-013 字体方案重启后并入）；AnnotationSidebar 不挂 AppShell，UI 验收需 layout worker 接入后浏览器截图。
-- 设置页面 UI 整合（DEC-038 / ISS-022 + ISS-023 第一版）：把现有扁平 `SettingsPanel` 升级为左侧导航 + 多 section 的 Portal 浮层（`role="dialog" aria-modal="true"`，`Esc` 关闭、点遮罩关闭、打开抢焦点、窄屏 < 768px 折叠为顶部 tab），至少包含「常规 / 阅读 / OCR provider / 快捷键 / 关于」5 个 section；CSS 落到独立 `SettingsPanel.css`，复用 `--bg / --surface / --border / --fg / --muted / --accent` 设计 token，不污染 `src/styles/app.css`。
-- 5 section 拆分到 `src/modules/settings/sections/`：GeneralSection（默认保存策略 + 默认保存目录 + 最近文件）、ReaderSection（默认缩放 + 默认阅读模式）、OcrProviderSection（默认 OCR 后端 / provider 启用 / endpoint + apiKeyRef 脱敏 / 联网确认）、ShortcutSection（只读 3 组快捷键：阅读翻页 / 缩放与旋转 / 工具切换）、AboutSection（应用 icon / 名称 / 定位 / 版本 / 官网 / GitHub 仓库 / 检查更新按钮 / 作者卡）。`AppSettings` 字段**不**新增，持久化复用 `settingsStorage` 抽象；各 section 通过受控 `SectionProps` 暴露 `settings` + `onChange`。
-- 新增 `src/shared/app/metadata.ts` + `metadata.test.ts`：`readAppMetadata()` 暴露 `name / version / description / homepage / repositoryUrl / authorName`，名称 / 版本优先 `tauri.conf.json` 的 `productName` / `version`，其余字段读 `package.json`；`FALLBACK_APP_VERSION = "0.0.0"` 兜底；解析 `repository`（字符串 / `{ url, type }` 两种形态）与 `author` 同理。
-- `package.json` 新增 `description` / `homepage` / `repository` / `author` 4 个 metadata 字段（**不**引入新依赖），`repository.url` 指 `https://github.com/cat-xierluo/FaroPDF.git`，`author.name` = `maoking`，`homepage` = 仓库 URL。`AboutSection` 直接 import `src-tauri/icons/128x128.png` 展示应用 icon，Vite 在构建时把 PNG 内联为 URL，不复制资源。
-- 「检查更新」按钮：ISS-021 tauri-plugin-updater 尚未合入，按钮触发后展示「当前环境不支持自动更新」+「ISS-021 集成后启用」占位文案；`checkForAppUpdate` 接入留待 ISS-021 PR。`App.handleSettingsChange` 仅 `setSettings(next)`，未接 `SettingsService.updateSettings` 持久化与校验失败回滚（SettingsService 接入时一并补）。
-- AppShell 接线：把 SettingsPanel 从 `utility-panel--settings` aside 提升到 `<div class="app-shell">` 顶层（与 StatusBar 同级），通过 `onUtilityPanelChange("none")` 关闭；AppShell 新增 `onSettingsChange?: (settings) => void` prop；`App` 改 `useState` 持有 settings，新增 `handleSettingsChange` 走 `setSettings`。
-- 测试：新增 36 个测试覆盖 5 section + SettingsPanel 容器 + metadata helper，总测试 526 / 526 通过（63 个测试文件）。`App.test.tsx` 旧的 aside 断言改为 dialog + 顶部 tab 切到 OCR section 才能看到「默认 OCR 后端」的新流程。`src/test/setup.ts` 加 `window.matchMedia` jsdom 兜底（v29 jsdom 缺实现）。`npm run typecheck` 干净；`npm run build` 成功（`dist/assets/128x128-D40VdaNu.png` 17.61 KB 等）；`cargo check --manifest-path src-tauri/Cargo.toml --offline` 干净。
-- 已知限制：SettingsPanel 未做完整 focus trap（仅开抢 + 关恢复），需要 WCAG AAA 时再补；「快捷键」section 仅展示不支持编辑；「关于」作者卡无微信公众号二维码图片（说明文字先就位，图片留待后续）；校验错误展示交给 SettingsService 调用方，浮层内不展示。
-- 同步 `docs/DECISIONS.md` DEC-038 设置页面 UI 整合方案（DEC 编号承接 DEC-037 批注第二阶段后 +1）；`docs/TASKS.md` 进度日志追加对应记录。**未**改 `docs/ROADMAP.md` 与 `src/modules/reader/annotation/forms` 等其他模块。
-
 ## 0.1.0-alpha.7 - 2026-06-04
 
 - 阅读模式深化（DEC-034）：4 种 view mode（连续 / 单页 / 双页 / **适合宽度**）切换，缩放预设 8 项（50/75/100/125/150/200% / 适合宽度 / 适合页面），旋转 90° 步进（顺/逆时针），键盘翻页（PageUp/PageDown/方向键/Space/Home/End），阅读位置本地恢复（localStorage 持久化 fingerprint + currentPage + zoom + viewMode + rotation）。

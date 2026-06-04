@@ -6,6 +6,7 @@ import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
 import { ReaderCanvas } from "./ReaderCanvas";
 import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
+import { AnnotationSidebar } from "./AnnotationSidebar";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 import { SettingsPanel } from "../../modules/settings/SettingsPanel";
@@ -137,6 +138,18 @@ function UtilityPanel({
   if (panel === "settings") {
     // 设置浮层已挪到 AppShell 顶层以走 Portal 模式，此处仅占位避免 UtilityPanel fallback。
     return null;
+  }
+
+  if (panel === "annotation") {
+    return (
+      <AnnotationSidebar
+        annotations={annotations ?? []}
+        currentPage={reader.state.document?.currentPage}
+        hasDocument={reader.state.document !== null}
+        onSelectPage={reader.setCurrentPage}
+        pageCount={reader.state.document?.pageCount}
+      />
+    );
   }
 
   return (

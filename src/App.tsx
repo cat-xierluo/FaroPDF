@@ -70,7 +70,12 @@ function App() {
       return;
     }
 
-    if (utilityPanel === "none") {
+    if (nextMode === "annotate") {
+      setUtilityPanel("annotation");
+      return;
+    }
+
+    if (utilityPanel === "annotation" || utilityPanel === "none") {
       setUtilityPanel("summary");
     }
   }
