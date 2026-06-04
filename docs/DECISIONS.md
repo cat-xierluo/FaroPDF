@@ -1819,3 +1819,110 @@ manifest 脚本设计要点：
 - 本 PR 不引入新依赖。
 - 本 PR 不调用 Tauri command；OCR 后端逻辑未变（仅在 controller 上新增 `parameters` 派生字段）。
 - 跨 worker 协调：未与其他 worktree 冲突（其它 worker 范围在 `src/modules/{annotation,export,forms,preprocess}/` 等，本 worker 集中在 `src/components/layout/` + `src/modules/ocr/ui/` + `src/styles/app.css` + `tsconfig.json`）。
+
+## DEC-048 ISS-007 OCR 端到端联调（fixture + E2E 集成测试）
+
+### 1. 背景
+
+承接 DEC-030（OCR bridge 真实接入）+ DEC-042（OCR 模式工具条接入 AppShell）+ DEC-031 / DEC-040 之后，`feat/ocr-e2e` 分支落实 ISS-007 「下一步」段第一条：
+> 真实 PDF 端到端联调（提供 fixture 验证 `*-ocr.pdf` 输出 + 质量检查）
+
+OCR 链路跨 5 个 Tauri command（`start_ocr_job` / `list_ocr_jobs` / `poll_ocr_job` / `cancel_ocr_job` / `extract_ocr_text`）+ 前端 `OcrBridgeService` + `OcrJobController` + `OcrPostProcessor` + `OcrQualityCheckService`，**未有任何集成测试**覆盖「真实 ocrmypdf 子进程 → 真实 pdftotext 文本抽取 → 真实质量报告生成」全链路。本期填这个缺口。
+
+### 2. 决策
+
+#### 2.1 夹具策略：脚本生成（不入仓）
+
+- 新增 `tests/fixtures/ocr/generate-scan-fixture.mjs`：Node + pdf-lib 脚本，把一张 400x150 预渲染 PNG（base64 内嵌在源文件里，**不依赖 ImageMagick / pdftoppm**）嵌入 2 页 A4 PDF，生成 `scan-only-sample.pdf`（~5 KB）。
+  - 选 base64 内嵌是因为 2.3KB 体积的 PNG 完整 base64 仅 ~3.1KB，可作为源文件常量；脚本不依赖任何外部渲染工具，保证 clone 后 `node tests/fixtures/ocr/generate-scan-fixture.mjs` 即可得到稳定 fixture。
+  - 2 页 A4 便于覆盖 `pageRange` 参数（"1" / "1-2" / "2" 都能命中）。
+  - PNG 内的 "OCR E2E 2026 / line one / line two / line three" 文字在外部用 `magick convert` 预渲染成像素（**不是 PDF 文字层**），保证 ocrmypdf 走图像识别路径。
+- 产物 `scan-only-sample.pdf` 由 `.gitignore` 排除（新增 `tests/fixtures/ocr/*.pdf` 规则）。
+- 配套 `tests/fixtures/ocr/README.md` 记录重新生成命令、所需本机工具（ocrmypdf ≥ 13 / pdftotext ≥ 22 / curl ≥ 7 / tesseract + eng + chi_sim）、已知限制。
+
+#### 2.2 前端 vitest 集成测试 `tests/e2e/ocr-e2e.test.ts`
+
+- 4 个 case：
+  1. **full pipeline** — `OcrBridgeService.startOcr`（注入真实 ocrmypdf 后端）→ `OcrJobController`（注入 pdftotext 后端 list/poll/extract）→ `OcrPostProcessor.buildReport` → 断言 `status=completed` / 输出 PDF 存在 / 2 页都有文字 / 关键词 "OCR/E2E/2026" 全部命中 / `passed=true`。
+  2. **bridge rejects mismatched providerId** — 配置只含 `local-ocrmypdf` 时，调 `providerId: "mineru"` 必须抛 `OCR Provider ...` 错误（不出 ocrmypdf 子进程）。
+  3. **controller sanitises paths** — 后端抛带路径的错误，controller 包装后必须把完整本地路径替换为 `[path]`。
+  4. **prepareOcrRequest defaults** — 纯函数 `prepareOcrRequest` 把 `outputPath` 填成 `*-ocr.pdf`、`outputStrategy="new-layered-pdf"`、`qualityCheck.enabled=false`。
+- 跳过策略：模块级 `beforeAll` 探测 `ocrmypdf --version` 与 `pdftotext -v`，缺一则每个 test 内部 `if (!requireTools()) return;` 静默跳过（CI 不阻塞）。
+- 后端注入：测试不依赖 Tauri runtime，构造 `OcrBridgeBackend.startOcr`（real ocrmypdf via `child_process.spawn`）+ `OcrJobController` 注入的 invoker（`list_ocr_jobs` / `poll_ocr_job` / `cancel_ocr_job` 走内存 state，`extract_ocr_text` 走 `pdftotext -layout`）。
+- fixture 路径解析：`process.cwd()` 即项目根；fixture 缺失时通过 `spawn(/opt/homebrew/bin/node, generate-scan-fixture.mjs)` 重生成（vitest 沙箱里 PATH 可能被裁，先硬编码几个候选路径再回退 `process.execPath`）。
+- pdftotext 输出分页：`splitPages` 先 strip 收尾 `\f` / 空白再 `split("\f")`，避免结尾空段被算成额外页（实际修复了一个 3 vs 2 的 false alarm）。
+
+#### 2.3 Rust 集成测试 `src-tauri/src/lib.rs` 末尾 `#[cfg(test)] mod ocr_e2e_tests`
+
+- 项目无 `src-tauri/tests/` 目录，且除 `run()` 外所有模块都是 private，集成测试只能内联在 `lib.rs` 的 `#[cfg(test)] mod` 里（与 `ocr_bridge_tests` / `scan_preprocess_tests` 风格一致）。
+- 单 case `full_ocr_pipeline_runs_ocrmypdf_then_extracts_text_via_pdftotext`：
+  1. 复用前端 fixture（`tests/fixtures/ocr/scan-only-sample.pdf`，不存在则整个测试 `return` 跳过，不 panic），复制到 temp 目录避免污染源文件。
+  2. `dispatch_ocr(OcrDispatchBackend::LocalOcrMyPdf)` 真实跑 ocrmypdf，断言输出 PDF 存在且 `output_size_bytes > 0`。
+  3. `extract_pdf_text` 抽文字层，断言 `pages.len() == 2`（fixture 2 页）+ `summarized.searchable_pages == 2`。
+  4. `OcrJobQueue::new(tempfile)` 持久化 `OcrStoredJob` 字段，重新 `OcrJobQueue::new(same path)` 读回，断言 `status=completed` / `backend=local-ocrmypdf` / `input_path_summary.kind=local-pdf` / `fingerprint` 非空 / `progress.completed_pages=2`。
+- 跳过条件：`tools_available()` 探测 `ocrmypdf --version` 与 `pdftotext -v`，缺一就 `return`。
+- 状态写入：直接 upsert `status="completed"`（避开 `reconcile_running_after_restart` 把残留 running 改成 cancelled 的行为，这是该 hook 的预期行为不是 bug）。
+
+#### 2.4 顺手修了一个生产 bug：`extract_pdf_text` 参数顺序
+
+- `src-tauri/src/ocr_text_extract.rs:53-58` 原代码：
+  ```rust
+  Command::new("pdftotext").arg("-layout").arg("-enc").arg("UTF-8").arg("-").arg(pdf_path)
+  ```
+  pdftotext 期望的语法是 `pdftotext [options] input.pdf [output]`，把 `-`（stdout）放在 input 之前会让 pdftotext 把 `-` 当成 input（读 stdin），`pdf_path` 当成 output（写文件），结果进程以 `Syntax Error: Document stream is empty` 退出 1。
+- 修正为 `.arg(pdf_path).arg("-")`，与 pdftotext CLI 语法一致。`extract_ocr_text` Tauri command 自 DEC-030 接入以来实际从未在真实 E2E 流通过——本期 E2E 第一次把它接进真实链路并触发。
+- 影响：`extract_ocr_text` + `start_ocr_job` 内 `quality_check.enabled=true` 分支（lib.rs:654）现在能正确抽取文字层喂给质量检查。
+- 既有 `split_into_pages` 单测只用字符串拼接，不调真实 `Command::new("pdftotext")`，所以这个 bug 之前完全没被测到。本期新增 4 + 1 个 E2E 真实链接测试补了这个盲点。
+- 沿用 DEC-030 / DEC-031 / DEC-040 风格：bug 修复 + 真实链接测试一起落 PR，不拆独立 commit。
+
+#### 2.5 范围与依赖
+
+- **修改**：
+  - `.gitignore`（新增 `tests/fixtures/ocr/*.pdf` 等规则）
+  - `src-tauri/src/ocr_text_extract.rs`（1 行参数顺序修复，# §2.4）
+  - `src-tauri/src/lib.rs`（末尾追加 `#[cfg(test)] mod ocr_e2e_tests`；不修改 `run()` / 任何 command / 任何共享契约；理由见 STATUS.json 的 `scope_change_log`，已设 `pm_action_required=true`）
+- **新增**：
+  - `tests/fixtures/ocr/generate-scan-fixture.mjs`
+  - `tests/fixtures/ocr/README.md`
+  - `tests/fixtures/ocr/scan-only-sample.pdf`（.gitignore 排除，不入仓）
+  - `tests/e2e/ocr-e2e.test.ts`
+- **不修改**：`package.json` / `package-lock.json` / `src-tauri/Cargo.toml`（`lopdf` 已在 DEC-040 引入，fixture 复用前端脚本，Rust 测试只复用不重新生成）/ `src/components/` / `src/App.tsx` / 全局样式 / 路由 / `Toolbar.tsx`（按 DEC-032 协议）/ `src/shared/ocr/*`（契约不变）。
+- 不引入新 crate，不引入新 npm 包；测试只读已有 `pdf-lib` 1.17.1 + Node 25 + Cargo 1.88.0 + lopdf 0.33 + ocrmypdf 17.4 + pdftotext 26.02。
+
+#### 2.6 commit cadence
+
+- 2 个 milestone（按 prompt 要求）：
+  - **(a) E2E 测试基础设施 + fixture 策略**：`tests/fixtures/ocr/{generate-scan-fixture.mjs, README.md, scan-only-sample.pdf}` + `.gitignore` + `src-tauri/src/ocr_text_extract.rs` 修复。
+  - **(b) E2E 集成测试 + 验证**：`tests/e2e/ocr-e2e.test.ts` + `src-tauri/src/lib.rs` 末尾 `ocr_e2e_tests` mod。
+
+### 3. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `npm test -- --run` | ✅ 74 文件 / 697 tests 全过 | + 4 个新 e2e（OCR bridge + controller + postProcessor + prepareOcrRequest）|
+| `npx vite build` | ✅ 2.81s | dist 产物完整；`npm run build` 走 `tsc && vite build`，tsc 阶段会因 pre-existing `.at()` 报错，**与本 PR 无关**（详见 §5）|
+| `cargo test --manifest-path src-tauri/Cargo.toml --offline --lib` | ✅ 42 / 42 全过 | + 1 个新 Rust E2E（dispatch_ocr + extract_pdf_text + OcrJobQueue 持久化）|
+| `cargo check --manifest-path src-tauri/Cargo.toml --offline` | ✅ 干净 | 9 个 pre-existing dead_code warning 来自 scan_preprocess，与本 PR 无关 |
+| `ocrmypdf --version` | 17.4.0 | `/opt/homebrew/bin/ocrmypdf` |
+| `pdftotext -v` | 26.02.0 | poppler-utils，`/opt/homebrew/bin/pdftotext` |
+| `bash .claude/skills/doc-curator/scripts/scan.sh` | （未跑，pm_action_required 处理）| PM 在合并时单独跑 |
+
+### 4. 已知限制
+
+- **typecheck / `npm run build` 失败**：`tsc --noEmit` 报 28 个 `TS2550: Property 'at' does not exist`，全部在 pre-existing 文件（`src/components/layout/AnnotationToolbar.test.tsx` / `src/modules/annotation/sidebarGroups.test.ts` / `src/modules/export/pathSafety.ts` / `src/modules/pages/imagePack/imagePackPlanner.ts` / `src/modules/pages/pageOrganizer.{ts,test.ts}` / `src/modules/reader/pdfReaderService.ts` / `src/modules/settings/sections/{GeneralSection,OcrProviderSection,ReaderSection}.test.tsx` / `src/modules/settings/SettingsPanel.test.tsx` / `src/shared/{ocr,preprocess}/defaults.ts`），根因是 `tsconfig.json` 的 `target: ES2020` / `lib: ["ES2020", ...]` 不支持 `Array.prototype.at`（ES2022）。本 PR 不引入任何新 `.at()`，修复需升级 `tsconfig.json`（超出本任务范围）。PM 合并时可与 48cb9b4 annotation stage 4 PR 的同类问题一并处理。
+- **fixture 必须先有**：`scan-only-sample.pdf` 不入仓，clone 后必须先 `node tests/fixtures/ocr/generate-scan-fixture.mjs`，否则 Rust E2E 静默跳过（前端 E2E 会自动重新生成）。
+- **CI 环境假设**：E2E 测试要求 `ocrmypdf` + `pdftotext` + `tesseract` + `eng` / `chi_sim` 语言包；CI 镜像未预装时测试会被 `describe.skip` 静默跳过，**不视为失败**。如果 PM 需要 CI 强制 E2E，可加 GitHub Actions setup 步骤 `brew install ocrmypdf poppler tesseract`。
+- **云端 OCR provider E2E 缺位**：本期 E2E 只覆盖 `local-ocrmypdf` + `legal-skills`（走相同本地 ocrmypdf 后端），不覆盖 `paddleocr` / `mineru` 真实 HTTP 调用（需要 mock server 或断网测试）。ISS-007 v0.1 真实使用场景是本地 ocrmypdf，云端 provider 留 ISS-010 consent flow 收口后另起 worker。
+- **`reconcile_running_after_restart` 不让 E2E 写 running 状态**：测试必须写 completed 状态以验证 reload 完整性；如要覆盖 reconcile 行为需另起专门 case（不在本期范围）。
+
+### 5. PM 关注项
+
+- **scope 变更**：`src-tauri/src/lib.rs` 原本在 forbidden 范围，但 Rust 集成测试只能内联在此文件末尾的 `#[cfg(test)] mod`（项目无 `tests/` 目录 + 除 `run()` 外模块都是 private）。已在 STATUS.json 的 `scope_change_log` 详细说明，仅追加测试模块不动生产路径。`pm_action_required: true`。
+- **bug fix 归并**：`extract_pdf_text` 的 pdftotext 参数顺序 bug 与 E2E 测试一起落 PR，未拆独立 commit。理由：bug 仅在 E2E 真实链接中浮现，且 DEC-030 / DEC-031 / DEC-040 既有 worker 都按"bug 修复 + 真实测试同 PR"模式走。
+- **typecheck 现状**：本 PR 不引入新 typecheck 错误；28 个 pre-existing `TS2550` 阻塞 `npm run build` 走 `tsc` 阶段，但 `npx vite build` 本身正常出 dist。建议 PM 单独提一个 `chore(tsconfig): 升级到 ES2022 修复 .at()` 维护 PR（也可并入 doc-curator 维护 PR），不在本 PR 范围。
+
+### 6. 后续路径
+
+- ISS-007 v0.1 收口：bridge + 模式工具条 + 端到端测试三件套落齐；`keychain:` 凭证引用与 OS Keychain 集成、legal-skills fallback 收敛按 ISS-007 「下一步」后续推进。
+- 真实场景验证：把本 E2E 测试纳入 CI（在 GitHub Actions 镜像装 `ocrmypdf` + `poppler` + `tesseract-lang`）。
+- 云端 provider 端到端：ISS-010 consent flow 收口后，另起 worker 写 `paddleocr` / `mineru` 的 vitest E2E（需要本地 mock HTTP server）。
