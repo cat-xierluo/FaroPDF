@@ -15,6 +15,7 @@ mod ocr_credentials;
 mod ocr_dispatch;
 mod ocr_queue;
 mod ocr_text_extract;
+mod scan_preprocess;
 
 use ocr_credentials::{resolve_credential_reference, CredentialResolution};
 use ocr_dispatch::{dispatch_ocr, OcrDispatchBackend, OcrDispatchError, OcrDispatchRequest};
@@ -23,9 +24,15 @@ use ocr_queue::{
     OcrStoredJob, OcrStoredProgress, OcrStoredQualityCheck, OcrStoredQualitySummary,
 };
 use ocr_text_extract::{extract_pdf_text, file_size_or_zero, summarize_extracted_pages};
+use scan_preprocess::{
+    run_scan_preprocess_job, redact_path as scan_preprocess_redact_path, ScanPreprocessJobQueue,
+    ScanPreprocessJobQueueState, ScanPreprocessRunRequest, ScanPreprocessStoredJob,
+    ScanPreprocessStoredOptions, ScanPreprocessStoredProgress, ScanPreprocessStoredSummary,
+};
 
 const SETTINGS_FILE_NAME: &str = "settings.json";
 const OCR_JOB_QUEUE_FILE: &str = "ocr-jobs.json";
+const SCAN_PREPROCESS_QUEUE_FILE: &str = "scan-preprocess-jobs.json";
 
 #[tauri::command]
 fn read_app_settings(app_handle: AppHandle) -> Result<Option<Value>, String> {
@@ -61,6 +68,7 @@ fn write_app_settings(app_handle: AppHandle, settings: Value) -> Result<Value, S
 #[tauri::command]
 fn start_scan_preprocess_job(
     request: ScanPreprocessCommandRequest,
+    state: State<'_, ScanPreprocessJobQueueState>,
 ) -> Result<ScanPreprocessCommandJob, String> {
     validate_scan_preprocess_request(&request)?;
 
@@ -73,36 +81,203 @@ fn start_scan_preprocess_job(
             .map(|path| PathBuf::from(path.trim())),
     )?;
     let output_path_string = output_path.to_string_lossy().to_string();
-    let now = current_timestamp_string();
+    let now = current_iso_timestamp();
+    let job_id = format!("scan-preprocess-{now}");
 
-    Ok(ScanPreprocessCommandJob {
-        id: format!("scan-preprocess-stub-{now}"),
-        input_path: request.input_path,
+    let stored_options = stored_options_from_command(&request.options);
+    let stored = ScanPreprocessStoredJob {
+        id: job_id.clone(),
+        input_path: request.input_path.trim().to_string(),
+        input_path_summary: scan_preprocess_redact_path(&request.input_path),
         output_path: output_path_string.clone(),
-        page_range: request.page_range,
-        status: "queued".to_string(),
-        options: request.options,
-        progress: ScanPreprocessCommandProgress {
-            stage: "queued".to_string(),
+        output_path_summary: scan_preprocess_redact_path(&output_path_string),
+        page_range: request.page_range.clone(),
+        options: stored_options,
+        status: "running".to_string(),
+        progress: ScanPreprocessStoredProgress {
+            stage: "validating".to_string(),
             completed_pages: 0,
             total_pages: 0,
-            message: Some("等待后台扫描预处理 bridge 接入。".to_string()),
+            message: Some("正在准备扫描预处理任务…".to_string()),
         },
-        summary: ScanPreprocessCommandSummary {
-            total_pages: 0,
-            processed_pages: 0,
-            rotated_pages: 0,
-            deskewed_pages: 0,
-            split_pages: 0,
-            cropped_pages: 0,
-            blank_edges_cleared_pages: 0,
-            elapsed_ms: 0,
-            output_path: output_path_string,
-            preprocess_only: true,
-        },
+        summary: None,
+        error_message: None,
         created_at: now.clone(),
-        updated_at: now,
-    })
+        updated_at: now.clone(),
+        started_at: Some(now.clone()),
+        completed_at: None,
+    };
+    state
+        .inner()
+        .0
+        .lock()
+        .expect("scan preprocess job queue mutex poisoned")
+        .upsert(stored.clone())
+        .map_err(|error| format!("无法持久化扫描预处理任务：{error}"))?;
+
+    let queue_state = state.inner().clone();
+    let run_request = ScanPreprocessRunRequest {
+        job_id: job_id.clone(),
+        input_path: stored.input_path.clone(),
+        output_path: stored.output_path.clone(),
+        page_range: stored.page_range.clone(),
+        options: stored.options.clone(),
+    };
+    tauri::async_runtime::spawn(async move {
+        let queue = queue_state.0.clone();
+        if let Err(error) = run_scan_preprocess_job(queue, run_request) {
+            // runner 自身已经把 status=failed 持久化；此处仅记录日志。
+            eprintln!("[scan-preprocess] job {job_id} failed: {error}");
+        }
+    });
+
+    Ok(scan_stored_to_command_job(&stored))
+}
+
+#[tauri::command]
+fn list_scan_preprocess_jobs(
+    state: State<'_, ScanPreprocessJobQueueState>,
+) -> Result<Vec<ScanPreprocessCommandJob>, String> {
+    let jobs = state
+        .inner()
+        .0
+        .lock()
+        .expect("scan preprocess job queue mutex poisoned")
+        .list();
+    Ok(jobs
+        .into_iter()
+        .map(|stored| scan_stored_to_command_job(&stored))
+        .collect())
+}
+
+#[tauri::command]
+fn poll_scan_preprocess_job(
+    job_id: String,
+    state: State<'_, ScanPreprocessJobQueueState>,
+) -> Result<Option<ScanPreprocessCommandJob>, String> {
+    let job = state
+        .inner()
+        .0
+        .lock()
+        .expect("scan preprocess job queue mutex poisoned")
+        .get(&job_id);
+    Ok(job.map(|stored| scan_stored_to_command_job(&stored)))
+}
+
+#[tauri::command]
+fn cancel_scan_preprocess_job(
+    job_id: String,
+    state: State<'_, ScanPreprocessJobQueueState>,
+) -> Result<Option<ScanPreprocessCommandJob>, String> {
+    let cancelled = state
+        .inner()
+        .0
+        .lock()
+        .expect("scan preprocess job queue mutex poisoned")
+        .cancel(&job_id)
+        .map_err(|error| format!("无法取消扫描预处理任务：{error}"))?;
+    Ok(cancelled.map(|stored| scan_stored_to_command_job(&stored)))
+}
+
+fn scan_stored_to_command_job(stored: &ScanPreprocessStoredJob) -> ScanPreprocessCommandJob {
+    ScanPreprocessCommandJob {
+        id: stored.id.clone(),
+        input_path: stored.input_path.clone(),
+        output_path: stored.output_path.clone(),
+        page_range: stored.page_range.clone(),
+        status: stored.status.clone(),
+        options: command_options_from_stored(&stored.options),
+        progress: ScanPreprocessCommandProgress {
+            stage: stored.progress.stage.clone(),
+            completed_pages: stored.progress.completed_pages,
+            total_pages: stored.progress.total_pages,
+            message: stored.progress.message.clone(),
+        },
+        summary: stored
+            .summary
+            .clone()
+            .map(stored_summary_to_command_summary)
+            .unwrap_or_else(default_command_summary),
+        error_message: stored.error_message.clone(),
+        created_at: stored.created_at.clone(),
+        updated_at: stored.updated_at.clone(),
+        started_at: stored.started_at.clone(),
+        completed_at: stored.completed_at.clone(),
+    }
+}
+
+fn stored_options_from_command(options: &ScanPreprocessCommandOptions) -> ScanPreprocessStoredOptions {
+    ScanPreprocessStoredOptions {
+        enhance_scans: options.enhance_scans,
+        detect_orientation: options.detect_orientation,
+        deskew: options.deskew,
+        split_pages: options.split_pages,
+        crop_pages: options.crop_pages,
+        trim_blank_edges: options.trim_blank_edges,
+        output_mode: options.output_mode.clone(),
+        dpi: options.dpi as u32,
+        jpeg_quality: options.jpeg_quality as u32,
+        skew_threshold_degrees: options.skew_threshold_degrees,
+        rotation_confidence: options.rotation_confidence,
+        max_deskew_degrees: options.max_deskew_degrees,
+        blank_edge_margin_px: options.blank_edge_margin_px as u32,
+        blank_edge_threshold: options.blank_edge_threshold as u32,
+        parallel_jobs: options.parallel_jobs as u32,
+        chunk_pages: options.chunk_pages as u32,
+        preserve_original_page_size: options.preserve_original_page_size,
+    }
+}
+
+fn command_options_from_stored(options: &ScanPreprocessStoredOptions) -> ScanPreprocessCommandOptions {
+    ScanPreprocessCommandOptions {
+        enhance_scans: options.enhance_scans,
+        detect_orientation: options.detect_orientation,
+        deskew: options.deskew,
+        split_pages: options.split_pages,
+        crop_pages: options.crop_pages,
+        trim_blank_edges: options.trim_blank_edges,
+        output_mode: options.output_mode.clone(),
+        dpi: options.dpi.min(u16::MAX as u32) as u16,
+        jpeg_quality: options.jpeg_quality.min(u8::MAX as u32) as u8,
+        skew_threshold_degrees: options.skew_threshold_degrees,
+        rotation_confidence: options.rotation_confidence,
+        max_deskew_degrees: options.max_deskew_degrees,
+        blank_edge_margin_px: options.blank_edge_margin_px.min(u16::MAX as u32) as u16,
+        blank_edge_threshold: options.blank_edge_threshold.min(u8::MAX as u32) as u8,
+        parallel_jobs: options.parallel_jobs.min(u8::MAX as u32) as u8,
+        chunk_pages: options.chunk_pages.min(u16::MAX as u32) as u16,
+        preserve_original_page_size: options.preserve_original_page_size,
+    }
+}
+
+fn stored_summary_to_command_summary(summary: ScanPreprocessStoredSummary) -> ScanPreprocessCommandSummary {
+    ScanPreprocessCommandSummary {
+        total_pages: summary.total_pages,
+        processed_pages: summary.processed_pages,
+        rotated_pages: summary.rotated_pages,
+        deskewed_pages: summary.deskewed_pages,
+        split_pages: summary.split_pages,
+        cropped_pages: summary.cropped_pages,
+        blank_edges_cleared_pages: summary.blank_edges_cleared_pages,
+        elapsed_ms: summary.elapsed_ms,
+        output_path: summary.output_path,
+        preprocess_only: summary.preprocess_only,
+    }
+}
+
+fn default_command_summary() -> ScanPreprocessCommandSummary {
+    ScanPreprocessCommandSummary {
+        total_pages: 0,
+        processed_pages: 0,
+        rotated_pages: 0,
+        deskewed_pages: 0,
+        split_pages: 0,
+        cropped_pages: 0,
+        blank_edges_cleared_pages: 0,
+        elapsed_ms: 0,
+        output_path: String::new(),
+        preprocess_only: true,
+    }
 }
 
 #[tauri::command]
@@ -293,14 +468,21 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let queue = OcrJobQueue::new(ocr_job_queue_path(&app.handle())?);
-            app.manage(OcrJobQueueState(std::sync::Arc::new(Mutex::new(queue))));
+            let ocr_queue = OcrJobQueue::new(ocr_job_queue_path(&app.handle())?);
+            app.manage(OcrJobQueueState(std::sync::Arc::new(Mutex::new(ocr_queue))));
+            let scan_queue = ScanPreprocessJobQueue::new(scan_preprocess_job_queue_path(&app.handle())?);
+            app.manage(ScanPreprocessJobQueueState(std::sync::Arc::new(Mutex::new(
+                scan_queue,
+            ))));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             read_app_settings,
             write_app_settings,
             start_scan_preprocess_job,
+            list_scan_preprocess_jobs,
+            poll_scan_preprocess_job,
+            cancel_scan_preprocess_job,
             start_ocr_job,
             list_ocr_jobs,
             poll_ocr_job,
@@ -317,6 +499,15 @@ fn ocr_job_queue_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
         .app_config_dir()
         .map_err(|_| "无法定位应用设置目录。".to_string())?;
     app_config_dir.push(OCR_JOB_QUEUE_FILE);
+    Ok(app_config_dir)
+}
+
+fn scan_preprocess_job_queue_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    let mut app_config_dir = app_handle
+        .path()
+        .app_config_dir()
+        .map_err(|_| "无法定位应用设置目录。".to_string())?;
+    app_config_dir.push(SCAN_PREPROCESS_QUEUE_FILE);
     Ok(app_config_dir)
 }
 
@@ -661,8 +852,11 @@ struct ScanPreprocessCommandJob {
     options: ScanPreprocessCommandOptions,
     progress: ScanPreprocessCommandProgress,
     summary: ScanPreprocessCommandSummary,
+    error_message: Option<String>,
     created_at: String,
     updated_at: String,
+    started_at: Option<String>,
+    completed_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1454,6 +1648,10 @@ mod ocr_bridge_tests {
 #[cfg(test)]
 mod scan_preprocess_tests {
     use super::*;
+    use crate::scan_preprocess::{
+        RedactedPathSummary, ScanPreprocessStoredJob, ScanPreprocessStoredProgress,
+        ScanPreprocessStoredSummary, stored_options_default,
+    };
     use std::path::PathBuf;
 
     fn default_scan_options() -> ScanPreprocessCommandOptions {
@@ -1521,27 +1719,56 @@ mod scan_preprocess_tests {
     }
 
     #[test]
-    fn command_stub_returns_queued_job_and_safe_summary() {
-        let request = ScanPreprocessCommandRequest {
-            input_path: "/tmp/faropdf-fixtures/source.pdf".to_string(),
-            output_path: None,
+    fn scan_stored_to_command_job_converts_real_processed_state() {
+        let stored = ScanPreprocessStoredJob {
+            id: "scan-1".to_string(),
+            input_path: "/tmp/source.pdf".to_string(),
+            input_path_summary: RedactedPathSummary {
+                kind: "local-pdf".to_string(),
+                fingerprint: "deadbeef".to_string(),
+                redacted: "[path].pdf".to_string(),
+            },
+            output_path: "/tmp/source-preprocessed.pdf".to_string(),
+            output_path_summary: RedactedPathSummary {
+                kind: "local-pdf".to_string(),
+                fingerprint: "cafef00d".to_string(),
+                redacted: "[path].pdf".to_string(),
+            },
             page_range: Some("1,3-5".to_string()),
-            options: default_scan_options(),
+            options: stored_options_default(),
+            status: "completed".to_string(),
+            progress: ScanPreprocessStoredProgress {
+                stage: "completed".to_string(),
+                completed_pages: 2,
+                total_pages: 2,
+                message: Some("处理完成".to_string()),
+            },
+            summary: Some(ScanPreprocessStoredSummary {
+                total_pages: 2,
+                processed_pages: 2,
+                rotated_pages: 0,
+                deskewed_pages: 0,
+                split_pages: 0,
+                cropped_pages: 1,
+                blank_edges_cleared_pages: 1,
+                elapsed_ms: 1234,
+                output_path: "/tmp/source-preprocessed.pdf".to_string(),
+                preprocess_only: true,
+            }),
+            error_message: None,
+            created_at: "1000".to_string(),
+            updated_at: "1234".to_string(),
+            started_at: Some("1001".to_string()),
+            completed_at: Some("1234".to_string()),
         };
 
-        let job = start_scan_preprocess_job(request).expect("queued job");
-
-        assert_eq!(job.status, "queued");
-        assert_eq!(
-            job.output_path,
-            "/tmp/faropdf-fixtures/source-preprocessed.pdf"
-        );
-        assert_eq!(job.progress.completed_pages, 0);
-        assert_eq!(job.progress.stage, "queued");
-        assert_eq!(job.summary.rotated_pages, 0);
-        assert_eq!(
-            job.summary.output_path,
-            "/tmp/faropdf-fixtures/source-preprocessed.pdf"
-        );
+        let command_job = scan_stored_to_command_job(&stored);
+        assert_eq!(command_job.id, "scan-1");
+        assert_eq!(command_job.status, "completed");
+        assert_eq!(command_job.progress.completed_pages, 2);
+        assert_eq!(command_job.progress.total_pages, 2);
+        assert_eq!(command_job.summary.blank_edges_cleared_pages, 1);
+        assert_eq!(command_job.started_at, Some("1001".to_string()));
+        assert_eq!(command_job.completed_at, Some("1234".to_string()));
     }
 }
