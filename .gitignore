@@ -35,6 +35,11 @@ coverage/
 htmlcov/
 .pytest_cache/
 
+# OCR E2E 夹具（脚本可重新生成，PDF 体积大不入仓）
+tests/fixtures/ocr/*.pdf
+tests/fixtures/ocr/*.tmp
+tests/fixtures/ocr/*.bak
+
 # Claude Code
 .claude/settings.local.json
 .claude/skills/
