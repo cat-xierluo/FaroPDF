@@ -467,6 +467,7 @@ fn extract_ocr_text(pdf_path: String) -> Result<OcrTextExtractionResponse, Strin
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let ocr_queue = OcrJobQueue::new(ocr_job_queue_path(&app.handle())?);
             app.manage(OcrJobQueueState(std::sync::Arc::new(Mutex::new(ocr_queue))));
