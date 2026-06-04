@@ -1,0 +1,52 @@
+/* AuthorCard 独立样式：不污染 src/styles/app.css，继承 .settings-author-card 基础壳层（详见 src/modules/settings/SettingsPanel.css）。 */
+
+.settings-author-card__name {
+  margin: 0;
+  color: var(--fg);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.settings-author-card__github-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.settings-author-card__github-link:hover,
+.settings-author-card__github-link:focus {
+  text-decoration: underline;
+  outline: none;
+}
+
+.settings-author-card__qr {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.settings-author-card__qr-image {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 4px;
+  /* 1x1 占位图在 120px 容器内会被放大；
+     通过 image-rendering: pixelated 保持方块感，避免被浏览器平滑模糊掩盖「占位」事实。 */
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.settings-author-card__instruction {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* 窄屏（< 480px）：二维码 + 说明堆叠为单列，避免 900px 视口下文字被挤压 */
+@media (max-width: 479px) {
+  .settings-author-card__qr {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
