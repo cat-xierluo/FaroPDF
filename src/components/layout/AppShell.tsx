@@ -15,6 +15,7 @@ import { ReaderCanvas } from "./ReaderCanvas";
 import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
 import { AnnotationSidebar } from "./AnnotationSidebar";
 import { AnnotationToolbar } from "./AnnotationToolbar";
+import { PageOrganizerWorkspace } from "./PageOrganizerWorkspace";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 import { SettingsPanel } from "../../modules/settings/SettingsPanel";
@@ -41,7 +42,6 @@ interface AppShellProps {
    * 测试可传 mock controller；生产环境由 App.tsx 调用 useOcrWorkspaceController 创建。
    */
   ocr?: OcrWorkspaceController;
-  /**
   /**
    * 批注 armed 状态 bundle（state + setter）。stage 4 接入 AppShell
    * 后，App.tsx 持有单一真相源并把受控值回填；未传时回退到初始 state，
@@ -374,43 +374,3 @@ function ContextToolbar({
   );
 }
 
-function PageOrganizerWorkspace({ reader }: { reader: ReaderController }) {
-  const pageCount = reader.state.document?.pageCount ?? 0;
-  const pages = Array.from({ length: Math.min(pageCount, 12) }, (_, index) => index + 1);
-
-  if (!reader.state.document) {
-    return (
-      <main className="page-organizer" aria-label="页面管理工作台">
-        <section className="page-organizer__empty" aria-label="页面管理空态">
-          <div className="open-dropzone__sheet" aria-hidden="true" />
-          <h2>打开 PDF 后管理页面</h2>
-          <p>旋转、摘录、删除和另存操作只会在文档打开后启用。</p>
-        </section>
-      </main>
-    );
-  }
-
-  return (
-    <main className="page-organizer" aria-label="页面管理工作台">
-      <div className="page-organizer__toolbar" role="toolbar" aria-label="页面管理工具条">
-        {["插入页", "附加文件", "旋转", "复制", "粘贴", "摘录", "删除"].map((action) => (
-          <button className="context-tool" disabled={action === "粘贴"} key={action} type="button">
-            {action}
-          </button>
-        ))}
-        <button className="context-tool context-tool--primary" type="button">
-          另存为新 PDF
-        </button>
-      </div>
-      <ol className="page-grid" aria-label="页面网格">
-        {pages.map((page) => (
-          <li className="page-card" key={page}>
-            <div className="page-card__sheet" aria-hidden="true" />
-            <span>第 {page} 页</span>
-            <small>A4 (210 x 297 毫米)</small>
-          </li>
-        ))}
-      </ol>
-    </main>
-  );
-}
