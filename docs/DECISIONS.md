@@ -780,3 +780,34 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 - 真实目录拾取 / 文件对话框：仍由后续 UI worker 接入 toolbar，本分支只暴露 executor 给前端的 `createImagePackExportRequest`（后续 PR 提）。
 - OCR / 扫描模块、Tauri command、PR 推送：本期按 worker 协议不推送，待 PM 合 review 后再发。
 >>>>>>> cc53cd9 (chore(docs): DEC-032 + CHANGELOG 0.1.0-alpha.6 + TASKS 进度日志)
+
+## DEC-034 阅读模式深化（连续/单页/双页/适合宽度 + 缩放/旋转/键盘翻页）
+
+- 日期：2026-06-04
+- 状态：已采纳
+- 关联任务：v0.1-§2 阅读模式深化
+- 分支：`feat/reader-modes`
+
+决定：
+
+- **数据模型扩展**：`PdfViewMode` 从 `continuous | single | double` 扩展为 `continuous | single | double | fit-width`；`PdfDocumentState` 增加 `rotation: 0 | 90 | 180 | 270` 字段；新增 `ZOOM_PRESETS` 清单（50/75/100/125/150/200% + 适合宽度/适合页面 8 项）和 `ReaderSession` 持久化类型（fingerprint + currentPage + zoom + viewMode + rotation + savedAt）。
+- **viewMode 分层**：`calculateReaderRenderRange` 已经在 "double" 模式包含 2 页，新 `fit-width` 模式复用单页路径（1 页 + overscan），无需修改虚拟化层。
+- **缩放计算与 viewMode 关注点分离**：`viewMode = "fit-width"` 时 `document.zoom` 仍记录用户手动值，渲染层通过 `resolveEffectiveZoom({ viewMode, manualZoom, pageWidth, containerWidth })` 按 `ResizeObserver` 测得的容器宽度实时计算；其它 viewMode 直接使用 `manualZoom`。`applyZoomPresetId` 把 8 个预设 id 转换为 viewMode + zoom：
+  - 数字预设（0.5/0.75/1/1.25/1.5/2）：直接设置 zoom；若当前 viewMode 是 fit-width 则回退到 continuous；
+  - 适合宽度：切换 viewMode = fit-width，zoom 由渲染层覆盖；
+  - 适合页面：切换 viewMode = single。
+- **适合宽度 / 适合页面计算**：`calculateFitWidthZoom(pageWidth, containerWidth)` = `(containerWidth - 16) / pageWidth`（16px padding 避免水平滚动条抖动）；`calculateFitPageZoom` 取宽高两个限制的较小值。两者都把结果夹紧到 [0.25, 4]，并在容器尺寸 ≤ 0 时回退到 1 兜底。
+- **持久化**：`readerSessionStorage` 抽象为 `ReaderSessionStorage` 接口，提供 `createLocalStorageReaderSessionStorage`（生产）和 `createMemoryReaderSessionStorage`（测试）两个实现；key 命名空间 `faropdf:reader-session:<fingerprint>`；`normalizeReaderSession` 在读取时对全字段做类型校验。`useReaderController` 通过 `useEffect` 在文档加载时（fingerprint 匹配）恢复 session，在 currentPage/zoom/viewMode/rotation 任意变化时写回；首次加载完成前不写回，避免把默认值覆盖到 storage。
+- **键盘翻页**：新增 `useReaderKeyboard` hook，绑定 `keydown` 全局监听：PageDown/Space/ArrowDown/ArrowRight 推进，PageUp/ArrowUp/ArrowLeft 回退，Home/End 跳首尾；double 模式下 Arrow 步进 2 页；input/textarea/contenteditable 元素内和 Cmd/Ctrl/Alt 组合键不拦截。
+- **UI 渲染**：`ReaderCanvas` 抽出 `DocumentReader` 子组件，通过 `ResizeObserver` 监听容器宽度，fit-width 实时计算 effectiveZoom；rotation 90/270 时交换宽高参与计算；double 模式用 `flexDirection: row` 并排，其它模式 `column` 纵向；`PdfPage` 在单/双页模式下点击页边空白翻页（左半上一页、右半下一页）。`Sidebar.tsx` 的 `ViewSettingsPanel` 扩展为 4 视图按钮 + 8 缩放预设 + 顺/逆时针 90° 旋转按钮；`AppShell` 接入 `reader.rotateClockwise / rotateCounterClockwise / setZoomPreset` 并按 0.01 容差推断 `activeZoomPresetId`。
+- **mode 工具注册**：新增 `registerReadModeTools()` 通过 `registerModeTools("read", [...])` 注册 3 个工具：顺时针 / 逆时针 / 适合页面；自动出现在 `Toolbar.tsx` 的 `ModeActiveTools` 区域；`App.tsx` 启动时一次性调用。**未直接修改 `Toolbar.tsx`**（PR #20 DEC-032 注册表已就位）。
+- **范围**：`src/modules/reader/{readerState,useReaderController,viewMode,readerSessionStorage,useReaderKeyboard,readerModeTools,readerLabels,index}` + `src/components/layout/{ReaderCanvas,Sidebar,AppShell}` + `src/shared/pdf/types` + `src/shared/settings/defaults` + 对应单测；**不动** `src/components/layout/Toolbar.tsx`（PR #20 约束）/ `src/App.tsx` 主结构（仅追加 `registerReadModeTools()`）/ `package.json` / 锁文件 / `src-tauri/` / 全局样式。
+- **验证**：53 个测试文件 / 435 个测试全部通过；`npm run typecheck` 干净；`npm run build` 成功（261.71 kB → 81.88 kB gzip）。
+
+不采纳（本期暂缓）：
+
+- fit-width 模式下当前缩放值不写回 `document.zoom`，避免与用户手动缩放相互覆盖；后续如需"记住上次的适合宽度缩放"可单独提一个 PR。
+- 双页模式是否需要 spread 起始页在奇数页（书籍样式）vs 偶数页（演示样式）暂不区分，按当前页号直接渲染；后续阅读体验 worker 提。
+- rotation 通过 CSS `transform: rotate()` 旋转 section，未在 PDF.js 渲染阶段（`getViewport({ scale, rotation })`）传 rotation — 这样会让 canvas 像素本身正确旋转；本期保留 CSS 旋转，理由是 pdf-lib 不参与 canvas 渲染、PDF.js 渲染已能正确处理内嵌 rotation；后续若发现宽高 swap 不准确再切到 PDF.js 原生 rotation 参数。
+- 缩放预设的「适合页面」目前用 `viewMode = "single"` + 保留当前 zoom，由渲染层在 `ResizeObserver` 触发时把 effectiveZoom 算到 container size 上后写回 `document.zoom`；本期先实现 UI 入口 + 缩放计算函数，写回动作由下一批 UI worker 接入。
+

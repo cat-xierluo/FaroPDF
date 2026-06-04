@@ -1,4 +1,6 @@
 import type { PdfAnnotation } from "../../shared";
+import type { ZoomPresetId } from "../../shared/pdf/types";
+import { ZOOM_PRESETS } from "../../shared/pdf/types";
 import type { AppSettings } from "../../shared";
 import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
@@ -75,6 +77,7 @@ export function AppShell({
         ) : (
           <ReaderCanvas
             onOpenFile={reader.openFile}
+            onPageNavigate={reader.setCurrentPage}
             onPageVisible={reader.setCurrentPage}
             readerState={reader.state}
             renderPageToCanvas={reader.renderPageToCanvas}
@@ -101,11 +104,26 @@ function UtilityPanel({
   annotations?: PdfAnnotation[];
 }) {
   if (panel === "view") {
+    const document = reader.state.document;
+    const viewMode = document?.viewMode ?? reader.state.defaults.viewMode;
+    const zoom = document?.zoom ?? reader.state.defaults.zoom;
+    // 推断当前激活的缩放预设（数字预设按 0.01 容差匹配）
+    const matchedPreset: ZoomPresetId | undefined = matchZoomPreset(zoom);
     return (
       <ViewSettingsPanel
+        activeZoomPresetId={matchedPreset}
         canChangeViewMode={reader.state.document !== null}
+        isFitWidth={viewMode === "fit-width"}
+        onRotate={(direction) => {
+          if (direction === "clockwise") {
+            reader.rotateClockwise();
+          } else {
+            reader.rotateCounterClockwise();
+          }
+        }}
         onViewModeChange={reader.setViewMode}
-        viewMode={reader.state.document?.viewMode ?? reader.state.defaults.viewMode}
+        onZoomPresetChange={reader.setZoomPreset}
+        viewMode={viewMode}
       />
     );
   }
@@ -139,6 +157,17 @@ function collectPagesWithSearchHits(hits: ReadonlyArray<{ pageNumber: number }>)
     set.add(hit.pageNumber);
   }
   return set;
+}
+
+/** 将当前 zoom 匹配到 ZOOM_PRESETS 中的预设 id（数字预设按 0.01 容差）。
+ *  自动模式（fit-width / fit-page）不会通过此函数匹配 — 调用方根据 viewMode 判断。 */
+function matchZoomPreset(zoom: number): ZoomPresetId | undefined {
+  for (const preset of ZOOM_PRESETS) {
+    if (preset.kind === "fixed" && preset.value !== null && Math.abs(preset.value - zoom) < 0.01) {
+      return preset.id;
+    }
+  }
+  return undefined;
 }
 
 function ContextToolbar({ mode }: { mode: Exclude<AppModeId, "read" | "pages"> }) {

@@ -1,5 +1,12 @@
 import type { ReaderLoadedMetadata } from "../../shared/pdf/reader";
-import type { PdfDocumentState, PdfPageViewport, PdfViewMode, TextLayerStatus } from "../../shared/pdf/types";
+import type {
+  PageRotation,
+  PdfDocumentState,
+  PdfPageViewport,
+  PdfViewMode,
+  ReaderSession,
+  TextLayerStatus,
+} from "../../shared/pdf/types";
 import { calculateReaderRenderRange, type ReaderRenderRange } from "./virtualization";
 
 export type ReaderStatus = "idle" | "loading" | "ready" | "error";
@@ -23,6 +30,9 @@ export type ReaderAction =
   | { type: "reader/setCurrentPage"; payload: { currentPage: number } }
   | { type: "reader/setZoom"; payload: { zoom: number } }
   | { type: "reader/setViewMode"; payload: { viewMode: PdfViewMode } }
+  | { type: "reader/setRotation"; payload: { rotation: PageRotation } }
+  | { type: "reader/rotate"; payload: { direction: "clockwise" | "counter-clockwise" } }
+  | { type: "reader/applySession"; payload: { session: ReaderSession } }
   | { type: "reader/setTextLayerStatus"; payload: { textLayerStatus: TextLayerStatus } };
 
 export interface ReaderStateDefaults {
@@ -52,6 +62,16 @@ export function createInitialReaderState({
 
 function clampPage(currentPage: number, pageCount: number) {
   return Math.min(Math.max(Math.trunc(currentPage), 1), Math.max(pageCount, 1));
+}
+
+function clampZoom(zoom: number) {
+  return Math.min(Math.max(zoom, 0.25), 4);
+}
+
+function rotateBy(currentRotation: PageRotation, direction: "clockwise" | "counter-clockwise"): PageRotation {
+  const step = direction === "clockwise" ? 90 : -90;
+  const next = ((currentRotation + step) % 360 + 360) % 360;
+  return next as PageRotation;
 }
 
 function updateRenderRange(document: PdfDocumentState | null): ReaderRenderRange {
@@ -88,6 +108,7 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
         currentPage: 1,
         zoom: state.defaults.zoom,
         viewMode: state.defaults.viewMode,
+        rotation: 0,
         dirty: false,
         textLayerStatus: metadata.textLayerStatus,
         ocrStatus: metadata.textLayerStatus === "missing" ? "needed" : "not-needed",
@@ -134,7 +155,7 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
 
       const document = {
         ...state.document,
-        zoom: Math.min(Math.max(action.payload.zoom, 0.25), 4),
+        zoom: clampZoom(action.payload.zoom),
       };
 
       return { ...state, document };
@@ -147,6 +168,46 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
       const document = {
         ...state.document,
         viewMode: action.payload.viewMode,
+      };
+
+      return { ...state, document, renderRange: updateRenderRange(document) };
+    }
+    case "reader/setRotation": {
+      if (!state.document) {
+        return state;
+      }
+
+      return {
+        ...state,
+        document: { ...state.document, rotation: action.payload.rotation },
+      };
+    }
+    case "reader/rotate": {
+      if (!state.document) {
+        return state;
+      }
+
+      return {
+        ...state,
+        document: { ...state.document, rotation: rotateBy(state.document.rotation, action.payload.direction) },
+      };
+    }
+    case "reader/applySession": {
+      if (!state.document) {
+        return state;
+      }
+      const { session } = action.payload;
+      // 仅当 fingerprint 匹配才应用，防止跨文档串台
+      if (state.document.fingerprint && state.document.fingerprint !== session.fingerprint) {
+        return state;
+      }
+
+      const document = {
+        ...state.document,
+        currentPage: clampPage(session.currentPage, state.document.pageCount),
+        zoom: clampZoom(session.zoom),
+        viewMode: session.viewMode,
+        rotation: session.rotation,
       };
 
       return { ...state, document, renderRange: updateRenderRange(document) };
