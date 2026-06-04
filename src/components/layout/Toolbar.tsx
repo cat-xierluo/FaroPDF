@@ -56,8 +56,18 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
   const pageCount = document?.pageCount ?? 0;
   const zoom = document?.zoom ?? reader.state.defaults.zoom;
   const viewMode = document?.viewMode ?? reader.state.defaults.viewMode;
-  const fileSubtitle =
-    reader.state.status === "loading" ? "正在打开" : document?.name ?? reader.state.errorMessage ?? "等待文件";
+  const fileSubtitle = (() => {
+    if (reader.state.status === "loading") {
+      return "正在打开";
+    }
+    if (document) {
+      return document.name;
+    }
+    if (reader.state.status === "error" && reader.state.errorMessage) {
+      return `打开失败：${reader.state.errorMessage}`;
+    }
+    return "未打开文档";
+  })();
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];

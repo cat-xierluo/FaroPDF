@@ -146,4 +146,42 @@ describe("ReaderCanvas 阅读深化", () => {
     const footer = screen.getByTestId("reader-status-footer");
     expect(within(footer).getByText("x.pdf")).toBeInTheDocument();
   });
+
+  test("ocrStatus=needed 时显示 OCR-needed 提示条，onRequestOcr 回调被调用", async () => {
+    const onRequestOcr = vi.fn();
+    const state = makeState({
+      document: { ...baseDocument, ocrStatus: "needed" },
+    });
+    render(<ReaderCanvas onRequestOcr={onRequestOcr} readerState={state} />);
+
+    const banner = screen.getByRole("status");
+    expect(banner).toHaveClass("reader__status-banner--ocr-needed");
+    const button = within(banner).getByRole("button", { name: "前往 OCR 模式" });
+    await userEvent.click(button);
+    expect(onRequestOcr).toHaveBeenCalledTimes(1);
+  });
+
+  test("ocrStatus=not-needed 时不显示 OCR-needed 提示条", () => {
+    const state = makeState({ document: { ...baseDocument, ocrStatus: "not-needed" } });
+    render(<ReaderCanvas readerState={state} />);
+    expect(document.querySelector(".reader__status-banner--ocr-needed")).toBeNull();
+  });
+
+  test("ocrStatus=needed 但未传 onRequestOcr 时按钮禁用", () => {
+    const state = makeState({ document: { ...baseDocument, ocrStatus: "needed" } });
+    render(<ReaderCanvas readerState={state} />);
+    const button = screen.getByRole("button", { name: "前往 OCR 模式" });
+    expect(button).toBeDisabled();
+  });
+
+  test("每个 PdfPage 渲染 text-layer-badge 徽章", () => {
+    const state = makeState({
+      document: { ...baseDocument, viewMode: "single", currentPage: 1 },
+      renderRange: { endPage: 1, pageNumbers: [1], startPage: 1 },
+    });
+    render(<ReaderCanvas readerState={state} />);
+    const badge = screen.getByTestId("text-layer-badge-1");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveClass("pdf-page__text-layer-badge--available");
+  });
 });

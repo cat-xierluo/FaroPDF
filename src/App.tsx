@@ -162,6 +162,7 @@ function App() {
       ocr={ocrController}
       onAnnotationDraft={handleAnnotationDraft}
       onModeChange={handleModeChange}
+      onRequestOcr={() => setActiveMode("ocr")}
       onSettingsChange={handleSettingsChange}
       onUtilityPanelChange={handleUtilityPanelChange}
       reader={reader}

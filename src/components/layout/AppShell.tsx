@@ -42,6 +42,7 @@ interface AppShellProps {
    */
   ocr?: OcrWorkspaceController;
   /**
+  /**
    * 批注 armed 状态 bundle（state + setter）。stage 4 接入 AppShell
    * 后，App.tsx 持有单一真相源并把受控值回填；未传时回退到初始 state，
    * 以保证既有 AppShell 测试不破。
@@ -51,6 +52,11 @@ interface AppShellProps {
   onAnnotationDraft?: (input: AnnotationDraftSubmission) => void;
   /** 用户点击已有批注时回调（用于侧边栏跳转等扩展） */
   onAnnotationClick?: (annotationId: string) => void;
+  /**
+   * OCR-needed 状态条"前往 OCR 模式"按钮的回调（ISS-009 M1 / DEC-049）。
+   * 由 App.tsx 注入到 ReaderCanvas，避免阅读态组件直接依赖 mode setter。
+   */
+  onRequestOcr?: () => void;
 }
 
 const contextualTools: Partial<Record<Exclude<AppModeId, "read" | "pages" | "ocr">, string[]>> = {
@@ -86,6 +92,7 @@ export function AppShell({
   onSettingsChange,
   onUtilityPanelChange,
   ocr,
+  onRequestOcr,
   reader,
   search,
   settings,
@@ -148,6 +155,7 @@ export function AppShell({
               onOpenFile={reader.openFile}
               onPageNavigate={reader.setCurrentPage}
               onPageVisible={reader.setCurrentPage}
+              onRequestOcr={onRequestOcr}
               readerState={reader.state}
               renderPageToCanvas={reader.renderPageToCanvas}
               searchState={search.state}
