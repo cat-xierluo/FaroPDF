@@ -7,8 +7,9 @@ import { createDefaultAppSettings } from "../../shared/settings/defaults";
 import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
 import type { OcrCommandJob } from "../../shared/ocr/jobQueue";
+import { createInitialAnnotationToolState } from "../../modules/annotation";
 import { AppShell } from "./AppShell";
-import type { AppModeId, UtilityPanelId } from "./types";
+import type { AnnotationArmedStateBundle, AppModeId, UtilityPanelId } from "./types";
 import type { OcrWorkspaceController } from "../../modules/ocr";
 
 function makeAnnotation(overrides: Partial<PdfAnnotation> & { id: string; pageIndex: number }): PdfAnnotation {
@@ -96,6 +97,7 @@ function makeStoredJob(overrides: Partial<OcrCommandJob> = {}): OcrCommandJob {
 interface RenderArgs {
   activeMode?: AppModeId;
   annotations?: PdfAnnotation[];
+  annotationArmed?: AnnotationArmedStateBundle;
   onModeChange?: (mode: AppModeId) => void;
   onUtilityPanelChange?: (panel: UtilityPanelId) => void;
   reader?: ReaderController;
@@ -110,6 +112,7 @@ function renderAppShell(args: RenderArgs = {}) {
   return render(
     <AppShell
       activeMode={args.activeMode ?? "read"}
+      annotationArmed={args.annotationArmed}
       annotations={args.annotations}
       onModeChange={onModeChange}
       onUtilityPanelChange={onUtilityPanelChange}
@@ -354,6 +357,173 @@ describe("AppShell non-OCR modes", () => {
     renderShell("annotate");
     const toolbar = screen.getByRole("toolbar", { name: "批注工具条" });
     expect(within(toolbar).getByRole("button", { name: "高亮" })).toBeInTheDocument();
+  });
+});
+
+describe("AppShell annotate overlay wiring (ISS-026 stage 4)", () => {
+  function makeReadyReader(pageCount: number): ReaderController {
+    return makeReader({
+      state: {
+        status: "ready",
+        defaults: { viewMode: "continuous", zoom: 1 },
+        document: {
+          documentId: "doc-1",
+          path: "test.pdf",
+          fingerprint: "fp-1",
+          name: "test.pdf",
+          currentPage: 1,
+          pageCount,
+          zoom: 1,
+          viewMode: "continuous",
+          rotation: 0,
+          textLayerStatus: "available",
+          ocrStatus: "not-needed",
+          dirty: false,
+        },
+        pageViewports: [
+          { pageIndex: 0, width: 612, height: 792, rotation: 0, scale: 1 },
+          { pageIndex: 1, width: 612, height: 792, rotation: 0, scale: 1 },
+        ],
+        renderRange: { startPage: 1, endPage: pageCount, pageNumbers: [1, 2] },
+        errorMessage: undefined,
+      },
+    });
+  }
+
+  test("annotate mode + document → 渲染 AnnotationOverlay 覆盖 workspace__main", () => {
+    const reader = makeReadyReader(2);
+    renderAppShell({ activeMode: "annotate", reader, utilityPanel: "annotation" });
+    // overlay 内部用 aria-label「第 N 页批注叠加层」标记
+    expect(screen.getByLabelText("第 1 页批注叠加层")).toBeInTheDocument();
+  });
+
+  test("annotate mode + 无文档 → 不渲染 AnnotationOverlay", () => {
+    renderAppShell({ activeMode: "annotate", utilityPanel: "annotation" });
+    expect(screen.queryByLabelText(/第 \d+ 页批注叠加层/)).not.toBeInTheDocument();
+  });
+
+  test("read mode → 不渲染 AnnotationOverlay", () => {
+    const reader = makeReadyReader(2);
+    renderAppShell({ activeMode: "read", reader });
+    expect(screen.queryByLabelText(/第 \d+ 页批注叠加层/)).not.toBeInTheDocument();
+  });
+
+  test("overlay 接收当前页（currentPage=2）的批注子集", () => {
+    const reader = makeReadyReader(2);
+    const annotations = [
+      makeAnnotation({ id: "ann-page1", pageIndex: 0, type: "highlight" }),
+      makeAnnotation({ id: "ann-page2", pageIndex: 1, type: "note" }),
+    ];
+    // 把 reader.currentPage 改成 2（用 vi.fn 让 setCurrentPage 同步）
+    (reader as unknown as { state: { document: { currentPage: number } } }).state.document.currentPage = 2;
+    renderAppShell({ activeMode: "annotate", annotations, reader, utilityPanel: "annotation" });
+    // 当前是第 2 页，overlay 应渲染「第 2 页批注叠加层」且只显示 ann-page2
+    const overlay = screen.getByLabelText("第 2 页批注叠加层");
+    // ann-page2 的批注 glyph 会有 aria-label「备注」；ann-page1 不会在 overlay 内出现
+    expect(within(overlay).getByLabelText("备注")).toBeInTheDocument();
+  });
+
+  test("AppShell 接收 annotationArmed bundle 并把 state 透传给 overlay", async () => {
+    const reader = makeReadyReader(1);
+    const annotationState = { ...createInitialAnnotationToolState(), activeToolType: "highlight" as const, color: "#2f80ed" };
+    const onStateChange = vi.fn();
+    renderAppShell({
+      activeMode: "annotate",
+      annotationArmed: { onStateChange, state: annotationState },
+      reader,
+      utilityPanel: "annotation",
+    });
+    // overlay 接收 activeToolType=highlight 后会启用 crosshair 光标（pointerEvents: auto）
+    const overlay = screen.getByLabelText("第 1 页批注叠加层");
+    expect(overlay).toHaveStyle({ cursor: "crosshair" });
+  });
+});
+
+describe("AppShell annotate toolbar integration (ISS-026 stage 4 milestone 2)", () => {
+  test("annotate mode 的批注工具条内嵌真正的 AnnotationToolbar（9 工具 + 6 色板）", () => {
+    renderAppShell({ activeMode: "annotate", utilityPanel: "annotation" });
+    const toolbar = screen.getByRole("toolbar", { name: "批注工具条" });
+    // AnnotationToolbar 内部的 role=toolbar 名「批注工具」
+    const innerToolbar = within(toolbar).getByRole("toolbar", { name: "批注工具" });
+    for (const label of ["高亮", "下划线", "删除线", "备注", "文本框", "矩形", "箭头", "手写", "图章"]) {
+      expect(within(innerToolbar).getByRole("button", { name: label })).toBeInTheDocument();
+    }
+    for (const swatch of ["黄", "蓝", "红", "绿", "紫", "黑"]) {
+      expect(within(toolbar).getByRole("button", { name: `颜色 ${swatch}` })).toBeInTheDocument();
+    }
+  });
+
+  test("点击 AnnotationToolbar 工具按钮 → 触发 bundle.onStateChange", async () => {
+    const user = userEvent.setup();
+    const onStateChange = vi.fn();
+    const reader = makeReader({
+      state: {
+        status: "ready",
+        defaults: { viewMode: "continuous", zoom: 1 },
+        document: {
+          documentId: "doc-1",
+          path: "test.pdf",
+          fingerprint: "fp-1",
+          name: "test.pdf",
+          currentPage: 1,
+          pageCount: 1,
+          zoom: 1,
+          viewMode: "continuous",
+          rotation: 0,
+          textLayerStatus: "available",
+          ocrStatus: "not-needed",
+          dirty: false,
+        },
+        pageViewports: [{ pageIndex: 0, width: 612, height: 792, rotation: 0, scale: 1 }],
+        renderRange: { startPage: 1, endPage: 1, pageNumbers: [1] },
+        errorMessage: undefined,
+      },
+    });
+    renderAppShell({
+      activeMode: "annotate",
+      annotationArmed: { onStateChange, state: createInitialAnnotationToolState() },
+      reader,
+      utilityPanel: "annotation",
+    });
+    await user.click(screen.getByRole("button", { name: "高亮" }));
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+    const next = (onStateChange.mock.calls.at(-1) as [{ activeToolType: string }])[0];
+    expect(next.activeToolType).toBe("highlight");
+  });
+
+  test("hasDocument=false 时 AnnotationToolbar 全部按钮 disabled", () => {
+    // makeReader 默认 document=null → hasDocument=false
+    renderAppShell({ activeMode: "annotate", utilityPanel: "annotation" });
+    expect(screen.getByRole("button", { name: "高亮" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "颜色 黄" })).toBeDisabled();
+  });
+
+  test("hasDocument=true 时 AnnotationToolbar 按钮可用", () => {
+    const reader = makeReader({
+      state: {
+        status: "ready",
+        defaults: { viewMode: "continuous", zoom: 1 },
+        document: {
+          documentId: "doc-1",
+          path: "test.pdf",
+          fingerprint: "fp-1",
+          name: "test.pdf",
+          currentPage: 1,
+          pageCount: 1,
+          zoom: 1,
+          viewMode: "continuous",
+          rotation: 0,
+          textLayerStatus: "available",
+          ocrStatus: "not-needed",
+          dirty: false,
+        },
+        pageViewports: [{ pageIndex: 0, width: 612, height: 792, rotation: 0, scale: 1 }],
+        renderRange: { startPage: 1, endPage: 1, pageNumbers: [1] },
+        errorMessage: undefined,
+      },
+    });
+    renderAppShell({ activeMode: "annotate", reader, utilityPanel: "annotation" });
+    expect(screen.getByRole("button", { name: "高亮" })).not.toBeDisabled();
   });
 });
 

@@ -172,12 +172,12 @@ describe("pdf operation engine", () => {
             id: "flatten-ann-strategy",
             type: "flatten-annotations",
             sidecar,
-            strategy: "draw",
-          } as never,
+            strategy: "stamp-flood" as never,
+          },
         ],
         requestedAt: "2026-06-02T00:00:00.000Z",
       }),
-    ).rejects.toThrow("批注扁平化第一版只支持 plan-only 策略。");
+    ).rejects.toThrow("批注扁平化不支持的策略");
 
     sidecar.annotations[0].pageIndex = 1;
 
@@ -660,6 +660,129 @@ describe("pdf operation engine", () => {
     const outputPdf = await PDFDocument.load(result.bytes);
     expect(outputPdf.getPageCount()).toBe(1);
     expect(result.summary.outputToolPlan?.entries[0].label).toBe("合同-1-号");
+  });
+
+  // ==================== flatten-annotations draw 策略测试 ====================
+
+  test("flatten-annotations draw 策略：把批注真实绘制到 PDF 字节流", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const sidecar = createAnnotationSidecar([
+      createAnnotation("ann-highlight", "highlight"),
+      createAnnotation("ann-note", "note"),
+    ]);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-flatten-draw-1",
+      source: { bytes: inputBytes, path: "/case/source.pdf" },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "flatten-draw-1",
+          type: "flatten-annotations",
+          sidecar,
+          strategy: "draw",
+        },
+      ],
+      requestedAt: "2026-06-02T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+    // 输出仍是 1 页（writeAnnotationPdf 不删页）
+    expect(outputPdf.getPageCount()).toBe(1);
+    // summary 中 annotationPlan 切换到 draw 模式 + 完整 drawnCount
+    expect(result.summary.annotationPlan).toMatchObject({
+      strategy: "draw",
+      annotationCount: 2,
+      drawnCount: 2,
+      skippedCount: 0,
+      skipped: [],
+      pageDrawCounts: { 0: 2 },
+      fingerprintChecked: false,
+    });
+    expect(result.summary.annotationPlan?.entries.every((e) => e.status === "applied")).toBe(true);
+    // PDF metadata 切换到 flattened 标签
+    expect(outputPdf.getKeywords()).toContain("faropdf:annotation-flattened");
+    expect(outputPdf.getKeywords()).toContain("faropdf:annotation-drawn:2");
+  });
+
+  test("flatten-annotations draw 策略：sidecar 与 source fingerprint 不一致时整体抛错", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const sidecar = createAnnotationSidecar([createAnnotation("ann-mismatch", "highlight")]);
+    sidecar.document.fingerprint = "stale-fingerprint";
+    const engine = createPdfOperationEngine();
+
+    await expect(
+      engine.exportPdf({
+        id: "export-flatten-draw-fingerprint",
+        source: { bytes: inputBytes, path: "/case/source.pdf", fingerprint: "fresh-fingerprint" },
+        destination: { type: "bytes" },
+        operations: [
+          {
+            id: "flatten-draw-fingerprint",
+            type: "flatten-annotations",
+            sidecar,
+            strategy: "draw",
+          },
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("批注 sidecar 指纹与源 PDF 不一致。");
+  });
+
+  test("flatten-annotations draw 策略：sidecar 越界 pageIndex 抛错（不静默丢弃）", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const sidecar = createAnnotationSidecar([createAnnotation("ann-oob", "highlight")]);
+    sidecar.annotations[0].pageIndex = 5;
+    const engine = createPdfOperationEngine();
+
+    await expect(
+      engine.exportPdf({
+        id: "export-flatten-draw-oob",
+        source: { bytes: inputBytes, path: "/case/source.pdf" },
+        destination: { type: "bytes" },
+        operations: [
+          {
+            id: "flatten-draw-oob",
+            type: "flatten-annotations",
+            sidecar,
+            strategy: "draw",
+          },
+        ],
+        requestedAt: "2026-06-02T00:00:00.000Z",
+      }),
+    ).rejects.toThrow(/页码.*超出/);
+  });
+
+  test("flatten-annotations draw 策略：单个批注被跳过时记录到 warnings + skipped（不抛错）", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const sidecar = createAnnotationSidecar([
+      createAnnotation("ann-good", "highlight"),
+      // 中文 textbox 会因 Helvetica WinAnsi 限制被 skip（非致命）
+      createAnnotation("ann-cjk-textbox", "textbox"),
+    ]);
+    sidecar.annotations[1].content = "中文文本框内容";
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-flatten-draw-skip",
+      source: { bytes: inputBytes, path: "/case/source.pdf" },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "flatten-draw-skip",
+          type: "flatten-annotations",
+          sidecar,
+          strategy: "draw",
+        },
+      ],
+      requestedAt: "2026-06-02T00:00:00.000Z",
+    });
+
+    expect(result.summary.annotationPlan?.drawnCount).toBe(1);
+    expect(result.summary.annotationPlan?.skippedCount).toBe(1);
+    expect(result.summary.annotationPlan?.skipped?.[0].annotationId).toBe("ann-cjk-textbox");
+    expect(result.summary.warnings?.some((w) => w.includes("ann-cjk-textbox") && w.includes("未绘制"))).toBe(true);
   });
 
   // ==================== execute 模式测试 ====================

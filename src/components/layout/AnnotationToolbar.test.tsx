@@ -146,3 +146,45 @@ describe("AnnotationToolbar", () => {
     expect(screen.getByRole("button", { name: "颜色 黄" })).toBeDisabled();
   });
 });
+
+describe("AnnotationToolbar stamp 模板预览（ISS-026 stage 4 milestone 3）", () => {
+  test("激活图章工具时，每个 stamp 按钮内嵌 SVG 预览节点", () => {
+    render(
+      <AnnotationToolbar
+        onStateChange={() => undefined}
+        state={{ ...createInitialAnnotationToolState(), activeToolType: "stamp" }}
+      />,
+    );
+
+    const stampGroup = screen.getByRole("group", { name: "图章选项" });
+    for (const id of ["reviewed", "important", "todo", "evidence", "custom"]) {
+      expect(within(stampGroup).getByTestId(`stamp-preview-${id}`)).toBeInTheDocument();
+    }
+  });
+
+  test("stamp 预览 viewBox 与 renderStampPreview 子树 0 0 400 100 兼容", () => {
+    render(
+      <AnnotationToolbar
+        onStateChange={() => undefined}
+        state={{ ...createInitialAnnotationToolState(), activeToolType: "stamp" }}
+      />,
+    );
+    const preview = screen.getByTestId("stamp-preview-reviewed");
+    // closest('svg') 拿到外层 svg 元素，确认 viewBox 已正确写入
+    const svg = preview.closest("svg");
+    expect(svg?.getAttribute("viewBox")).toBe("0 0 400 100");
+  });
+
+  test("stamp 预览的 SVG 包含模板默认色 + 标签文字", () => {
+    render(
+      <AnnotationToolbar
+        onStateChange={() => undefined}
+        state={{ ...createInitialAnnotationToolState(), activeToolType: "stamp" }}
+      />,
+    );
+    const reviewedPreview = screen.getByTestId("stamp-preview-reviewed");
+    // innerHTML 包含默认绿色 #1f7a3a + "已阅"
+    expect(reviewedPreview.innerHTML).toContain("#1f7a3a");
+    expect(reviewedPreview.innerHTML).toContain("已阅");
+  });
+});
