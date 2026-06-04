@@ -62,11 +62,14 @@ describe("FaroPDF app shell", () => {
     expect(screen.getByRole("button", { name: "导出为压平" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "OCR" }));
+    // OCR 模式 context toolbar 挂 OcrModeToolbar 组件：识别文本 / 输出双层 PDF / 质量检查
     expect(screen.getByRole("toolbar", { name: "OCR 工具条" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "增强扫描" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "拆分页面" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "清除空白边" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "识别文本" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "输出双层 PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "质量检查" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "任务列表" })).toBeInTheDocument();
+    // OCR 工作区主区域：OcrJobList + OcrQualityReportView
+    expect(screen.getByRole("main", { name: "OCR 工作区" })).toBeInTheDocument();
   });
 
   test("opens view settings and app settings in the left utility area", async () => {

@@ -4,6 +4,11 @@ import { ZOOM_PRESETS } from "../../shared/pdf/types";
 import type { AppSettings } from "../../shared";
 import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
+import {
+  OcrModeToolbar,
+  OcrWorkspace,
+  type OcrWorkspaceController,
+} from "../../modules/ocr";
 import { ReaderCanvas } from "./ReaderCanvas";
 import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
 import { AnnotationSidebar } from "./AnnotationSidebar";
@@ -22,12 +27,16 @@ interface AppShellProps {
   search: TextSearchController;
   settings: AppSettings;
   utilityPanel: UtilityPanelId;
+  /**
+   * OCR 工作区控制器；当 activeMode === "ocr" 时挂入 context toolbar + 主区域。
+   * 测试可传 mock controller；生产环境由 App.tsx 调用 useOcrWorkspaceController 创建。
+   */
+  ocr?: OcrWorkspaceController;
 }
 
-const contextualTools: Partial<Record<Exclude<AppModeId, "read" | "pages">, string[]>> = {
+const contextualTools: Partial<Record<Exclude<AppModeId, "read" | "pages" | "ocr">, string[]>> = {
   annotate: ["高亮", "下划线", "删除线", "笔", "橡皮擦", "文本", "形状", "笔记", "图章", "签名", "内容选定", "裁剪"],
   forms: ["文本", "签名", "日期", "钩号", "叉号", "图章", "图像", "导出为压平"],
-  ocr: ["增强扫描", "拆分页面", "裁剪页面", "清除空白边", "识别文本", "内容选定", "裁剪"],
 };
 
 const exportToolGroups = [
@@ -54,13 +63,16 @@ export function AppShell({
   onModeChange,
   onSettingsChange,
   onUtilityPanelChange,
+  ocr,
   reader,
   search,
   settings,
   utilityPanel,
 }: AppShellProps) {
   const showContextToolbar = activeMode !== "read" && activeMode !== "pages";
-  const showUtilityPanel = utilityPanel !== "none" && activeMode !== "pages";
+  // ocr 模式独占主区域（OcrWorkspace 包含任务列表 + 质量报告），隐藏 utility panel
+  const showUtilityPanel = utilityPanel !== "none" && activeMode !== "pages" && activeMode !== "ocr";
+  const isOcrMode = activeMode === "ocr";
 
   return (
     <div className="app-shell" role="application" aria-label="FaroPDF PDF 工作台">
@@ -72,11 +84,17 @@ export function AppShell({
         search={search}
         utilityPanel={utilityPanel}
       />
-      {showContextToolbar ? <ContextToolbar mode={activeMode} /> : null}
+      {showContextToolbar ? <ContextToolbar mode={activeMode} ocr={ocr} /> : null}
       <div className={showUtilityPanel ? "workspace" : "workspace workspace--full"}>
         {showUtilityPanel ? <UtilityPanel panel={utilityPanel} reader={reader} search={search} annotations={annotations} /> : null}
         {activeMode === "pages" ? (
           <PageOrganizerWorkspace reader={reader} />
+        ) : isOcrMode ? (
+          ocr ? (
+            <OcrWorkspace controller={ocr} />
+          ) : (
+            <OcrWorkspaceUnavailable />
+          )
         ) : (
           <ReaderCanvas
             onOpenFile={reader.openFile}
@@ -96,6 +114,17 @@ export function AppShell({
         settings={settings}
       />
     </div>
+  );
+}
+
+function OcrWorkspaceUnavailable() {
+  return (
+    <main className="ocr-workspace" aria-label="OCR 工作区">
+      <div className="ocr-quality-report ocr-quality-report--missing" role="status">
+        <p>OCR 控制器尚未就绪。</p>
+        <p>请刷新页面或在设置中确认 OCR 后端已启用。</p>
+      </div>
+    </main>
   );
 }
 
@@ -186,7 +215,44 @@ function matchZoomPreset(zoom: number): ZoomPresetId | undefined {
   return undefined;
 }
 
-function ContextToolbar({ mode }: { mode: Exclude<AppModeId, "read" | "pages"> }) {
+function ContextToolbar({
+  mode,
+  ocr,
+}: {
+  mode: Exclude<AppModeId, "read" | "pages">;
+  ocr?: OcrWorkspaceController;
+}) {
+  if (mode === "ocr") {
+    if (!ocr) {
+      return (
+        <div className="context-toolbar" role="toolbar" aria-label={contextualToolbarLabels[mode]}>
+          <span className="ocr-mode-toolbar__status ocr-mode-toolbar__status--idle" aria-live="polite">
+            OCR 控制器未就绪
+          </span>
+        </div>
+      );
+    }
+    return (
+      <OcrModeToolbar
+        busy={ocr.busy}
+        currentJob={ocr.currentJob}
+        hasDocument={ocr.hasDocument}
+        hasProvider={ocr.hasProvider}
+        onCancelJob={(job) => {
+          void ocr.cancelJob(job);
+        }}
+        onOpenJobList={() => ocr.openJobList()}
+        onOpenQualityReport={(job) => ocr.openQualityReport(job)}
+        onOutputLayeredPdf={() => {
+          void ocr.outputLayeredPdf();
+        }}
+        onStartOcr={() => {
+          void ocr.startOcr();
+        }}
+      />
+    );
+  }
+
   if (mode === "export") {
     return (
       <div className="context-toolbar context-toolbar--grouped" role="toolbar" aria-label={contextualToolbarLabels[mode]}>
