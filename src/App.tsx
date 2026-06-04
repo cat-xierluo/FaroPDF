@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "./components/layout/AppShell";
-import type { AppModeId, UtilityPanelId } from "./components/layout/types";
-import { AnnotationService } from "./modules/annotation";
+import type { AnnotationDraftSubmission, AppModeId, UtilityPanelId } from "./components/layout/types";
+import {
+  AnnotationService,
+  createInitialAnnotationToolState,
+  type AnnotationToolState,
+} from "./modules/annotation";
 import { createMemoryAnnotationStorage } from "./modules/annotation";
 import { AnnotationRepository } from "./modules/annotation";
 import { useReaderController } from "./modules/reader";
@@ -21,6 +25,8 @@ function App() {
   const [activeMode, setActiveMode] = useState<AppModeId>("read");
   const [utilityPanel, setUtilityPanel] = useState<UtilityPanelId>("summary");
   const [loadedAnnotations, setLoadedAnnotations] = useState<PdfAnnotation[]>([]);
+  // 批注 armed 状态（单一真相源），由 ContextToolbar 工具条 + AnnotationOverlay 共享
+  const [annotationToolState, setAnnotationToolState] = useState<AnnotationToolState>(() => createInitialAnnotationToolState());
   const reader = useReaderController(settings);
   const search = useTextSearchController({
     document: reader.state.document,
@@ -110,11 +116,51 @@ function App() {
     setSettings(next);
   }, []);
 
+  // 切换 mode 时若离开 annotate 模式，自动 disarm 工具（避免 overlay 在 read 模式还捕获事件）
+  useEffect(() => {
+    if (activeMode !== "annotate" && annotationToolState.activeToolType !== null) {
+      setAnnotationToolState((prev) => ({ ...prev, activeToolType: null }));
+    }
+  }, [activeMode, annotationToolState.activeToolType]);
+
+  // 用户在 overlay 上完成一次新建 → 调 service.addAnnotation 并刷新本地列表
+  const handleAnnotationDraft = useCallback(
+    (input: AnnotationDraftSubmission) => {
+      const document = reader.state.document;
+      if (!document) {
+        return;
+      }
+      const service = getAnnotationService();
+      void service
+        .addAnnotation(
+          { path: document.path, fingerprint: document.fingerprint, pageCount: document.pageCount },
+          {
+            type: input.type,
+            pageIndex: input.pageIndex,
+            rects: input.rects,
+            color: input.color,
+            ...(input.content ? { content: input.content } : {}),
+            ...(input.quote ? { quote: input.quote } : {}),
+            ...(input.line ? { line: input.line } : {}),
+            ...(input.ink ? { ink: input.ink } : {}),
+            ...(input.stamp ? { stamp: input.stamp } : {}),
+          },
+        )
+        .then((created) => {
+          setLoadedAnnotations((prev) => [...prev, created]);
+        })
+        .catch(() => undefined);
+    },
+    [reader.state.document],
+  );
+
   return (
     <AppShell
       activeMode={activeMode}
+      annotationArmed={{ state: annotationToolState, onStateChange: setAnnotationToolState }}
       annotations={loadedAnnotations}
       ocr={ocrController}
+      onAnnotationDraft={handleAnnotationDraft}
       onModeChange={handleModeChange}
       onSettingsChange={handleSettingsChange}
       onUtilityPanelChange={handleUtilityPanelChange}

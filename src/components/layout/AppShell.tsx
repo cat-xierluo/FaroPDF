@@ -9,13 +9,21 @@ import {
   OcrWorkspace,
   type OcrWorkspaceController,
 } from "../../modules/ocr";
+import { createInitialAnnotationToolState } from "../../modules/annotation";
+import type { AnnotationToolState } from "../../modules/annotation";
 import { ReaderCanvas } from "./ReaderCanvas";
 import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
 import { AnnotationSidebar } from "./AnnotationSidebar";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 import { SettingsPanel } from "../../modules/settings/SettingsPanel";
-import type { AppModeId, UtilityPanelId } from "./types";
+import { AnnotationOverlay, type AnnotationDraftInput, type AnnotationOverlayViewport } from "./AnnotationOverlay";
+import type {
+  AnnotationArmedStateBundle,
+  AnnotationDraftSubmission,
+  AppModeId,
+  UtilityPanelId,
+} from "./types";
 
 interface AppShellProps {
   activeMode: AppModeId;
@@ -32,6 +40,16 @@ interface AppShellProps {
    * 测试可传 mock controller；生产环境由 App.tsx 调用 useOcrWorkspaceController 创建。
    */
   ocr?: OcrWorkspaceController;
+  /**
+   * 批注 armed 状态 bundle（state + setter）。stage 4 接入 AppShell
+   * 后，App.tsx 持有单一真相源并把受控值回填；未传时回退到初始 state，
+   * 以保证既有 AppShell 测试不破。
+   */
+  annotationArmed?: AnnotationArmedStateBundle;
+  /** 用户在 overlay 上完成一次新建时回调；stage 4 由 App.tsx 注入 service.addAnnotation 链 */
+  onAnnotationDraft?: (input: AnnotationDraftSubmission) => void;
+  /** 用户点击已有批注时回调（用于侧边栏跳转等扩展） */
+  onAnnotationClick?: (annotationId: string) => void;
 }
 
 const contextualTools: Partial<Record<Exclude<AppModeId, "read" | "pages" | "ocr">, string[]>> = {
@@ -60,6 +78,9 @@ const contextualToolbarLabels: Record<Exclude<AppModeId, "read" | "pages">, stri
 export function AppShell({
   activeMode,
   annotations,
+  annotationArmed,
+  onAnnotationClick,
+  onAnnotationDraft,
   onModeChange,
   onSettingsChange,
   onUtilityPanelChange,
@@ -73,6 +94,23 @@ export function AppShell({
   // ocr 模式独占主区域（OcrWorkspace 包含任务列表 + 质量报告），隐藏 utility panel
   const showUtilityPanel = utilityPanel !== "none" && activeMode !== "pages" && activeMode !== "ocr";
   const isOcrMode = activeMode === "ocr";
+  const isAnnotateMode = activeMode === "annotate";
+  // stage 4 批注 armed 状态：App.tsx 持有单一真相源；未传时回退到初始 state，保证既有测试不破
+  const annotationState: AnnotationToolState = annotationArmed?.state ?? createInitialAnnotationToolState();
+  const document = reader.state.document;
+  const hasDocument = document !== null;
+  // 当前页 PDF viewport（pt），用于 overlay 真实坐标
+  const currentPageNumber = document?.currentPage ?? 1;
+  const currentPageViewport = reader.state.pageViewports.find((viewport) => viewport.pageIndex + 1 === currentPageNumber);
+  const overlayViewport: AnnotationOverlayViewport | null = currentPageViewport
+    ? {
+        width: currentPageViewport.width,
+        height: currentPageViewport.height,
+        rotation: currentPageViewport.rotation,
+      }
+    : null;
+  // 当前页的批注子集
+  const currentPageAnnotations = (annotations ?? []).filter((annotation) => annotation.pageIndex === currentPageNumber - 1);
 
   return (
     <div className="app-shell" role="application" aria-label="FaroPDF PDF 工作台">
@@ -87,24 +125,45 @@ export function AppShell({
       {showContextToolbar ? <ContextToolbar mode={activeMode} ocr={ocr} /> : null}
       <div className={showUtilityPanel ? "workspace" : "workspace workspace--full"}>
         {showUtilityPanel ? <UtilityPanel panel={utilityPanel} reader={reader} search={search} annotations={annotations} /> : null}
-        {activeMode === "pages" ? (
-          <PageOrganizerWorkspace reader={reader} />
-        ) : isOcrMode ? (
-          ocr ? (
-            <OcrWorkspace controller={ocr} />
+        <div className="workspace__main" style={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, position: "relative" }}>
+          {activeMode === "pages" ? (
+            <PageOrganizerWorkspace reader={reader} />
+          ) : isOcrMode ? (
+            ocr ? (
+              <OcrWorkspace controller={ocr} />
+            ) : (
+              <OcrWorkspaceUnavailable />
+            )
           ) : (
-            <OcrWorkspaceUnavailable />
-          )
-        ) : (
-          <ReaderCanvas
-            onOpenFile={reader.openFile}
-            onPageNavigate={reader.setCurrentPage}
-            onPageVisible={reader.setCurrentPage}
-            readerState={reader.state}
-            renderPageToCanvas={reader.renderPageToCanvas}
-            searchState={search.state}
-          />
-        )}
+            <ReaderCanvas
+              onOpenFile={reader.openFile}
+              onPageNavigate={reader.setCurrentPage}
+              onPageVisible={reader.setCurrentPage}
+              readerState={reader.state}
+              renderPageToCanvas={reader.renderPageToCanvas}
+              searchState={search.state}
+            />
+          )}
+          {isAnnotateMode && hasDocument && overlayViewport ? (
+            <AnnotationOverlay
+              activeAnnotationId={null}
+              activeColor={annotationState.color}
+              activeStampLabel={annotationState.stampLabel}
+              activeStampName={annotationState.stampName}
+              activeToolType={annotationState.activeToolType}
+              annotations={currentPageAnnotations}
+              onAnnotationClick={onAnnotationClick}
+              onAnnotationDraft={
+                onAnnotationDraft
+                  ? (input: AnnotationDraftInput) =>
+                      onAnnotationDraft({ ...input, pageIndex: currentPageNumber - 1 })
+                  : undefined
+              }
+              pageIndex={currentPageNumber - 1}
+              viewport={overlayViewport}
+            />
+          ) : null}
+        </div>
       </div>
       <StatusBar readerState={reader.state} />
       <SettingsPanel
