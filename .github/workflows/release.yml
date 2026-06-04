@@ -1,0 +1,187 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+# ISS-021 跨平台打包 + 自动更新发布流水线。
+#
+# 触发条件：推送形如 vX.Y.Z 的 tag（带 v 前缀）。
+# 流程：
+#   1. build 矩阵（macOS universal / Windows / Linux）各自 `cargo tauri build` 产出 updater bundle
+#   2. 三个 build 完成后，release job 拉取所有 artifacts
+#   3. 运行 scripts/create-updater-manifest.mjs：
+#      - 识别每个 artifact 所属的 updater platform（macOS / Windows / Linux）
+#      - 调用 `cargo tauri signer sign` 产出 .sig 旁车文件
+#      - 读 .sig 内容生成 latest.json（tauri-plugin-updater v2 manifest schema）
+#   4. 用 softprops/action-gh-release 发布 release：
+#      - 上传所有 dmg / msi / AppImage / deb / macOS .app.tar.gz
+#      - 上传 latest.json（updater 入口固定 URL）
+#
+# 关键环境变量（GitHub Secrets）：
+#   - TAURI_SIGNING_PRIVATE_KEY          tauri signer generate 输出的私钥字符串
+#   - TAURI_SIGNING_PRIVATE_KEY_PASSWORD  私钥密码（若创建时设置了）
+#   - GITHUB_TOKEN                       默认提供，用于创建 release
+#
+# 首次发布前由 PM 在本地跑 `cargo tauri signer generate` 生成 keypair，把 pubkey
+# 写进 src-tauri/tauri.conf.json 的 plugins.updater.pubkey（ISS-021 M1 已占位），
+# 私钥 + 密码保存到 GitHub Secrets。
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macos-universal
+            os: macos-latest
+            target: universal-apple-darwin
+            bundles: app,dmg
+            artifact_glob: |
+              src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app
+              src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz
+              src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          - label: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: msi,nsis
+            artifact_glob: |
+              src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+              src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+          - label: linux-x64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: appimage,deb
+            artifact_glob: |
+              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: ${{ matrix.target }}
+
+      - name: Install Linux system dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev
+
+      - name: Install Tauri CLI (Rust)
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Tauri bundle
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          CI: "true"
+        run: |
+          cargo tauri build \
+            --target ${{ matrix.target }} \
+            --bundles ${{ matrix.bundles }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: faropdf-${{ matrix.label }}
+          if-no-files-found: error
+          retention-days: 7
+          path: ${{ matrix.artifact_glob }}
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Tauri CLI (Rust)
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create updater manifest (latest.json)
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_UPDATER_REPO: "cat-xierluo/FaroPDF"
+          TAURI_UPDATER_TAG: ${{ github.ref_name }}
+        run: |
+          node scripts/create-updater-manifest.mjs \
+            --release-dir artifacts \
+            --repo "$TAURI_UPDATER_REPO" \
+            --tag "$TAURI_UPDATER_TAG" \
+            --output latest.json
+
+      - name: Show generated latest.json
+        if: always()
+        run: cat latest.json
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          files: |
+            latest.json
+            artifacts/**/*.dmg
+            artifacts/**/*.msi
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/**/*.app.tar.gz
+            artifacts/**/*.exe
+            artifacts/**/*.app

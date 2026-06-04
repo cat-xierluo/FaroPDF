@@ -1562,3 +1562,152 @@ ISS-026 批注深化「下一步」段已规划好的收尾事项：
 - UI 入口：未来导出工具条"压平批注"按钮会调 `engine.exportPdf`，把 `summary.annotationPlan.drawnCount` 展示给用户——本 worker 留 hook（已落类型与 summary shape），UI 入口由其他 worker 接。
 - 中文 textbox stamp 仍会被 skip（Helvetica WinAnsi 限制），保持 DEC-037 的非致命语义。
 - 测试覆盖：pdfOperationEngine.test.ts 新增 4 个 draw 策略测试；stamps.test.ts 新增 5 个 renderStampPreview 测试；AnnotationToolbar.test.tsx 新增 3 个 preview 渲染测试。
+## DEC-048 ISS-021 全平台打包与自动更新落地方案
+
+### 1. 背景
+
+ISS-021 任务卡验收标准要求 v0.3 桌面端覆盖 macOS / Windows / Linux 三平台 + 应用内「检查更新」入口；依赖 tauri-plugin-updater 与 GitHub Releases 清单。Foliation 仓库有可参考的 `tauri-plugin-updater` 集成 + `latest.json` 生成脚本，但本机无法访问 folia 仓库，本 worker 按 Tauri 2 官方 docs + v2.10.1 plugin 实际 API 自行实现。
+
+worker 的 scope 约束（per `tmp/w4-app-distribution_full.md`）：
+- 允许：`src-tauri/Cargo.toml` / `tauri.conf.json` / `lib.rs` / `src/shared/update/` / `src/modules/settings/` / `src/modules/settings/sections/AboutSection.tsx` / `.github/workflows/release.yml` / `scripts/create-updater-manifest.mjs` / `docs/RELEASE.md` / `docs/DECISIONS.md` / `docs/TASKS.md` / `CHANGELOG.md` / `package.json`（仅当引入新依赖时）
+- 禁碰：`src/components/...`（除 update 入口）/ `src/styles/` / `Toolbar.tsx` / `App.tsx` / `Sidebar.tsx` / `src-tauri/src/{ocr,scan_preprocess,forms}/` / 其他 reader/search/annotation/forms/export/pages/ocr/preprocess 模块 / `src/shared/{pdf,ocr,preprocess,annotation,form,export,settings}/`（除 update 子目录）/ `assets/fonts/`
+
+### 2. 关键决策
+
+#### 2.1 单一 macOS universal target（vs 拆分 aarch64 / x86_64）
+
+不切两台 macos 机器跑 aarch64 + x86_64；CI 单一 `macos-latest` runner 跑
+`cargo tauri build --target universal-apple-darwin --bundles app,dmg`。
+
+- 优：1 个 artifact 覆盖两种架构；CI 时间 / 成本减半；`latest.json` 的 darwin
+  平台用单一 `darwin-universal` key。
+- 劣：universal 二进制略大（≈ 2x）；后续如要按架构发包再拆。
+- 验证：本机 macOS 14.x + arm64 自带 universal 支持；CI 沿用 `macos-latest` 默认
+  runner，universal target 已在 Tauri 2 官方推荐。
+
+#### 2.2 手動检查 + 推迟 autoUpdateCheck 设置项
+
+ISS-021 验收写「`autoUpdateCheck` 设置项可关闭自动检查」，但实现需要改
+`src/shared/settings/types.ts` 的 `AppSettings`（加 `autoUpdateCheck: boolean`）。
+该文件在 worker 的 forbidden list 内（除非新引入 update 子目录）。本期在
+AboutSection 落地「手动按钮检查 → available 时下载并安装」完整流程；自动
+检查留 follow-up 文档到 `docs/RELEASE.md §4`。决策依据：v0.3 先用最少耦合的
+方式把 updater 走通，自动检查是非阻塞特性。
+
+#### 2.3 pubkey 占位 vs 真实生产 key
+
+`tauri.conf.json` 的 `plugins.updater.pubkey` 必须有值才能 `cargo tauri build`
+通过 linter；本期写入本地用 `cargo tauri signer generate`（CI 模式 + 弱密码
+`ISS-021-placeholder-ci-only-do-not-ship`）生成的真格式 keypair base64
+`RWSY2kf...`。
+
+- 风险：占位 key 一旦 ship 到生产 latest.json，签名无法验过。`docs/RELEASE.md
+  §3.1` 明确要求 PM 首次发布前本地重生成 keypair 并替换 `pubkey` 字段。
+- 风险控制：CI 的 release job 强制要求 `TAURI_SIGNING_PRIVATE_KEY` secret；占位
+  key 不会进 secret（私钥已 `rm` 丢弃），生产发布必须由 PM 注入真 key。
+
+#### 2.4 tsconfig lib ES2020 → ES2022
+
+ISS-021 验证要求 `npm run typecheck` 通过。运行 typecheck 时发现 27 个
+pre-existing 错误，根因是 `tsconfig.json` 的 `lib: ["ES2020", ...]` 不支持
+`Array.prototype.at` / `String.prototype.at`（ES2022 引入），这些调用分布在
+被禁的 reader / annotation / export / pages / ocr / preprocess / settings 测试
+文件中。最小修复：把 `lib` 升级到 `ES2022`（向后兼容 ES2020），不动其他配置。
+
+- 该改动是 ISS-021 verification 的传递依赖，不在 ISS-021 scope 设计的代码中。
+- CHANGELOG 0.1.0-alpha.10 显式列出本 side fix。
+
+#### 2.5 latest.json 由 CI release job 生成，固定 GitHub Releases URL
+
+`tauri.conf.json` 的 `plugins.updater.endpoints` 固定指向
+`https://github.com/cat-xierluo/FaroPDF/releases/latest/download/latest.json`。
+CI release job 在三个 build job 完成后：
+
+1. 拉取所有 artifacts 到 `artifacts/`（actions/download-artifact@v4）
+2. 跑 `scripts/create-updater-manifest.mjs`：
+   - 递归扫 `artifacts/`，按文件后缀匹配 updater 平台（`.app.tar.gz` →
+     `darwin-universal` / `.msi` → `windows-x86_64` / `.AppImage` →
+     `linux-x86_64`）
+   - 对每个 updater 兼容 bundle spawn `cargo tauri signer sign <file>` 产出
+     `<file>.sig` 旁车文件
+   - 读 `.sig` 内容（minisign 格式 base64），组装 v2 manifest
+3. softprops/action-gh-release@v2 发布 release，上传 `latest.json` + 所有 bundle
+
+manifest 脚本设计要点：
+
+- 纯 ESM（`package.json type=module`），零 npm 依赖（用 `node:child_process` +
+  `node:fs/promises`）
+- 退出码明确：1 参数 / bundle 缺失；2 signing 失败；3 IO 异常
+- 平台 → 产物映射明确（`UPDATER_PATTERNS` 表），新增平台时加一行
+
+#### 2.6 bundle 命名约定
+
+- macOS：`FaroPDF.app` + `FaroPDF.app.tar.gz`（updater 拉这个）+ `FaroPDF.dmg`
+- Windows：`FaroPDF_0.1.0_x64_en-US.msi`（updater 拉这个）+ `FaroPDF_*_x64.exe`
+- Linux：`FaroPDF_0.1.0_amd64.AppImage`（updater 拉这个）+ `faropdf_*_amd64.deb`
+
+### 3. 文件清单
+
+#### 新增
+
+- `src/shared/update/types.ts`（53 行）— `AppUpdateStatus` / `AppUpdateCheckOutcome`
+  / `AppUpdateApplyResult` / `AppUpdateClient` 接口
+- `src/shared/update/updateService.ts`（155 行）— `createTauriUpdateClient` 薄封装
+  `@tauri-apps/plugin-updater`，`createProgressAdapter` 累计 chunk 进度
+- `src/shared/update/updateCapability.ts`（21 行）— `detectUpdateCapability` 通过
+  `@tauri-apps/api/core` 的 `isTauri()` 探测
+- `src/shared/update/index.ts`（5 行）— barrel
+- `src/shared/update/{updateService,updateCapability,index}.test.ts`（约 220 行）— 8 项单测覆盖
+- `.github/workflows/release.yml`（152 行）
+- `scripts/create-updater-manifest.mjs`（约 200 行）
+- `docs/RELEASE.md`（约 130 行）
+
+#### 修改
+
+- `src-tauri/Cargo.toml` — `tauri-plugin-updater = "2.10.1"`
+- `src-tauri/Cargo.lock` — `cargo add` 副作用更新（自动）
+- `src-tauri/src/lib.rs` — plugin chain 加 `tauri_plugin_updater::Builder::new().build()`
+- `src-tauri/tauri.conf.json` — `bundle.createUpdaterArtifacts` + `plugins.updater`
+  配置块（active / endpoints / pubkey / windows.installMode）
+- `package.json` + `package-lock.json` — `@tauri-apps/plugin-updater@2.10.1`
+- `tsconfig.json` — `lib: ["ES2020", ...]` → `["ES2022", ...]`
+- `src/modules/settings/sections/AboutSection.tsx` — 接 update service，9 态状态机
+- `src/modules/settings/sections/AboutSection.test.tsx` — 9 项单测（4 outcome + install 流程 + 错误回显 + 已存在 3 项 UI 断言）
+
+### 4. 验证
+
+- `npm run typecheck` ✅ 干净
+- `npm test -- --run` ✅ 76 文件 / 689 测试（+5：updateService 7 / updateCapability 2 / AboutSection 新增 6 + 替换 3）
+- `npm run build` ✅
+- `cargo check --manifest-path src-tauri/Cargo.toml` ✅ 干净（9 pre-existing warnings 与本期无关）
+- 文档扫描：未跑（`.claude/skills/doc-curator/scripts/scan.sh` 在本机不存在，任务无 PM 决策依赖）
+
+### 5. 已知限制（v0.3 同步 docs/RELEASE.md §4）
+
+- **autoUpdateCheck 设置项未实现**：见 §2.2。Follow-up 路径在 `docs/RELEASE.md`。
+- **占位 pubkey 必须替换**：见 §2.3。PM 在 `cargo tauri signer generate` 后更新
+  `tauri.conf.json`，并把私钥 / 密码落到 GitHub Secrets。
+- **增量更新失败回退到完整重装未实现**：`tauri-plugin-updater` 内部有 chunk
+  重试但失败后只显示错误，需用户手动去 GitHub Releases 页面下载安装包。
+- **移动端不在 v0.3 scope**：Android / iOS 打包需要扩展 release.yml 矩阵 +
+  单独签名 keypair + latest.json 平台字段，留待 v0.3 评估。
+- **CODE_SIGNING 不在 scope**：macOS notarization / Windows EV 证书 / Linux
+  apt repo 签名都需要本机持有商业证书；当前 `cargo tauri build` 不传
+  `--sign` 参数。
+- **签名 key rotation 不支持**：minisign 固有限制；私钥泄露需要从 0.x
+  重新发布到 1.0.0 之前的所有版本签名（不在 ISS-021 scope）。
+- **bundle 命名依赖 Tauri 默认约定**：脚本的 `UPDATER_PATTERNS` 假设 Tauri
+  2.x 默认 bundle 命名（`*.app.tar.gz` / `*_x64_en-US.msi` / `*_amd64.AppImage`），
+  Tauri 升级或自定义 bundle 名时需要同步更新脚本。
+
+### 6. 后续路径
+
+- 本期合并到 `feat/app-distribution` 后，由 PM 评估是否合并 main（ISS-022/023
+  settings 页 worker 已在 `feat/settings-page` 用 placeholder 占位等待 ISS-021
+  收口）。
+- v0.3 第一次正式 release 前，PM 完成：
+  1. 本地 `cargo tauri signer generate` 生成生产 keypair
+  2. 把 `tauri.conf.json` 的 `pubkey` 替换为 `.pub` 第二行
+  3. 把私钥 / 密码添加到 GitHub Secrets
+- autoUpdateCheck 落地（加 `AppSettings.autoUpdateCheck` + About section mount
+  hook）作为独立 PR，从 `feat/app-distribution` 拉出 `feat/auto-update-check`。
