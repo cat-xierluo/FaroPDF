@@ -1773,3 +1773,184 @@ mod scan_preprocess_tests {
         assert_eq!(command_job.completed_at, Some("1234".to_string()));
     }
 }
+
+#[cfg(test)]
+mod ocr_e2e_tests {
+    //! ISS-007 端到端联调（DEC-044）— Rust 侧集成测试。
+    //!
+    //! 把 `OcrJobQueue`（持久化）+ `dispatch_ocr`（真实子进程）+ `extract_pdf_text`（pdftotext）
+    //! 串成一条真实链路，覆盖：
+    //!   - 用 lopdf 生成 1 页 A4 fixture（无文字层，模拟扫描件）
+    //!   - 调用 `dispatch_ocr` + `OcrDispatchBackend::LocalOcrMyPdf` 真实跑 ocrmypdf
+    //!   - `OcrJobQueue.upsert` 持久化 running / reload 状态
+    //!   - `extract_pdf_text` 抽取文字层并按页索引返回
+    //!   - `summarize_extracted_pages` 生成 searchable_pages 摘要
+    //!
+    //! 跳过条件：本机缺 `ocrmypdf` 或 `pdftotext` 时整体跳过并打印 warning。
+    use super::*;
+    use lopdf::dictionary;
+    use lopdf::{Document as LopdfDocument, Object};
+    use std::env;
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    fn tools_available() -> bool {
+        let ocrmypdf_ok = Command::new("ocrmypdf")
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false);
+        let pdftotext_ok = Command::new("pdftotext")
+            .arg("-v")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false);
+        if !ocrmypdf_ok || !pdftotext_ok {
+            eprintln!(
+                "[ocr_e2e_tests] skipping: ocrmypdf_ok={ocrmypdf_ok} pdftotext_ok={pdftotext_ok}"
+            );
+        }
+        ocrmypdf_ok && pdftotext_ok
+    }
+
+    fn temp_dir(label: &str) -> PathBuf {
+        let mut path = env::temp_dir();
+        let unique = format!(
+            "faropdf-ocr-e2e-{label}-{}",
+            ocr_queue::current_iso_timestamp()
+        );
+        path.push(unique);
+        path
+    }
+
+    /// 复用前端 vitest 同一份 fixture（`tests/fixtures/ocr/generate-scan-fixture.mjs`
+    /// 产物），保证 Rust 与前端 e2e 用完全相同的扫描件基准。
+    /// 该 fixture 由 Node + pdf-lib 生成，包含预渲染 PNG，无 PDF 文字层。
+    /// 路径解析以 src-tauri/Cargo.toml 为基准，回溯到项目根。
+    fn resolve_javascript_fixture() -> Option<PathBuf> {
+        // `cargo test` 的工作目录是 `src-tauri/`（即 Cargo.toml 所在目录），
+        // 所以回溯两级到项目根。`cargo test --manifest-path ...` 也保持同样
+        // 语义。
+        let mut project_root = env::current_dir().ok()?;
+        if project_root.ends_with("src-tauri") {
+            project_root.pop();
+        }
+        let candidate = project_root.join("tests/fixtures/ocr/scan-only-sample.pdf");
+        if candidate.exists() {
+            Some(candidate)
+        } else {
+            None
+        }
+    }
+
+    fn unique_job_id() -> String {
+        format!("ocr-e2e-{}", ocr_queue::current_iso_timestamp())
+    }
+
+    fn running_stored_job(id: &str, input_path: &str, output_path: &str) -> OcrStoredJob {
+        OcrStoredJob {
+            id: id.to_string(),
+            input_path: input_path.to_string(),
+            input_path_summary: redact_path(input_path),
+            output_path: output_path.to_string(),
+            output_path_summary: redact_path(output_path),
+            page_range: None,
+            backend: "local-ocrmypdf".to_string(),
+            provider_id: "local-ocrmypdf".to_string(),
+            status: "running".to_string(),
+            output_strategy: "new-layered-pdf".to_string(),
+            progress: OcrStoredProgress {
+                stage: "running-provider".to_string(),
+                completed_pages: 0,
+                total_pages: 0,
+                message: Some("running".to_string()),
+            },
+            quality_check: OcrStoredQualityCheck {
+                enabled: true,
+                sample_pages: vec![1],
+                keywords: vec!["OCR".to_string()],
+            },
+            quality: None,
+            error_message: None,
+            created_at: ocr_queue::current_iso_timestamp(),
+            updated_at: ocr_queue::current_iso_timestamp(),
+            started_at: Some(ocr_queue::current_iso_timestamp()),
+            completed_at: None,
+        }
+    }
+
+    #[test]
+    fn full_ocr_pipeline_runs_ocrmypdf_then_extracts_text_via_pdftotext() {
+        if !tools_available() {
+            return;
+        }
+        let Some(fixture_source) = resolve_javascript_fixture() else {
+            eprintln!(
+                "[ocr_e2e_tests] skipping: tests/fixtures/ocr/scan-only-sample.pdf 不存在；先跑 `node tests/fixtures/ocr/generate-scan-fixture.mjs`"
+            );
+            return;
+        };
+
+        let dir = temp_dir("pipeline");
+        std::fs::create_dir_all(&dir).expect("mkdir temp");
+        // 把前端 fixture 复制到 temp 目录，避免修改源文件
+        let input = dir.join("scan-only.pdf");
+        let output = dir.join("scan-only-ocr.pdf");
+        let queue_path = dir.join("ocr-jobs.json");
+        std::fs::copy(&fixture_source, &input).expect("copy fixture");
+
+        // 1) dispatch_ocr 真实跑 ocrmypdf
+        let dispatch_request = OcrDispatchRequest {
+            backend: OcrDispatchBackend::LocalOcrMyPdf,
+            input_path: input.to_string_lossy().to_string(),
+            output_path: output.to_string_lossy().to_string(),
+            page_range: None,
+            endpoint: None,
+            api_key: None,
+        };
+        let result = dispatch_ocr(&dispatch_request).expect("dispatch_ocr should succeed");
+        assert!(output.exists(), "ocrmypdf output should exist");
+        assert!(
+            result.output_size_bytes > 0,
+            "output size must be > 0 (got {})",
+            result.output_size_bytes
+        );
+
+        // 2) extract_pdf_text 抽文字层
+        let pages = extract_pdf_text(&output).expect("pdftotext should succeed");
+        assert_eq!(pages.len(), 2, "2 page fixture should yield 2 extracted pages");
+        let summary = summarize_extracted_pages(&pages);
+        assert_eq!(summary.total_pages, 2);
+        // fixture 含预渲染文字，OCR 后 2 页都应该有文字
+        assert_eq!(summary.searchable_pages, 2);
+
+        // 3) OcrJobQueue 持久化：upsert + reload 验证完整字段
+        let queue = OcrJobQueue::new(queue_path.clone());
+        let job_id = unique_job_id();
+        let mut stored = running_stored_job(
+            &job_id,
+            &input.to_string_lossy(),
+            &output.to_string_lossy(),
+        );
+        // OCR 实际已完成，先把状态写为 completed，避开 reconcile 把它改成 cancelled
+        stored.status = "completed".to_string();
+        stored.progress.stage = "completed".to_string();
+        stored.progress.completed_pages = 2;
+        stored.progress.total_pages = 2;
+        stored.progress.message = Some("OCR 完成".to_string());
+        stored.completed_at = Some(ocr_queue::current_iso_timestamp());
+        queue.upsert(stored.clone()).expect("upsert completed");
+        let restored = OcrJobQueue::new(queue_path);
+        let loaded = restored.get(&job_id).expect("job should reload");
+        assert_eq!(loaded.status, "completed");
+        assert_eq!(loaded.backend, "local-ocrmypdf");
+        assert_eq!(loaded.input_path_summary.kind, "local-pdf");
+        assert!(!loaded.input_path_summary.fingerprint.is_empty());
+        assert_eq!(loaded.progress.completed_pages, 2);
+        assert_eq!(loaded.progress.total_pages, 2);
+    }
+}

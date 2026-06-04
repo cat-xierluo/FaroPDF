@@ -1820,7 +1820,7 @@ manifest 脚本设计要点：
 - 本 PR 不调用 Tauri command；OCR 后端逻辑未变（仅在 controller 上新增 `parameters` 派生字段）。
 - 跨 worker 协调：未与其他 worktree 冲突（其它 worker 范围在 `src/modules/{annotation,export,forms,preprocess}/` 等，本 worker 集中在 `src/components/layout/` + `src/modules/ocr/ui/` + `src/styles/app.css` + `tsconfig.json`）。
 
-## DEC-048 ISS-007 OCR 端到端联调（fixture + E2E 集成测试）
+## DEC-050 ISS-007 OCR 端到端联调（fixture + E2E 集成测试）
 
 ### 1. 背景
 
