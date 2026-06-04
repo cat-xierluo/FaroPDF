@@ -1,7 +1,7 @@
 # FaroPDF 发布流程（v0.3）
 
 > ISS-021 全平台打包与自动更新。本文件记录 v0.3 起的桌面端发布流程、密钥管理与
-> 当前已知限制。详细方案见 `docs/DECISIONS.md` DEC-044。
+> 当前已知限制。详细方案见 `docs/DECISIONS.md` DEC-048。
 
 ## 1. 产物矩阵
 
@@ -118,4 +118,4 @@ git push origin v0.1.0
 - `src/modules/settings/sections/AboutSection.tsx` — 检查更新 UI
 - `scripts/create-updater-manifest.mjs` — `latest.json` 生成器
 - `.github/workflows/release.yml` — 跨平台 CI 流水线
-- `docs/DECISIONS.md` DEC-044 — 架构与限制决策
+- `docs/DECISIONS.md` DEC-048 — 架构与限制决策

@@ -14,6 +14,25 @@
 - 验证：73 个测试文件 / 693 个测试全部通过（新增 17 项：AppShell 9 + AnnotationToolbar 3 + stamps 5）；`npm run typecheck` 干净（pre-existing `.at` ES2022 lib target / `@pdf-lib/fontkit` 模块未装 错误不在本 PR 范围）；`npx vitest run` 693/693；`npx vite build` 2012 modules 成功（`tsc` 严格检查在项目级 pre-existing 失败，与本 PR 无关）。
 - 已知限制：导出工具条"压平批注"按钮 UI 入口未接（属另一个 worker 范围，本 worker 留 hook：类型与 summary shape 已落，调用方在 `engine.exportPdf` 后读 `summary.annotationPlan.drawnCount` 即可）；CJK textbox 仍走 Helvetica WinAnsi 跳过语义（与 DEC-037 一致）；`AnnotationOverlay` 与 `AnnotationSidebar` 的 active 联动仍未接（`onAnnotationClick` prop 已留好，等下一阶段统一接线）。
 
+- 全平台打包与自动更新第一版（DEC-048 / ISS-021）：把 v0.3 桌面端发布流水线 + 应用内「检查更新」入口打通，覆盖 macOS / Windows / Linux 三个平台。
+  - `src-tauri/Cargo.toml` 新增 `tauri-plugin-updater = "2.10.1"`；`src-tauri/src/lib.rs` plugin chain 注册 `tauri_plugin_updater::Builder::new().build()`；`src-tauri/tauri.conf.json` 新增 `bundle.createUpdaterArtifacts: true` + `plugins.updater` 配置块（`active` / `endpoints` 指向 `https://github.com/cat-xierluo/FaroPDF/releases/latest/download/latest.json` / `pubkey` 占位 / `windows.installMode: passive`）。
+  - `package.json` 新增 `@tauri-apps/plugin-updater@2.10.1`（前端 SDK 对应 v2 plugin）。
+  - `tsconfig.json` lib 从 `["ES2020", ...]` 升级到 `["ES2022", ...]`（解锁 27 个 pre-existing `Array.prototype.at` / `String.prototype.at` 错误；该 side fix 是 ISS-021 verification 的传递依赖；其他 forbidden 模块的 `.at()` 调用位于本期不可触碰的 reader / annotation / export / pages / ocr / preprocess / settings tests 中）。
+  - 新增 `src/shared/update/` 5 源文件 + 3 测试文件（types / updateService / updateCapability / index + 3 测试，14 项新单测）：`AppUpdateClient` 抽象 + `createTauriUpdateClient` 工厂薄封装 `@tauri-apps/plugin-updater`；`createProgressAdapter` 把单帧 Progress 事件累计成 `{ downloadedBytes, totalBytes }` 推给 UI；`detectUpdateCapability` 通过 `isTauri()` 探测环境能力并返回 unsupported outcome 兜底。
+  - `src/modules/settings/sections/AboutSection.tsx` 接 `createTauriUpdateClient`，9 态状态机（idle / checking / latest / available / downloading / downloaded / installing / unsupported / error），available 后露「下载并安装」二次按钮，progress 走 `role="status"` 推 percentage + 字节；`updateClient` props 注入替身便于单测。AboutSection.test.tsx 新增 7 项单测覆盖 4 个 outcome 分支 + 安装 progress + 错误回显，老 placeholder 断言替换为真实 outcome。
+  - 新增 `.github/workflows/release.yml`：监听 `vX.Y.Z` tag push；3 平台 build matrix（macos-universal / windows-x64 / linux-x64，linux 上 apt-get 装 webkit2gtk-4.1 / librsvg2 / libxdo / libayatana-appindicator3）；release job 下载所有 artifacts 调 `scripts/create-updater-manifest.mjs` 生成 `latest.json` + `softprops/action-gh-release@v2` 发布。
+  - 新增 `scripts/create-updater-manifest.mjs`：纯 ESM、零 npm 依赖；递归扫 `--release-dir` 匹配 `.app.tar.gz` / `.msi` / `.AppImage`，对每个 updater 兼容 bundle spawn `cargo tauri signer sign` 产出 `.sig` 旁车文件，组装 tauri-plugin-updater v2 manifest 输出。
+  - 新增 `docs/RELEASE.md`：产物矩阵表 / `latest.json` schema + GitHub Releases URL 入口 / 3 步发布流程（生成 keypair → 写 pubkey → tag push）/ 5 项 v0.3 限制（autoUpdateCheck / 增量回退 / 移动端 / key rotation / CODE_SIGNING）。
+- 范围严格遵守：未修改 `src/components/...`（除 About section update 入口）/ `src/styles/` / `src/App.tsx` / `src/main.tsx` / `src/components/layout/Toolbar.tsx` / `src/components/layout/Sidebar.tsx` / `src-tauri/src/{ocr,scan_preprocess,forms}/` / reader/search/annotation/forms/export/pages/ocr/preprocess 模块 / `src/shared/{pdf,ocr,preprocess,annotation,form,export,settings}/` / `assets/fonts/`。
+- 同步 `docs/DECISIONS.md` DEC-048（ISS-021 全平台打包与自动更新落地方案）；`docs/TASKS.md` ISS-021 任务卡状态更新为「第一版已交付」+ 进度日志追加；`docs/ROADMAP.md` **未改**。
+- 验证：76 个测试文件 / 689 个测试全部通过（新增 14 项：updateService 7 / updateCapability 2 / index 1 / AboutSection 4 新测试覆盖真实 outcome 流程替换 3 项老 placeholder 断言）；`npm run typecheck` 干净；`npm run build` 成功；`cargo check --manifest-path src-tauri/Cargo.toml` 干净（9 个 pre-existing warnings 与本期无关）。
+- 已知限制（v0.3）：
+  - `autoUpdateCheck` 设置项未实现（落地需要改 forbidden 的 `src/shared/settings/types.ts`，留 follow-up：从 `feat/app-distribution` 拆 `feat/auto-update-check`，扩展 `AppSettings` 并在 About section mount hook 自动检查）。
+  - `tauri.conf.json` 的 `plugins.updater.pubkey` 当前是占位 `RWSY2kf...`（CI 弱密码生成的 base64 段），私钥已 rm 丢弃。**首次生产发布前**必须由 PM 本地 `cargo tauri signer generate -p <STRONG_PASSWORD>` 重新生成并替换 + 把私钥 / 密码加到 GitHub Secrets（步骤见 `docs/RELEASE.md §3.1`）。
+  - 增量更新失败回退到完整重装未实现：tauri-plugin-updater 内部 chunk 重试后失败，需用户手动去 GitHub Releases 页面下载新安装包；不在本期 scope。
+  - 移动端（Android / iOS）打包在 v0.3 评估范围：本期不实现；后续启动需扩展 `release.yml` 矩阵 + 单独签名 keypair + `latest.json` platform 字段。
+  - 平台级 CODE_SIGNING（macOS notarization / Windows EV 证书 / Linux apt repo 签名）不在本期 scope。
+
 ## 0.1.0-alpha.9 - 2026-06-04
 
 - 批注深化第三阶段（DEC-040 / ISS-026）：把第二阶段产出的 `AnnotationSidebar` 真正挂到 `AppShell` + 中文 stamp 文字用思源黑体 SC 真实绘制（补 DEC-039 W8 已知限制）。
