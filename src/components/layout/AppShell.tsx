@@ -15,6 +15,7 @@ interface AppShellProps {
   activeMode: AppModeId;
   annotations?: PdfAnnotation[];
   onModeChange: (mode: AppModeId) => void;
+  onSettingsChange?: (settings: AppSettings) => void;
   onUtilityPanelChange: (panel: UtilityPanelId) => void;
   reader: ReaderController;
   search: TextSearchController;
@@ -50,6 +51,7 @@ export function AppShell({
   activeMode,
   annotations,
   onModeChange,
+  onSettingsChange,
   onUtilityPanelChange,
   reader,
   search,
@@ -71,7 +73,7 @@ export function AppShell({
       />
       {showContextToolbar ? <ContextToolbar mode={activeMode} /> : null}
       <div className={showUtilityPanel ? "workspace" : "workspace workspace--full"}>
-        {showUtilityPanel ? <UtilityPanel panel={utilityPanel} reader={reader} search={search} settings={settings} annotations={annotations} /> : null}
+        {showUtilityPanel ? <UtilityPanel panel={utilityPanel} reader={reader} search={search} annotations={annotations} /> : null}
         {activeMode === "pages" ? (
           <PageOrganizerWorkspace reader={reader} />
         ) : (
@@ -86,6 +88,12 @@ export function AppShell({
         )}
       </div>
       <StatusBar readerState={reader.state} />
+      <SettingsPanel
+        onClose={() => onUtilityPanelChange(utilityPanel === "settings" ? "none" : "none")}
+        onSettingsChange={onSettingsChange}
+        open={utilityPanel === "settings"}
+        settings={settings}
+      />
     </div>
   );
 }
@@ -94,13 +102,11 @@ function UtilityPanel({
   panel,
   reader,
   search,
-  settings,
   annotations,
 }: {
   panel: Exclude<UtilityPanelId, "none">;
   reader: ReaderController;
   search: TextSearchController;
-  settings: AppSettings;
   annotations?: PdfAnnotation[];
 }) {
   if (panel === "view") {
@@ -129,11 +135,8 @@ function UtilityPanel({
   }
 
   if (panel === "settings") {
-    return (
-      <aside className="utility-panel utility-panel--settings" aria-label="设置面板">
-        <SettingsPanel settings={settings} />
-      </aside>
-    );
+    // 设置浮层已挪到 AppShell 顶层以走 Portal 模式，此处仅占位避免 UtilityPanel fallback。
+    return null;
   }
 
   return (
