@@ -50,3 +50,34 @@ export type { AnnotationSearchOptions } from "./search";
 export { STAMP_TEMPLATES, STAMP_TEMPLATE_LIST, renderStampSvg, resolveStampTemplate } from "./stamps";
 export type { StampTemplate } from "./stamps";
 export type { AnnotationSummary, AnnotationSummaryGroup, AnnotationSummaryItem } from "./summary";
+export {
+  ANNOTATION_SIDEBAR_COLOR_CHOICES,
+  ANNOTATION_SIDEBAR_GROUP_BY_LABELS,
+  ANNOTATION_SIDEBAR_GROUP_BY_LIST,
+  ANNOTATION_SIDEBAR_TYPE_CHOICES,
+  applyAnnotationSidebarFilters,
+  collectAnnotationLabelChoices,
+  deriveAnnotationLabel,
+  filterAnnotationsByOptions,
+  groupAnnotations,
+  groupAnnotationsByColor,
+  groupAnnotationsByLabel,
+  groupAnnotationsByPage,
+  groupAnnotationsByType,
+  sidebarFiltersFromSearch,
+  sidebarFiltersToSearch,
+} from "./sidebarGroups";
+export type {
+  AnnotationSidebarFilterState,
+  AnnotationSidebarGroup,
+  AnnotationSidebarGroupBy,
+} from "./sidebarGroups";
+export {
+  writeAnnotationPdf,
+  degrees as annotationWriterDegrees,
+} from "./annotationPdfWriter";
+export type {
+  AnnotationPdfWriteSummary,
+  WriteAnnotationPdfInput,
+  WriteAnnotationPdfResult,
+} from "./annotationPdfWriter";
