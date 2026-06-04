@@ -1390,3 +1390,175 @@ PM 在 Wave 4 启动前直接处理 ISS-024 时发现工程现实与该计划冲
 - 本轮不再跟踪 doc-curator symlink；本机 `state.json` 已经在 symlink target 下建好基线（CHANGELOG.md 167 / docs/DECISIONS.md 1366 / docs/TASKS.md 257 / docs/ARCHITECTURE.md 733 / docs/DESIGN.md 192 / docs/ROADMAP.md 140 / README.md 68 / AGENTS.md 102）。
 - 团队层面是否要把 doc-curator 真目录化（与 `.claude/agents/doc-curator.md` 一并入仓）由 PM 后续单独评估。
 - 同步更新 `docs/TASKS.md` ISS-024 任务卡的「下一步」和进度日志。
+
+## DEC-044 批注深化第四阶段收尾方案（ISS-026 stage 4 总体方案）
+
+### 1. 背景
+
+ISS-026 批注深化「下一步」段已规划好的收尾事项：
+- 把 `src/components/layout/AnnotationOverlay.tsx` 与 `AnnotationToolbar.tsx` 从孤岛组件接入 `AppShell` 渲染树。
+- 把 `writeAnnotationPdf`（DEC-037 第二阶段已落地的真实绘制）接入 `pdfOperationEngine.exportPdf` 的 `flatten-annotations` 路径，目前只能 `plan-only`，缺 draw 策略。
+- stamp 模板选择面板加视觉预览（目前只显示纯 label）。
+
+承接的既有 DEC：
+- DEC-031：第一版（几何 / 搜索 / 图章 / 工具条模型）
+- DEC-037：第二阶段（侧边栏 4 维度 + 真实 PDF 绘制导出）
+- DEC-041：第三阶段（AnnotationSidebar 挂 AppShell + 中文 stamp 真实字形）
+
+### 2. 总体决策
+
+本 worker 在 `feat/annotation-stage-4` worktree 用 3 个 commit milestone 完成收尾：
+
+- **milestone 1（DEC-045）**：types + AppShell prop 透传 + App.tsx armed state 上提 + workspace__main 包裹 + AnnotationOverlay 渲染。
+- **milestone 2（DEC-046）**：ContextToolbar annotate 分支替换为受控 AnnotationToolbar；不动 Toolbar.tsx / Sidebar.tsx。
+- **milestone 3（DEC-047）**：pdfOperationEngine flatten-annotations draw 策略打通 + stamp 模板 SVG 预览（不引入新依赖）。
+
+**Scope 纪律（强制）**
+
+- 不修改 `src/components/layout/Toolbar.tsx`（按 DEC-032 协议，worker 走 `ContextToolbar` 槽位注入，参考 OcrModeToolbar 的同款接法）。
+- 不修改 `src/components/layout/Sidebar.tsx`（按 DEC-041 协议，保留 `DocumentSummaryPanel` 的 `AnnotationListPanel` tab）。
+- 不修改 `src/styles/app.css`、`src-tauri/`、`package.json` / 锁文件。
+- 不实现手写签名 / 日期 / 勾叉图章等高级控件（属 ISS-008 后续范围）。
+- 不接「导出工具条」UI 入口（属于另一个 worker 范围；本 worker 只把 engine 路径打通）。
+
+**单一真相源**
+
+`annotationToolState` 在 `App.tsx` 持有 `useState<AnnotationToolState>`，通过 `annotationArmed={{ state, onStateChange }}` bundle 同时驱动：
+- `AnnotationOverlay` 的 `activeToolType / activeColor / activeStampName / activeStampLabel` props（受控显示 armed 状态）
+- `AnnotationToolbar` 的 `state / onStateChange` props（受控读写工具条按钮）
+- 离开 annotate 模式时 useEffect 自动 disarm（避免 overlay 在 read 模式还捕获事件）
+
+**与既有 contract 的兼容性**
+
+- AppShell 既有测试（19 条）使用 `getByRole("toolbar", { name: "批注工具条" })` 命中硬编码按钮，milestone 2 把 annotate 分支包到 `<div role="toolbar" aria-label="批注工具条">` 内嵌 `<AnnotationToolbar>`——外层 div role/label 保留，inner AnnotationToolbar 仍渲染 9 工具按钮（"高亮"等），既有测试一行不改全通过。
+- 既有 `pdfOperationEngine.test.ts:155-180` 测试期望 "draw" 抛错——milestone 3 改为测 `strategy: "stamp-flood"`（typo'd 真实非法值），期望新错误消息 `批注扁平化不支持的策略`。
+- 既有 `AnnotationToolbar.test.tsx` 11 条 + `stamps.test.ts` 7 条全通过，未改任何旧行为。
+
+### 3. 后续路径
+
+- 引擎层：未来导出工具条"压平批注"按钮会调 `engine.exportPdf`，把 `summary.annotationPlan.drawnCount` 展示给用户——本 worker 留 hook（已落类型与 summary shape）。
+- UI 层：未来如果做"stamp thumbnail 库"（左侧抽屉展示 10+ 自定义 stamp），`renderStampPreview` 已预留 `width/height` 自定义能力，等比缩放不会失真。
+- 字体：中文 textbox stamp 仍会被 skip（Helvetica WinAnsi 限制），保持 DEC-037 的非致命语义。
+
+## DEC-045 批注深化第四阶段 milestone 1：AppShell 接线 + AnnotationOverlay 渲染（ISS-026 stage 4）
+
+### 1. 背景
+
+承接 DEC-044：本 milestone 是 3 个 milestone 的"地基"——先把 AnnotationOverlay 真正挂到 AppShell 的渲染树，才能让后续 milestone 2 的工具条 armed 状态有"接收方"、milestone 3 的 PDF 真实绘制有"产生方"。
+
+### 2. 决策
+
+**types 扩展（src/components/layout/types.ts）**
+
+- `AnnotationOverlayAnchor` 联合类型（当前只支持 `workspace-main`，保留扩展位）
+- `AnnotationArmedStateBundle` 透传 shape：`{ state, onStateChange }`
+- `AnnotationDraftSubmission` 加上 `pageIndex` 字段（Overlay 内部 `buildClickDraft/DragDraft/InkDraft` 不知道当前页，由 AppShell 在边界处注入）
+
+**AppShell 改造（src/components/layout/AppShell.tsx）**
+
+- props 解构追加 `annotationArmed / onAnnotationDraft / onAnnotationClick`，均 optional；未传时回退到 `createInitialAnnotationToolState()` + no-op，保持既有 AppShell 测试不破。
+- 渲染树：
+  - workspace 内部追加 `<div className="workspace__main" style={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, position: "relative" }}>` 包裹主内容（`minWidth: 0` 防止 grid overflow），作为 overlay 的相对定位锚。
+  - annotate 模式 + `hasDocument` + `overlayViewport`（来自 `reader.state.pageViewports[currentPage-1]`）时挂 `<AnnotationOverlay>`，注入：
+    - `pageIndex = currentPage - 1`
+    - `viewport = { width, height, rotation }`（PDF 视口空间，pt）
+    - `annotations = annotations.filter(a => a.pageIndex === currentPage - 1)`（仅当前页）
+    - `activeToolType / activeColor / activeStampName / activeStampLabel` 来自 armed bundle
+    - `onAnnotationDraft` 在边界处注入 `pageIndex` 后回调父级
+
+**App.tsx 状态上提（src/App.tsx）**
+
+- `annotationToolState` 用 `useState<AnnotationToolState>(createInitialAnnotationToolState())` 持有
+- useEffect：离开 annotate 模式自动 disarm（避免 overlay 在 read 模式还捕获事件）
+- `handleAnnotationDraft` callback：调 `service.addAnnotation(document, { ...input, pageIndex })` 并把返回的批注 append 到 `loadedAnnotations` 触发 React re-render
+
+**ContextToolbar 保持不动**
+
+为遵守"3 commit cadence"且确保每个 commit typecheck 干净，milestone 1 不修改 ContextToolbar 函数体——`annotationArmed.state` 已被 overlay 消费，`annotationArmed.onStateChange` 留待 milestone 2 接入。
+
+### 3. 后续路径
+
+- 测试覆盖：AppShell 新增 5 个 overlay 接线测试（`AppShell annotate overlay wiring` describe 块），覆盖 hasDocument × mode 矩阵 + page 子集 + armed bundle 透传。
+
+## DEC-046 批注深化第四阶段 milestone 2：AppShell ContextToolbar 接入受控 AnnotationToolbar（ISS-026 stage 4）
+
+### 1. 背景
+
+承接 DEC-045 milestone 1：AppShell 的 `annotationArmed` bundle 已经能驱动 AnnotationOverlay，但仍把 hardcoded 9 工具 + 6 色板 + stamp 模板按钮在 ContextToolbar 的 annotate 分支直接渲染。这意味着：
+- 用户在 overlay 上 arm 高亮工具时，工具条上「高亮」按钮不会显示 `aria-pressed=true`。
+- 用户切色板后 overlay 仍按旧色绘制（双重真相源）。
+- stamp 模板没有 preview，工具识别靠纯文字。
+
+### 2. 决策
+
+- `ContextToolbar` 函数签名追加 `annotationState / annotationDisabled / onAnnotationStateChange` 三个 prop（`annotationDisabled` 由 AppShell 派生自 `!hasDocument`，避免在 ContextToolbar 内重复算 hasDocument）。
+- `mode === "annotate"` 分支替换为：
+  ```tsx
+  <div className="context-toolbar context-toolbar--annotation" role="toolbar" aria-label={contextualToolbarLabels[mode]}>
+    <AnnotationToolbar disabled={annotationDisabled} state={annotationState} onStateChange={onAnnotationStateChange} />
+  </div>
+  ```
+  外层 div 保留 `role="toolbar" aria-label="批注工具条"`，**以保持既有 AppShell 测试契约**（`getByRole("toolbar", { name: "批注工具条" })` 仍能命中）。
+- `AppShell.tsx` 在调用 ContextToolbar 时把 `annotationArmed.onStateChange` 透传；未传时回退到 no-op，保留 milestone 1 的兼容。
+- 严格遵守"不修改 `Toolbar.tsx`"协议：worker 走 `ContextToolbar` 槽位注入（与 OcrModeToolbar 的同款接法），不动 top header 的 modeButtons 与 registerModeTools 注册。
+
+### 3. 后续路径
+
+- milestone 3：stamp 模板 preview 增强会再动 `AnnotationToolbar.tsx` 的 stamp 按钮内部结构。
+- 测试覆盖：AppShell 新增 4 个工具条接线测试（`AppShell annotate toolbar integration` describe 块），覆盖 9+6 按钮渲染、点击触发 bundle.onStateChange、hasDocument 矩阵 disabled。
+
+## DEC-047 批注深化第四阶段 milestone 3：pdfOperationEngine flatten-annotations draw 策略 + stamp 模板预览（ISS-026 stage 4）
+
+### 1. 背景
+
+两个独立但同时落地的子任务：
+- **`pdfOperationEngine.ts` flatten-annotations** 目前只支持 `strategy: "plan-only"`，`writeAnnotationPdf`（DEC-037 第二阶段）已经能把 9 种批注真实绘制到 PDF 字节流但 export 引擎拿不到——ISS-026 stage 4 必须打通的"导出引擎收口"。
+- **`AnnotationToolbar`** 的 stamp 模板选择面板仍只显示纯文字 label（DEC-041 第三阶段只把 stamp 真实字形落到了 writeAnnotationPdf 路径即导出端），用户在工具条上无法快速识别「重点 / 待核 / 证据」几何形态的差异。
+
+### 2. 决策（engine 部分）
+
+**类型扩展（src/shared/pdf/export.ts）**
+
+- `PdfAnnotationFlattenStrategy` 联合类型追加 `"draw"`，与既有 `"plan-only"` 并列。
+- `PdfAnnotationFlattenPlan` 追加可选字段：`drawnCount? / skippedCount? / skipped? / pageDrawCounts? / fingerprintChecked?`。
+- `PdfAnnotationFlattenPlanEntry.status` 由字面量 `"planned"` 改为联合 `"planned" | "applied" | "skipped"`，新增 `PdfAnnotationFlattenEntryStatus` 类型供消费者引用。
+
+**Engine 实现（src/modules/export/pdfOperationEngine.ts）**
+
+- `workingPdf` 与 `inputPageCount` 改为 `let`（draw 路径需要替换 workingPdf）。
+- flatten-annotations 分支按 strategy 分发：
+  - `"plan-only"`：保持 DEC-037 行为（仅生成 plan summary，PDF 字节不变）。
+  - `"draw"`：先 `await workingPdf.save()` 拿到当前字节，调 `writeAnnotationPdf({ sourceBytes, sidecar, sourceFingerprint? })`，把返回的 `drawResult.bytes` 重新 `PDFDocument.load` 到 `workingPdf` 替换后续步骤的输入。
+  - 不支持的 strategy（如 typo'd `"stamp-flood"`）整体抛 `批注扁平化不支持的策略：${strategy}`，由调用方 catch。
+- draw 完成后 `inputPageCount = workingPdf.getPageCount()` 重新计算（防御性——writeAnnotationPdf 当前不删页但理论可能）。
+- `buildAnnotationFlattenPlan` 接受可选第 4 参数 `drawSummary`，在 draw 路径下用真实 summary 填充 drawnCount/skipped/pageDrawCounts，并把 entries 的 status 切到 `"applied"` 或 `"skipped"`（按 drawResult.skipped 命中判定）。
+- `skipped` 项降级为 `warnings`（非致命），与既有 `PAGE_OPERATIONS_PLAN_ONLY_WARNING` 风格一致。
+- `applyExportMetadata` 切换 PDF keywords：draw 用 `faropdf:annotation-flattened` + drawn 计数；plan-only 保持 `faropdf:annotation-plan-only`。
+
+**既有测试更新**
+
+- 旧测试 `rejects unsupported annotation flatten strategy` 改为测 `strategy: "stamp-flood" as never` + 期望新错误消息。
+- 越界 pageIndex 抛错测试改为正则匹配（writeAnnotationPdf 的错误更具体）。
+
+### 3. 决策（stamp 预览部分）
+
+**新增 `renderStampPreview` helper（src/modules/annotation/stamps.ts）**
+
+- 与 `renderStampSvg` 共用 `viewBox 0 0 400 100` 和 shape 几何（rectangle / rounded / ellipse / banner）——保证"缩略图"与"正图"在视觉上严格同比例。
+- 字号缩到 0.55×（24pt 而不是 44pt），让 120×30 CSS 像素的缩略图保持"印章感"不被文字撑爆。
+- 接受 `RenderStampPreviewOptions`：`{ width?, height?, label?, color? }`，未指定时回退到 `template.defaultLabel` / `template.defaultColor`。
+- 与既有 `renderStampSvg` 共享 `escapeXml` 转义函数（XML 实体）——避免在 stamp 工具里引入"label 含 `<script>`"这种 XSS 风险。
+- 导出 `STAMP_PREVIEW_VIEWBOX_WIDTH/HEIGHT` 常量 + `DEFAULT_STAMP_PREVIEW_WIDTH/HEIGHT`。
+- `src/modules/annotation/index.ts` 重新导出新符号。
+
+**AnnotationToolbar 集成（src/components/layout/AnnotationToolbar.tsx）**
+
+- stamp 模板按钮内部结构改造：从纯文字 label 改为 `<svg viewBox="0 0 400 100" height="32" width="100%">` 包 `<g dangerouslySetInnerHTML>` 注入预览子树 + `<span class="annotation-stamp-button__label">{label}</span>`。
+- SVG 元素加 `data-testid="stamp-preview-{id}"` 供测试定位；预览使用 `aria-hidden="true"` 不污染无障碍树。
+- 不引入新依赖（用既有 inline SVG + `dangerouslySetInnerHTML`）。
+
+### 4. 后续路径
+
+- UI 入口：未来导出工具条"压平批注"按钮会调 `engine.exportPdf`，把 `summary.annotationPlan.drawnCount` 展示给用户——本 worker 留 hook（已落类型与 summary shape），UI 入口由其他 worker 接。
+- 中文 textbox stamp 仍会被 skip（Helvetica WinAnsi 限制），保持 DEC-037 的非致命语义。
+- 测试覆盖：pdfOperationEngine.test.ts 新增 4 个 draw 策略测试；stamps.test.ts 新增 5 个 renderStampPreview 测试；AnnotationToolbar.test.tsx 新增 3 个 preview 渲染测试。
