@@ -1134,3 +1134,71 @@ ISS-022 把现有扁平的 `SettingsPanel` 升级为左侧导航 + 多 section �
 - pdfOperationEngine.test.ts：删 apply 模式 plan-only warning 矛盾
 
 修后 4 件套全绿（typecheck / 621 tests / build / cargo check）。
+
+## DEC-040 ISS-016 扫描预处理第二阶段真实处理（lopdf + 任务队列 + list/poll/cancel）
+
+- 日期：2026-06-04
+- 状态：已采纳
+- 关联任务：ISS-016
+
+承接 DEC-016（第一版 job bridge stub）+ DEC-020 / DEC-030 OCR bridge 真实接入模式 + DEC-039 字体与压缩真实处理，本决策把扫描预处理从「queued stub 立即返回 + 全部统计归零」推进到「文件持久化任务队列 + lopdf 真实 PDF 清洁 + 真实状态机流转」。
+
+### 1. 依赖与工具链
+
+- `src-tauri/Cargo.toml` 加 `lopdf = "0.33"`（纯 Rust PDF 读写，default-features = false，启用 `pom_parser`）。
+- lopdf 0.34 在 rustc 1.88 上 reader.rs 内部 API 失配（`indirect_object` 多余参数），回退到 0.33 稳定版。
+- 不引入 opencv / mupdf：这两个需要系统级 C 库（`brew install opencv`），在 macOS 开发机和 CI 都增加 build 风险；本期按 prompt 允许的最小依赖推进，旋转 + 栅格化方向检测留作后续 mupdf 接入阶段。
+- `image` crate 暂不引入：本期 PDF 处理只到「PDF 元数据修改」级别，不做像素级栅格化。
+
+### 2. 后端模块拆分
+
+新增 `src-tauri/src/scan_preprocess/`：
+- `mod.rs`：模块入口，公开 `ScanPreprocessJobQueue / ScanPreprocessJobQueueState / ScanPreprocessStoredJob / ScanPreprocessStoredOptions / ScanPreprocessStoredProgress / ScanPreprocessStoredSummary / ScanPreprocessRunRequest / run_scan_preprocess_job`。
+- `types.rs`：stored job 持久化类型，含完整生命周期（status / progress / summary / error_message / started_at / completed_at / input_path_summary / output_path_summary），不再用 Eq derive（f32 字段不支持 Eq）。
+- `queue.rs`：仿 `ocr_queue.rs` 的 `OcrJobQueue`，实现 `ScanPreprocessJobQueue::new / list / get / upsert / update_progress / complete / fail / cancel / reconcile_running_after_restart / snapshot_by_status`；持久化到应用配置目录的 `scan-preprocess-jobs.json`（schema_version = 1）；启动时把残留 `running` 标记 `cancelled` 避免幽灵任务阻塞 UI；输入 / 输出路径走 `redact_path` 脱敏 + `fingerprint_of` 哈希，只保留 `[path].pdf` + 16 位指纹；7 项单测覆盖 upsert / update_progress / complete / cancel / reconcile / 路径脱敏。
+- `pdf_probe.rs`：用 lopdf 0.33 真实解析输入 PDF，记录页数、每页 MediaBox、当前 Rotate、文本对象数；`probe_pdf` / `apply_clean_edge`（按 `margin_px` 真实缩小 MediaBox，1 in = 72 pt，边距过宽跳过）/ `save_pdf`（包含父目录 create_dir_all）/ `detect_orientation_vote`（plan-only 占位，注释说明 lopdf 不解析 FlateDecode 压缩 content stream，文本对象 `cm` 矩阵投票待 mupdf 接入）；3 项单测覆盖 probe / clean-edge 真实缩小 / 边距过宽跳过。
+- `runner.rs`：主流程 `validating → preprocessing → writing-output → completed`；真实测量 `elapsed_ms` 并填入 summary；输入文件不存在时立即 `fail` 落盘；2 项单测覆盖 happy path 真实写新 PDF + missing input 落盘失败。
+
+### 3. lib.rs 桥接改造
+
+- `ScanPreprocessCommandJob` 扩展 `error_message: Option<String> / started_at: Option<String> / completed_at: Option<String>`，与 stored job 字段对齐。
+- 新增 `list_scan_preprocess_jobs / poll_scan_preprocess_job / cancel_scan_preprocess_job` 三个 Tauri command，与 OCR 队列命令同形。
+- `start_scan_preprocess_job` 函数体从「queued stub 立即返回」改为「`state.inner()` 写 stored job（status=running, stage=validating）→ `tauri::async_runtime::spawn` 异步执行 `run_scan_preprocess_job` → 返回 stored_to_command_job」。
+- 旧 stub 行为的 `command_stub_returns_queued_job_and_safe_summary` 测试删除（OCR command 同样无测试，State mock 不易构造）；新增 `scan_stored_to_command_job_converts_real_processed_state` 测试覆盖 stored → command job 转换。
+- `setup` 中 `app.manage(ScanPreprocessJobQueueState(Arc<Mutex<...>)))`；`invoke_handler` 注册 4 个新 command（含 start）；`scan_preprocess_job_queue_path` helper 解析 app config dir + `scan-preprocess-jobs.json`。
+- `current_timestamp_string` 不再被 start_scan_preprocess_job 使用，移除对应字段；保留 OCR 的 `current_iso_timestamp`。
+
+### 4. 前端 service 扩展
+
+- `ScanPreprocessBackend` 接口加 `listScanPreprocessJobs / pollScanPreprocessJob / cancelScanPreprocessJob` 三个方法。
+- `ScanPreprocessService` 接口加 `listPreprocessJobs() / pollPreprocessJob(jobId) / cancelPreprocessJob(jobId)`，统一错误脱敏。
+- `normalizeScanPreprocessJob` 兼容 stored job 缺字段 / 输入非 record / 字符串 ID 缺失 / 不可信 options 字段（fallback 到 request.options 或 defaultOptions）。
+- 新增 `normalizeOptions` / `booleanOr` / `numberOr` 辅助函数；不再做 `Record<string, unknown>` → `ScanPreprocessOptions` 强转。
+- 7 项前端单测：start queued / start validating running / 校验失败 / 错误脱敏 / list 排序（newest first）/ poll 返回 null / cancel 返回 cancelled / 空 jobId 拒绝。
+
+### 5. 范围严格遵守
+
+- 修改：`src-tauri/Cargo.toml` / `src-tauri/Cargo.lock` / `src-tauri/src/lib.rs` / `src/modules/preprocess/scanPreprocessService.ts` / `src/modules/preprocess/scanPreprocessService.test.ts`。
+- 新增：`src-tauri/src/scan_preprocess/{mod,types,queue,pdf_probe,runner}.rs`。
+- 不修改：`package.json` / `package-lock.json` / `Toolbar.tsx` / `App.tsx` / 全局样式 / 路由 / `src/shared/preprocess/*` 共享契约（不破坏现有前端 PDF 工具）。
+
+### 6. 验证
+
+- `npm run typecheck` ✅
+- `npm test -- --run` ✅ 69 文件 / 625 测试全过（新增 4 项：list 排序 / poll null / cancel / 空 jobId 拒绝）
+- `npm run build` ✅
+- `cargo check` ✅（无错误，9 个 dead_code warning 不影响功能）
+- `cargo test --lib` ✅ 41 测试全过（新增 16 项：queue 7 + pdf_probe 3 + runner 2 + lib 1 新增 + 3 旧 helper 测试保留 + 1 新增 stored → command 转换）
+
+### 7. 已知限制
+
+- 90 度方向检测（`detectOrientation`）plan-only：纯 lopdf 不解析 FlateDecode 压缩的 content stream，文本对象 `cm` 矩阵投票需要 mupdf / opencv 栅格化能力。`detect_orientation_vote` 返回 `None`，`rotated_pages` 记 0。
+- 微倾斜校正（`deskew`）plan-only：同上，无栅格化能力，deskewed_pages 记 0。
+- 双页拆分（`splitPages`）plan-only：需栅格化判断中间空白，split_pages 记 0。
+- 空白边裁剪按 `blankEdgeMarginPx` 在 MediaBox 上线性内缩，不做像素级空白检测；边距过宽或页面过小时安全跳过。
+- fontkit devDep 在 worktree 内未预装（`npm install` 已自动处理），新 worktree clone 后需要先 `npm install` 才能 `npm run typecheck`。
+- Tauri command 的 State 注入测试难构造（`start_scan_preprocess_job` 直接调用需要 `State<'_, ScanPreprocessJobQueueState>`），本期通过 `scan_stored_to_command_job` 纯函数单测 + `run_scan_preprocess_job` 间接覆盖来补偿。
+
+### 8. 推进方式
+
+按 DEC-018（OCR bridge / 导出引擎 / 页面整理并行）+ DEC-030（ISS-007 第二版真实接入）模式，把 ISS-016 第二阶段从最新 `main` 41675b3 拉出 `feat/scan-preprocess-real` worktree；worker 只修改本任务范围，文档冲突由 PM 在合并时统一收口。
