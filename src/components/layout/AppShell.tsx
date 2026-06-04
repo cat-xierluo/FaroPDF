@@ -156,7 +156,6 @@ export function AppShell({
               <OcrWorkspaceUnavailable />
             )
           ) : (
-          ) : (
             <ReaderCanvas
               onOpenFile={reader.openFile}
               onPageNavigate={reader.setCurrentPage}

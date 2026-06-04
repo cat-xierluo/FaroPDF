@@ -19,7 +19,7 @@
 - [x] 读 `docs/TASKS.md` ISS-009 + `docs/DESIGN.md`「当前设计差距」+ `src/components/layout/{AppShell,Toolbar,Sidebar,ReaderCanvas}.tsx`
 - [x] 跑 `npm install`（新 worktree 必需）
 - [x] 跑 `npm run typecheck` + `npm test -- --run` + `npm run build` + `cargo check --offline`
-- [x] 修 `tsconfig.json` `lib: ["ES2020"...] → "ES2022"...]`（baseline unblock：17 个 `.at()` 类型错误被 ES2022 吸收），写到 DEC-047「baseline 修复」
+- [x] 修 `tsconfig.json` `lib: ["ES2020"...] → "ES2022"...]`（baseline unblock：17 个 `.at()` 类型错误被 ES2022 吸收），写到 DEC-049「baseline 修复」
 
 ## Milestone 1 — 阅读态视觉 polish
 
@@ -96,7 +96,7 @@
 
 ## Milestone 5 — 文档与 PR
 
-- 写 DEC-047（阅读态 polish / 搜索结果层 / 页面管理 / OCR 参数 + baseline tsconfig 修复）
+- 写 DEC-049（阅读态 polish / 搜索结果层 / 页面管理 / OCR 参数 + baseline tsconfig 修复）
 - 更新 `docs/TASKS.md` ISS-009「下一步」+ 进度日志
 - 更新 `CHANGELOG.md` 0.1.0-alpha.10 段
 - 更新 `docs/DESIGN.md`「当前设计差距」标记部分完成
@@ -118,5 +118,5 @@
 
 - /tmp/faropdf-ui-sample.pdf 不存在 → 视觉验证改为在 dev server 起来后用 playwright 截 dev 空态（开发环境打开 vite dev server）
 - OCR provider 状态由 props 传入（不动 hook）以保持本 PR 范围可控
-- 页面管理 Undo 是占位 UI（不接 pageOrganizer service）— 在 DEC-047 标注
+- 页面管理 Undo 是占位 UI（不接 pageOrganizer service）— 在 DEC-049 标注
 - baseline tsconfig 修复跨全项目，但仅 1 行 lib 字段，影响 ES2022 已支持 API
