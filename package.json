@@ -2,6 +2,16 @@
   "name": "faropdf",
   "private": true,
   "version": "0.1.0",
+  "description": "FaroPDF 是一个独立 PDF 阅读器，面向律师日常处理卷宗、证据、判决、合同和扫描材料。",
+  "homepage": "https://github.com/cat-xierluo/FaroPDF",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cat-xierluo/FaroPDF.git"
+  },
+  "author": {
+    "name": "maoking",
+    "url": "https://github.com/cat-xierluo"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

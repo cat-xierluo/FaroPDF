@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "./components/layout/AppShell";
 import type { AppModeId, UtilityPanelId } from "./components/layout/types";
 import { AnnotationService } from "./modules/annotation";
@@ -8,6 +8,7 @@ import { useReaderController } from "./modules/reader";
 import { registerReadModeTools } from "./modules/reader/readerModeTools";
 import { useTextSearchController } from "./modules/search";
 import type { PdfAnnotation } from "./shared";
+import type { AppSettings } from "./shared/settings/types";
 import { createDefaultAppSettings } from "./shared/settings/defaults";
 import "./styles/app.css";
 
@@ -15,7 +16,7 @@ import "./styles/app.css";
 registerReadModeTools();
 
 function App() {
-  const settings = useMemo(() => createDefaultAppSettings(), []);
+  const [settings, setSettings] = useState<AppSettings>(() => createDefaultAppSettings());
   const [activeMode, setActiveMode] = useState<AppModeId>("read");
   const [utilityPanel, setUtilityPanel] = useState<UtilityPanelId>("summary");
   const [loadedAnnotations, setLoadedAnnotations] = useState<PdfAnnotation[]>([]);
@@ -81,11 +82,18 @@ function App() {
     }
   }
 
+  const handleSettingsChange = useCallback((next: AppSettings) => {
+    // 设置面板通过 Portal 浮层即时更新 App 状态；后续接入 SettingsService 做
+    // 持久化与校验失败回滚时，只需在这里替换 setSettings 为 service.updateSettings。
+    setSettings(next);
+  }, []);
+
   return (
     <AppShell
       activeMode={activeMode}
       annotations={loadedAnnotations}
       onModeChange={handleModeChange}
+      onSettingsChange={handleSettingsChange}
       onUtilityPanelChange={handleUtilityPanelChange}
       reader={reader}
       search={search}

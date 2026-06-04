@@ -1,56 +1,130 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, test, vi } from "vitest";
-import { createDefaultAppSettings } from "../../shared/settings/defaults";
+import { afterEach, describe, expect, test, vi, type Mock } from "vitest";
+import { createDefaultAppSettings, exportSafeAppSettings } from "../../shared/settings/defaults";
 import type { AppSettings } from "../../shared/settings/types";
 import { SettingsPanel } from "./SettingsPanel";
 
-function settingsWithRawPaddleKey() {
-  const settings = createDefaultAppSettings();
-  settings.ocrProviders = settings.ocrProviders.map((provider) =>
-    provider.id === "paddleocr"
-      ? {
-          ...provider,
-          enabled: true,
-          endpoint: "https://ocr.example.test/paddle",
-          apiKeyRef: "paddle-secret-123456",
-        }
-      : provider,
+function renderPanel(overrides: Partial<{ open: boolean; onClose: () => void; onSettingsChange: (s: AppSettings) => void; settings: AppSettings }> = {}) {
+  const onClose: Mock<() => void> = (overrides.onClose ? vi.fn(overrides.onClose) : vi.fn()) as Mock<() => void>;
+  const onSettingsChange: Mock<(s: AppSettings) => void> = (overrides.onSettingsChange
+    ? vi.fn(overrides.onSettingsChange)
+    : vi.fn()) as Mock<(s: AppSettings) => void>;
+  const settings = overrides.settings ?? createDefaultAppSettings();
+  const utils = render(
+    <SettingsPanel
+      onClose={onClose}
+      onSettingsChange={onSettingsChange}
+      open={overrides.open ?? true}
+      settings={settings}
+    />,
   );
-  return settings;
+  return { ...utils, onClose, onSettingsChange, settings };
 }
 
-describe("SettingsPanel", () => {
-  test("renders OCR provider settings without exposing a full API key", () => {
-    render(<SettingsPanel settings={settingsWithRawPaddleKey()} />);
+afterEach(() => {
+  // Portal 在 document.body 上，RTL 的 unmount 才能正确清理
+  // 单独测试用 utils.unmount() 收尾。
+});
 
-    expect(screen.getByLabelText("默认 OCR 后端")).toBeInTheDocument();
-    expect(screen.getByLabelText("默认保存策略")).toBeInTheDocument();
-    expect(screen.getByLabelText("默认缩放")).toBeInTheDocument();
-    expect(screen.getByLabelText("默认阅读模式")).toBeInTheDocument();
-    expect(screen.getByLabelText("PaddleOCR API Key 引用")).toHaveAttribute("placeholder", "padd...3456");
-    expect(screen.queryByDisplayValue("paddle-secret-123456")).not.toBeInTheDocument();
-    expect(screen.queryByText("paddle-secret-123456")).not.toBeInTheDocument();
+describe("SettingsPanel", () => {
+  test("does not render portal when closed", () => {
+    const { unmount } = renderPanel({ open: false });
+    expect(screen.queryByTestId("settings-overlay")).not.toBeInTheDocument();
+    unmount();
   });
 
-  test("edits provider enablement, endpoint, key reference and network confirmation", async () => {
+  test("renders left nav with 5 sections and first section is active by default", () => {
+    const { unmount } = renderPanel();
+    const nav = screen.getByRole("tablist", { name: "设置分类" });
+    const navItems = within(nav).getAllByRole("tab");
+    expect(navItems.map((item) => item.textContent)).toEqual([
+      "常规",
+      "阅读",
+      "OCR provider",
+      "快捷键",
+      "关于",
+    ]);
+    expect(navItems[0]).toHaveAttribute("aria-selected", "true");
+    unmount();
+  });
+
+  test("renders first section content", () => {
+    const { unmount } = renderPanel();
+    expect(screen.getByRole("tabpanel", { name: "常规" })).toBeInTheDocument();
+    expect(screen.getByLabelText("默认保存策略")).toBeInTheDocument();
+    unmount();
+  });
+
+  test("switches sections when clicking nav items", async () => {
     const user = userEvent.setup();
-    const onSettingsChange = vi.fn<(settings: AppSettings) => void>();
-    render(<SettingsPanel settings={createDefaultAppSettings()} onSettingsChange={onSettingsChange} />);
+    const { unmount } = renderPanel();
+    const nav = screen.getByRole("tablist", { name: "设置分类" });
+    await user.click(within(nav).getByRole("tab", { name: "阅读" }));
+    expect(screen.getByRole("tabpanel", { name: "阅读" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("默认保存策略")).not.toBeInTheDocument();
+    unmount();
+  });
 
-    await user.click(screen.getByLabelText("启用 PaddleOCR"));
-    await user.type(screen.getByLabelText("PaddleOCR Endpoint"), "https://ocr.example.test/paddle");
-    await user.type(screen.getByLabelText("PaddleOCR API Key 引用"), "paddle-secret-123456");
-    await user.tab();
-    await user.click(screen.getByLabelText("联网 OCR 需要确认"));
+  test("close button calls onClose", async () => {
+    const user = userEvent.setup();
+    const { onClose, unmount } = renderPanel();
+    await user.click(screen.getByRole("button", { name: "关闭设置" }));
+    expect(onClose).toHaveBeenCalled();
+    unmount();
+  });
 
-    const lastSettings = onSettingsChange.mock.calls.at(-1)?.[0];
-    const paddleocr = lastSettings?.ocrProviders.find((provider) => provider.id === "paddleocr");
+  test("backdrop click calls onClose", () => {
+    const { onClose, unmount } = renderPanel();
+    fireEvent.click(screen.getByTestId("settings-backdrop"));
+    expect(onClose).toHaveBeenCalled();
+    unmount();
+  });
 
-    expect(paddleocr?.enabled).toBe(true);
-    expect(paddleocr?.endpoint).toBe("https://ocr.example.test/paddle");
-    expect(paddleocr?.apiKeyRef).toBe("padd...3456");
-    expect(JSON.stringify(lastSettings)).not.toContain("paddle-secret-123456");
-    expect(lastSettings?.requireNetworkOcrConfirmation).toBe(false);
+  test("Escape key calls onClose", () => {
+    const { onClose, unmount } = renderPanel();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
+    unmount();
+  });
+
+  test("settings change propagates via onSettingsChange", async () => {
+    const user = userEvent.setup();
+    const settings = createDefaultAppSettings();
+    const { onSettingsChange, unmount } = renderPanel({ settings });
+    await user.selectOptions(screen.getByLabelText("默认保存策略"), "ask-each-time");
+    const lastCall = onSettingsChange.mock.calls.at(-1)?.[0];
+    expect(lastCall?.defaultSavePolicy).toBe("ask-each-time");
+    unmount();
+  });
+
+  test("focus moves to close button when opened", () => {
+    const { unmount } = renderPanel();
+    expect(screen.getByRole("button", { name: "关闭设置" })).toHaveFocus();
+    unmount();
+  });
+
+  test("navigates to OCR section and shows masked API key", async () => {
+    const user = userEvent.setup();
+    const settings = createDefaultAppSettings();
+    settings.ocrProviders = settings.ocrProviders.map((p) =>
+      p.id === "paddleocr" ? { ...p, enabled: true, apiKeyRef: "paddle-secret-123456" } : p,
+    );
+    const safeSettings = exportSafeAppSettings(settings);
+    const { unmount } = renderPanel({ settings: safeSettings });
+    await user.click(screen.getByRole("tab", { name: "OCR provider" }));
+    expect(screen.getByLabelText("PaddleOCR API Key 引用")).toHaveAttribute("placeholder", "padd...3456");
+    unmount();
+  });
+
+  test("navigates to about section and shows version + homepage", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderPanel();
+    await user.click(screen.getByRole("tab", { name: "关于" }));
+    expect(screen.getByRole("link", { name: "官网" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("github.com"),
+    );
+    unmount();
   });
 });

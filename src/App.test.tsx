@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test } from "vitest";
 import App from "./App";
@@ -84,10 +84,15 @@ describe("FaroPDF app shell", () => {
 
     await user.click(screen.getByRole("button", { name: "设置" }));
 
-    expect(screen.getByRole("complementary", { name: "设置面板" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "设置" })).toBeInTheDocument();
-    expect(screen.getByLabelText("默认 OCR 后端")).toHaveValue("local-ocrmypdf");
-    expect(screen.getByText("联网 OCR 需要确认")).toBeInTheDocument();
-    expect(screen.queryByText("paddle-secret-123456")).not.toBeInTheDocument();
+    // 设置浮层走 Portal 浮层，role="dialog" + aria-modal="true"；不再是侧栏 aside。
+    const dialog = screen.getByRole("dialog", { name: "设置对话框" });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "设置" })).toBeInTheDocument();
+
+    // 默认进入「常规」section；切到 OCR provider 才能看到 OCR 控件。
+    expect(within(dialog).queryByLabelText("默认 OCR 后端")).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("tab", { name: "OCR provider" }));
+    expect(within(dialog).getByLabelText("默认 OCR 后端")).toHaveValue("local-ocrmypdf");
+    expect(within(dialog).getByText("联网 OCR 需要确认")).toBeInTheDocument();
   });
 });

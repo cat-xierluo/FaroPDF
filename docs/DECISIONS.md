@@ -937,6 +937,7 @@ ISS-013 第一版已在 main（PR 合并见 DEC-013 段 2026-06-02 进度日志 
 - 范围：仅本文档 + `docs/ROADMAP.md` §138 状态行 + `docs/TASKS.md` ISS-013 任务卡 + `CHANGELOG.md` 0.1.0-alpha.7 段 + worktree 清理。
 - 不影响：PR #22 / PR #23 已合并的 reader-modes / forms-signing 不变；现有导出 operation 不变；压缩仍维持 plan-only 摘要。
 - 后续：若用户要求立即推进，第二阶段 worker prompt 必须显式写"@pdf-lib/fontkit 是 pdf-lib 官方 devDep，可装"，并指明字体协议（OFL / Apache 2.0 / MIT），且 PM 必须提供 `npm install` 后的版本指纹给 user 复核。
+- DEC 编号说明：原 commit 42f4489 写时用 `DEC-037`（base 是 d1df565 拉的无 PR #22/#23 之后的批注 DEC），与已合的 `DEC-037 批注深化第二阶段`（feat/annotation-stage-2 / PR #24）冲突；rebase 时改为 `DEC-038` 释放已占用编号。
 
 ## DEC-037 批注深化第二阶段：侧边栏 4 维度分组 + 真实 PDF 绘制导出
 
@@ -999,3 +1000,46 @@ ISS-013 第一版已在 main（PR 合并见 DEC-013 段 2026-06-02 进度日志 
 - AnnotationSidebar 当前不挂 AppShell，UI 验收需 layout worker 接入后浏览器截图；本分支只保证组件自洽与可测。
 - `*-annotated.pdf` 建议输出名由调用方按 `deriveAnnotationOutputPath` 之类安全路径（DEC-005 输出保护）生成；本期不实现 `deriveAnnotationOutputPath`，由调用方提供绝对新路径。
 
+## DEC-038 设置页面 UI 整合方案（ISS-022 + ISS-023 第一版）
+
+### 背景
+
+ISS-022 把现有扁平的 `SettingsPanel` 升级为左侧导航 + 多 section 浮层，至少 5 个 section（常规 / 阅读 / OCR provider / 快捷键 / 关于）；ISS-023 在「关于」section 集中展示应用 icon、版本号、官网 / GitHub 链接、当前更新状态、作者卡。ISS-021 tauri-plugin-updater 尚未合入，ISS-023 的「检查更新」按钮本期仅放占位。需求见 `docs/TASKS.md` ISS-022 / ISS-023 任务卡 + `docs/ROADMAP.md` v0.3 §9 + DEC-013（设置面板与 OCR provider 契约保持兼容）。
+
+### 目标与决策
+
+1. **section 拆分**：`src/modules/settings/SettingsPanel.tsx` 退化为容器（Portal 浮层 + 左侧 nav + 右侧 content），具体 5 个 section 拆到 `src/modules/settings/sections/`（GeneralSection / ReaderSection / OcrProviderSection / ShortcutSection / AboutSection + `sections/types.ts` 共享 SectionId / SECTION_LIST / SectionProps）。`AppSettings` 已有字段复用，**不**新增 setting 字段。
+2. **浮层壳走 Portal + createPortal**：用 React `createPortal` 渲染到 `document.body`，`Esc` 关闭、点遮罩关闭、打开时焦点抢到关闭按钮、关闭时恢复触发元素焦点；`role="dialog" aria-modal="true" aria-label="设置对话框"`。CSS 落到 `SettingsPanel.css`（独立文件，不污染 `src/styles/app.css`），复用 `--bg / --surface / --border / --fg / --muted / --accent` 设计 token。
+3. **AppShell 接线**：原 `utilityPanel === "settings"` 在 AppShell 内 UtilityPanel 占位（返回 `null`），`SettingsPanel` 整体上移到 AppShell 顶层（`<div class="app-shell">` 的 StatusBar 之后）；AppShell 新增 `onSettingsChange?: (settings) => void` prop。App 层从 `useMemo(createDefaultAppSettings)` 改为 `useState`，新增 `handleSettingsChange` 走 `setSettings`（SettingsService 持久化后续接入）。
+4. **窄屏适配**：宽度 < 768px 时左侧 nav 自动折叠为顶部 tab，CSS grid 重排为「header / topnav / content」三行。`@media (max-width: 767px)`。
+5. **元数据来源**：`src/shared/app/metadata.ts` 暴露 `readAppMetadata()` + `FALLBACK_APP_VERSION`；名称 / 版本优先 `tauri.conf.json` 的 `productName` / `version`（面向用户），描述 / 主页 / 仓库 / 作者读 `package.json`。为支持「关于」展示，package.json 新增 `description` / `homepage` / `repository` / `author` 4 个 metadata 字段（**不**引入任何新依赖）。
+6. **关于 section**：
+   - 应用 icon：直接 import `src-tauri/icons/128x128.png`（Vite 在构建时把它内联为 URL）。
+   - 版本号：`tauri.conf.json.version` 优先；`FALLBACK_APP_VERSION = "0.0.0"` 兜底。
+   - 官网 / GitHub：read `package.json.homepage` / `package.json.repository.url`，**不**硬编码。
+   - 检查更新按钮：本期显示「当前环境不支持自动更新」+ 「ISS-021 集成后启用」提示；不接 `tauri-plugin-updater`。
+   - 作者卡：占位结构（姓名 + GitHub 链接 + 公众号二维码说明），二维码图片留待后续迭代。
+7. **快捷键 section 只读**：当前仅展示内置快捷键（阅读翻页 / 缩放与旋转 / 工具切换）；可编辑快捷键配置不在本期范围。
+8. **OCR provider 行为兼容**：保持原有 `apiKeyRef` 脱敏、endpoint + key 引用、network consent 校验逻辑；`exportSafeAppSettings` 在 SettingsPanel 容器入口处脱敏后下传 section（section 内的 placeholder 不再展示明文）。`validateAppSettings` 错误展示交给 SettingsService 后续接入（本期不在浮层里渲染错误列表，section 内自带提示即可）。
+9. **测试策略**：每个 section 独立 test（受控 wrapper `ControlledHarness` 模拟父组件 `useState`，避免链式操作看到陈旧 `settings`）；SettingsPanel 容器 test 覆盖 portal 关闭 / 5 section nav 顺序 / section 切换 / Esc / 遮罩 / 焦点抢占 / 窄屏顶部 tab。`App.test.tsx` 旧的 aside 断言改为 dialog 断言。`src/test/setup.ts` 加 `window.matchMedia` jsdom 兜底（v29 jsdom 缺实现）。
+10. **持久化**：本期 `App.handleSettingsChange` 仅 `setSettings(next)`，不接 `SettingsService.updateSettings` —— 校验失败的回滚路径由后续 worker 接入 ISS-021 / SettingsService 时一并处理。
+
+### 不采纳
+
+- 把 SettingsPanel 拆到 `src/components/SettingsPage.tsx` + `src/components/settings/`：与既有「模块按 feature 划分」约定（`src/modules/forms/`、`src/modules/ocr/`）不一致；本任务采用「`src/modules/settings/` + 子目录 `sections/`」与现有架构对齐。
+- 引入路由 / lazy import / Suspense 拆分 section：当前 5 section 加起来 < 50KB，未到必须 lazy 的体量；TASKS §"非首屏 section 走 lazy" 留待后续 PR，PM 显式要求时再开。
+- 复制 `src-tauri/icons/128x128.png` 到 `src/assets/`：避免资源重复；Vite 仍能 import `src-tauri/` 下静态资源。
+- 在 metadata.ts 硬编码 GitHub URL / author：违反「不硬编码 URL」约束；全部走 `package.json` 读取。
+- `tauri-plugin-updater` 提前集成：ISS-021 在 v0.3 后续，本期「检查更新」按钮只展示占位文案。
+
+### 范围与影响
+
+- 范围：新增 `src/shared/app/metadata.{ts,test.ts}`、`src/modules/settings/sections/` 14 个文件、`src/modules/settings/SettingsPanel.{tsx,css,test.tsx}` 重写、`src/components/layout/AppShell.tsx` 加 `onSettingsChange` 与 SettingsPanel 顶层挂载、`src/App.tsx` `useState` + `handleSettingsChange` 接线、`src/App.test.tsx` 跟随更新、`src/test/setup.ts` 加 matchMedia polyfill、`package.json` 加 metadata 字段、文档同步（`docs/DECISIONS.md` / `CHANGELOG.md` / `docs/TASKS.md`）。
+- 不影响：`Toolbar.tsx` 维持原状（设置按钮、utility panel 切换契约不变）；`shared/settings/{types,defaults,service}.ts` 契约与 `validateAppSettings` 不动；其他模块（reader / annotation / forms / pages）零修改。
+- 已知限制：
+  - 「检查更新」按钮仅展示占位文案（ISS-021 集成后替换）。
+  - 「快捷键」section 仅展示，不支持编辑（留待后续 ISS）。
+  - 校验错误展示由 SettingsService 调用方处理，浮层内不展示。
+  - 「关于」section 的作者卡无微信公众号二维码图片（说明文字先就位，图片留待后续）。
+  - 浮层未做完整 focus trap（仅打开抢焦点 + 关闭恢复），未来如需 WCAG AAA 可加 `tabindex=-1` trap。
+- 后续：ISS-021 tauri-plugin-updater 集成时，把「检查更新」按钮的 `handleCheckUpdate` 替换为 `checkForAppUpdate`，并把 `App.handleSettingsChange` 接到 `SettingsService.updateSettings` 走持久化。

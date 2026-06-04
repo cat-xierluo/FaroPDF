@@ -1,212 +1,186 @@
-import { useEffect, useMemo, useState } from "react";
-import type { OcrProviderConfig } from "../../shared";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { exportSafeAppSettings } from "../../shared/settings/defaults";
+import type { AppSettings } from "../../shared/settings/types";
 import {
-  exportSafeAppSettings,
-  sanitizeApiKeyRefForStorage,
-  validateAppSettings,
-} from "../../shared/settings/defaults";
-import type { AppSettings, DefaultSavePolicy } from "../../shared/settings/types";
-import type { PdfViewMode } from "../../shared/pdf/types";
+  AboutSection,
+  GeneralSection,
+  OcrProviderSection,
+  ReaderSection,
+  SECTION_LIST,
+  ShortcutSection,
+  type SectionId,
+} from "./sections";
+import "./SettingsPanel.css";
 
 interface SettingsPanelProps {
+  /** 是否打开；为 false 时组件不渲染 portal。 */
+  open: boolean;
+  /** 关闭回调（Esc / 点遮罩 / 点关闭按钮）。 */
+  onClose: () => void;
+  /** 当前 AppSettings；面板不会在内部维护草稿，变更即向上传播。 */
   settings: AppSettings;
+  /** 变更回调：参数为 exportSafe 后的 AppSettings。 */
   onSettingsChange?: (settings: AppSettings) => void;
 }
 
-const savePolicyLabels: Record<DefaultSavePolicy, string> = {
-  "always-export-copy": "始终另存副本",
-  "ask-each-time": "每次询问",
-  "allow-overwrite-with-confirmation": "二次确认后允许覆盖",
-};
+const NARROW_BREAKPOINT = 768;
 
-const viewModeLabels: Record<PdfViewMode, string> = {
-  continuous: "连续",
-  single: "单页",
-  double: "双页",
-  "fit-width": "适合宽度",
-};
+/**
+ * 设置浮层：左侧导航 + 右侧内容，通过 createPortal 渲染到 document.body。
+ *
+ * 设计要点：
+ * - 5 个 section（常规 / 阅读 / OCR provider / 快捷键 / 关于）由 sections/ 子模块提供；
+ * - Esc 与点遮罩关闭；
+ * - 打开时把焦点送到关闭按钮，便于键盘用户；
+ * - 窄屏（< NARROW_BREAKPOINT）时左侧导航折叠为顶部 tab。
+ */
+export function SettingsPanel({ open, onClose, settings, onSettingsChange }: SettingsPanelProps) {
+  const [activeSection, setActiveSection] = useState<SectionId>("general");
+  const [isNarrow, setIsNarrow] = useState<boolean>(() =>
+    typeof window === "undefined" ? false : window.innerWidth < NARROW_BREAKPOINT,
+  );
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
-export function SettingsPanel({ settings, onSettingsChange }: SettingsPanelProps) {
-  const [draft, setDraft] = useState(() => exportSafeAppSettings(settings));
-  const [pendingApiKeyRefs, setPendingApiKeyRefs] = useState<Record<string, string>>({});
-  const defaultProvider = draft.defaultOcrProviderId ?? draft.ocrProviders[0]?.id ?? "";
-  const validation = useMemo(() => validateAppSettings(draft), [draft]);
-
+  // 每次打开时重置到第一个 section，并恢复 / 抢占焦点
   useEffect(() => {
-    setDraft(exportSafeAppSettings(settings));
-  }, [settings]);
-
-  function emitSettingsChange(nextSettings: AppSettings) {
-    const safeSettings = exportSafeAppSettings(nextSettings);
-    setDraft(safeSettings);
-    onSettingsChange?.(safeSettings);
-  }
-
-  function updateSettings(patch: Partial<AppSettings>) {
-    emitSettingsChange({
-      ...draft,
-      ...patch,
-    });
-  }
-
-  function updateProvider(providerId: string, patch: Partial<OcrProviderConfig>) {
-    emitSettingsChange({
-      ...draft,
-      ocrProviders: draft.ocrProviders.map((provider) =>
-        provider.id === providerId
-          ? {
-              ...provider,
-              ...patch,
-            }
-          : provider,
-      ),
-    });
-  }
-
-  function commitApiKeyRef(providerId: string) {
-    const pendingValue = pendingApiKeyRefs[providerId]?.trim();
-    if (!pendingValue) {
+    if (!open) {
       return;
     }
+    setActiveSection("general");
+    previousFocusRef.current = (document.activeElement as HTMLElement | null) ?? null;
+    // portal 挂载后 useEffect 同步触发，ref 已可用；直接 focus 即可。
+    closeButtonRef.current?.focus();
+    return () => {
+      previousFocusRef.current?.focus?.();
+    };
+  }, [open]);
 
-    updateProvider(providerId, {
-      apiKeyRef: sanitizeApiKeyRefForStorage(pendingValue),
-    });
-    setPendingApiKeyRefs((current) => ({
-      ...current,
-      [providerId]: "",
-    }));
+  // 监听窗口宽度，窄屏自动切换为顶部 tab 形式
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const mediaQuery = window.matchMedia(`(max-width: ${NARROW_BREAKPOINT - 1}px)`);
+    const handler = (event: MediaQueryListEvent) => setIsNarrow(event.matches);
+    setIsNarrow(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handler);
+    return () => mediaQuery.removeEventListener("change", handler);
+  }, []);
+
+  // Esc 关闭
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
+  if (!open || typeof document === "undefined") {
+    return null;
   }
 
-  return (
-    <section className="settings-panel">
-      <h2>设置</h2>
-      <label className="field" htmlFor="default-save-policy">
-        <span>默认保存策略</span>
-        <select
-          id="default-save-policy"
-          onChange={(event) => updateSettings({ defaultSavePolicy: event.currentTarget.value as DefaultSavePolicy })}
-          value={draft.defaultSavePolicy}
+  function handleChange(next: AppSettings) {
+    onSettingsChange?.(exportSafeAppSettings(next));
+  }
+
+  const activeSectionDescriptor = SECTION_LIST.find((section) => section.id === activeSection) ?? SECTION_LIST[0];
+
+  return createPortal(
+    <div
+      aria-label="设置对话框"
+      aria-modal="true"
+      className="settings-overlay"
+      data-testid="settings-overlay"
+      role="dialog"
+    >
+      <button
+        aria-label="关闭"
+        className="settings-overlay__backdrop"
+        data-testid="settings-backdrop"
+        onClick={onClose}
+        type="button"
+      />
+      <div className="settings-overlay__panel" data-testid="settings-panel" data-view={isNarrow ? "narrow" : "wide"}>
+        <header className="settings-overlay__header">
+          <h1 className="settings-overlay__title">设置</h1>
+          <button
+            aria-label="关闭设置"
+            className="settings-overlay__close"
+            onClick={onClose}
+            ref={closeButtonRef}
+            type="button"
+          >
+            ×
+          </button>
+        </header>
+
+        {isNarrow ? (
+          <nav aria-label="设置分类（顶部 tab）" className="settings-overlay__topnav" role="tablist">
+            {SECTION_LIST.map((section) => (
+              <button
+                aria-selected={activeSection === section.id}
+                className="settings-overlay__topnav-item"
+                data-active={activeSection === section.id}
+                key={section.id}
+                onClick={() => setActiveSection(section.id)}
+                role="tab"
+                type="button"
+              >
+                {section.label}
+              </button>
+            ))}
+          </nav>
+        ) : (
+          <nav aria-label="设置分类" className="settings-overlay__nav" role="tablist">
+            {SECTION_LIST.map((section) => (
+              <button
+                aria-selected={activeSection === section.id}
+                className="settings-overlay__nav-item"
+                data-active={activeSection === section.id}
+                key={section.id}
+                onClick={() => setActiveSection(section.id)}
+                role="tab"
+                type="button"
+              >
+                {section.label}
+              </button>
+            ))}
+          </nav>
+        )}
+
+        <section
+          aria-label={activeSectionDescriptor.label}
+          className="settings-overlay__content"
+          key={activeSectionDescriptor.id}
+          role="tabpanel"
         >
-          {(Object.keys(savePolicyLabels) as DefaultSavePolicy[]).map((policy) => (
-            <option key={policy} value={policy}>
-              {savePolicyLabels[policy]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field" htmlFor="default-zoom">
-        <span>默认缩放</span>
-        <input
-          id="default-zoom"
-          min="0.25"
-          max="4"
-          onChange={(event) => updateSettings({ defaultZoom: Number(event.currentTarget.value) })}
-          step="0.05"
-          type="number"
-          value={draft.defaultZoom}
-        />
-      </label>
-      <label className="field" htmlFor="default-view-mode">
-        <span>默认阅读模式</span>
-        <select
-          id="default-view-mode"
-          onChange={(event) => updateSettings({ defaultViewMode: event.currentTarget.value as PdfViewMode })}
-          value={draft.defaultViewMode}
-        >
-          {(Object.keys(viewModeLabels) as PdfViewMode[]).map((viewMode) => (
-            <option key={viewMode} value={viewMode}>
-              {viewModeLabels[viewMode]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field" htmlFor="default-ocr-provider">
-        <span>默认 OCR 后端</span>
-        <select
-          id="default-ocr-provider"
-          onChange={(event) => updateSettings({ defaultOcrProviderId: event.currentTarget.value })}
-          value={defaultProvider}
-        >
-          {draft.ocrProviders.map((provider) => (
-            <option key={provider.id} value={provider.id}>
-              {provider.displayName}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="setting-row" htmlFor="network-ocr-confirmation">
-        <input
-          checked={draft.requireNetworkOcrConfirmation}
-          id="network-ocr-confirmation"
-          onChange={(event) => updateSettings({ requireNetworkOcrConfirmation: event.currentTarget.checked })}
-          type="checkbox"
-        />
-        <span>联网 OCR 需要确认</span>
-      </label>
-      <div className="settings-list" aria-label="OCR Provider">
-        {draft.ocrProviders.map((provider) => (
-          <div className="settings-list__row" key={provider.id}>
-            <label htmlFor={`${provider.id}-enabled`}>
-              <input
-                checked={provider.enabled}
-                id={`${provider.id}-enabled`}
-                onChange={(event) => updateProvider(provider.id, { enabled: event.currentTarget.checked })}
-                type="checkbox"
-              />
-              <span>启用 {provider.displayName}</span>
-            </label>
-            <span>{provider.requiresNetworkConsent ? "联网" : "本地"}</span>
-            <span>{provider.enabled ? "已启用" : "未启用"}</span>
-          </div>
-        ))}
+          {activeSectionDescriptor.id === "general" ? (
+            <GeneralSection onChange={handleChange} settings={settings} />
+          ) : null}
+          {activeSectionDescriptor.id === "reader" ? (
+            <ReaderSection onChange={handleChange} settings={settings} />
+          ) : null}
+          {activeSectionDescriptor.id === "ocr" ? (
+            <OcrProviderSection onChange={handleChange} settings={settings} />
+          ) : null}
+          {activeSectionDescriptor.id === "shortcuts" ? (
+            <ShortcutSection onChange={handleChange} settings={settings} />
+          ) : null}
+          {activeSectionDescriptor.id === "about" ? (
+            <AboutSection onChange={handleChange} settings={settings} />
+          ) : null}
+        </section>
       </div>
-      {draft.ocrProviders
-        .filter((provider) => provider.requiresNetworkConsent)
-        .map((provider) => (
-          <section aria-label={`${provider.displayName} 配置`} key={provider.id}>
-            <h3>{provider.displayName}</h3>
-            <label className="field" htmlFor={`${provider.id}-endpoint`}>
-              <span>{provider.displayName} Endpoint</span>
-              <input
-                id={`${provider.id}-endpoint`}
-                onChange={(event) => updateProvider(provider.id, { endpoint: event.currentTarget.value })}
-                placeholder="https://ocr.example/api"
-                type="url"
-                value={provider.endpoint ?? ""}
-              />
-            </label>
-            <label className="field" htmlFor={`${provider.id}-api-key-ref`}>
-              <span>{provider.displayName} API Key 引用</span>
-              <input
-                autoComplete="off"
-                id={`${provider.id}-api-key-ref`}
-                onBlur={() => commitApiKeyRef(provider.id)}
-                onChange={(event) => {
-                  const nextValue = event.currentTarget.value;
-                  setPendingApiKeyRefs((current) => ({
-                    ...current,
-                    [provider.id]: nextValue,
-                  }));
-                }}
-                placeholder={provider.apiKeyRef || "keychain:provider-name 或已脱敏占位"}
-                type="password"
-                value={pendingApiKeyRefs[provider.id] ?? ""}
-              />
-            </label>
-          </section>
-        ))}
-      <section aria-label="最近文件">
-        <h3>最近文件</h3>
-        <p className="panel-placeholder">{draft.recentFiles.length === 0 ? "暂无最近文件" : `${draft.recentFiles.length} 个文件`}</p>
-      </section>
-      {!validation.valid ? (
-        <ul aria-label="设置校验错误">
-          {validation.errors.map((error) => (
-            <li key={error}>{error}</li>
-          ))}
-        </ul>
-      ) : null}
-    </section>
+    </div>,
+    document.body,
   );
 }
