@@ -54,8 +54,8 @@ pub fn extract_pdf_text(pdf_path: &Path) -> Result<Vec<OcrExtractedPage>, OcrTex
         .arg("-layout")
         .arg("-enc")
         .arg("UTF-8")
-        .arg("-")
         .arg(pdf_path)
+        .arg("-")
         .output()
     {
         Ok(output) => output,
