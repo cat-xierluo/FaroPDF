@@ -1043,3 +1043,94 @@ ISS-022 把现有扁平的 `SettingsPanel` 升级为左侧导航 + 多 section �
   - 「关于」section 的作者卡无微信公众号二维码图片（说明文字先就位，图片留待后续）。
   - 浮层未做完整 focus trap（仅打开抢焦点 + 关闭恢复），未来如需 WCAG AAA 可加 `tabindex=-1` trap。
 - 后续：ISS-021 tauri-plugin-updater 集成时，把「检查更新」按钮的 `handleCheckUpdate` 替换为 `checkForAppUpdate`，并把 `App.handleSettingsChange` 接到 `SettingsService.updateSettings` 走持久化。
+
+## DEC-039 ISS-013 第二阶段 v2 落地（真实压缩 + 中文字体）
+
+- 日期：2026-06-04
+- 状态：已采纳
+- 关联任务：ISS-013（第二阶段）
+- 关联分支：`feat/export-real-encoding`
+- 关联 PR：#26
+- DEC 编号承接 DEC-036（v1 延期）→ DEC-037（批注第二阶段）/ DEC-038（设置页）→ DEC-039（本期）
+
+承接 DEC-013 + DEC-023 + DEC-036（scope-fontkit 延期），按 DEC-036 重启条件落实 ISS-013 第二阶段。
+
+### 1. fontLoader + 中文字体资源
+
+- 新增 `src/shared/pdf/fontLoader.ts`：
+  - `FontBytesLoader` 抽象 + `embedChineseFont(pdfDoc, options)` 入口
+  - `containsCjk(text)` 字符检测（CJK Unicode 范围 + 半角 → 全角 + 假名）
+  - `getFontkit()` 懒加载 + 缓存 `@pdf-lib/fontkit` 实例
+  - `registerFontkitForDocument(pdfDoc, fontkitInstance)` 显式注册到 pdf-lib
+  - vitest 1.x 默认不解析 Vite `?arraybuffer` 资源，默认 loader 加 `readFileSync` fallback
+- 中文字体资源：
+  - 选 **思源黑体 SC Regular**（`SourceHanSansSC-Regular.otf`，16.5MB，OFL 1.1 协议）
+  - 来源：adobe-fonts/source-han-sans GitHub release
+  - 路径：`assets/fonts/SourceHanSansSC-Regular.otf`
+  - 协议：复制 OFL 1.1 全文到 `assets/fonts/LICENSE-SourceHanSans.txt`
+- `@pdf-lib/fontkit` 安装为 devDep（pdf-lib 官方 devDep，npm install 自动改 `package.json` + `package-lock.json`，按 DEC-036 重启条件允许）
+
+### 2. compressionService 真实压缩
+
+- 新增 `src/modules/export/compressionService.ts`：
+  - `compressPdf(bytes, options)` 入口：走 `PDFDocument.save({ useObjectStreams: options.useObjectStreams ?? true })`
+  - 输出 `{ bytes, ratio, imageInventory, originalBytes, compressedBytes }` 元数据
+  - `imageInventory`：`{ imageCount, flateDecodeCount, dctDecodeCount, otherCount }`，按 PDF 资源树遍历 page → XObject → 统计 Subtype=/Image
+  - **图像重采样** 计划为 plan-only fallback：当前 pdf-lib 不直接提供 image 重新编码能力，CMYK/JPEG 保留原图
+- 集成到 `pdfOperationEngine.ts`：
+  - `mode: "apply"` 走真实 `compressPdf`，label 包含 `court-upload (ratio 0.42)` 格式
+  - `mode: "plan-only"` 仍记录计划摘要（不报错）
+  - 修 `PDFDict.lookup` 防御：先 `instanceof PDFDict` 判断再操作
+  - 修 `PDFName.encodedName` 私有属性 → 改用 `toString()` 公开 API
+
+### 3. fontAwareWatermark + 中文水印
+
+- 新增 `src/modules/export/fontAwareWatermark.ts`：
+  - `resolveTextFont(pdfDoc, text, options)` 路由：CJK → `embedChineseFont`、Latin → `StandardFonts.Helvetica`
+  - 测试支持注入 `chineseFontBytes` / `chineseFontLoader` override
+- 集成到 `pdfOperationEngine.ts`：
+  - watermark / page-number / bates 路径全部改走 `resolveTextFont`
+  - CJK 字符（"机密文档" / "第 1 页 / 共 1 页" / "合同-1-号"）自动用思源黑体
+  - 中文 stamp label 仍 fallback Helvetica（pdf-lib 标准字体不支持 CJK）
+
+### 4. Bates 默认行为修正
+
+- `normalizeBatesDigits(undefined)` 默认值 6 → 0（**PM 修**：worker 默认 6 与测试期待 0 矛盾）
+- 0 表示无 0-pad（"合同-1-号"），6 表示 6 位 0-pad（"合同-000001-号"）
+- 显式传 `digits` 字段不受影响
+
+### 5. 验证
+
+- `npm run typecheck` ✅
+- `npm test -- --run` ✅ 69 文件 / 621 测试全过（19 项新测试：fontLoader 9 + compressionService 4 + fontAwareWatermark 6）
+- `npm run build` ✅
+- `cargo check` ✅
+
+### 6. 已知限制
+
+- vitest 1.x 不支持 Vite `?arraybuffer` 资源，fontLoader 加 `readFileSync` fallback 兜底；生产环境（vite build）走 `?arraybuffer` 正常路径
+- 图像重采样是 plan-only fallback：CMYK / JPEG / FlateDecode 之外的 Filter 走原图，pdf-lib 不提供 embed 时降采样 API
+- stamp 文字使用 Helvetica，中文 stamp label 静默跳过文字（保留边框）
+- 字体未做 subset 优化（`{ subset: true }` 已加但 16MB → PDF 输出仍较大），后续按需优化
+- fontkit 实例全局缓存，多 PDF 文档间共享，不支持 per-document override
+
+### 7. 范围与依赖
+
+- 修改：`package.json` + `package-lock.json`（加 `@pdf-lib/fontkit` devDep）+ `src/shared/pdf/fontLoader.ts` + `src/modules/export/compressionService.ts` + `src/modules/export/fontAwareWatermark.ts` + `src/modules/export/pdfOperationEngine.ts` + `src/modules/export/pdfOperationEngine.test.ts` + `src/shared/pdf/export.ts` + `src/vite-env.d.ts` + `docs/DECISIONS.md` + `CHANGELOG.md` + `docs/TASKS.md` + `docs/ROADMAP.md`
+- 新增：`assets/fonts/SourceHanSansSC-Regular.otf` + `assets/fonts/LICENSE-SourceHanSans.txt`
+- 不修改：`Toolbar.tsx` / `App.tsx` / 全局样式 / 路由 / `src-tauri/Cargo.toml`（沿用 pdf-lib）
+- 不破坏：现有导出 operation 的 plan-only 行为（mode=plan-only 仍工作）
+
+### 8. PM 自主决策痕迹
+
+按 SKILL v1.9.7 防逃逸门禁例外（用户授权"可以按照你的思路去推进吧"）+ worker 留下 4 个 typecheck/test bug，PM 收口时修了 10 处（保持 worker 提交语义不变）：
+- fontLoader.ts：fontkit namespace import + readFileSync fallback
+- vite-env.d.ts：加 `?arraybuffer` 模块声明
+- compressionService.ts：`PDFDict` 防御 + `PDFName.toString()` 改公开 API
+- pdfOperationEngine.ts：`normalizeBatesDigits` 默认 6 → 0
+- fontLoader.test.ts + fontAwareWatermark.test.ts：Object.assign 类型断言
+- compressionService.test.ts：删未用 import
+- fontAwareWatermark.test.ts：`await PDFDocument.create()` 修 async 误用
+- pdfOperationEngine.test.ts：删 apply 模式 plan-only warning 矛盾
+
+修后 4 件套全绿（typecheck / 621 tests / build / cargo check）。

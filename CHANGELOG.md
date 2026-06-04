@@ -1,5 +1,15 @@
 ## 0.1.0-alpha.8 - 2026-06-04
 
+- 导出真实压缩 + 中文字体（DEC-039 / ISS-013 第二阶段）：按 DEC-036 重启条件落地，fontkit devDep + 思源黑体 SC（OFL 1.1）+ pdfOperationEngine 集成 CJK 水印 / 中文页码 / 中文 Bates + 真实压缩取代 plan-only。
+  - `src/shared/pdf/fontLoader.ts`：`FontBytesLoader` 抽象 + `embedChineseFont(pdfDoc, options)` + `containsCjk(text)` + `getFontkit()` 懒加载 + `registerFontkitForDocument` + vitest 1.x `readFileSync` fallback；9 项单测。
+  - `assets/fonts/SourceHanSansSC-Regular.otf`（16.5MB，OFL 1.1）+ `assets/fonts/LICENSE-SourceHanSans.txt`（协议全文）；中文字体协议合规。
+  - `@pdf-lib/fontkit` 安装为 devDep（pdf-lib 官方 devDep，README §645 明确要求），自动改 `package.json` + `package-lock.json`。
+  - `src/modules/export/compressionService.ts`：`compressPdf(bytes, options)` 走 `PDFDocument.save({ useObjectStreams: true })`；输出 `{ bytes, ratio, imageInventory }`；图像重采样 plan-only fallback；4 项单测。
+  - `src/modules/export/fontAwareWatermark.ts`：`resolveTextFont(pdfDoc, text, options)` 路由 CJK → `embedChineseFont`、Latin → `StandardFonts.Helvetica`；6 项单测。
+  - `src/modules/export/pdfOperationEngine.ts` 集成：watermark / page-number / bates 全部改走 `resolveTextFont`；compress apply 模式走 `compressPdf`；修 `PDFDict` 防御 + `PDFName.toString()` 改公开 API；`normalizeBatesDigits` 默认 6 → 0。
+  - `src/vite-env.d.ts`：加 `?arraybuffer` 模块声明（vitest 1.x 兼容性）。
+  - 19 项新测试通过；总测试 69 文件 / 621 通过；typecheck / build / cargo check --offline 全绿。
+  - 已知限制：vitest 不解析 Vite `?arraybuffer` 资源（生产正常）；CMYK / JPEG 走原图；stamp 文字 Helvetica 不支持 CJK 静默跳过；fontkit 全局缓存。
 - 批注深化第二阶段（DEC-037 / ISS-026）：新增批注侧边栏 4 维度分组与搜索/筛选、批注 → PDF 真实绘制导出、AnnotationSidebar 独立组件。
   - `src/modules/annotation/sidebarGroups.ts`：`AnnotationSidebarGroupBy = "page" | "color" | "type" | "label"` 4 维度分组纯函数 + `applyAnnotationSidebarFilters` 组合 query / types / pageNumbers / colors / labels 多 chip 筛选 + `deriveAnnotationLabel` 单来源标签提取 + `collectAnnotationLabelChoices` / 6 色 / 9 类型 chip 选项 + `sidebarFiltersFromSearch` / `sidebarFiltersToSearch` 互转；28 项单测覆盖。
   - `src/modules/annotation/annotationPdfWriter.ts`：`writeAnnotationPdf({ sourceBytes, sidecar, sourceFingerprint? })` 入口用 `pdf-lib` 真实绘制 9 种批注（highlight / underline / strikeout / note / textbox / rectangle / arrow / ink / stamp）；3/6 位 hex 颜色解析；越界 rect 自动 clamp；非法颜色 / 缺字段 / clamp 后面积为 0 / 中文 WinAnsi 字符等单批注跳过并记录原因；pageIndex 越界、pageCount 不一致、fingerprint 不匹配、schemaVersion 不匹配、空 / 非法 PDF 在调用方层抛错并脱敏；输出 PDF 元数据写入 `faropdf:annotation-flattened` 等关键字；`summary` 包含 drawnCount / skippedCount / pageDrawCounts / fingerprintChecked；建议输出名 `*-annotated.pdf`；20 项单测覆盖。
