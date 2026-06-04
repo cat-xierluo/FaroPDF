@@ -1364,3 +1364,29 @@ const ocrController = useOcrWorkspaceController(
 - `useOcrWorkspaceController` 一次性锁定 controller / bridge（首挂载后不再重新注入），切到 ocr 模式后想替换需要刷新 App。
 - 任务状态轮询间隔 1500ms 写死；高频 OCR 场景可由后续 worker 把 `pollIntervalMs` 接入设置页。
 - `OcrQualityReportView` 在选中任务无 quality 时显示"尚未生成质量报告"占位（沿用既有组件行为，未新增"质量报告生成中"占位，等 `extract_ocr_text` 联动 UI 单独推进）。
+
+## DEC-043 doc-curator symlink 治理决策（ISS-024 首跑基线调整）
+
+### 1. 背景
+
+ISS-024 任务卡在「下一步」一节写明「`.claude/skills/` 默认被 `.gitignore` 忽略，需用 `git add -f` 强制跟踪该子目录；按 git-workflow 多模块规则拆 commit；推 main 后跑首跑基线脚本」。
+
+PM 在 Wave 4 启动前直接处理 ISS-024 时发现工程现实与该计划冲突：
+
+- `.claude/skills/doc-curator` 在本仓库是 symlink，target 指向 `~/Library/Application Support/maoscripts/skills/legal-skills/private-skills/doc-curator`，是用户本机私有的 skill 库。
+- `git add -f .claude/skills/doc-curator` 只会跟踪 symlink 本身（git 不跟随 symlink 进 target），等于把用户机器特定路径固化到公共仓库。
+- 由于 `.gitignore` 的 `.claude/skills/` 规则对所有协作者生效，其他开发者 clone 这个仓库时，doc-curator 的 symlink 仍不会出现在他们本地，跟踪 symlink 没有可移植收益。
+- 真要让团队成员都能用 doc-curator，需要把 symlink 替换为真目录副本（去掉对 `private-skills/` 的外部依赖），这是项目级 skill 治理决策。
+
+### 2. 决策
+
+- 撤销 ISS-024 「下一步」中 `git add -f` 跟踪 symlink 的动作；本机 doc-curator 工具通过 symlink 独立使用，不入仓。
+- 跑 `bash .claude/skills/doc-curator/scripts/first-baseline.sh` 在本机建立基线（写入 symlink target 下的 `state.json`，仓库不可见，不污染）。
+- ISS-024 状态从「待 git add -f 强跟踪 + 首跑基线」调整为「symlink 独立使用 + 项目级 skill 治理另案」。
+- 项目级 skill 治理（`private-skills/` vs 仓库内置 vs 选择性 fork 副本）作为单独议题，由 ISS-024 子项或新 ISS 处理，不在本次 Wave 4 范围。
+
+### 3. 后续路径
+
+- 本轮不再跟踪 doc-curator symlink；本机 `state.json` 已经在 symlink target 下建好基线（CHANGELOG.md 167 / docs/DECISIONS.md 1366 / docs/TASKS.md 257 / docs/ARCHITECTURE.md 733 / docs/DESIGN.md 192 / docs/ROADMAP.md 140 / README.md 68 / AGENTS.md 102）。
+- 团队层面是否要把 doc-curator 真目录化（与 `.claude/agents/doc-curator.md` 一并入仓）由 PM 后续单独评估。
+- 同步更新 `docs/TASKS.md` ISS-024 任务卡的「下一步」和进度日志。
