@@ -148,8 +148,7 @@ describe("AnnotationToolbar", () => {
 });
 
 describe("AnnotationToolbar stamp 模板预览（ISS-026 stage 4 milestone 3）", () => {
-  test("激活图章工具时，每个 stamp 按钮内嵌 SVG 预览节点", async () => {
-    const user = userEvent.setup();
+  test("激活图章工具时，每个 stamp 按钮内嵌 SVG 预览节点", () => {
     render(
       <AnnotationToolbar
         onStateChange={() => undefined}
