@@ -10,6 +10,11 @@ import {
 import { createInitialReaderState, readerReducer } from "./readerState";
 import { applyZoomPresetId, clampZoom } from "./viewMode";
 
+interface CachedFile {
+  name: string;
+  bytesPromise: Promise<Uint8Array>;
+}
+
 export interface UseReaderControllerOptions {
   /** 注入 session 存储；测试时可传内存版 */
   sessionStorage?: ReaderSessionStorage;
@@ -17,6 +22,7 @@ export interface UseReaderControllerOptions {
 
 export function useReaderController(settings: AppSettings, options: UseReaderControllerOptions = {}) {
   const loadedDocumentRef = useRef<LoadedPdfDocument | null>(null);
+  const cachedFileRef = useRef<CachedFile | null>(null);
   const loadRequestIdRef = useRef(0);
   const sessionStorageRef = useRef<ReaderSessionStorage>(options.sessionStorage ?? createDefaultReaderSessionStorage());
   const sessionRestoredRef = useRef<string | null>(null);
@@ -36,6 +42,10 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     sessionRestoredRef.current = null;
     dispatch({ type: "reader/loadStarted", payload: { fileName: file.name } });
 
+    // 在发起 PDF.js 加载之前缓存 file bytes 引用，便于 forms 模式工具等场景复用同一份源 bytes。
+    const bytesPromise = file.arrayBuffer().then((buffer) => new Uint8Array(buffer));
+    cachedFileRef.current = { name: file.name, bytesPromise };
+
     try {
       await loadedDocumentRef.current?.destroy();
       const loadedDocument = await loadPdfFromFile(file);
@@ -54,6 +64,7 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
         return;
       }
 
+      cachedFileRef.current = null;
       dispatch({
         type: "reader/loadFailed",
         payload: { errorMessage: error instanceof Error ? error.message : "无法打开 PDF" },
@@ -211,6 +222,47 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     return loadedDocument.renderThumbnail(pageIndex, canvas, maxWidth);
   }, []);
 
+  /**
+   * 返回当前打开的 PDF 源字节副本。无文档时返回 null；底层使用 openFile 时缓存的 arrayBuffer，
+   * 避免再次读取 file。同一文件被多次调用时共用同一 bytesPromise 但消费方各自 copy 出独立 Uint8Array。
+   */
+  const getFileBytes = useCallback(async (): Promise<Uint8Array | null> => {
+    const cached = cachedFileRef.current;
+    if (!cached) {
+      return null;
+    }
+    return cached.bytesPromise;
+  }, []);
+
+  /** 返回当前打开的源文件名（仅用于导出时的默认命名），无文档时返回 null。 */
+  const getCurrentFileName = useCallback((): string | null => {
+    return cachedFileRef.current?.name ?? null;
+  }, []);
+
+  /**
+   * 把处理后的 PDF 字节保存为新文件。默认走浏览器 `<a download>`，不依赖 Tauri；
+   * 调用方负责提供 suggestedFileName（建议形如 `<原名>-<操作>.pdf`）。
+   */
+  const saveUpdatedBytes = useCallback(async (bytes: Uint8Array, suggestedFileName: string): Promise<void> => {
+    if (typeof document === "undefined" || typeof URL === "undefined") {
+      throw new Error("当前环境不支持浏览器下载，无法保存更新后的 PDF。");
+    }
+    const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    try {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = suggestedFileName;
+      link.rel = "noopener";
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, []);
+
   return {
     state,
     openFile,
@@ -230,6 +282,9 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     getPageText,
     renderPageToCanvas,
     renderThumbnail,
+    getFileBytes,
+    getCurrentFileName,
+    saveUpdatedBytes,
   };
 }
 

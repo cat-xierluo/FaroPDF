@@ -757,6 +757,87 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 - 2026-06-03：在 `feat/reader-toolbar-refactor` 推进 DEC-032 ReaderToolbar 注册表基础设施：新增 `src/components/layout/toolbarRegistry.ts`（`ToolbarState` / `ToolbarToolItem` 类型 + `registerModeTools` / `getModeTools` / `_resetToolbarRegistry` 函数）和 9 项单元测试；`Toolbar.tsx` 末尾新增 `ModeActiveTools` 组件，挂在 `toolbar__group--modes` 内 4 个 mode 入口按钮之后，按 `getModeTools(activeMode).slice().sort()` 渲染当前 mode 工具；activeMode="read" 时为 `[]`，UI 与重构前一致；typecheck / 332 项测试 / build 三件套全绿。后续 W3 Forms / W4 Reader modes worker 在各自模块内 `registerModeTools("<mode>", [...])` 即可接入 mode 工具，不再改 Toolbar.tsx。
 - 2026-06-03：在 `feat/page-organizer-suite` 推进 DEC-033 page-organizer-suite 第二阶段（ISS-006 + ISS-018 真实改写）：原 PR #21 commit 63220eb 写的 DEC-032 段与 PR #20 冲突（PR #20 的 DEC-032 已被 reader-toolbar 占用），PM rebase 时改为 DEC-033。
 
+## DEC-035 ISS-008 表单填写与签署第一版方案
+
+- 日期：2026-06-04
+- 状态：已采纳
+- 关联分支：`feat/forms-signing`
+- 关联任务：ISS-008
+- DEC 编号说明：原 commit 53c91dc 写时用 `DEC-034`（base 是 59594d6 拉的无此编号），与已合并的 `DEC-034 阅读模式深化`（feat/reader-modes / PR #22）冲突；PM rebase 时改为 `DEC-035` 释放已占用编号。
+
+承接 ISS-005 PDF 导出引擎和 ISS-002 阅读底座，本决策记录表单填写与签署第一版的边界，按 DEC-032 §"W3 Forms 接入指南"在 forms 模块内 `registerModeTools("forms", [...])` 注册 mode 工具按钮，**不**修改 `src/components/layout/Toolbar.tsx`。
+
+### 契约扩展（`src/shared/pdf/form.ts`）
+
+- 已有 `PdfFormField` / `PdfFormState` / `PdfFormFillingInput` / `PdfSignatureInput` / `validateXxx` 全部保留，向后兼容。
+- 新增 `PDF_FORM_OPERATION_TYPES` 常量 + `PdfFormOperationType` 字面量联合（`"fill" | "sign" | "flatten"`）。
+- 新增 `PdfFormOperation` 联合类型：
+  - `PdfFormFillOperation { id, type: "fill", fieldId, value }`
+  - `PdfFormSignatureOperation { id, type: "sign", fieldId, imageBytes, imageType }`
+  - `PdfFormFlattenOperation { id, type: "flatten" }`
+- 新增 `PdfFormFlattenSummary { fieldCountBeforeFlatten, fieldCountAfterFlatten, flattened }`。
+- 新增 `PdfFormBatchRequest { id, pdfBytes, operations, requestedAt }` + `PdfFormBatchResult { id, bytes, appliedCount, failedCount, results, completedAt }`。
+- 新增 `PdfFormOperationResult` 联合（`applied` / `failed` 两种状态 + 各 operation 类型的 success payload）。
+- 新增 helper：`isPdfFormOperationType` / `isPdfFormOperation` / `validateFormBatchRequest`；后者要求 operations 非空，避免 `Array.every` 在空数组上 vacuously true。
+
+### `formService` execute 能力升级（`src/modules/forms/formService.ts`）
+
+- 修 `mapFormField` 的 `pageIndex`：之前硬编码 0，现在构造 `PDFDict → pageIndex` 查找表 —— 关键点：`page.node.Annots()` 元素是 `PDFRef`，而 `widget.dict` 是 `PDFDict`，必须 `context.lookup(ref, PDFDict)` 解析后才能比较引用相等。
+- `signField` 复用同一 pageIndexMap，避免每次签名都遍历所有 page。
+- 新增 `flattenForm(pdfBytes) → { bytes, summary }`：调用 pdf-lib `form.flatten()`，并产出 before / after 字段数。
+- 新增 `applyFormOperations(request) → PdfFormBatchResult`：单次 `PDFDocument.load` 后按数组顺序执行每条 operation，**单条失败封装为 `status: "failed"` 结果不中断后续**；最终一次性 `pdf.save()` 输出新 bytes + appliedCount / failedCount + completedAt。
+
+### Reader 扩展（`src/modules/reader/useReaderController.ts`）
+
+- `openFile` 时缓存 `file.arrayBuffer()` Promise 到 `cachedFileRef`，加载失败时清空。
+- 新增 `getFileBytes()` / `getCurrentFileName()` / `saveUpdatedBytes(bytes, suggestedFileName)` 三个方法。
+- `saveUpdatedBytes` 用浏览器原生 `<a download>` + `URL.createObjectURL`，不依赖 Tauri command；建议文件名由 `forms` 模块用 `<原名>-<操作>.pdf` 模板生成。
+- reader 仍是单一实例；多 controller 并存时各自缓存独立的 file bytes 引用。
+
+### Forms mode 工具接入（DEC-032 §"W3 Forms" 指南落地）
+
+- `src/modules/forms/activeFormController.ts` 提供模块级 setActiveFormController / getActiveFormController 桥：因为 `ToolbarState` 只暴露 `{ activeMode, reader, search }`，mode 工具 onClick 闭包拿不到 controller，桥让 worker 不修改 ToolbarState 类型。
+- `src/modules/forms/registerFormsToolbarTools.ts` 注册 4 个 mode 工具到 `forms` 命名空间：
+  - `forms.refresh`（order=10）→ `controller.refreshFormState()`
+  - `forms.fill`（order=20）→ `controller.openPanel("fill")`
+  - `forms.signature`（order=30）→ `controller.openPanel("sign")`
+  - `forms.flatten`（order=40）→ `controller.flattenAndSave()`
+  - 全部 `modeId: "forms"`、`isDisabled: (state) => !state.reader.state.document`、onClick 闭包通过桥调 controller。
+- `src/modules/forms/FormProvider.tsx` 是顶层 Provider：
+  - useEffect 注册 controller 到模块级桥，卸载时清空；
+  - useEffect 在 `activeMode === "forms"` 时调 `registerFormsToolbarTools()`；
+  - 渲染 children + 仅在 forms mode 挂载 `FormsPanel`。
+
+### `useFormController` + `FormsPanel`
+
+- `useFormController` 维护 formState / loading / errorMessage / successMessage / panelMode / selectedFieldId / draftValue / signatureImageBytes / signatureImageType；`reader.state.document?.documentId` 变化时 reset 全部状态。
+- 提供 `refreshFormState` / `openPanel` / `closePanel` / `selectField` / `setDraftValue` / `setSignatureImage` / `clearSignatureImage` / `applyFieldEdit` / `applySignature` / `flattenAndSave` / `applyBatchAndSave` / `setErrorMessage` / `clearMessages` 13 个动作；`applyFieldEdit` 和 `applySignature` 完成后调 `saveUpdatedBytes` 触发浏览器下载，再重新 `readFormFields` 刷新 state。
+- `FormsPanel`（`src/modules/forms/ui/FormsPanel.tsx` + `FormsPanel.css`）是绝对定位浮层（不修改 `src/styles/app.css`），按字段类型分组渲染 + 填值编辑器（text / dropdown / checkbox / radio）+ 签名图片选择（PNG / JPG）；错误 / 成功提示走独立 alert / status 区域。
+
+### 测试
+
+- `src/shared/pdf/form.test.ts`：16 项（新增 isPdfFormOperationType / isPdfFormOperation / validateFormBatchRequest 三组 helper 校验）
+- `src/modules/forms/formService.test.ts`：21 项（新增多页 pageIndex 真实值、flattenForm、applyFormOperations 顺序执行 / 失败不中断 / 空 operation / 空 bytes 抛错 6 个用例）
+- `src/modules/forms/activeFormController.test.ts`：4 项模块级桥
+- `src/modules/forms/registerFormsToolbarTools.test.ts`：9 项注册 / onClick 桥 / 顺序
+- `src/modules/forms/useFormController.test.tsx`：16 项 controller 行为（refresh / fill / sign / flatten / batch / 错误 / 成功 / 文档切换重置）
+- `src/modules/forms/ui/FormsPanel.test.tsx`：16 项 UI 渲染 / 交互
+- 全部 82 项新测试通过；总测试数 419 / 419（typecheck / build / cargo check --offline 全绿）
+
+### 范围与依赖
+
+- 修改：`src/shared/pdf/form.ts` + `src/shared/pdf/form.test.ts` + `src/shared/index.ts` + `src/modules/forms/**`（新增 + 扩展）+ `src/modules/reader/useReaderController.ts` + 对应测试。
+- 不修改：`src/components/layout/Toolbar.tsx`（按 DEC-032 §"W3 Forms"指南用 `registerModeTools("forms", [...])` 接入）、`src/App.tsx` / 全局样式 / 路由、`package.json` / 锁文件、`src-tauri/Cargo.toml`、reader 已有公共 API 形状。
+- **不**改 `AppShell.tsx` 的 ContextToolbar / UtilityPanel 槽位 —— Toolbar 工具条已通过 `ModeActiveTools` 渲染 4 个 forms mode 工具，FormsPanel 走绝对定位浮层，不依赖 utility panel。
+- 不引入新 crate / 新 npm 包（签名图片 / 下载走浏览器原生 API）。
+
+### 已知限制
+
+- 当前 FormsPanel 是绝对定位浮层（fixed top:72 right:16），在窄屏（< 360px）会与主工具栏重叠；后续 layout worker 在 `feat/pdf-expert-shell-ia` 收口时可换 utility panel 路径。
+- 签名图片必须 PNG / JPG（pdf-lib embedPng / embedJpg 不支持其他格式）；FormsPanel 在用户选非 PNG / JPG 时通过 setErrorMessage 提示。
+- 扁平化后源 PDF 仍保留 `textLayerStatus: "missing"` 不会重新标记；后续如需要扁平化后自动 re-OCR 走 `feat/ocr-bridge` 的统一接口。
+- 浏览器 `<a download>` 一次只触发一个文件；如果未来需要批量导出（多份填写版），需要切换到 Tauri save dialog。
+
 ## DEC-033 page-organizer-suite 第二阶段（ISS-006 + ISS-018 真实改写）
 
 - 日期：2026-06-03
@@ -779,7 +860,6 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 - ISS-018 行布局（per_page=4 拆成 2×2）按 DEC-005 决定继续保留单行算法。
 - 真实目录拾取 / 文件对话框：仍由后续 UI worker 接入 toolbar，本分支只暴露 executor 给前端的 `createImagePackExportRequest`（后续 PR 提）。
 - OCR / 扫描模块、Tauri command、PR 推送：本期按 worker 协议不推送，待 PM 合 review 后再发。
->>>>>>> cc53cd9 (chore(docs): DEC-032 + CHANGELOG 0.1.0-alpha.6 + TASKS 进度日志)
 
 ## DEC-034 阅读模式深化（连续/单页/双页/适合宽度 + 缩放/旋转/键盘翻页）
 

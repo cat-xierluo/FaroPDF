@@ -78,11 +78,24 @@ export type {
   PdfSignatureField,
   PdfSignatureImageType,
   PdfSignatureInput,
+  PdfFormFlattenSummary,
+  PdfFormOperation,
+  PdfFormOperationType,
+  PdfFormFillOperation,
+  PdfFormSignatureOperation,
+  PdfFormFlattenOperation,
+  PdfFormOperationResult,
+  PdfFormBatchRequest,
+  PdfFormBatchResult,
 } from "./pdf/form";
 export {
   PDF_FORM_FIELD_TYPES,
+  PDF_FORM_OPERATION_TYPES,
   isPdfFormFieldType,
+  isPdfFormOperationType,
+  isPdfFormOperation,
   validateFormFillingInput,
+  validateFormBatchRequest,
   validateSignatureInput,
 } from "./pdf/form";
 export type {
