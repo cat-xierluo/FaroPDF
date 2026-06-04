@@ -29,6 +29,7 @@
 - 4 件套验证：`npm run typecheck` / `npm run build` / `npm test -- --run` / `cargo check --manifest-path src-tauri/Cargo.toml --offline` 全绿。
 - 已知限制：FormsPanel 是绝对定位浮层（fixed top:72 right:16），在窄屏（< 360px）会与主工具栏重叠；签名图片必须 PNG / JPG；扁平化后源 PDF 仍保留 `textLayerStatus: "missing"` 不会重新标记；浏览器 `<a download>` 一次只触发一个文件。
 - 同步 `docs/DECISIONS.md` DEC-035（ISS-008 表单填写与签署第一版方案，DEC 编号承接 DEC-034 阅读模式深化后 +1）；`docs/TASKS.md` 进度日志追加对应记录。
+- ISS-013 第二阶段（真实压缩 + 中文字体）按 DEC-036 延期：Wave 3 W5 worker 在 `feat/export-real-encoding` 启动后即触发 scope-fontkit 物理冲突（pdf-lib 嵌入自定义字体需 `@pdf-lib/fontkit`，与 worker prompt 的"不修改 package.json / 不引入 npm 字体包"约束冲突），worktree 清理。重启条件：worker prompt 显式声明 `@pdf-lib/fontkit` 是 pdf-lib 官方 devDep 可装 + 选开源协议中文字体（OFL / Apache 2.0 / MIT）下载到 `assets/fonts/`，且 PM 兜底。ISS-013 状态保持"已完成交付工具导出底座第一版"，第二阶段从"延期"标签继续。
 
 ## 0.1.0-alpha.6 - 2026-06-03
 

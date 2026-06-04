@@ -891,3 +891,50 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 - rotation 通过 CSS `transform: rotate()` 旋转 section，未在 PDF.js 渲染阶段（`getViewport({ scale, rotation })`）传 rotation — 这样会让 canvas 像素本身正确旋转；本期保留 CSS 旋转，理由是 pdf-lib 不参与 canvas 渲染、PDF.js 渲染已能正确处理内嵌 rotation；后续若发现宽高 swap 不准确再切到 PDF.js 原生 rotation 参数。
 - 缩放预设的「适合页面」目前用 `viewMode = "single"` + 保留当前 zoom，由渲染层在 `ResizeObserver` 触发时把 effectiveZoom 算到 container size 上后写回 `document.zoom`；本期先实现 UI 入口 + 缩放计算函数，写回动作由下一批 UI worker 接入。
 
+## DEC-036 ISS-013 第二阶段（真实压缩 + 中文字体）延期与 scope-fontkit 决策
+
+- 日期：2026-06-04
+- 状态：已采纳（延期）
+- 关联任务：ISS-013（导出真实图像重编码 + 中文字体）
+- 关联分支：`feat/export-real-encoding`（Wave 3 W5 / 2026-06-04 启）
+
+### 背景
+
+ISS-013 第一版已在 main（PR 合并见 DEC-013 段 2026-06-02 进度日志 + DEC-005 / DEC-013），文字/图片水印、页码和 Bates 编号导出 operation 走 pdf-lib 真实写入，压缩维持 plan-only，水印字体仅 Latin-1。Wave 3 W5 worker 在 `feat/export-real-encoding` 启动后第一动作验证完 worker isolation gate 即触发 scope-fontkit 物理冲突，停在 `status: "blocked" / phase: "scope-conflict"`，未进入实现阶段。
+
+### 物理冲突
+
+- 目标：导出引擎真实图像重编码 + 中文字体支持（中文水印 / 中文页码 / 中文 Bates）。
+- pdf-lib 1.17.1 嵌入自定义字体必须安装 `@pdf-lib/fontkit`（pdf-lib 官方 devDep，README §645 明确：`pdf-lib relies on @pdf-lib/fontkit ... You must add the @pdf-lib/fontkit module to your project and register it using pdfDoc.registerFontkit(...) before embedding custom fonts.`）。
+- 当前 `package.json` / `package-lock.json` 没有 `@pdf-lib/fontkit` 传递依赖，`node_modules/@pdf-lib/` 目录下仅有 `standard-fonts` / `upng`，缺 fontkit。
+- Wave 3 W5 worker prompt 写有"不修改 `package.json` / 不引入 npm 字体包 / 用纯 pdf-lib + 系统字体路径"约束，与"中文水印 / 中文页码 / 中文 Bates"目标物理冲突：纯 pdf-lib + 系统字体路径仍需 fontkit 解析 OTF/TTF 表，绕不开。
+- 三种选项及决策：
+  1. **添加 `@pdf-lib/fontkit` 作为 devDep**（推荐方向，技术上唯一可行）：npm install + 改 package.json + package-lock.json + 1 个新依赖（~50KB），可直接走标准 pdf-lib embedFont 路径支持 OTF/TTF。
+  2. **放弃中文字体，只做真实压缩**（窄范围收口）：完成 ISS-013 第二阶段 = 真实压缩（pdf-lib `PDFDocument.save({ useObjectStreams: true })` + 图像重采样），中文字体延后到后续 task。
+  3. **走 macOS 系统字体路径**（`/System/Library/Fonts/`）：需为每个平台写字体解析器（macOS TTC collection / Windows TT / Linux TTF），且无 fontkit 仍无法 parse 字体表，不实用。
+
+### 决定
+
+- **延期**ISS-013 第二阶段到下一波 worker（有 PM 兜底时再启），原因：
+  1. Wave 3 W5 worker 在 bootstrap 阶段即停，未产出实现，无可收口产物；当前 wave 3 已收口 2 个 PR（#22 阅读模式深化 / #23 表单填写与签署），整体推进度足够。
+  2. 选项 1（添加 `@pdf-lib/fontkit`）需要在 worktree 内 `npm install` + 改 `package.json` / `package-lock.json`，超出"不修改 `package.json`"原约束；应由 PM 在重启 worker 时显式放开约束并明确 fontkit 是 pdf-lib 官方 devDep，不算"npm 字体包"——下一波 worker 启前必须重写 prompt。
+  3. 选项 2 拆分会破坏任务完整性（中文字体与真实压缩都需要 fontkit 路径，拆开后两半都做不深）；不如整段延后。
+  4. 选项 3 工程上不实用。
+- **当前状态保留**：`feat/export-real-encoding` worktree 在 `59594d6`（base 落后 main 2 commit），无业务 commit；STATUS.json `status: "blocked"`，issue 列表保留 scope-fontkit 三选项备查。
+- **关闭 worktree / tmux session / 分支**：`git worktree remove` + `git branch -D feat/export-real-encoding`（本地不推送）。
+- **下一波重启条件**：有人值守 + 重写 worker prompt 明确"@pdf-lib/fontkit 是 pdf-lib 官方 devDep，可装；选开源协议中文字体（OFL / Apache 2.0 / MIT）下载到 `assets/fonts/`"+ 选思源黑体 / 思源宋体 / 霞鹜文楷之一。
+- **ISS-013 状态**：维持"已完成交付工具导出底座第一版"，第二阶段从"延期"标签继续；ROADMAP §138 进度行 + DEC-013 段保留底座说明。
+- **CHANGELOG / TASKS 同步**：在 0.1.0-alpha.7 段末尾追加延期说明 + docs/TASKS.md ISS-013 任务卡加延期原因（"待引入 @pdf-lib/fontkit 重启 worker"）。
+
+### 不采纳（本期暂缓）
+
+- 走 `pdf-lib` 自带的 14 个 StandardFont 中任一中文兼容字体（不存在：StandardFont 全部 Latin-1 / 中欧字符集）。
+- 把中文字体图章化（即把中文字符栅格化为 PNG 后 `embedPng`）—— 仍需嵌入图片路径并通过 fontkit 等价物把字形拆解，本质与 embedFont 等价，复杂度更高。
+- 在 `src-tauri/` 加 `rustybuzz` / `ttf-parser` 解析 OTF/TTF 表后由 Tauri command 输出 font bytes 给前端——超出 ISS-013 scope，需 Tauri 桥接链路改造。
+
+### 范围与影响
+
+- 范围：仅本文档 + `docs/ROADMAP.md` §138 状态行 + `docs/TASKS.md` ISS-013 任务卡 + `CHANGELOG.md` 0.1.0-alpha.7 段 + worktree 清理。
+- 不影响：PR #22 / PR #23 已合并的 reader-modes / forms-signing 不变；现有导出 operation 不变；压缩仍维持 plan-only 摘要。
+- 后续：若用户要求立即推进，第二阶段 worker prompt 必须显式写"@pdf-lib/fontkit 是 pdf-lib 官方 devDep，可装"，并指明字体协议（OFL / Apache 2.0 / MIT），且 PM 必须提供 `npm install` 后的版本指纹给 user 复核。
+

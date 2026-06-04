@@ -136,4 +136,5 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - 2026-06-02：完成 `ISS-006` 页面整理第一版底座：页面整理状态、旋转/删除/重排/恢复/撤销、默认 `*-organized.pdf` 输出路径和 plan-only 导出请求已落地；真实页面改写、完整页面网格 UI 和高级页面整理能力继续后续接入。
 - 2026-06-02：完成 `ISS-010` 法律材料隐私与联网 OCR 提示第一版：notice/consent/audit 模型、脱敏路径摘要、API key 引用脱敏、云端 consent guard 和 bridge 审计衔接已落地；旧布尔确认标记不能单独放行云端 OCR，完整 UI 弹窗和真实云端 OCR 调用后续接入。
 - 2026-06-02：完成 `ISS-013` PDF 交付工具底座第一版：文字/图片水印、页码和 Bates 编号导出 operation 与 pdf-lib 写入已落地，默认 `*-delivery.pdf` 新输出路径和压缩 plan-only 摘要已建立；真实压缩和中文字体接入继续后续深化。
+- 2026-06-04：ISS-013 第二阶段（真实压缩 + 中文字体）worker 启动后即触发 scope-fontkit 物理冲突（pdf-lib 嵌入自定义字体需 `@pdf-lib/fontkit`，与 worker prompt 的"不修改 package.json / 不引入 npm 字体包"约束冲突），按 DEC-036 延期到下一波；当前 wave 3 收口 2 个 PR（PR #22 阅读模式深化 / PR #23 表单填写与签署），整体推进度足够。重启条件：重写 worker prompt 明确"@pdf-lib/fontkit 是 pdf-lib 官方 devDep，可装"+ 选开源协议中文字体（OFL / Apache 2.0 / MIT）。
 - 2026-06-03：合并 `ISS-017` OCR 质量检查第一版（可检索页比例、关键词命中、CER、体积比、耗时和问题页）和 `ISS-018` 证据图片 A4 编排计划器第一版（auto 布局、方向检测、边距校验、安全输出路径）。
