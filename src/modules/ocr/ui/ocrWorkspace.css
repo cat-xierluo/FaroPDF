@@ -52,3 +52,111 @@
   border-radius: 4px;
   word-break: break-word;
 }
+
+.ocr-workspace__parameters {
+  grid-column: 1 / -1;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-strong);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ocr-workspace__parameters-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--fg);
+}
+
+.ocr-workspace__parameters-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 18px;
+  margin: 0;
+}
+
+.ocr-workspace__parameters-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ocr-workspace__parameters-row dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.ocr-workspace__parameters-row dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ocr-workspace__parameters-row--network dd {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ocr-workspace__parameters-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  font-size: 11px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.ocr-workspace__parameters-tag--local {
+  color: #1f5a5f;
+  background: var(--accent-soft);
+  border-color: #b8d8db;
+}
+
+.ocr-workspace__parameters-tag--cloud {
+  color: #6a4a18;
+  background: #fff5d9;
+  border-color: #e7c97a;
+}
+
+.ocr-workspace__parameters-tag--network {
+  color: #6a4a18;
+  background: #fff5d9;
+  border-color: #e7c97a;
+}
+
+.ocr-workspace__parameters-tag--ok {
+  color: #1f5a5f;
+  background: var(--accent-soft);
+  border-color: #b8d8db;
+}
+
+.ocr-workspace__parameters-tag--idle {
+  color: var(--muted);
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.ocr-workspace__parameters-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ocr-workspace__parameters-warning {
+  font-size: 12px;
+  color: var(--danger);
+  background: rgba(168, 63, 63, 0.08);
+  border-left: 3px solid var(--danger);
+  border-radius: 3px;
+  padding: 4px 8px;
+}

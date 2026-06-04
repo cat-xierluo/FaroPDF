@@ -146,10 +146,16 @@ export function AppShell({
             <PageOrganizerWorkspace reader={reader} />
           ) : isOcrMode ? (
             ocr ? (
-              <OcrWorkspace controller={ocr} />
+              <OcrWorkspace
+                availableProviders={settings.ocrProviders}
+                controller={ocr}
+                documentLabel={reader.state.document?.name}
+                pageCount={reader.state.document?.pageCount}
+              />
             ) : (
               <OcrWorkspaceUnavailable />
             )
+          ) : (
           ) : (
             <ReaderCanvas
               onOpenFile={reader.openFile}
