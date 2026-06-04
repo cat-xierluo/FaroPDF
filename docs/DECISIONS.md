@@ -1202,3 +1202,81 @@ ISS-022 把现有扁平的 `SettingsPanel` 升级为左侧导航 + 多 section �
 ### 8. 推进方式
 
 按 DEC-018（OCR bridge / 导出引擎 / 页面整理并行）+ DEC-030（ISS-007 第二版真实接入）模式，把 ISS-016 第二阶段从最新 `main` 41675b3 拉出 `feat/scan-preprocess-real` worktree；worker 只修改本任务范围，文档冲突由 PM 在合并时统一收口。
+
+## DEC-041 批注深化第三阶段：AnnotationSidebar 挂 AppShell + 中文 stamp 真实字形
+
+- 日期：2026-06-04
+- DEC 编号说明：原 commit bd1b6f5 写时用 `DEC-040`（base 是 41675b3 拉的无 PR #27 之后的扫描 DEC），与已合的 `DEC-040 ISS-016 扫描预处理第二阶段`（feat/scan-preprocess-real / PR #27）冲突；rebase 时改为 `DEC-041` 释放已占用编号。
+- 状态：已采纳
+- 关联任务：ISS-026（第三阶段）
+- 关联分支：`feat/annotation-stage-3`
+- 关联 PR：TBD
+- DEC 编号承接 DEC-031（批注第一版）/ DEC-037（批注第二阶段）→ DEC-040（本期）
+
+承接 ROADMAP v0.1-§4 + DEC-031 + DEC-037 + DEC-039 第三阶段收口：把第二阶段产出的 `AnnotationSidebar` 真正挂到 `AppShell` + 把第二阶段遗留的 stamp 文字中文静默跳过（W8 已知限制）补成真实字形。
+
+### 1. AnnotationSidebar 挂 AppShell（替代模式）
+
+- 在 `AppShell.tsx` 增加 `utilityPanel === "annotation"` 分支，渲染 `AnnotationSidebar`（受控组件，props 来自 `reader` + `annotations`）
+- `types.ts` 扩展：`UtilityPanelId = "summary" | "view" | "settings" | "annotation" | "none"`
+- `App.tsx` 调整 `handleModeChange`：
+  - 切到 `annotate` mode → 强制 `setUtilityPanel("annotation")`
+  - 从 `annotate` 切到其他 mode（`read` / `forms` / `ocr` / `export`）→ 若当前 panel 是 `annotation` 则切回 `summary`
+  - 切到 `pages` 维持 `none` 行为
+- **共存策略**（不破坏旧版 `AnnotationListPanel`）：
+  - `AnnotationSidebar` 在 `annotate` 模式下替代 `DocumentSummaryPanel` 作为 utility panel
+  - `AnnotationListPanel` 仍保留在 `DocumentSummaryPanel` 的「批注列表」tab 中（`Sidebar.tsx` 未修改），read/forms/ocr/export 模式仍可看基础列表
+  - 用户从 annotate 切到 read 时自动回到 DocumentSummaryPanel
+
+### 2. 中文 stamp 真实字形（补 W8 限制）
+
+- 新增 `src/modules/annotation/annotationStampFont.ts`：
+  - `resolveStampFont(pdfDoc, text, options)` 路由：CJK → `embedChineseFont`、Latin-only → `StandardFonts.Helvetica`
+  - 与 `src/modules/export/fontAwareWatermark.ts` 的 `resolveTextFont` 模式对齐（独立函数以保持模块边界）
+  - 支持 `chineseFontBytes` / `chineseFontLoader` 注入（测试可 override）
+- 集成到 `annotationPdfWriter.ts`：
+  - `drawAnnotation` 改 async（stamp 路径需要 await 字体加载）
+  - `drawStamp` 签名改：去掉统一 `font` 参数，加 `workingPdf` 参数；内部 `await resolveStampFont(workingPdf, label)`
+  - 字体加载失败 → 静默保留边框（drawn: true，不计入 skipped），与原 stamp 行为一致（无 regression）
+  - 字体编码失败（极端字符）→ try/catch 保留边框
+- `index.ts` 追加 `resolveStampFont` / `ResolveStampFontOptions` 导出
+
+### 3. 范围严格遵守
+
+- 修改：`src/App.tsx` + `src/components/layout/AppShell.tsx` + `src/components/layout/types.ts` + `src/modules/annotation/annotationPdfWriter.ts` + `src/modules/annotation/index.ts`
+- 新增：`src/components/layout/AppShell.test.tsx` + `src/modules/annotation/annotationStampFont.ts` + `src/modules/annotation/annotationStampFont.test.ts`
+- **未修改**：
+  - `package.json` / 锁文件（fontkit + 思源黑体已在 DEC-039 落地）
+  - `Toolbar.tsx`（仍按 DEC-032 协议，工具按钮由后续 mode 工具 worker 通过 `registerModeTools` 接入）
+  - `Sidebar.tsx`（`AnnotationListPanel` 保留，不动）
+  - 全局样式 / 路由
+  - `src-tauri/Cargo.toml`（不引入新 crate）
+  - 其他模块：reader / forms / export / settings / ocr
+
+### 4. 验证
+
+- `npm run typecheck` ✅
+- `npm test -- --run` ✅ 71 文件 / 636 测试全过（15 项新测试：annotationStampFont 7 + AppShell 8）
+- `npm run build` ✅
+- `cargo check --manifest-path src-tauri/Cargo.toml --offline` ✅
+
+### 5. 已知限制
+
+- 窄屏下 `annotate` 模式 utilityPanel 槽位被 `AnnotationSidebar` 占满，无法同时看 `DocumentSummaryPanel` 缩略图（点击「文档摘要」按钮可手动切回 summary）
+- `ContextToolbar` 批注工具按钮仍是死按钮（按 prompt 协议未修改 Toolbar.tsx），由后续 mode 工具 worker 通过 `registerModeTools("annotate", [...])` 接入
+- textbox 批注的中文仍是 Helvetica 静默跳过（不属本期范围；沿用 W8 限制）
+- stamp 文字宽度计算走思源黑体的 `widthOfTextAtSize`，在 vitest 1.x 下 `readFileSync` fallback 已落地（fontLoader.ts 已处理）
+- `AnnotationSidebar` 的 `onAnnotationClick` / `activeAnnotationId` 暂未与 `AnnotationOverlay` 联动（Overlay 第一版只有 UI 无 controller），后续 PR 由 `useAnnotationController` 接入
+
+### 6. 范围与依赖
+
+- 依赖：DEC-039 的 `embedChineseFont` / `containsCjk` / `@pdf-lib/fontkit` + 思源黑体 SC
+- 不引入新依赖
+- 后续 PR：W4 OCR 真实接入（ISS-007 真实双层 PDF）/ 设置页 OCR section 校验（ISS-022）/ stamp 真实 SVG 形状（替代文字）等
+
+### 7. ISS-026 收口
+
+- 第一版（DEC-031 / PR #19）：`AnnotationOverlay` + `AnnotationToolbar` UI
+- 第二版（DEC-037 / PR #24）：`AnnotationSidebar` 4 维度分组 + 真实 PDF 绘制导出
+- 第三版（DEC-041 / 本 PR）：挂 `AppShell` + 中文 stamp 真实字形
+- 后续可选：扁平化导出接入 `pdfOperationEngine` 的 `flatten-annotations` 路径（execute 模式）/ `useAnnotationController` 接入 Overlay active 联动
