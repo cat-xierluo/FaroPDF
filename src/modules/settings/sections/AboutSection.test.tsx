@@ -76,6 +76,27 @@ describe("AboutSection", () => {
     expect(screen.getByTestId("about-author")).toHaveTextContent(/maoking|GitHub/);
   });
 
+  test("author card includes a WeChat QR image with descriptive alt text", () => {
+    render(<AboutSection settings={createDefaultAppSettings()} onChange={() => undefined} />);
+    const author = screen.getByTestId("about-author");
+    const qrImage = author.querySelector("img");
+    expect(qrImage).not.toBeNull();
+    expect(qrImage?.getAttribute("alt")).toMatch(/微信|WeChat/);
+    expect(qrImage?.getAttribute("src")).toMatch(/wechat-qrcode/);
+  });
+
+  test("author card surfaces the scan instruction text", () => {
+    render(<AboutSection settings={createDefaultAppSettings()} onChange={() => undefined} />);
+    expect(screen.getByTestId("about-author")).toHaveTextContent(/微信扫码|关注/);
+  });
+
+  test("does not render the legacy placeholder footnote about future iterations", () => {
+    render(<AboutSection settings={createDefaultAppSettings()} onChange={() => undefined} />);
+    expect(
+      screen.queryByText(/作者卡暂为占位，公众号二维码和详细联系方式将在后续迭代补齐/),
+    ).not.toBeInTheDocument();
+  });
+
   test("check update shows unsupported when not running in Tauri", async () => {
     const user = userEvent.setup();
     const client = createMockUpdateClient({
