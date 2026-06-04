@@ -7,6 +7,14 @@ export {
   type OcrQualityReportViewProps,
 } from "./ui/OcrModeToolbar";
 
+export { OcrWorkspace, type OcrWorkspaceProps } from "./ui/OcrWorkspace";
+export {
+  deriveLayeredOutputPath,
+  useOcrWorkspaceController,
+  type OcrWorkspaceController,
+  type UseOcrWorkspaceControllerOptions,
+} from "./ui/useOcrWorkspaceController";
+
 export {
   commandJobToOcrJob,
   createTauriOcrJobController,
