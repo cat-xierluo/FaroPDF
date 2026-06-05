@@ -223,6 +223,26 @@ Agent 可根据本文件自行判断：
 - 下一步：把 AnnotationOverlay/AnnotationToolbar 接入 `AppShell` context toolbar 槽位、把 AnnotationSidebar 接入左侧 utility panel（新 utilityPanelId "annotations" 或扩展 summary tab）、图章模板预览增强、把 `writeAnnotationPdf` 接入 `pdfOperationEngine.exportPdf` 的 `flatten-annotations` 路径（决定 plan-only / execute 二选一）、ISS-013 字体重启后并入 stamp 中文真实字形；用浏览器截图检查无重叠。
 - 2026-06-04：在 `feat/annotation-stage-4` worktree 推进 ISS-026 第四阶段收尾（DEC-044 总方案 + DEC-045/046/047 三 milestone 详情）：3 个 commit milestone（AppShell 接线 + Overlay 渲染 / Toolbar 接入 / 导出引擎 + stamp 预览）按 cadence 落盘。`types.ts` 追加 `AnnotationOverlayAnchor` / `AnnotationArmedStateBundle` / `AnnotationDraftSubmission` 透传 shape；`AppShell.tsx` workspace 内部追加 `workspace__main` 相对定位容器，annotate 模式 + hasDocument + overlayViewport 时挂 `AnnotationOverlay`（注入 currentPage-1 pageIndex + PDF 视口 + currentPage 批注子集 + armed bundle），`ContextToolbar` 的 annotate 分支替换为受控 `<AnnotationToolbar>`（外层 div 保留 `role="toolbar" aria-label="批注工具条"` 以兼容既有 AppShell 测试契约，disabled 由 `!hasDocument` 派生）。`App.tsx` 把 `annotationToolState` 用 `useState` 上提为单一真相源，useEffect 离开 annotate 自动 disarm，`handleAnnotationDraft` 走 `service.addAnnotation` + append loadedAnnotations。`pdfOperationEngine.ts` `flatten-annotations` 分支按 strategy 分发：plan-only 保持原行为、draw 走 `writeAnnotationPdf` 并 reload workingPdf、`skipped` 降级为 `warnings`（非致命）、PDF metadata 切换 `faropdf:annotation-flattened` + drawn 计数；类型层 `PdfAnnotationFlattenStrategy` 扩 `"draw"`，`PdfAnnotationFlattenPlan` 新增 drawnCount/skippedCount/skipped/pageDrawCounts/fingerprintChecked 可选字段，entry.status 联合 `"planned" | "applied" | "skipped"`。`stamps.ts` 新增 `renderStampPreview` helper（共用 0 0 400 100 viewBox，字号缩 0.55×，与 renderStampSvg 共享 escapeXml 防 XSS，导出 STAMP_PREVIEW_VIEWBOX_WIDTH/HEIGHT + DEFAULT_STAMP_PREVIEW_WIDTH/HEIGHT 常量）；`AnnotationToolbar` stamp 按钮改为 `<svg>` + `<g dangerouslySetInnerHTML>` 注入预览子树 + label span，加 `data-testid="stamp-preview-{id}"`，**不引入新依赖**。`package.json` / 锁文件 / `Toolbar.tsx`（按 DEC-032 协议 worker 走 `ContextToolbar` 槽位注入）/ `Sidebar.tsx`（按 DEC-041 保留 `AnnotationListPanel` tab）/ `src/styles/app.css` / `src-tauri/` / 全局样式 / 路由 / 其他模块（reader / forms / ocr / settings / pages / preprocess）**未修改**。新测 17 项（AppShell 9 + AnnotationToolbar 3 + stamps 5），总测试 73 文件 / 693 通过；`npm run typecheck` 干净（pre-existing `.at` ES2022 lib target / `@pdf-lib/fontkit` 模块未装 错误不在本 PR 范围）；`npx vitest run` 693/693；`npx vite build` 2012 modules 成功（`tsc` 严格检查在项目级 pre-existing 失败，与本 PR 无关）。`docs/DECISIONS.md` 追加 DEC-044/045/046/047；`CHANGELOG.md` 新增 0.1.0-alpha.10 段；`docs/ROADMAP.md` **未改**。已知限制：导出工具条"压平批注"按钮 UI 入口未接（属另一个 worker 范围，本 worker 留 hook）；CJK textbox 仍走 Helvetica WinAnsi 跳过语义（与 DEC-037 一致）；AnnotationOverlay 与 AnnotationSidebar 的 active 联动仍未接（`onAnnotationClick` prop 留好，等下一阶段统一接线）。
 
+### ISS-027 根目录配置收束（chore / DEC-053）
+
+- 优先级：P1
+- 类型：项目卫生（chore / 工具链）
+- 状态：第一版收口（DEC-053，待 PM 合 review）
+- 建议分支：`chore/consolidate-configs`
+- 建议 worktree：`.claude/worktrees/tmux-consolidate-configs`
+- 依赖：无
+- 范围：`config/`（新增子目录，容纳 5 个配置文件） + `package.json`（scripts 改 8 行）
+- 目标：参照 Folia 项目结构把 5 个根目录配置文件（`eslint.config.js` / `tsconfig.json` / `tsconfig.node.json` / `vite.config.ts` / `vitest.config.ts`）搬到新 `config/` 子目录；根目录只保留说明文档 + `package.json` + `package-lock.json` + `index.html` + `LICENSE`（Folia 风格）。
+- 验收：5 个配置文件成功移到 `config/`（`git mv` 保留 rename 历史）；`package.json` scripts 全部加 `--config config/<name>` 显式指向；`npm run typecheck` / `lint` / `test` / `build` 全部通过（与 main 基线一致，无回归）；`cd src-tauri && cargo check` 通过；根目录只剩说明文档 + npm 锁文件 + `index.html` + `LICENSE`。
+- 关键决策（DEC-053）：
+  - `vite.config.ts` 不动：Vite 以 cwd 为 project root，`--config` 不影响 root 解析；无 `root` / `outDir` / 显式 `process.cwd()` 调用。
+  - `tsconfig.json` `include: ["src"]` 改为 `include: ["../src"]`（相对 config 文件位置）。`references` 保持不变（双方同移，sibling 相对引用仍正确）。
+  - `tsconfig.node.json` 不动：`include: ["vite.config.ts", ...]` 是裸文件名，和 tsconfig 同目录，移入后自动正确。
+  - `vitest.config.ts` 改 `dependencyRoot` 为 `projectRoot`：worktree 场景 slice 到 marker，常规场景 `configDir.replace(/\/config$/, "")` 走父目录。`fs.allow` 同步从 `dependencyRoot` 改为 `projectRoot`。
+  - `eslint.config.js` 从 `parserOptions.projectService: true` 切换到 `parserOptions.project: ["./config/tsconfig.json", "./config/tsconfig.node.json"]`：tsconfig 收束到 `config/` 后，project service 从 linted 文件向上 walk 找不到；`defaultProject` / `allowDefaultProject` 不支持 `**` glob，无法覆盖 `src/**/*.ts`。显式列路径最稳。`tsconfigRootDir` 改用 `fileURLToPath` + `resolve(..)` 算 project root。
+- 2026-06-05：在 `chore/consolidate-configs` worktree 收口：5 个文件 `git mv` 到 `config/`（保留 rename 历史）；`tsconfig.json` `include` 改 `../src`；`vitest.config.ts` 修 `projectRoot`；`eslint.config.js` 换 `parserOptions.project` 显式指向；`package.json` 8 个 scripts 全部加 `--config` 标志。验证：`npm run typecheck` 干净；`npm run lint` 43 个错误（与 main 基线一致，pre-existing）；`npm test` 80 文件 / 743 用例全过；`npm run build` 2022 modules 成功；`cargo check` 干净（9 个 pre-existing dead_code warning）。`docs/DECISIONS.md` 追加 DEC-053；`CHANGELOG.md` 新增 0.1.0-alpha.13 段（README PR 占用 0.1.0-alpha.12）；`docs/ROADMAP.md` **未改**。
+- 下一步：与 PM 协同 PR 合并 / 验证；后续 chore 类工作（如整理 `tests/fixtures/` 体积、清理 pre-existing lint 错误）按需拆 worker；Folia 对齐度（删除 `package.json` 中 Tauri 配置/多余 deps）等 0.2 再议。
+
 ## 暂缓任务
 
 ### ISS-015 直接编辑 PDF 原有文字、图片和链接

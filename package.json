@@ -14,13 +14,13 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint .",
-    "preview": "vite preview",
+    "dev": "vite --config config/vite.config.ts",
+    "build": "tsc --noEmit --project config/tsconfig.json && vite build --config config/vite.config.ts",
+    "typecheck": "tsc --noEmit --project config/tsconfig.json",
+    "test": "vitest run --config config/vitest.config.ts",
+    "test:watch": "vitest --config config/vitest.config.ts",
+    "lint": "eslint . --config config/eslint.config.js",
+    "preview": "vite preview --config config/vite.config.ts",
     "tauri": "tauri"
   },
   "dependencies": {

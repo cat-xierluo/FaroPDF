@@ -2142,3 +2142,152 @@ ISS-023 任务卡（`docs/TASKS.md` §"ISS-023"）原验收要求分两块：
 - 官网入口：v0.3 阶段（ROADMAP §"v0.3 性能与发布"）若搭建独立官网页面，再补 `cat-xierluo.github.io` 入口到 README §"官方仓库"。
 - LICENSE 落地：首个 release 前 PM 确认采用 Apache-2.0 后单独 PR 创建 `LICENSE` 文件 + 把 README §"许可" 替换为实际协议名称。
 - README 维护责任：每条 ISS 收口时由 PM 决定是否同步更新 README（涉及功能可见性变更的 ISS 建议同步）；docs-only 维护 PR 可走 `docs/*` 分支不依赖 ISS 任务源。
+
+## DEC-053 根目录配置收束到 `config/` 子目录
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联任务：ISS-027
+- 关联分支：`chore/consolidate-configs`
+
+承接 README 重写（DEC-052）后，本决策记录项目根目录配置收束方案，确认沿用 Folia 项目的 `config/` 子目录结构。
+
+### 1. 背景与目标
+
+FaroPDF 根目录在 ISS-021 / ISS-023 等多次迭代后散落 5 个配置文件：
+
+- `eslint.config.js`
+- `tsconfig.json`
+- `tsconfig.node.json`
+- `vite.config.ts`
+- `vitest.config.ts`
+
+Folia 项目（`/Users/maoking/Library/Application Support/maoscripts/folia/`）的根目录只保留 4 份说明文档 + `LICENSE` + `index.html` + npm 锁文件，配置类（`tsconfig*.json` / `eslint.config.js` / `vite.config.ts` / `playwright.config.ts`）全部收束在 `config/` 子目录。本期对齐 Folia 风格。
+
+### 2. 决策
+
+#### 2.1 收束路径
+
+5 个配置 `git mv` 到 `config/` 同名位置（保留 rename 历史）：
+
+| Source | Destination |
+| --- | --- |
+| `eslint.config.js` | `config/eslint.config.js` |
+| `tsconfig.json` | `config/tsconfig.json` |
+| `tsconfig.node.json` | `config/tsconfig.node.json` |
+| `vite.config.ts` | `config/vite.config.ts` |
+| `vitest.config.ts` | `config/vitest.config.ts` |
+
+#### 2.2 `package.json` scripts 加 `--config` 显式指向
+
+```jsonc
+{
+  "scripts": {
+    "dev": "vite --config config/vite.config.ts",
+    "build": "tsc --noEmit --project config/tsconfig.json && vite build --config config/vite.config.ts",
+    "typecheck": "tsc --noEmit --project config/tsconfig.json",
+    "test": "vitest run --config config/vitest.config.ts",
+    "test:watch": "vitest --config config/vitest.config.ts",
+    "lint": "eslint . --config config/eslint.config.js",
+    "preview": "vite preview --config config/vite.config.ts",
+    "tauri": "tauri"
+  }
+}
+```
+
+- `build` 拆成 `tsc --noEmit --project ... && vite build --config ...`（Folia 用 `tsc -b` + `vite build`；FaroPDF 单 tsconfig + `noEmit: true` 等价方案）。
+- `typecheck` 显式 `--project` 指向 config 文件，避免 tsc 默认从 cwd 找 `tsconfig.json`。
+- 7 个会触发配置加载的 scripts 全部加 `--config` / `--project` 显式指向。
+
+#### 2.3 `tsconfig.json` include 路径
+
+`include: ["src"]` → `include: ["../src"]`（相对 config 文件位置）。`references: [{ "path": "./tsconfig.node.json" }]` 保持不变（双方同移，sibling 相对引用仍正确）。
+
+`tsconfig.node.json` 不动：`include: ["vite.config.ts", "vitest.config.ts", "eslint.config.js"]` 是裸文件名，和 tsconfig 同目录，移入 `config/` 后自动正确。
+
+#### 2.4 `vitest.config.ts` 修 `projectRoot` 计算
+
+原代码：
+
+```ts
+const configDir = decodeURIComponent(new URL(".", import.meta.url).pathname).replace(/\/$/, "");
+const worktreeMarker = "/.claude/worktrees/";
+const dependencyRoot = configDir.includes(worktreeMarker)
+  ? configDir.slice(0, configDir.indexOf(worktreeMarker))
+  : configDir;
+```
+
+在 worktree 之外时 `dependencyRoot = configDir`。移动后 `configDir = config/`，`dependencyRoot` 也变成 `config/`，导致 `server.fs.allow` 把 Vite 沙箱限制到 config 子目录。
+
+修复：改名 `dependencyRoot` → `projectRoot`，常规场景 `configDir.replace(/\/config$/, "")` 走父目录；worktree 场景逻辑不变。
+
+```ts
+const projectRoot = configDir.includes(worktreeMarker)
+  ? configDir.slice(0, configDir.indexOf(worktreeMarker))
+  : configDir.replace(/\/config$/, "");
+```
+
+`fs.allow` 同步从 `dependencyRoot` 改为 `projectRoot`。
+
+#### 2.5 `eslint.config.js` 切到 `parserOptions.project`
+
+原代码用 `projectService: true`：
+
+```js
+parserOptions: {
+  projectService: true,
+  tsconfigRootDir: import.meta.dirname,  // 移动后 = config/
+}
+```
+
+移动后 `import.meta.dirname = config/`，project service 从 linted 文件向上 walk 找不到 `tsconfig.json`（它在 `config/`，而 walk 是从文件目录往根目录走，找不到 `config/` 这个 sibling 子目录）。
+
+尝试用 `defaultProject` + `allowDefaultProject` 显式指向：
+- `defaultProject: "config/tsconfig.json"` 仍走 project service 逻辑，**不**自动覆盖所有不在 project 的文件。
+- `allowDefaultProject: ["**/*.ts"]` 被 typescript-eslint 拒绝（`glob too wide`）。
+- `allowDefaultProject: ["src/*"]` 太窄，无法覆盖嵌套。
+
+最终切回 `parserOptions.project` 显式列出两个 tsconfig ：
+
+```js
+parserOptions: {
+  project: ["./config/tsconfig.json", "./config/tsconfig.node.json"],
+  tsconfigRootDir: projectRoot,
+}
+```
+
+`tsconfigRootDir` 改用 `fileURLToPath(import.meta.url)` + `resolve(..)` 算 project root，不依赖 `import.meta.dirname`（= `config/`）。
+
+代价：`project` 模式（per-file TS Program）比 `projectService` 略慢，对 743 个测试 + 80 个文件规模无明显影响。
+
+#### 2.6 `vite.config.ts` 不动
+
+Vite 以 cwd 为 project root，`--config config/vite.config.ts` 不影响 root 解析。当前 `vite.config.ts` 无 `root` / `build.outDir` / 显式 `process.cwd()` 调用，**全部**走 Vite 默认（cwd-relative），move 后自动正确。
+
+#### 2.7 不影响面
+
+- **不动** `src/**` / `src-tauri/**` / 任何业务模块。
+- **不动** 锁文件 / 依赖列表。
+- **不动** `src-tauri/tauri.conf.json`（Tauri CLI 调子命令时已经走 `npm run dev` / `npm run build`，scripts 内部已加 `--config`）。
+- **不动** `AGENTS.md` / `CLAUDE.md` / `.gitignore` / `docs/ROADMAP.md` / `docs/DESIGN.md`。
+
+### 3. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `git mv` 5 个文件 | ✅ 成功 | rename 检测为 `R`（保留 history） |
+| `npm run typecheck` | ✅ 干净 | tsc `--noEmit --project config/tsconfig.json` 0 个新增错误 |
+| `npm run lint` | 43 errors | 与 `origin/main` 0.1.0-alpha.11 一致，全部 pre-existing（tests/e2e/ocr-e2e.test.ts 不在 project + tests/fixtures/ocr/generate-scan-fixture.mjs `Buffer`/`process` + fontLoader 一处 irregular whitespace），与本 PR 无关 |
+| `npm test` | ✅ 80 文件 / 743 用例 | 0 回归 |
+| `npm run build` | ✅ | 2022 modules，dist 产物正常 |
+| `cargo check` | ✅ | 9 个 pre-existing dead_code warning 与本 PR 无关 |
+
+### 4. 回退方式
+
+`git restore . && git clean -f` 回到 `origin/main` 状态；5 个 rename 操作可被 `git mv` 反向回到根目录。
+
+### 5. 后续路径
+
+- 与 PM 协同 PR 合并（PR 在 `chore/consolidate-configs` 分支上）。合并后调用 doc-curator subagent 跑文档体检。
+- 后续 chore 类工作（如整理 `tests/fixtures/` 体积、清理 pre-existing lint 错误）按需拆 worker。
+- Folia 对齐度进阶（如删除 `package.json` 中冗余 dep、统一 `tsconfig.app.json` 三段拆分）放到 0.2 阶段再议。
