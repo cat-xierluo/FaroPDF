@@ -2446,3 +2446,116 @@ README 顶部加 `<p align="center"><img src="docs/icon-128.png" alt="FaroPDF" w
 - 切到 utility panel 路径仍是 ISS-009 终极目标，本 DEC 是过渡方案；layout worker 收口时可一次性删掉底部 sheet 媒体查询并把 forms 改走 utility panel。
 - 真视口验证需在 Chromium DevTools device toolbar 切换 360 / 480 / 768 / 1024 四档；jsdom 不实现真视口，单测用 `data-layout` 属性 + `matchMedia` mock 验证状态切换。
 - 断点 480 与 `AuthorCard` 对齐，是 forms 模块内临时值；后续 AppShell 收口断点时可统一为 `BREAKPOINTS.narrow` 共享常量。
+
+## DEC-056 ISS-021 follow-up：autoUpdateCheck 设置项 + About toggle
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联任务：ISS-021（第二版）
+- 关联分支：`feat/iss-021-auto-update-check`
+- 关联 PR：TBD
+- DEC 编号承接 DEC-054（LICENSE + author.name + icon）后 +2（055 暂未使用，与历史跳号策略保持一致）
+
+承接 DEC-048 §2.2「推迟 autoUpdateCheck 设置项」+ DEC-051 §2.4「ISS-023 不实现 autoUpdateCheck」+ `docs/RELEASE.md` §4「自动检查更新未实现」+ `docs/TASKS.md` ISS-021 验收「M2-2」。本决策记录 ISS-021 follow-up 第二版：`AppSettings.autoUpdateCheck` 设置项 + About section 顶部 toggle UI + 挂载时按值决定是否自动调 `checkForAppUpdate`。
+
+### 1. 触发原因
+
+DEC-048 第一版（PR #31 / commit 652a53a）刻意把 `autoUpdateCheck` 留 follow-up（实现需要改 `src/shared/settings/types.ts` 的 `AppSettings`，与 ISS-021 当期的 forbidden list 冲突）。DEC-051（ISS-023）也明确「autoUpdateCheck 留 follow-up，由 PM 在后续 `feat/auto-update-check` 拆出」。本 PR 收口这一 follow-up。
+
+### 2. 关键决策
+
+#### 2.1 直接扩展 `AppSettings`（vs 新建 `updateSettings.ts`）
+
+直接在 `src/shared/settings/types.ts` 加 `autoUpdateCheck: boolean` 字段，**不**新建独立 `updateSettings.ts` 模块。
+
+- 优：复用现有 `SettingsService` 持久化路径（`write_app_settings` / `read_app_settings` Tauri command 已就位），不需要新 Tauri command / 新 storage slot；`normalizeAppSettings` 兜底旧 release payload（缺字段 → 默认 `true`）；`exportSafeAppSettings` 透传无需改。
+- 劣：把 update 概念「污染」到通用 `AppSettings` 字段表，类型层面缺命名空间；后续若 settings 增长可拆出子结构。
+- 选择依据：当前 settings 字段少（5 个一级字段），拆子结构 over-engineering；extension 是 DEC-053 收束 `config/` 之后最稳的演进路径。
+
+#### 2.2 mount 触发 vs App 启动触发
+
+auto-check 触发点选 **About section 首次 mount**（用户首次打开设置 → 关于），**不**改 `App.tsx` / `AppShell.tsx` 启动时刻。
+
+- 优：完全在 allowed files 范围内（`src/shared/settings/` + `src/modules/settings/sections/AboutSection.tsx` + `src/modules/settings/sections/AboutSection.test.tsx`），不触碰 layout worker 的 `App.tsx` / `AppShell.tsx` / `Toolbar.tsx` / `Sidebar.tsx`。
+- 劣：用户不打开设置 → 不自动检查；与「App 启动时自动检查」的产品直觉略有差距。
+- 选择依据：本 follow-up scope 严格不越界（mission: forbidden 列表明列 `src/components/layout/{AppShell,Toolbar,Sidebar}.tsx`；`App.tsx` 不在 allowed 列表中，pessimistic interpretation 也避免触碰）。未来「App 启动时自动检查」如确有必要，拆独立 PR 由 layout worker 接手。
+
+#### 2.3 ref guard 防 strict mode 双调用 + 切到 true 不会重复触发
+
+```tsx
+const autoCheckTriggeredRef = useRef(false);
+useEffect(() => {
+  if (autoCheckTriggeredRef.current) return;
+  autoCheckTriggeredRef.current = true;
+  if (settings.autoUpdateCheck) {
+    void handleCheckUpdate();
+  }
+}, []);  // mount-only
+```
+
+- React 18+ strict mode 在开发环境会双调用 effect 挂载函数 → 不带 guard 会触发两次 `checkForAppUpdate`。
+- 用 `useRef(false)` 同步 guard 防止双调用，且**不**在 `settings.autoUpdateCheck` 变化时重新触发（避免运行期切到 true 时弹出意外的检查请求）。
+- 用户运行期切到 true → 必须手动点「检查更新」按钮才检查，符合「mount 时自动检查 / 手动按钮始终可用」契约。
+
+#### 2.4 切换实时持久化（无 debounce）
+
+切换 toggle → `onChange({ ...settings, autoUpdateCheck: next })` → SettingsPanel → App.tsx `setSettings`。
+
+- **未**加 debounce 500ms：当前 `App.tsx` 的 `handleSettingsChange` 是同步 in-memory（详见 DEC-053 / DEC-038 留的 `// 后续接入 SettingsService 做持久化与校验失败回滚` TODO 注释），无真实磁盘写盘；debounce 是 future PR 接入 `SettingsService.updateSettings` 时的 hardening 点，本期不预做。
+- 校验：`AppSettings` 的 `validateAppSettings` 不校验 `autoUpdateCheck`（boolean 字段，类型层兜底）；写入路径无需 sanitization。
+
+#### 2.5 手动按钮始终可用，不与 toggle 联动
+
+`checkButtonDisabled = isWorking || status === "checking" || status === "downloading"`，**不**叠加 `!settings.autoUpdateCheck`。
+
+- 关 toggle 的用户能继续手动触发；与「关闭时：自动检查跳过，手动检查仍可用」契约一致。
+
+#### 2.6 9 态状态机零改动
+
+`AppUpdateStatus` 9 态（idle / checking / latest / available / downloading / downloaded / installing / unsupported / error）由 DEC-048 落定，本 PR 不动 `src/shared/update/*`。Available → 下载并安装 → 重启提示的流程在 toggle off / on / mount auto-check / manual click 四种入口下行为一致（实测由 6 个 manual-check 测试在 `autoUpdateCheck=false` 下回归 9 态）。
+
+### 3. 文件清单
+
+#### 修改
+
+- `src/shared/settings/types.ts`（+9 行）：`AppSettings` 增 `autoUpdateCheck: boolean` 字段 + 注释（ISS-021 follow-up / DEC-056 引用）。
+- `src/shared/settings/defaults.ts`（+2 行）：`createDefaultAppSettings` 增 `autoUpdateCheck: true`；`normalizeAppSettings` 增 boolean 类型 guard（`typeof input.autoUpdateCheck === "boolean" ? input.autoUpdateCheck : defaults.autoUpdateCheck`）。
+- `src/modules/settings/sections/AboutSection.tsx`（+38 / -6 行）：去掉 `_settings` / `_onChange` 的 void 忽略（现在实际消费 settings 与 onChange）；新增 `useEffect` mount 一次性 auto-check（ref guard）+ `handleAutoUpdateToggle` 切换回调；新增 `<label>` 包裹 checkbox + label + hint 的 toggle UI（data-testid `about-auto-update-toggle`，`htmlFor="auto-update-check"`）。
+- `src/modules/settings/sections/AboutSection.test.tsx`（+92 行）：6 个 manual-check 测试改 `autoUpdateCheck: false`（避免 mount auto-check 干扰 call-count 断言）；新增 6 项测试（toggle 默认值 / toggle off 持久化 / toggle on 持久化 / mount 时 auto-check 触发 / mount 时 auto-check 不触发在 `false` 下 / 关闭时手动按钮仍可用）。
+- `src/shared/settings/defaults.test.ts`（+1 行）：`createDefaultAppSettings` 断言补 `autoUpdateCheck === true`。
+- `src/shared/settings/service.test.ts`（+22 行）：新增 2 项（`autoUpdateCheck: false` 持久化不覆盖 / 旧 payload 缺字段退回默认 `true`）。
+- `src/shared/contracts.test.ts`（+1 行）：`AppSettings` 字面量补 `autoUpdateCheck: true`（typecheck 通过）。
+- `src/modules/settings/SettingsPanel.css`（+18 行）：`.settings-about-card__auto-toggle` / `__auto-toggle-hint` 样式（与既有 `.settings-row` 协同；`@media (max-width: 479px)` 由 `.settings-row` 现有规则覆盖，无需新增）。
+- `docs/RELEASE.md` §4：把「自动检查更新未实现」从限制列表移到「✅ DEC-056 落地」说明。
+- `docs/TASKS.md` ISS-021 任务卡：状态从「第一版已交付」推到「第二版已交付」+ 验收「autoUpdateCheck 设置项可关闭自动检查」改为 ✅ M2 + 进度日志追加 2026-06-05 记录。
+- `CHANGELOG.md` 顶部新增 0.1.0-alpha.15 段。
+
+#### 不修改（严格遵守 forbidden / 范围外）
+
+- `src/shared/update/*`（DEC-048 9 态状态机保留原样）
+- `src/components/layout/*`（layout worker 范围）
+- `src/App.tsx`（不在 allowed 列表）
+- `src/styles/app.css` / `package.json` / 锁文件 / `src-tauri/**` / `config/**`（DEC-053 收口）
+- 任何 reader / search / annotation / forms / export / pages / ocr / preprocess 模块
+
+### 4. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `npm run typecheck` | ✅ 干净 | `AppSettings` 新增必填字段；`contracts.test.ts` 同步补字段 |
+| `npm run lint` | ✅ 43 个错误 | 与 main 基线一致，0 回归（pre-existing：无 project ESLint config / `.at` lib target / 等） |
+| `npm test` | ✅ 80 文件 / 751 用例 | +8（AboutSection 6 + SettingsService 2）；6 个 manual-check 测试改 `autoUpdateCheck=false` 隔离 mount auto-check |
+| `npm run build` | ✅ 2022 modules | Vite 成功产出 dist 资产 |
+| `cargo check --manifest-path src-tauri/Cargo.toml` | ✅ 干净 | 9 个 pre-existing dead_code warning 与本 PR 无关 |
+
+### 5. 已知限制（同步 docs/RELEASE.md §4 + docs/TASKS.md ISS-021）
+
+- **auto-check 触发点是 About section mount** 而非 App 启动时刻（详见 §2.2）。
+- **debounce 500ms 未实现**（详见 §2.4）：App.tsx 当前是 in-memory 持久化，SettingsService 真正落盘由 future PR 接入时再按需加。
+- **回归 9 态状态机**：6 个 manual-check 测试在 `autoUpdateCheck=false` 下独立验证，确保 DEC-048 9 态行为零改动。
+- 增量更新失败回退 / 移动端 / CODE_SIGNING 仍 follow-up（继承 DEC-048 §5）。
+
+### 6. 后续路径
+
+- 未来如需「App 启动时自动检查」（不等用户打开设置）：由 layout worker 拆独立 PR，在 `App.tsx` 加 startup useEffect，按 `settings.autoUpdateCheck` 决定是否调 `createTauriUpdateClient().checkForAppUpdate()`；需同步讨论默认 `createTauriUpdateClient()` 与 `AboutSection` 共享的 client 实例（避免双 `checkForAppUpdate` 调用）。
+- 真实生产 pubkey 替换、增量更新回退、移动端打包、CODE_SIGNING 仍按 DEC-048 §6 路径推进。

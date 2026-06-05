@@ -130,7 +130,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：发布 / 工程
-- 状态：第一版已交付（手动检查 + 跨平台 CI）；autoUpdateCheck 设置项 / 移动端 / 增量回退 / CODE_SIGNING 留 follow-up
+- 状态：第二版已交付（autoUpdateCheck 设置项 + About toggle）；移动端 / 增量回退 / CODE_SIGNING 仍 follow-up
 - 建议分支：`feat/app-distribution`
 - 建议 worktree：`.claude/worktrees/tmux-app-distribution`
 - 依赖：ISS-001、ISS-009
@@ -141,12 +141,13 @@ Agent 可根据本文件自行判断：
   - `src-tauri/Cargo.toml` 加入 `tauri-plugin-updater`；`tauri.conf.json` 配置 `plugins.updater.endpoints` + `pubkey`，`bundle.createUpdaterArtifacts = true`。✅ M1
   - 桌面三平台 `tauri build` 产出 `.app` / `.msi` / `.AppImage` / `.deb` 及对应签名 updater artifact。✅ M3（CI 矩阵 + createUpdaterArtifacts；本地不跑跨平台构建）
   - `.github/workflows/release.yml` 在 `v*` tag push 时跨平台矩阵构建、生成 `latest.json` 与签名、自动发布到 GitHub Releases。✅ M3
-  - 应用内 `checkForAppUpdate` 走 `tauri-plugin-updater`，能拉到新版本并支持下载安装；`autoUpdateCheck` 设置项可关闭自动检查。⚠️ 手动检查 M2 已落地；`autoUpdateCheck` 设置项留 follow-up（见 DEC-048 §2.2 + docs/RELEASE.md §4）
+  - 应用内 `checkForAppUpdate` 走 `tauri-plugin-updater`，能拉到新版本并支持下载安装；`autoUpdateCheck` 设置项可关闭自动检查。✅ M2（手动检查 M2-1 + `autoUpdateCheck` 设置项 M2-2 / DEC-056）
   - 更新密钥通过本地 `tauri signer generate` 生成，私钥不入库，公钥写入 `tauri.conf.json`。⚠️ 占位 pubkey 已写，正式发布前由 PM 重生成（见 DEC-048 §2.3 + docs/RELEASE.md §3.1）
   - 增量更新失败时回退到完整重装路径，不阻塞用户阅读。❌ 留 v0.3+ follow-up（tauri-plugin-updater 内置 chunk 重试；失败需用户手动去 GitHub Releases 下载）
   - 移动端（Android / iOS）打包在 v0.3 评估范围，先在 `docs/RELEASE.md` 记录限制与后续计划，不在 ISS-021 内强制实现。✅ docs/RELEASE.md §1 + §4 记录
 - 进度日志：
   - 2026-06-04：在 `feat/app-distribution` 推进 ISS-021 第一版（DEC-048）：新增 `src/shared/update/` 5 文件（types / updateService 累计 progress adapter / updateCapability / index + 3 测试文件，14 项新单测）+ `src/modules/settings/sections/AboutSection.tsx` 接 `createTauriUpdateClient` 9 态状态机（手动检查 → available → 下载并安装 → 重启提示；AboutSection.test.tsx 9 项）+ `src-tauri/Cargo.toml` 加 `tauri-plugin-updater = "2.10.1"` + `src-tauri/src/lib.rs` 注册 plugin + `src-tauri/tauri.conf.json` `bundle.createUpdaterArtifacts` + `plugins.updater` 配置块 + `package.json` 加 `@tauri-apps/plugin-updater@2.10.1` + `tsconfig.json` lib ES2020→ES2022（解锁 27 个 pre-existing `Array.prototype.at` 错误）+ `.github/workflows/release.yml`（3 平台 matrix：macos-universal / windows-x64 / linux-x64 → artifacts → `scripts/create-updater-manifest.mjs` → latest.json + softprops/action-gh-release@v2 发布）+ `scripts/create-updater-manifest.mjs`（纯 ESM，零 npm 依赖，扫描 .app.tar.gz / .msi / .AppImage 调 `cargo tauri signer sign`）+ `docs/RELEASE.md`（产物矩阵 / 密钥管理 / 发布流程 / 5 项限制）。**未**改 `src/components/...`（除 update 入口）/ `src/styles/` / `Toolbar.tsx` / `App.tsx` / `Sidebar.tsx` / `src-tauri/src/{ocr,scan_preprocess,forms}/` / 其他 reader/search/annotation/forms/export/pages/ocr/preprocess 模块 / `src/shared/{pdf,ocr,preprocess,annotation,form,export,settings}/` / `assets/fonts/`。pubkey 写占位 `RWSY2kf...`（CI 弱密码生成的 base64 段），私钥已 rm 丢弃；首次生产发布前必须由 PM 重生成。验证：76 文件 / 689 测试（+5：updateService 7 / updateCapability 2 / AboutSection 新增 6 + 替换 3）；typecheck / build / cargo check 全绿；增量更新失败回退 / autoUpdateCheck / 移动端 / CODE_SIGNING 留 follow-up（详见 DEC-048 + docs/RELEASE.md §4）。
+  - 2026-06-05：在 `feat/iss-021-auto-update-check` 推进 ISS-021 follow-up 第二版（DEC-056）：`autoUpdateCheck: boolean` 写入 `AppSettings`（`src/shared/settings/types.ts`，默认 `true`）+ `createDefaultAppSettings` / `normalizeAppSettings` 同步更新（`src/shared/settings/defaults.ts`）+ `AboutSection` 加「自动检查更新」checkbox + useEffect 在 mount 时按 `autoUpdateCheck` 决定是否自动调 `checkForAppUpdate`（ref 一次性 guard，禁 strict mode 双调用 + 切到 true 不会重复触发）+ 6 项 AboutSection 单测（toggle 默认值 / 切换持久化 / mount 时自动检查 / 关闭时跳过 / 手动按钮仍可用 / 切回 true 持久化）+ 2 项 SettingsService 单测（持久化 `autoUpdateCheck=false` 不被默认值覆盖 / 旧 release 无该字段时退回默认 `true`）+ `SettingsPanel.css` 补充 `.settings-about-card__auto-toggle` / `__auto-toggle-hint` 样式（与既有 `.settings-row` 一致）。`contracts.test.ts` 同步补 `autoUpdateCheck: true` 字段（typecheck 通过）。**未**改 `src/shared/update/*`（DEC-048 9 态状态机保留原样）/ `src/components/layout/*` / `src/App.tsx` / `src/styles/app.css` / `package.json` / 锁文件 / `src-tauri/**` / `config/**`（DEC-053 收口） / 任何 reader / search / annotation / forms / export / pages / ocr / preprocess 模块。9 态状态机 `available` / `downloading` / `downloaded` / `installing` 行为零改动（确保 regression）。验证：80 文件 / 751 测试（+8：AboutSection 6 + SettingsService 2；现有 6 个 manual-check 测试在 `autoUpdateCheck=false` 下独立验证 9 态状态机）；typecheck 干净；lint 43 个错误（与 main 基线一致，pre-existing 0 回归）；build 2022 modules 成功；cargo check 干净（9 pre-existing dead_code warning 0 回归）。已知限制：auto-check 触发点是「About section mount」（用户首次打开设置 → 关于），**不**是 App 启动时刻（避免触碰 forbidden 的 `App.tsx` / `AppShell.tsx`）；debounce 500ms 未实现（App.tsx 当前 `onChange` 是同步 in-memory，SettingsService 真正落盘的 future PR 接入时再按需加）；增量更新失败回退 / 移动端 / CODE_SIGNING 仍 follow-up。
 
 ### ISS-022 设置页面 UI 整合
 

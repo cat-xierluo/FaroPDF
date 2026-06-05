@@ -64,6 +64,7 @@ export function createDefaultAppSettings(): AppSettings {
     defaultOcrProviderId: "local-ocrmypdf",
     requireNetworkOcrConfirmation: true,
     ocrProviders: createDefaultOcrProviders(),
+    autoUpdateCheck: true,
   };
 }
 
@@ -141,6 +142,8 @@ export function normalizeAppSettings(input: unknown): AppSettings {
       typeof input.requireNetworkOcrConfirmation === "boolean"
         ? input.requireNetworkOcrConfirmation
         : defaults.requireNetworkOcrConfirmation,
+    autoUpdateCheck:
+      typeof input.autoUpdateCheck === "boolean" ? input.autoUpdateCheck : defaults.autoUpdateCheck,
   };
 }
 

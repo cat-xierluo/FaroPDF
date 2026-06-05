@@ -20,4 +20,10 @@ export interface AppSettings {
   defaultOcrProviderId?: string;
   ocrProviders: OcrProviderConfig[];
   requireNetworkOcrConfirmation: boolean;
+  /**
+   * ISS-021 follow-up：是否在 About section 挂载时自动调用 `checkForAppUpdate`。
+   * 默认 `true`（与 DEC-048 / DEC-056 决策一致）。关闭时仅手动按钮触发检查，
+   * 自动检查在 mount 时跳过；切换实时经 `onChange` 路径持久化。
+   */
+  autoUpdateCheck: boolean;
 }

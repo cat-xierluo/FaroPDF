@@ -45,12 +45,12 @@ const STATUS_LABELS: Record<AppUpdateStatus, string> = {
  *
  * ISS-021：检查更新按钮接 `tauri-plugin-updater`（via `createTauriUpdateClient`）；
  * 仅在 Tauri WebView 内 + 端点已配置时才允许进入「检查 → 下载 → 安装」流程。
- * 自动检查（`autoUpdateCheck` 设置项）本期不实现，避免触碰被禁的 `src/shared/settings/`。
+ *
+ * ISS-021 follow-up（DEC-056）：`autoUpdateCheck` 设置项在 About 挂载时按值决定
+ * 是否自动调 `checkForAppUpdate`；手动按钮始终可用。`AppSettings.autoUpdateCheck`
+ * 默认 `true`；切换通过 `onChange` 走 SettingsPanel → App 实时持久化。
  */
-export function AboutSection({ settings: _settings, onChange: _onChange, updateClient }: AboutSectionProps) {
-  // 形参 onChange 被有意忽略：About section 只读，不修改 settings。
-  void _settings;
-  void _onChange;
+export function AboutSection({ settings, onChange, updateClient }: AboutSectionProps) {
   const metadata = readAppMetadata();
   const [status, setStatus] = useState<AppUpdateStatus>("idle");
   const [statusDetail, setStatusDetail] = useState<string | null>(null);
@@ -72,6 +72,26 @@ export function AboutSection({ settings: _settings, onChange: _onChange, updateC
       mountedRef.current = false;
     };
   }, []);
+
+  // ISS-021 follow-up（DEC-056）：About 首次挂载时按 `autoUpdateCheck` 决定是否
+  // 自动跑一次 `checkForAppUpdate`。用 ref 做一次性 guard，避免 React 18+ strict
+  // mode 下的双调用或后续 settings 变更触发重复检查。仅在 mount 时评估一次；
+  // 运行期切到 true 仍以手动按钮触发，符合「mount 时自动检查 / 手动按钮始终可用」
+  // 的契约。
+  const autoCheckTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (autoCheckTriggeredRef.current) {
+      return;
+    }
+    autoCheckTriggeredRef.current = true;
+    if (settings.autoUpdateCheck) {
+      void handleCheckUpdate();
+    }
+  }, []);
+
+  function handleAutoUpdateToggle(next: boolean) {
+    onChange({ ...settings, autoUpdateCheck: next });
+  }
 
   function setSafeStatus(next: AppUpdateStatus, detail: string | null = null) {
     if (!mountedRef.current) {
@@ -209,6 +229,22 @@ export function AboutSection({ settings: _settings, onChange: _onChange, updateC
               </dd>
             </div>
           </dl>
+          <label
+            className="settings-row settings-about-card__auto-toggle"
+            data-testid="about-auto-update-toggle"
+            htmlFor="auto-update-check"
+          >
+            <input
+              checked={settings.autoUpdateCheck}
+              id="auto-update-check"
+              onChange={(event) => handleAutoUpdateToggle(event.currentTarget.checked)}
+              type="checkbox"
+            />
+            <span>自动检查更新</span>
+            <small className="settings-about-card__auto-toggle-hint">
+              关闭后仅在手动点击「检查更新」时触发；切换实时保存。
+            </small>
+          </label>
           <div className="settings-about-card__links">
             {metadata.homepage ? (
               <a href={metadata.homepage} rel="noreferrer" target="_blank">

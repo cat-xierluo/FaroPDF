@@ -103,9 +103,10 @@ describe("AboutSection", () => {
       capability: { inTauri: false, endpointConfigured: false },
       outcome: { kind: "unsupported", reason: "test reason" },
     });
+    const settings = { ...createDefaultAppSettings(), autoUpdateCheck: false };
     render(
       <AboutSection
-        settings={createDefaultAppSettings()}
+        settings={settings}
         onChange={() => undefined}
         updateClient={client}
       />,
@@ -123,9 +124,10 @@ describe("AboutSection", () => {
     const client = createMockUpdateClient({
       outcome: { kind: "latest", currentVersion: "0.1.0" },
     });
+    const settings = { ...createDefaultAppSettings(), autoUpdateCheck: false };
     render(
       <AboutSection
-        settings={createDefaultAppSettings()}
+        settings={settings}
         onChange={() => undefined}
         updateClient={client}
       />,
@@ -150,9 +152,10 @@ describe("AboutSection", () => {
         releaseNotes: "新增搜索功能",
       },
     });
+    const settings = { ...createDefaultAppSettings(), autoUpdateCheck: false };
     render(
       <AboutSection
-        settings={createDefaultAppSettings()}
+        settings={settings}
         onChange={() => undefined}
         updateClient={client}
       />,
@@ -171,9 +174,10 @@ describe("AboutSection", () => {
     const client = createMockUpdateClient({
       outcome: { kind: "error", message: "network unreachable" },
     });
+    const settings = { ...createDefaultAppSettings(), autoUpdateCheck: false };
     render(
       <AboutSection
-        settings={createDefaultAppSettings()}
+        settings={settings}
         onChange={() => undefined}
         updateClient={client}
       />,
@@ -202,9 +206,10 @@ describe("AboutSection", () => {
       ],
       applyResult: { kind: "installed" },
     });
+    const settings = { ...createDefaultAppSettings(), autoUpdateCheck: false };
     render(
       <AboutSection
-        settings={createDefaultAppSettings()}
+        settings={settings}
         onChange={() => undefined}
         updateClient={client}
       />,
@@ -232,9 +237,10 @@ describe("AboutSection", () => {
       },
       applyResult: { kind: "error", message: "签名校验失败" },
     });
+    const settings = { ...createDefaultAppSettings(), autoUpdateCheck: false };
     render(
       <AboutSection
-        settings={createDefaultAppSettings()}
+        settings={settings}
         onChange={() => undefined}
         updateClient={client}
       />,
@@ -247,5 +253,108 @@ describe("AboutSection", () => {
     await waitFor(() => {
       expect(screen.getByText("签名校验失败")).toBeInTheDocument();
     });
+  });
+
+  // ISS-021 follow-up（DEC-056）：autoUpdateCheck 设置项 + About section 挂载时
+  // 自动检查契约。下面 6 项覆盖：toggle 默认值 / 切换持久化 / 自动检查触发 / 关
+  // 闭时跳过 / 手动按钮始终可用 / 切换到 false 后再次 mount 仍跳过。
+
+  test("auto-update toggle is on by default", () => {
+    render(<AboutSection settings={createDefaultAppSettings()} onChange={() => undefined} />);
+    const toggle = screen.getByTestId("about-auto-update-toggle").querySelector("input");
+    expect(toggle).not.toBeNull();
+    expect((toggle as HTMLInputElement).checked).toBe(true);
+  });
+
+  test("toggling auto-update off persists autoUpdateCheck=false via onChange", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<AboutSection settings={createDefaultAppSettings()} onChange={onChange} />);
+
+    const toggle = screen.getByTestId("about-auto-update-toggle").querySelector("input") as HTMLInputElement;
+    await user.click(toggle);
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0]?.[0] as ReturnType<typeof createDefaultAppSettings>;
+    expect(next.autoUpdateCheck).toBe(false);
+  });
+
+  test("toggling auto-update back on persists autoUpdateCheck=true via onChange", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const settings = { ...createDefaultAppSettings(), autoUpdateCheck: false };
+    render(<AboutSection settings={settings} onChange={onChange} />);
+
+    const toggle = screen.getByTestId("about-auto-update-toggle").querySelector("input") as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+    await user.click(toggle);
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0]?.[0] as ReturnType<typeof createDefaultAppSettings>;
+    expect(next.autoUpdateCheck).toBe(true);
+  });
+
+  test("auto-checks for updates on mount when autoUpdateCheck is true", async () => {
+    const client = createMockUpdateClient({
+      outcome: { kind: "latest", currentVersion: "0.1.0" },
+    });
+    render(
+      <AboutSection
+        settings={createDefaultAppSettings()}
+        onChange={() => undefined}
+        updateClient={client}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(client.checkForAppUpdate).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByText("已是最新版本")).toBeInTheDocument();
+  });
+
+  test("does NOT auto-check on mount when autoUpdateCheck is false", async () => {
+    const client = createMockUpdateClient({
+      outcome: { kind: "latest", currentVersion: "0.1.0" },
+    });
+    const settings = { ...createDefaultAppSettings(), autoUpdateCheck: false };
+    render(
+      <AboutSection
+        settings={settings}
+        onChange={() => undefined}
+        updateClient={client}
+      />,
+    );
+
+    // 等待一个 microtask 周期：若有自动检查会在 await 后 resolve
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(client.checkForAppUpdate).not.toHaveBeenCalled();
+    // 状态保持 idle
+    expect(screen.getByText("未检查")).toBeInTheDocument();
+  });
+
+  test("manual check button still works when autoUpdateCheck is false", async () => {
+    const user = userEvent.setup();
+    const client = createMockUpdateClient({
+      outcome: { kind: "latest", currentVersion: "0.1.0" },
+    });
+    const settings = { ...createDefaultAppSettings(), autoUpdateCheck: false };
+    render(
+      <AboutSection
+        settings={settings}
+        onChange={() => undefined}
+        updateClient={client}
+      />,
+    );
+
+    // 关闭自动检查 → 初始 mount 不调
+    expect(client.checkForAppUpdate).not.toHaveBeenCalled();
+
+    // 手动点击按钮 → 仍能触发
+    await user.click(screen.getByTestId("about-check-update"));
+
+    await waitFor(() => {
+      expect(client.checkForAppUpdate).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByText("已是最新版本")).toBeInTheDocument();
   });
 });

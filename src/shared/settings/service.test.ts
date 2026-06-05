@@ -21,6 +21,29 @@ describe("settings service", () => {
     expect(settings.defaultSavePolicy).toBe("always-export-copy");
     expect(settings.defaultOcrProviderId).toBe("local-ocrmypdf");
     expect(settings.requireNetworkOcrConfirmation).toBe(true);
+    expect(settings.autoUpdateCheck).toBe(true);
+  });
+
+  test("preserves persisted autoUpdateCheck=false across readSettings", async () => {
+    // ISS-021 follow-up（DEC-056）：用户切到 false 持久化后，重新读取不应当被
+    // 默认值覆盖。模拟 0.1.0-alpha.10 之前 release 的旧持久化数据无该字段时
+    // 才退回默认 true。
+    vi.mocked(backend.readSettings).mockResolvedValue({ autoUpdateCheck: false });
+    const service = createSettingsService(backend);
+
+    const settings = await service.readSettings();
+
+    expect(settings.autoUpdateCheck).toBe(false);
+  });
+
+  test("falls back to default autoUpdateCheck=true when persisted payload omits the field", async () => {
+    // 旧版本 release 没有 autoUpdateCheck 字段，读取时按默认值补齐。
+    vi.mocked(backend.readSettings).mockResolvedValue({});
+    const service = createSettingsService(backend);
+
+    const settings = await service.readSettings();
+
+    expect(settings.autoUpdateCheck).toBe(true);
   });
 
   test("updates settings through a sanitized storage view", async () => {

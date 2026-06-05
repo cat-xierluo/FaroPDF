@@ -255,6 +255,7 @@ describe("shared contracts", () => {
       recentFiles: [],
       ocrProviders: [provider],
       requireNetworkOcrConfirmation: true,
+      autoUpdateCheck: true,
     };
 
     expect(documentState.pageCount).toBe(12);

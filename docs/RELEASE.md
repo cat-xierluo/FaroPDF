@@ -91,12 +91,11 @@ git push origin v0.1.0
 
 ## 4. 当前限制（v0.3）
 
-- **自动检查更新未实现**：`autoUpdateCheck` 设置项未在 ISS-021 落地（落地会触
-  碰被禁的 `src/shared/settings/`，与并发 worker 的 scope 冲突）。当前仅支持手
-  动点按钮检查。后续 follow-up：
-  1. 在 `src/shared/settings/types.ts` 的 `AppSettings` 加 `autoUpdateCheck: boolean`
-  2. About section 在 mount 时按该值决定是否自动调 `checkForAppUpdate`
-  3. 默认值 `true`，提供 UI toggle 关闭
+- **自动检查更新**：✅ DEC-056 落地。`AppSettings.autoUpdateCheck`（默认 `true`）
+  + About section 顶部「自动检查更新」checkbox，关闭时 About 首次 mount 跳过
+  `checkForAppUpdate`，手动按钮仍可用；切换实时经 `onChange` → SettingsPanel
+  → App 路径持久化（App.tsx 当前是 in-memory，SettingsService 真正落盘由后续
+  PR 接入时再加 debounce）。详见 `docs/DECISIONS.md` DEC-056。
 - **增量更新回退完整重装**：未实现。`tauri-plugin-updater` 的下载流若中断会自
   动重试；网络异常的最终回退路径留给用户手动下载新版本安装包（GitHub Release
   页面有所有 assets）。
