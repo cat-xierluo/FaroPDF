@@ -47,6 +47,11 @@ jobs:
           - label: macos-universal
             os: macos-latest
             target: universal-apple-darwin
+            # `universal-apple-darwin` was removed from the stable Rust distribution
+            # in 2026-05 (rust-lang/rustup components). Install both underlying
+            # arch targets; Tauri CLI builds both then runs `lipo` to produce
+            # the universal bundle under `target/universal-apple-darwin/`.
+            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
             bundles: app,dmg
             artifact_glob: |
               src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app
@@ -55,6 +60,7 @@ jobs:
           - label: windows-x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
+            rust_targets: x86_64-pc-windows-msvc
             bundles: msi,nsis
             artifact_glob: |
               src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
@@ -62,6 +68,7 @@ jobs:
           - label: linux-x64
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            rust_targets: x86_64-unknown-linux-gnu
             bundles: appimage,deb
             artifact_glob: |
               src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
@@ -80,7 +87,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.rust_targets }}
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
@@ -92,9 +99,11 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
+          # NOTE: jammy (Ubuntu 22.04) only ships `libayatana-appindicator3-dev`;
+          # `libappindicator3-dev` is not in the repo and conflicts with the
+          # ayatana variant via `Conflicts:`. Install the ayatana one only.
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
             librsvg2-dev \
             patchelf \
             build-essential \
