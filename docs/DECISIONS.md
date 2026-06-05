@@ -3248,3 +3248,58 @@ RWS8WkTIW8ht2pmQPiablJPY8vRrsXleS6NxLsalJ/Tyn+1tKpHGxREc  // 新（2026-06-05 �
 - 错误分类（5 类）+ 脱敏（移除路径 / token / URL query 参数）+ 单元测试覆盖 4 路径（chunk retry / network / signature / cancelled / unknown）。
 - 前端 9 态状态机扩为 10 态，新增 `fallback` 分支。
 - 11 项 Rust 单元测试 + 5 项新增前端测试覆盖 16 项 total。
+
+## DEC-067 v0.1.0-beta.1 封箱
+
+- 日期：2026-06-06
+- 状态：已采纳
+- 关联：v0.1 主功能封箱 → 启动 v0.2 法律增强
+- 关联分支：`chore/release-0.1.0-beta.1`
+
+### 1. 背景
+
+- Wave 7 收口（PR #53 ISS-008 FormsPanel utility panel + PR #54 ISS-021 增量更新失败回退）后，v0.1 主功能全部落地。
+- 几个 v0.3 follow-ups（移动端 / CODE_SIGNING / key rotation）有明确 SOP 但不在 v0.1 scope。
+- ISS-021 真实 pubkey 已在 PR #55 / DEC-065 替换（CI 弱密码生成的占位 `RWSY2kf...` → 正式 keypair），release.yml 路径完整就位。
+- ROADMAP v0.1 阶段状态行停留在「进行中（alpha.0 ~ 0.1.0-alpha.18 已封箱；详细子项审计留 follow-up，下一版起逐节刷新）」，本封箱后维持同样状态（v0.1 仍未到「完成」标志，仍有 unchecked 子项需要后续审计）。
+
+### 2. 决策
+
+- 切到 `chore/release-0.1.0-beta.1` 分支做封箱，**不**直接 push 到 main 触发 release.yml。
+- bump 版本：
+  - `package.json` version `0.1.0-alpha.18` → `0.1.0-beta.1`
+  - `src-tauri/tauri.conf.json` version `0.1.0-alpha.18` → `0.1.0-beta.1`
+- CHANGELOG 顶部加 `## 0.1.0-beta.1 - 2026-06-06` 段，列封箱范围（与 0.1.0-alpha.18 ~ alpha.20 累计比较）+ v0.3 follow-ups + 封箱变更清单。
+- PR 合并到 main 后由 PM 在 main 上 `git tag v0.1.0-beta.1 && git push origin v0.1.0-beta.1` 触发 release.yml 三平台 build 矩阵。
+- **不**打 `## 0.1.0-alpha.20` / `## 0.1.0-alpha.19` 单独的 tag（这两个段只在 CHANGELOG 里留作历史，alpha.18 才是第一个正式 tag 锚点；beta.1 tag 落在 main 当前 52ec18b，semver "v0.1.0-beta.1" 已含所有 alpha.18~20 的累计变更）。
+
+### 3. 拒绝的方案
+
+- **直接打 `v0.1.0` stable tag**：方案 A。v0.3 follow-ups 明确 v0.3 评估（移动端 / CODE_SIGNING），backdating 这些 follow-up 到 v0.1 stable 会误导用户；走 beta.1 → rc.1 → stable 节奏更清晰。
+- **走 `0.2.0-alpha.1` 不打 v0.1 stable**：方案 B。用户明确指示"先发布一个版本再启动 0.2"，v0.1 必须有独立 tag 锚点。
+- **跑 release.yml dry-run 验证三平台产物后再 tag**：方案 C。release.yml 已经在 Wave 5 验证过（macos-universal / windows-x64 / linux-x64 矩阵），本封箱无新增 build 配置变更，dry-run 多余。
+
+### 4. 变更范围
+
+| 文件 | 变更 |
+| --- | --- |
+| `package.json` | `version: 0.1.0-beta.1` |
+| `src-tauri/tauri.conf.json` | `version: 0.1.0-beta.1` |
+| `CHANGELOG.md` | 顶部加 `## 0.1.0-beta.1 - 2026-06-06` 段 |
+| `docs/DECISIONS.md` | 追加本条目（DEC-067） |
+| `docs/ROADMAP.md` | **不**改（v0.1 状态维持「进行中」，beta.1 仍属 v0.1 进行中里程碑） |
+
+### 5. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `npm run typecheck` | ✅ 干净 | 仅 version bump，无代码变更 |
+| `npm run build` | ✅ 成功 | 版本号变化不影响 build 产物 |
+| `cargo check --offline` | ✅ 干净 | 同上 |
+
+### 6. 后续路径
+
+- `git tag v0.1.0-beta.1 && git push origin v0.1.0-beta.1` 触发 release.yml → CI 三平台 build 矩阵 → 产物上传到 GitHub Releases + `latest.json` 生成。
+- alpha 阶段累计的 v0.1.0-alpha.18 ~ alpha.20 段保留在 CHANGELOG（用户按版本号回溯时仍能看到逐次变更），但**不**单独打 tag。
+- 0.1.0-rc.1 / 0.1.0 stable 视 v0.3 follow-ups（移动端 / CODE_SIGNING / key rotation）完成度推进；当前 v0.1 → 完成的判定标准是 ROADMAP v0.1 子项审计 + 上述 follow-ups 全部 close。
+- 封箱后启动 v0.2 法律增强（详见 DEC-068 / ROADMAP v0.2 行）。
