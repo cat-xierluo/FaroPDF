@@ -243,6 +243,27 @@ Agent 可根据本文件自行判断：
 - 2026-06-05：在 `chore/consolidate-configs` worktree 收口：5 个文件 `git mv` 到 `config/`（保留 rename 历史）；`tsconfig.json` `include` 改 `../src`；`vitest.config.ts` 修 `projectRoot`；`eslint.config.js` 换 `parserOptions.project` 显式指向；`package.json` 8 个 scripts 全部加 `--config` 标志。验证：`npm run typecheck` 干净；`npm run lint` 43 个错误（与 main 基线一致，pre-existing）；`npm test` 80 文件 / 743 用例全过；`npm run build` 2022 modules 成功；`cargo check` 干净（9 个 pre-existing dead_code warning）。`docs/DECISIONS.md` 追加 DEC-053；`CHANGELOG.md` 新增 0.1.0-alpha.13 段（README PR 占用 0.1.0-alpha.12）；`docs/ROADMAP.md` **未改**。
 - 下一步：与 PM 协同 PR 合并 / 验证；后续 chore 类工作（如整理 `tests/fixtures/` 体积、清理 pre-existing lint 错误）按需拆 worker；Folia 对齐度（删除 `package.json` 中 Tauri 配置/多余 deps）等 0.2 再议。
 
+### ISS-028 杨卫薪律师个人主页 + 两产品展示（Folia / FaroPDF）
+
+- 优先级：P1
+- 类型：项目卫生（chore / 文档 + 营销）
+- 状态：待 PM 启动（brainstorm + design，**本 ISS 任务卡**仅登记框架，**不**绑定实现）
+- 建议分支：TBD（启动时由 PM 与 brainstorming 决定）
+- 建议 worktree：TBD
+- 依赖：无
+- 范围：独立仓库（建议 `cat-xierluo/personal-site` 或同 owner 下 monorepo 路径） + Folia / FaroPDF README §"官方仓库" 加主页入口（如 `https://cat-xierluo.github.io/`） + 可选 `description` / `homepage` 字段更新
+- 目标：杨卫薪律师个人主页，展示 Folia / FaroPDF 两个产品，作为作者对外的「官方门面」+ 项目入口聚合点。技术方向待定（Astro / Vite + React / 纯静态 HTML / GitHub Pages 自定义域）。
+- 验收：TBD（启动 brainstorming 时与 PM 确认）
+- 关联：DEC-054 §4「后续路径」登记项；与 Folia 同作者的「个人品牌 + 多个产品」聚合页需求
+- 关键决策（待 brainstorm 时确认）：
+  - 仓库位置：独立 repo / monorepo 子目录 / GitHub Pages
+  - 域名：`https://cat-xierluo.github.io/`（默认）或自定义
+  - 框架：Astro（与 Folia `website/` 一致）/ Vite + React（与 Folia / FaroPDF 一致）/ 纯静态
+  - 内容板块：bio / 工作领域 / 产品列表 / 联系方式 / 公众号（与 Folia README / AuthorCard 数据打通）/ 中英文切换
+  - 与 Folia `website/` 子目录的关系：迁出独立仓库 / 保留子目录但主页独立 / 二者并行
+- 2026-06-05：登记 ISS-028 任务卡（DEC-054 §4 后续路径触发）。**当前分支 `chore/add-license-and-author` 不实现本 ISS**；启动时由 PM 开 brainstorming，按 ISS-007 / ISS-026 模式拆 worker 推进。
+- 下一步：brainstorming（确认仓库位置 / 域名 / 框架 / 内容板块 / 与现有 Folia website 关系）→ 新分支 → 落地。
+
 ## 暂缓任务
 
 ### ISS-015 直接编辑 PDF 原有文字、图片和链接
