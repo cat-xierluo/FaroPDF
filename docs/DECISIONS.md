@@ -2025,3 +2025,120 @@ ISS-023 任务卡（`docs/TASKS.md` §"ISS-023"）原验收要求分两块：
 
 - ISS-023 第一版收口后，作者卡升级（如支持多作者、加 GitHub Sponsors / Patreon 链接、运行时切换 dark mode 配色）按需新开 worker。
 - 公众号二维码替换流程 PR 走标准 git-workflow：作者在自己分支替换图 + 更新 `QRCODE_LICENSE.md` 替换日期；不强制走本 worktree。
+
+## DEC-052 README 参照 Folia 模板重写
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联分支：`docs/readme-rewrite`
+- 关联任务：未挂活跃 ISS（README 重写由 PM 直接派发 worker，不在 `docs/TASKS.md` 活跃任务源里）
+
+承接 DEC-051（ISS-023 作者卡 + 微信二维码占位收口）之后，本决策记录 `README.md` 从 70 行散段重写为与 Folia 同结构项目门面的方案，遵循 DEC-002「FaroPDF 独立项目」、DEC-003「Tauri + React + PDF.js + pdf-lib 技术选型」、DEC-013「阅读优先的 Shell IA」与 Folia README 的 9 个一级 section 结构。
+
+### 1. 背景与动机
+
+- 旧 `README.md`（70 行）只有「项目名 + 一句话定位 + 当前状态 + 首版能力目标 + 设计原则 + 开发命令 + 文档」单线叙述；与 Folia README 的标准门面结构差距明显。
+- 0.1.0-alpha.0 ~ 0.1.0-alpha.11 已实际交付阅读底座、4 视图模式 + 8 缩放 + 旋转 + 键盘翻页 + 阅读位置恢复、缩略图、搜索结果层、批注深化 4 阶段（AnnotationOverlay / Toolbar / Sidebar / 中文图章真实绘制 / writeAnnotationPdf / stamp 预览）、OCR bridge 真实接入（本地 ocrmypdf + 云端 PaddleOCR/MinerU + 9 态质量检查）、扫描预处理 lopdf 真实清洁、导出引擎（pdf-lib 真实改写 + 表单 / 批注 flatten + 水印 / Bates / 页码 + 证据图片 A4 编排）、表单签署第一版、ISS-021 全平台打包与自动更新（DEC-048 9 态）、ISS-023 作者卡（DEC-051），旧 README 没体现这些已交付能力。
+- 用户经常把 Folia 与 FaroPDF 放在一起看（独立项目但同作者），README 结构对齐 Folia 降低用户认知成本。
+
+### 2. 决策
+
+#### 2.1 README 9 个一级 section，对齐 Folia 结构
+
+按 Folia README 的 9 个一级 section 顺序，并按 FaroPDF 实际形态调整：
+
+1. **项目名 + 一句话定位**（FaroPDF + 面向律师的独立 PDF 阅读器，**快读、检索、批注、整理、OCR、表单签署**一条龙）；
+2. **官方仓库**（GitHub `https://github.com/cat-xierluo/FaroPDF`，**不**写官网链接因为 v0.1 阶段尚未搭建独立官网页面，明确标「待发布」避免给假链接）；
+3. **下载与安装**（**待发布**——ISS-021 流水线已就位但**未生成公开 release**，本节给出 release 上线后的下载入口占位 + macOS 首次运行 `xattr` 未来指引，**不**假装已有 release）；
+4. **功能**（按「阅读与检索 / 批注 / 页面整理 / OCR 扫描 / 导出 / 表单签署 / 设置」7 个子节列实际已交付能力，每条 bullet 都能在 `CHANGELOG.md` 找到对应版本号）；
+5. **技术栈**（Tauri v2 + React 19 + TypeScript 5.8 + Vite 7 + PDF.js 6.0.227 + pdf-lib 1.17.1 + @pdf-lib/fontkit 1.1.1 + Vitest 4.1.8 + ESLint 10；版本号严格来自 `package.json`）；
+6. **作者**（沿用 ISS-023 / DEC-051 AuthorCard 数据：**杨卫薪律师** + GitHub `[cat-xierluo](https://github.com/cat-xierluo)` + 微信 `ywxlaw`；**不**写 `package.json` author.name 的 `maoking`，因为 AuthorCard 实际展示名是杨卫薪律师，`maoking` 是 GitHub 用户名）；
+7. **开发环境**（Node.js + npm + Rust stable + Xcode CLT for macOS + Tauri CLI 已作为 devDep 安装）；
+8. **构建**（`npm run build` 前端 + `npm run tauri build` 桌面 + 产物 `src-tauri/target/release/bundle/` + 引用 `docs/RELEASE.md`）；
+9. **许可**（**TODO** —— 当前仓库未提交 LICENSE 文件，建议与 Folia 对齐采用 Apache-2.0，但需首个 release 前 PM 确认与定稿；**不**在本 PR 创建 LICENSE）；
+10. **文档**（AGENTS.md / docs/ROADMAP.md / docs/TASKS.md / docs/DECISIONS.md / docs/ARCHITECTURE.md / docs/DESIGN.md / docs/RELEASE.md / CHANGELOG.md）。
+
+#### 2.2 严格不发明未交付能力
+
+- 所有功能 bullet 必须能映射到 `CHANGELOG.md` 0.1.0-alpha.0 ~ 0.1.0-alpha.11 实际交付的版本条目。
+- 不确定的能力**不**写入 README：
+  - 真实文本高亮几何绘制（DEC-037 flatten 已知限制）**不**写；
+  - 增量更新回退完整重装（DEC-048 v0.3 已知限制）**不**写；
+  - `autoUpdateCheck` 设置项（DEC-048 v0.3 已知限制）**不**写；
+  - `keychain:` 凭证引用与 OS Keychain 集成（DEC-042 已知限制）**不**写；
+  - 真实图像重编码压缩（DEC-037 已知限制）**不**写；
+  - 90 度方向检测 + 微倾斜 + 双页拆分真实像素检测（DEC-040 已知限制）**不**写。
+- 标注规则：若某能力在 `CHANGELOG.md` 已出现但仅「plan-only」或「stub」，README bullet 末尾加「plan-only」或「stub」等限定语，避免把未完成的子能力误报为已完成。
+
+#### 2.3 下载与安装标「待发布」而非留空或假装有
+
+- ISS-021 全平台打包与自动更新流水线已就位（`docs/RELEASE.md` 记录了发布流程、产物矩阵、`latest.json` schema、keypair 生成与 GitHub Secrets 注入），`createUpdaterManifest.mjs` 已实现。
+- 但**当前 `GitHub Releases` 页面没有任何 FaroPDF release**，`latest.json` 也未发布；CI 镜像装 webkit2gtk-4.1 / librsvg2 / libxdo / libayatana-appindicator3 走 macos-universal + windows-x64 + linux-x64 3 平台 build matrix 已配，但**首发签名 keypair 仍需 PM 手动 `cargo tauri signer generate`**。
+- 旧 README 没有下载入口；本 PR 仍不假装有 release，给出「release 上线后预期下载入口 + macOS 首次运行 `xattr` 未来指引」并明确标「**当前状态：待发布**」。
+
+#### 2.4 许可标「TODO」而非默认某种协议
+
+- 当前仓库未提交 `LICENSE` 文件；项目首版贡献者协议与发布协议尚未与 PM 确认。
+- 建议与 Folia 对齐采用 **Apache License 2.0**（因为 Folia 已采用），但需首个 release 前 PM 拍板。
+- 本 PR **不**创建 LICENSE 文件（避免 PM 后续改协议时需删除 / 替换文件引入 git 历史噪音）。
+
+#### 2.5 图标
+
+- `docs/icon.png` 不存在（搜索 `*.png` 确认）。
+- README **不**插入 `<img src="docs/icon.png">` 标签，避免 404 资源引用；与 Folia 顶部居中 logo 的处理差异化。
+- 后续如需在 README 顶部加 logo，应先在 `docs/icon.png` 落图标资产，再加标签（独立 PR，避免与本 README 重写耦合）。
+
+#### 2.6 作者卡数据
+
+- 沿用 ISS-023 / DEC-051 收口的 AuthorCard 真实数据：
+  - 展示名：**杨卫薪律师**
+  - GitHub：`cat-xierluo`（链接 `https://github.com/cat-xierluo`）
+  - 微信：`ywxlaw`
+- `package.json` author.name 是 `maoking`（GitHub 用户名）；README 以 AuthorCard 实际展示名为准，**不**写 `maoking`。
+- 简介沿用 Folia 作者卡语言：专注于技术类纠纷领域，包括知识产权、数据与 AI 相关争议，同时长期关注 AI 技术在法律实务、知识管理和专业写作中的应用；FaroPDF 解决卷宗 / 证据 / 扫描件 / 表单的快读、批注、OCR、页面整理和签署交付。
+
+#### 2.7 范围与依赖
+
+- **修改**：
+  - `README.md`（完全重写，从 70 行扩到 ~230 行）
+  - `CHANGELOG.md`（顶部追加 `0.1.0-alpha.12 - 2026-06-05` 一段，描述 README 重写 + 范围 + 已知限制）
+  - `docs/DECISIONS.md`（追加 DEC-052 本条目）
+- **不修改**：
+  - `src/**` / `src-tauri/**` / `package.json` / 锁文件 / 任何构建 / Lint / 类型检查配置（与并行 `chore/consolidate-configs` 分支解耦）
+  - `docs/ROADMAP.md` / `docs/ARCHITECTURE.md` / `docs/DESIGN.md` / `docs/TASKS.md` / `docs/RELEASE.md` / `AGENTS.md` / `CLAUDE.md`
+  - `LICENSE`（**不**创建，与 §2.4 一致）
+  - `.gitignore` / `.github/**` / `scripts/**`
+- 不引入新依赖。
+- 不实现新功能；不修改 `src/components/settings/AuthorCard.tsx` / `src/assets/wechat-qrcode.png` / `src/modules/settings/sections/AboutSection.tsx`（AuthorCard 数据已就位，本 README 直接消费其内容）。
+
+#### 2.8 已知限制
+
+- README 是项目门面快照，与功能持续迭代存在天然滞后；后续每条 ISS 收口后，由 PM 在合并时同步更新 README 对应 bullet（或开 docs-only 维护 PR）。
+- 官网入口（`https://cat-xierluo.github.io/FaroPDF/`）在 v0.1 阶段尚未搭建，README 标「待发布」避免给假链接；如未来 v0.3 阶段搭建独立官网页面，再补 `cat-xierluo.github.io` 入口。
+- 「macOS 首次运行」指引基于未来 release 形态预测（`xattr -dr com.apple.quarantine`），实际首次运行步骤以 release 时 `docs/RELEASE.md` 为准。
+- 「下载与安装」section 描述的是 release 上线后的入口占位，与 `docs/RELEASE.md` §"发布流程" 对齐；首个 release 发布时由 PM 同步把「待发布」标替换为真实 release URL。
+
+### 3. commit cadence
+
+- 1 个 commit（按 worker prompt 要求）：
+  - **`docs: README 参照 Folia 模板重写（DEC-052）`**：3 个文件（README.md / CHANGELOG.md / docs/DECISIONS.md）一起落，1 个 commit。
+
+### 4. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `git status --short` | ✅ 干净 | 仅 `M README.md` + `M CHANGELOG.md` + `M docs/DECISIONS.md` 三项 |
+| README 资源引用 | ✅ 无 404 | 不引用 `docs/icon.png` / 不存在 release URL |
+| README 功能列表与 CHANGELOG 一致 | ✅ | 7 个子节每条 bullet 都能在 `CHANGELOG.md` 找到对应版本号 |
+| README 不发明未交付能力 | ✅ | 真实高亮几何绘制 / 增量更新回退 / autoUpdateCheck / keychain / 真实图像重编码 / 像素级方向检测均**不**出现 |
+| README 下载与安装 | ✅ 标「待发布」 | 不假装有 release |
+| README 许可 | ✅ 标「TODO」 | 不创建 LICENSE 文件 |
+| README 作者 | ✅ | 杨卫薪律师 + GitHub cat-xierluo + 微信 ywxlaw，与 AuthorCard 一致 |
+| 技术栈版本号 | ✅ | 严格来自 `package.json`（Tauri v2 / React 19 / TS 5.8 / Vite 7 / PDF.js 6.0.227 / pdf-lib 1.17.1 / Vitest 4.1.8） |
+
+### 5. 后续路径
+
+- README 与 `docs/RELEASE.md` 同步：首个 release 发布时由 PM 把「待发布」标替换为真实 release URL；macOS 首次运行步骤以 `docs/RELEASE.md` 实际指引为准。
+- 官网入口：v0.3 阶段（ROADMAP §"v0.3 性能与发布"）若搭建独立官网页面，再补 `cat-xierluo.github.io` 入口到 README §"官方仓库"。
+- LICENSE 落地：首个 release 前 PM 确认采用 Apache-2.0 后单独 PR 创建 `LICENSE` 文件 + 把 README §"许可" 替换为实际协议名称。
+- README 维护责任：每条 ISS 收口时由 PM 决定是否同步更新 README（涉及功能可见性变更的 ISS 建议同步）；docs-only 维护 PR 可走 `docs/*` 分支不依赖 ISS 任务源。
