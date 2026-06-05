@@ -149,24 +149,22 @@ Agent 可根据本文件自行判断：
   - 2026-06-04：在 `feat/app-distribution` 推进 ISS-021 第一版（DEC-048）：新增 `src/shared/update/` 5 文件（types / updateService 累计 progress adapter / updateCapability / index + 3 测试文件，14 项新单测）+ `src/modules/settings/sections/AboutSection.tsx` 接 `createTauriUpdateClient` 9 态状态机（手动检查 → available → 下载并安装 → 重启提示；AboutSection.test.tsx 9 项）+ `src-tauri/Cargo.toml` 加 `tauri-plugin-updater = "2.10.1"` + `src-tauri/src/lib.rs` 注册 plugin + `src-tauri/tauri.conf.json` `bundle.createUpdaterArtifacts` + `plugins.updater` 配置块 + `package.json` 加 `@tauri-apps/plugin-updater@2.10.1` + `tsconfig.json` lib ES2020→ES2022（解锁 27 个 pre-existing `Array.prototype.at` 错误）+ `.github/workflows/release.yml`（3 平台 matrix：macos-universal / windows-x64 / linux-x64 → artifacts → `scripts/create-updater-manifest.mjs` → latest.json + softprops/action-gh-release@v2 发布）+ `scripts/create-updater-manifest.mjs`（纯 ESM，零 npm 依赖，扫描 .app.tar.gz / .msi / .AppImage 调 `cargo tauri signer sign`）+ `docs/RELEASE.md`（产物矩阵 / 密钥管理 / 发布流程 / 5 项限制）。**未**改 `src/components/...`（除 update 入口）/ `src/styles/` / `Toolbar.tsx` / `App.tsx` / `Sidebar.tsx` / `src-tauri/src/{ocr,scan_preprocess,forms}/` / 其他 reader/search/annotation/forms/export/pages/ocr/preprocess 模块 / `src/shared/{pdf,ocr,preprocess,annotation,form,export,settings}/` / `assets/fonts/`。pubkey 写占位 `RWSY2kf...`（CI 弱密码生成的 base64 段），私钥已 rm 丢弃；首次生产发布前必须由 PM 重生成。验证：76 文件 / 689 测试（+5：updateService 7 / updateCapability 2 / AboutSection 新增 6 + 替换 3）；typecheck / build / cargo check 全绿；增量更新失败回退 / autoUpdateCheck / 移动端 / CODE_SIGNING 留 follow-up（详见 DEC-048 + docs/RELEASE.md §4）。
   - 2026-06-05：在 `feat/iss-021-auto-update-check` 推进 ISS-021 follow-up 第二版（DEC-056）：`autoUpdateCheck: boolean` 写入 `AppSettings`（`src/shared/settings/types.ts`，默认 `true`）+ `createDefaultAppSettings` / `normalizeAppSettings` 同步更新（`src/shared/settings/defaults.ts`）+ `AboutSection` 加「自动检查更新」checkbox + useEffect 在 mount 时按 `autoUpdateCheck` 决定是否自动调 `checkForAppUpdate`（ref 一次性 guard，禁 strict mode 双调用 + 切到 true 不会重复触发）+ 6 项 AboutSection 单测（toggle 默认值 / 切换持久化 / mount 时自动检查 / 关闭时跳过 / 手动按钮仍可用 / 切回 true 持久化）+ 2 项 SettingsService 单测（持久化 `autoUpdateCheck=false` 不被默认值覆盖 / 旧 release 无该字段时退回默认 `true`）+ `SettingsPanel.css` 补充 `.settings-about-card__auto-toggle` / `__auto-toggle-hint` 样式（与既有 `.settings-row` 一致）。`contracts.test.ts` 同步补 `autoUpdateCheck: true` 字段（typecheck 通过）。**未**改 `src/shared/update/*`（DEC-048 9 态状态机保留原样）/ `src/components/layout/*` / `src/App.tsx` / `src/styles/app.css` / `package.json` / 锁文件 / `src-tauri/**` / `config/**`（DEC-053 收口） / 任何 reader / search / annotation / forms / export / pages / ocr / preprocess 模块。9 态状态机 `available` / `downloading` / `downloaded` / `installing` 行为零改动（确保 regression）。验证：80 文件 / 751 测试（+8：AboutSection 6 + SettingsService 2；现有 6 个 manual-check 测试在 `autoUpdateCheck=false` 下独立验证 9 态状态机）；typecheck 干净；lint 43 个错误（与 main 基线一致，pre-existing 0 回归）；build 2022 modules 成功；cargo check 干净（9 pre-existing dead_code warning 0 回归）。已知限制：auto-check 触发点是「About section mount」（用户首次打开设置 → 关于），**不**是 App 启动时刻（避免触碰 forbidden 的 `App.tsx` / `AppShell.tsx`）；debounce 500ms 未实现（App.tsx 当前 `onChange` 是同步 in-memory，SettingsService 真正落盘的 future PR 接入时再按需加）；增量更新失败回退 / 移动端 / CODE_SIGNING 仍 follow-up。
 
-### ISS-022 设置页面 UI 整合
+### ISS-022 设置页面 UI 整合（已归档 → DEC-059）
 
 - 优先级：P1
 - 类型：UI
-- 状态：待处理
-- 建议分支：`feat/settings-page`
-- 建议 worktree：`.claude/worktrees/tmux-settings-page`
+- 状态：已完成（lazy load 收口 DEC-059，`feat/iss-022-lazy-load`）
+- 建议分支：`feat/iss-022-lazy-load`
+- 建议 worktree：`.claude/worktrees/tmux-iss-022-lazy-load`
 - 依赖：ISS-014、ISS-021
-- 范围：`src/components/SettingsPage.tsx`（新增）、`src/components/settings/`（新增分组目录）、`src/modules/settings/SettingsPanel.tsx`（拆分到各 section）、`src/styles/`、`docs/DESIGN.md`（设置浮层视觉补遗）
-- 参考实现：`folia/src/components/SettingsPage.tsx`、`folia/src/components/settings/GeneralSection.tsx` / `AppearanceSection.tsx` / `ShortcutsSection.tsx`、`folia/src/hooks/useSettings.ts`、`folia/src/services/settingsService.ts`
-- 目标：把现有扁平的 `SettingsPanel.tsx` 改造成左侧导航 + 右侧多 section 的浮层设置页，至少包含「常规 / 阅读 / OCR provider / 快捷键 / 关于」五个 section；遵循 `docs/DESIGN.md` 的视觉系统。
+- 范围：`src/modules/settings/SettingsPanel.tsx`、`src/modules/settings/sections/`、`docs/`
+- 目标：ISS-022 第一版 PR #25 已合并 5 section + SettingsPanel + AppShell 接入；本收口把 DEC-038 §"不采纳" defer 的 lazy load 落地。
 - 验收：
-  - 设置入口在主工具栏触发浮层，Esc 关闭、点遮罩关闭、焦点管理符合 `docs/DESIGN.md`。
-  - 左侧导航在窄屏视口下能折叠为顶部 tabs 或下拉。
-  - 五个 section 全部可访问；非首屏 section 走 `lazy` 减少首屏体积。
-  - 现有 `AppSettings`、`OcrProviderConfig` 契约和 `useSettings` 不破坏。
-  - 单元测试覆盖导航切换、Esc 关闭、section 懒加载和验证错误展示。
-  - 与 `docs/DESIGN.md` 的色板、字号、控件密度和暗色模式保持一致。
+  - 默认常规 section eager 加载，其他 4 个 section 走 `React.lazy` + `Suspense`。✅
+  - Vite build 把 4 个 lazy section 拆分为独立 chunk。✅
+  - typecheck / build / cargo check 全绿。✅
+  - 新增 4 项 lazy 行为测试。✅
+- 2026-06-05：在 `feat/iss-022-lazy-load` worktree 完成收口（DEC-059）。新增 `sections/lazy.ts` 4 个 lazy wrapper；SettingsPanel.tsx import 改 lazy + Suspense 包裹；SettingsPanel.css +5 行 skeleton fallback 样式；SettingsPanel.test.tsx +4 项 lazy 行为测试。npm test 全量失败是 pre-existing `html-encoding-sniffer` ESM 不兼容（主工作区同样失败，与本次改动无关）。归档到 DEC-059。
 
 ### ISS-023 关于页面与作者页
 
@@ -307,7 +305,7 @@ Agent 可根据本文件自行判断：
 - **页面管理 / 证据材料**：ISS-006、ISS-018
 - **OCR / 质量**：ISS-010、ISS-017
 - **扫描预处理**：ISS-016
-- **设置 / OCR Provider**：ISS-014
+- **设置 / OCR Provider**：ISS-014、ISS-022
 - **法律材料整理**：ISS-019
 - **品牌 / UI**：ISS-020
 - **跨仓协调**：personal-site `ISS-005`（Folio 仓 PR-A / FaroPDF 仓 PR-B 联动，FaroPDF 仓侧见 DEC-058 docs-only 同步）

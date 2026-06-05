@@ -2879,4 +2879,57 @@ esac
 - 跨会话可查 memory `project_multi_agent_state.md` 在 Task #9 条目下追加"实战发现 synonym 缺口（DEC-060 修复）"留痕。
 - Wave 7+ 启动时 PM 仍按 Task #9 设计：用 `spawn-worker.sh --with-sentinel` + 2 background sentinel + harness task-notification。本次 patch 已保证 synonym 兜底，事件驱动链路恢复。
 - 如果未来再加新 synonym（例如 `succeeded` / `ok`），按 §4.1 pattern 加 pattern + §4.2 文档化。
+## DEC-059 ISS-022 lazy load settings sections 收口
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联任务：ISS-022 设置页面 UI 整合（lazy load 收口）
+- 关联分支：`feat/iss-022-lazy-load`
+
+ISS-022 第一版 PR #25 已合并，5 个 section 已落 `src/modules/settings/sections/`，SettingsPanel 已挂 AppShell。本决策只做 DEC-038 §"不采纳" 当时显式 defer 的 lazy load 收口。
+
+### 1. 决策
+
+- General section 保持 eager 加载（默认首屏 section，打开设置即渲染）。
+- Reader / OcrProvider / Shortcut / About 4 个 section 走 `React.lazy` + `Suspense`，切换到对应 tab 时才触发 module load。
+- 新增 `src/modules/settings/sections/lazy.ts` 集中声明 4 个 lazy wrapper。
+- Suspense fallback 使用 `settings-section-skeleton` CSS class（最小占位，与设计 token 一致）。
+- `src/modules/settings/sections/index.ts` 保持不变（eager export 保留，供非 SettingsPanel 直接 import 场景使用）。
+
+### 2. 为什么现在做
+
+- DEC-038 §"不采纳"当时记录"5 section 体积 < 50KB，lazy 主要价值是扩展点"，本期收口把扩展点落地。
+- 为后续新增 section（如 ISS-025 Agent section）提供现成的 lazy 路径。
+- 当前 5 section 虽小，但 `npm run build` 输出确认 Vite 已把 4 个 lazy section 拆分为独立 chunk（ReaderSection / OcrProviderSection / ShortcutSection / AboutSection 各自独立 .js 文件），说明 code-splitting 已生效。
+
+### 3. 修改范围
+
+- 新增 `src/modules/settings/sections/lazy.ts`
+- 修改 `src/modules/settings/SettingsPanel.tsx`（import 改 lazy + Suspense 包裹）
+- 修改 `src/modules/settings/SettingsPanel.css`（+5 行 skeleton 样式）
+- 修改 `src/modules/settings/SettingsPanel.test.tsx`（+4 项 lazy 行为测试）
+- 修改 `docs/DECISIONS.md`（本条目）
+- 修改 `CHANGELOG.md`（新增 alpha.18 段）
+- 修改 `docs/TASKS.md`（ISS-022 状态归档）
+
+### 4. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `npm run typecheck` | ✅ 干净 | |
+| `npm run build` | ✅ 4 个 lazy section 独立 chunk | `dist/assets/` 下可见 `ReaderSection-*.js` 等 |
+| `cargo check --offline` | ✅ 9 pre-existing dead_code warning | |
+| `npm test -- --run` | ❌ 全量失败 | pre-existing `html-encoding-sniffer` ESM 不兼容，主工作区同样失败，与本次改动无关 |
+
+### 5. 已知限制
+
+- 4 个 lazy section 的 module load 在 vitest jsdom 环境下是同步完成的（测试无法观测 Suspense fallback 闪现），测试只能验证 lazy section 最终渲染成功。
+- `html-encoding-sniffer` ESM 问题阻塞全量测试；需 PM 在 CI 或修复 node_modules 后验证。
+- 不引入 `@loadable/component` 或 `react-loadable` 等额外依赖，纯 React.lazy + Suspense。
+
+### 6. 后续路径
+
+- 后续新增 section 时，在 `lazy.ts` 追加对应 lazy wrapper 即可。
+- 如果单个 section 体积增长到 > 100KB，可考虑该 section 内部再做 code-split。
+- ISS-022 任务卡从 TASKS.md 归档到 DECISIONS.md「ISS 任务归档」一节。
 

@@ -1,16 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { exportSafeAppSettings } from "../../shared/settings/defaults";
 import type { AppSettings } from "../../shared/settings/types";
+import { GeneralSection, SECTION_LIST, type SectionId } from "./sections";
 import {
-  AboutSection,
-  GeneralSection,
-  OcrProviderSection,
-  ReaderSection,
-  SECTION_LIST,
-  ShortcutSection,
-  type SectionId,
-} from "./sections";
+  LazyAboutSection,
+  LazyOcrProviderSection,
+  LazyReaderSection,
+  LazyShortcutSection,
+} from "./sections/lazy";
 import "./SettingsPanel.css";
 
 interface SettingsPanelProps {
@@ -167,16 +165,24 @@ export function SettingsPanel({ open, onClose, settings, onSettingsChange }: Set
             <GeneralSection onChange={handleChange} settings={settings} />
           ) : null}
           {activeSectionDescriptor.id === "reader" ? (
-            <ReaderSection onChange={handleChange} settings={settings} />
+            <Suspense fallback={<div className="settings-section-skeleton" />}>
+              <LazyReaderSection onChange={handleChange} settings={settings} />
+            </Suspense>
           ) : null}
           {activeSectionDescriptor.id === "ocr" ? (
-            <OcrProviderSection onChange={handleChange} settings={settings} />
+            <Suspense fallback={<div className="settings-section-skeleton" />}>
+              <LazyOcrProviderSection onChange={handleChange} settings={settings} />
+            </Suspense>
           ) : null}
           {activeSectionDescriptor.id === "shortcuts" ? (
-            <ShortcutSection onChange={handleChange} settings={settings} />
+            <Suspense fallback={<div className="settings-section-skeleton" />}>
+              <LazyShortcutSection onChange={handleChange} settings={settings} />
+            </Suspense>
           ) : null}
           {activeSectionDescriptor.id === "about" ? (
-            <AboutSection onChange={handleChange} settings={settings} />
+            <Suspense fallback={<div className="settings-section-skeleton" />}>
+              <LazyAboutSection onChange={handleChange} settings={settings} />
+            </Suspense>
           ) : null}
         </section>
       </div>

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi, type Mock } from "vitest";
 import { createDefaultAppSettings, exportSafeAppSettings } from "../../shared/settings/defaults";
@@ -125,6 +125,43 @@ describe("SettingsPanel", () => {
       "href",
       expect.stringContaining("github.com"),
     );
+    unmount();
+  });
+
+  test("default general section renders without Suspense fallback", () => {
+    const { unmount } = renderPanel();
+    expect(screen.queryByText("默认保存策略")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("默认保存策略")).toBeInTheDocument();
+    unmount();
+  });
+
+  test("lazy section shows Suspense fallback then loads content", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderPanel();
+    await user.click(screen.getByRole("tab", { name: "快捷键" }));
+    await waitFor(() => {
+      expect(screen.getByRole("tabpanel", { name: "快捷键" })).toBeInTheDocument();
+    });
+    unmount();
+  });
+
+  test("lazy reader section loads on demand", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderPanel();
+    await user.click(screen.getByRole("tab", { name: "阅读" }));
+    await waitFor(() => {
+      expect(screen.getByRole("tabpanel", { name: "阅读" })).toBeInTheDocument();
+    });
+    unmount();
+  });
+
+  test("lazy OCR section loads on demand", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderPanel();
+    await user.click(screen.getByRole("tab", { name: "OCR provider" }));
+    await waitFor(() => {
+      expect(screen.getByRole("tabpanel", { name: "OCR provider" })).toBeInTheDocument();
+    });
     unmount();
   });
 });

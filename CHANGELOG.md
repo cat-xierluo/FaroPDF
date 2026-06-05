@@ -1,5 +1,15 @@
 ## Unreleased
 
+- ISS-022 设置页 lazy load sections 收口（DEC-059 / `feat/iss-022-lazy-load`）：把 SettingsPanel 的 4 个非默认 section（阅读 / OCR provider / 快捷键 / 关于）从 eager import 拆为 `React.lazy` + `Suspense`，默认常规 section 保持 eager。Vite build 已把这 4 个 section 拆分为独立 chunk。
+  - **新增** `src/modules/settings/sections/lazy.ts`：集中声明 4 个 `React.lazy` wrapper。
+  - **修改** `src/modules/settings/SettingsPanel.tsx`：import 改为 lazy + Suspense 包裹（默认常规 section 仍为 eager）。
+  - **修改** `src/modules/settings/SettingsPanel.css`：+5 行 `settings-section-skeleton` Suspense fallback 样式。
+  - **修改** `src/modules/settings/SettingsPanel.test.tsx`：+4 项 lazy 行为测试（默认 section 不走 Suspense / lazy section 按需加载 / reader 切换加载 / OCR 切换加载）。
+  - **不修改** `src/modules/settings/sections/index.ts`（eager export 保留）/ `package.json` / 锁文件 / `src-tauri/` / `config/**` / 全局样式 / 其他模块。
+  - 验证：typecheck 干净 / build 成功（4 个 lazy section 独立 chunk）/ cargo check 干净 / npm test 全量失败（pre-existing `html-encoding-sniffer` ESM 不兼容，主工作区同样失败，与本次改动无关）。
+
+## Unreleased (continued)
+
 - 跨仓 cleanup（personal-site `ISS-005` 联动 / DEC-058 / `chore/iss-005-faropdf-cleanup`）：FaroPDF 仓 docs-only 同步官网 / 文档站入口迁出。
   - **修改** `README.md` §"官方仓库" line 15：官网占位 `- 官网：待发布（v0.1 阶段尚未搭建独立官网页面）` 改为 `- 官网：https://cat-xierluo.github.io/personal-site/faropdf/`，与 Folia 仓 README（已指向 `personal-site/folia`）口径一致。
   - **修改** `docs/ROADMAP.md`：§"阶段状态速览" v0.3 行描述从「官网文档」调整为「官网与文档站（迁出 personal-site）」；§"9. 全平台发布与设置 UI" 末尾"官网与文档站"任务项标记为 `- [x]`，加注释指向 personal-site 仓；ISS-023 任务描述补充「官网（指向 personal-site 仓）」；§"进度日志" 追加 2026-06-05 记录。
