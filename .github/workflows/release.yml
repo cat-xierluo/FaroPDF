@@ -4,10 +4,11 @@ on:
   push:
     tags:
       - "v*.*.*"
+      - "v*.*.*-*"
 
 # ISS-021 跨平台打包 + 自动更新发布流水线。
 #
-# 触发条件：推送形如 vX.Y.Z 的 tag（带 v 前缀）。
+# 触发条件：推送形如 vX.Y.Z（stable）或 vX.Y.Z-prerelease（alpha / beta / rc）的 tag（带 v 前缀）。
 # 流程：
 #   1. build 矩阵（macOS universal / Windows / Linux）各自 `cargo tauri build` 产出 updater bundle
 #   2. 三个 build 完成后，release job 拉取所有 artifacts

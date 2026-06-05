@@ -2963,3 +2963,66 @@ ISS-022 第一版 PR #25 已合并，5 个 section 已落 `src/modules/settings/
 - 未来如需更换真实 QR / 改用其他联系方式，按 `QRCODE_LICENSE.md` §"后续替换"三仓同步流程操作。
 - 未来如把三仓同步自动化（如 Makefile / 脚本），按 ISS-026 / ISS-027 模式拆独立 worker。
 
+## DEC-063 封箱 0.1.0-alpha.18：合并 Unreleased + 版本号 bump + release.yml tag pattern 扩展
+
+### 1. 背景
+
+- 封箱前 CHANGELOG.md 顶部有 `## Unreleased`（ISS-022 lazy load sections 收口，DEC-059）和 `## Unreleased (continued)`（DEC-061 keychain / DEC-058 跨仓 cleanup / DEC-062 ISS-029 真实 QR 替换）4 条 Unreleased 条目，按发布惯例应合并为带版本号和日期的 release entry。
+- 0.1.0-alpha.0 ~ 0.1.0-alpha.17 共 18 个 release entry 全部在 CHANGELOG.md 中有结构化条目，但 `package.json` 和 `src-tauri/tauri.conf.json` 的 `version` 字段长期停在 `0.1.0`（与 alpha 渠道不一致；Tauri updater manifest 期望 version 字段反映发布版本才能正确生成 `latest.json`）。
+- release.yml 当前 tag pattern 是 `v*.*.*`（3 段），只能匹配 `v0.1.0` 等 stable 版本。SemVer 4 段 prerelease 版本（如 `v0.1.0-alpha.18`）**不**会被 GitHub Actions 触发，导致 alpha 渠道永远无法走 CI 出构建产物。
+
+### 2. 决策
+
+把 4 条 Unreleased 条目合并为 `## 0.1.0-alpha.18 - 2026-06-05` 段，同时把 `package.json` 和 `src-tauri/tauri.conf.json` 的 `version` 字段 bump 到 `0.1.0-alpha.18`，让 alpha 渠道也走「版本号 = CHANGELOG 一致」的契约。release.yml 的 tag pattern 同步扩展为 `["v*.*.*", "v*.*.*-*"]` 以同时匹配 stable 和 prerelease 格式。
+
+### 3. 关键决策
+
+- **CHANGELOG 合并保留 4 条原始条目的完整内容**：不缩写、不裁剪 DEC-059 / DEC-061 / DEC-058 / DEC-062 的细节；只把两段 `## Unreleased*` 标题换成 `## 0.1.0-alpha.18 - 2026-06-05` 标题。
+- **版本号 bump 到 `0.1.0-alpha.18` 而非 `0.1.0`**：alpha 渠道与 stable 渠道必须能在 version 字段上区分；Tauri updater manifest 的 `version` 字段直接取自 `tauri.conf.json`，影响「上一版 vs 当前版」比较逻辑。
+- **ROADMAP v0.1 状态从「待开始」改为「进行中（alpha.0 ~ 0.1.0-alpha.18 已封箱；详细子项审计留 follow-up，下一版起逐节刷新）」**：实际 alpha.0~18 已经交付大部分 v0.1 能力，原状态严重落后于现实；本 PR 不逐项刷新 v0.1 子项的 `[x] / [ ]`（避免越权篡改未审计结论），仅更新顶层状态 + 加 2026-06-05 进度日志。
+- **release.yml tag pattern 用 `v*.*.*-*` 而非 `v*.*.*-alpha.*`**：保留 SemVer prerelease 的通用性（`-beta.1` / `-rc.1` 等其它渠道也能用同一份 workflow）；避免在 workflow 里 hardcode `-alpha` 字符串。
+- **CHANGELOG 下半部分的 pre-existing 重复 header（alpha.7 / 8 / 9 / 10 重复）不在本 PR 范围**：那是先前 PR 合并时的数据质量遗留，需要专门 audit 合并；本 PR 仅处理顶部 alpha.18 封箱，不为无关历史问题担责。
+- **不触发实际 tag push / 不发真实 release**：本 PR 只合 `package.json` / `tauri.conf.json` 的版本号 + CHANGELOG 合并 + workflow pattern。是否在 main 上 `git tag v0.1.0-alpha.18 && git push origin v0.1.0-alpha.18` 触发 CI 由 PM 在 PR 合并后另行决定（避免误触发占位 pubkey 下的 `latest.json` 推送）。
+
+### 4. 拒绝的方案
+
+- **版本号停在 `0.1.0`，只改 CHANGELOG**：方案 A。代价是 Tauri updater manifest 无法反映 alpha 渠道；用户在 App 内点「检查更新」拿到的 `latest.json` 永远指向 `0.1.0` 伪 stable，破坏 ISS-021 的 9 态更新状态机。拒绝。
+- **把 release.yml tag pattern 改 `v*` 一刀切**：方案 B。代价是任何含 `v` 前缀的 tag（包括误打的 `v0.1.0-foo` / `vNext`）都触发 release，CI 误触发风险高。拒绝。`v*.*.*` + `v*.*.*-*` 是更克制的最小变更。
+- **在 ROADMAP 里逐项审计 v0.1 子项的 `[x] / [ ]`**：方案 C。本 PR 范围是封箱 + 版本号 + workflow 扩展，ROADMAP 详细子项审计需要逐项对照 CHANGELOG 0.1.0-alpha.0 ~ 0.1.0-alpha.18 的 19 个 release entry，是个独立 chore。拒绝，留 follow-up。
+- **在 PR 内直接 push tag `v0.1.0-alpha.18`**：方案 D。代价是 `tauri.conf.json` 的 `plugins.updater.pubkey` 还是占位弱密码（ISS-021 M1 留下的 `RWSY2kf...`），CI 跑出的 `latest.json` 的 `signature` 字段无法被 in-app updater 验证；用户用 `0.1.0-alpha.18` 包点「检查更新」会拿到不可验签的 manifest。拒绝，由 PM 在 pubkey 正式替换后再决定是否打 tag。
+
+### 5. 资源放置
+
+- `CHANGELOG.md`：1-42 行（4 个 Unreleased 条目）→ 替换为 `## 0.1.0-alpha.18 - 2026-06-05` 段（41 行净 -1）
+- `package.json` line 4：`"version": "0.1.0"` → `"version": "0.1.0-alpha.18"`
+- `src-tauri/tauri.conf.json` line 4：`"version": "0.1.0"` → `"version": "0.1.0-alpha.18"`
+- `docs/ROADMAP.md`：line 3 `Last updated: 2026-06-02` → `2026-06-05`；line 14 v0.1 状态 `待开始` → `进行中（... 已封箱 ... 详细子项审计留 follow-up ...）`；line 141 进度日志追加 2026-06-05 封箱 0.1.0-alpha.18 记录
+- `.github/workflows/release.yml` line 4-6：`tags: ["v*.*.*"]` → `tags: ["v*.*.*", "v*.*.*-*"]`（同时匹配 stable 和 prerelease）；line 11 注释从「推送形如 vX.Y.Z 的 tag」改为「推送形如 vX.Y.Z（stable）或 vX.Y.Z-prerelease（alpha / beta / rc）的 tag」
+
+### 6. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `git diff main...HEAD --stat` | ✅ 5 个文件 | CHANGELOG + package.json + tauri.conf.json + ROADMAP + release.yml |
+| `grep -c "^## Unreleased" CHANGELOG.md` | ✅ 0 | 两段 Unreleased 标题都已替换为 alpha.18 段 |
+| `grep "^## 0.1.0-alpha.18" CHANGELOG.md` | ✅ 1 | 唯一 alpha.18 段标题在 line 1 |
+| `jq .version package.json` | ✅ `"0.1.0-alpha.18"` | 与 CHANGELOG 同步 |
+| `jq .version src-tauri/tauri.conf.json` | ✅ `"0.1.0-alpha.18"` | 与 package.json 同步 |
+| `grep "^  tags:" -A 2 .github/workflows/release.yml` | ✅ `- "v*.*.*"` + `- "v*.*.*-*"` | stable + prerelease 都触发 |
+| `npm run typecheck` | ✅ 干净 | 无业务代码 / 类型变更 |
+| `npm run build` | ✅ 成功 | Vite 不读 version 字段，预期 0 影响 |
+| `cargo check --offline` | ✅ 干净 | 无 Rust 代码 / 配置变更，9 pre-existing warning 0 回归 |
+
+### 7. 已知限制
+
+- **不触发实际 tag push / 不发真实 release**：本 PR 仅合代码与文档；`v0.1.0-alpha.18` tag 是否 push 触发 CI 由 PM 在 PR 合并后另行决定，避免误触发占位 pubkey 下的 `latest.json` 推送（ISS-021 M1 占位 pubkey 是弱密码生成的 base64 段，私钥已 rm 丢弃；首次生产发布前必须由 PM 本地 `cargo tauri signer generate` 重新生成并替换）。
+- **ROADMAP v0.1 子项 `[x] / [ ]` 状态未逐项审计**：本 PR 只改顶层状态行 + 进度日志；详细子项的 `[x] / [ ]` 状态审计需要逐项对照 CHANGELOG 0.1.0-alpha.0 ~ 0.1.0-alpha.18 的 19 个 release entry 决定；本 PR 不为未审计结论担责，留 follow-up 在下一版起逐节刷新。
+- **CHANGELOG 下半部分 alpha.7 / 8 / 9 / 10 重复 header 是 pre-existing 数据质量问题**：本 PR 不处理；需要专门 audit 合并。
+- **docs/DECISIONS.md DEC 编号从 DEC-062 → DEC-063 连续**：DEC-060 已被 PR #50 revert（revert 决议本身保留在 git history），DEC-061 / DEC-062 是真实落地，本 PR 追加 DEC-063。
+
+### 8. 后续路径
+
+- **PR 合并后由 PM 决定是否打 tag**：若 pubkey 仍为占位（当前状态），建议**不**打 tag 触发 CI；若 PM 已重新生成 keypair + 替换 pubkey + 配置 GitHub Secrets，可按 `docs/RELEASE.md` §3 流程打 `v0.1.0-alpha.18` tag 触发 release.yml 跑三平台 build 矩阵 + updater manifest。
+- **alpha.19 起的封箱 SOP**：本 PR 把「合并 Unreleased + 版本号 bump + release.yml tag pattern」三件套跑通；后续每个 alpha / beta / rc 封箱都按同一 SOP（不需要再开新 DEC，由 PM 在合并时直接执行）。
+- **ROADMAP v0.1 子项审计**：作为独立 follow-up，由 `chore/roadmap-v01-audit` worker 推进，参照 DEC-052 README 重写 + DEC-053 配置收束模式；不在本 PR 范围。
+- **CHANGELOG 下半部分 alpha.7~10 重复 header 合并**：作为独立 follow-up，由 `chore/changelog-dedup` worker 推进；不在本 PR 范围。
