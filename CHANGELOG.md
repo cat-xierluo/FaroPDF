@@ -1,3 +1,20 @@
+## 0.1.0-alpha.13 - 2026-06-05
+
+- 根目录配置收束到 `config/` 子目录（DEC-053 / `chore/consolidate-configs`）：参照 Folia 项目结构把 `eslint.config.js` / `tsconfig.json` / `tsconfig.node.json` / `vite.config.ts` / `vitest.config.ts` 5 个根目录配置搬到新 `config/` 子目录，根目录只保留说明文档 + `package.json` + `package-lock.json` + `index.html` + `LICENSE`（Folia 风格）。
+  - **移动** 5 个配置文件到 `config/`（`git mv` 保留 rename 历史）：`eslint.config.js` / `tsconfig.json` / `tsconfig.node.json` / `vite.config.ts` / `vitest.config.ts`。
+  - **修改** `package.json` scripts，全部加 `--config config/<name>` 显式指向（`dev` / `build` / `typecheck` / `test` / `test:watch` / `lint` / `preview`）。`build` 拆成 `tsc --noEmit --project config/tsconfig.json && vite build --config config/vite.config.ts`，`typecheck` 显式 `--project config/tsconfig.json`。
+  - **修改** `config/tsconfig.json`：`include: ["src"]` → `include: ["../src"]`（相对 config 文件位置）。`references: [{ "path": "./tsconfig.node.json" }]` 保持不变（双方同移，sibling 相对引用仍正确）。
+  - **修改** `config/vitest.config.ts`：原 `dependencyRoot` 在 worktree 之外时等于 `configDir`，移动后会变成 `config/`，导致 `server.fs.allow` 把 Vite 沙箱限制到 config 子目录。改为 `projectRoot` 计算：worktree 场景 slice 到 marker，常规场景 `configDir.replace(/\/config$/, "")` 走父目录。`fs.allow` 同步从 `dependencyRoot` 改为 `projectRoot`。
+  - **修改** `config/eslint.config.js`：从 `parserOptions.projectService: true` 切换到 `parserOptions.project: ["./config/tsconfig.json", "./config/tsconfig.node.json"]`。原因：tsconfig 收束到 `config/` 后，project service 从 linted 文件向上 walk 找不到 tsconfig.json，且 `defaultProject` / `allowDefaultProject` 不支持 `**` glob，无法覆盖 `src/**/*.ts`。显式列出两个 tsconfig 路径最稳，`tsconfigRootDir` 用 `fileURLToPath` + `resolve(..)` 算 project root。`tsconfigRootDir` 不再用 `import.meta.dirname`（= `config/`），改用显式计算的 projectRoot。
+  - **不动** `config/vite.config.ts`：无 `root` / `build.outDir` / 显式 `process.cwd()` 调用，Vite 自动以 cwd 为 project root，`--config config/vite.config.ts` 不影响 root 解析。
+  - **不动** `config/tsconfig.node.json`：`include: ["vite.config.ts", "vitest.config.ts", "eslint.config.js"]` 是裸文件名，和 tsconfig 同目录，移入 `config/` 后自动正确。
+  - **不修改** `src/**` / `src-tauri/**` / 锁文件 / 任何业务模块。
+- 范围严格遵守：仅 `config/**`（新增 5 个文件） + `package.json`（scripts 改 8 行）；其他模块 / 共享契约 / 业务代码 / Tauri 任何文件均**未修改**。
+- 同步 `docs/DECISIONS.md` 追加 DEC-053（收束方案 / 选型 / 路径处理 / 影响面 / 回退方式）；`docs/TASKS.md` 同步追加 ISS-027 任务卡（chore 类，根目录配置收束）；`docs/ROADMAP.md` **未改**。
+- 验证：80 个测试文件 / 743 个测试全部通过（与 `origin/main` 0.1.0-alpha.11 一致，无回归）；`npm run typecheck` 干净；`npm run lint` 43 个错误（与 main 基线一致，全部 pre-existing：tests/e2e/ocr-e2e.test.ts 不在 project + tests/fixtures/ocr/generate-scan-fixture.mjs 的 `Buffer`/`process` undefined + fontLoader 一处 irregular whitespace，与本 PR 无关）；`npm run build` 成功（2022 modules，dist 产物正常）；`cargo check --manifest-path src-tauri/Cargo.toml` 干净（9 个 pre-existing dead_code warning 与本 PR 无关）。
+- 已知限制：`parserOptions.project` 而非 `projectService` 导致 ESLint 在类型感知 lint 上比 `projectService` 略慢（per-file TS Program），对 743 个测试 + 80 个文件规模无明显影响；`tsconfigRootDir` 改用 `fileURLToPath` + `resolve(..)` 而非 `import.meta.dirname`，eslint 升级到不支持 `import.meta.dirname` 时可平滑切换。
+- 1 个 commit（`chore(config): 收束根目录配置到 config/ 子目录（DEC-053）`）。
+
 ## 0.1.0-alpha.12 - 2026-06-05
 
 - README 重写（DEC-052 / `docs/readme-rewrite`）：把 `README.md` 从 70 行散段重写为与 Folia 同结构的项目门面，覆盖官方仓库、下载与安装（标「待发布」）、功能、技术栈、作者、开发环境、构建、许可、文档指针 9 个一级 section。
