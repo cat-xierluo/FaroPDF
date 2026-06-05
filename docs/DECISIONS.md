@@ -2323,15 +2323,26 @@ Vite 以 cwd 为 project root，`--config config/vite.config.ts` 不影响 root 
 - 优先级规则（user explicit）：**`author.name` 字段以 README 实际展示名为准**。`maoking` 是 GitHub 操作系统用户名 / commit author 字段用，不应混用到 author.name。
 - 后续约束：所有面向用户的展示（README、AuthorCard、settings §关于、CHANGELOG）统一用「**杨卫薪律师**」；`package.json` 内部字段也保持一致；`git config user.name` 仍可用 `maoking`（开发环境字段，与展示解耦）。
 
-#### 2.3 项目 icon：SVG 源 + 两种 PNG 尺寸
+#### 2.3 项目 icon：沿用项目既有 `src-tauri/icons/icon-source.png`
 
-设计主题（呼应 `Faro` = 灯塔 / 指引，与 Folia logo 一脉相承）：
+**修正（PR #39 / `fix/icon-from-source`）**：原计划自创 SVG 灯塔（深蓝底 + 自设计），但**项目已有官方 icon source**：
 
-- **底色**：深蓝渐变（`#1A2940` → `#0F1B2D`），app-icon 风格圆角（`rx=48`）
-- **灯塔塔身**：白（`#F5F5F5`）+ 红色横条（`#C73E3A`）—— 经典灯塔视觉符号
-- **灯光**：黄（`#FFC847`）+ 径向 halo（`url(#glow)`）—— 散发指引之意
-- **底座 + 窗**：深灰（`#2C3E50`）+ 黄色窗内光（透明度 0.4）
-- **水印**：右下角低透明度（0.18）"FaroPDF" 文字
+- `src-tauri/icons/icon-source.png`（1254×1254，master 源，1.3MB）
+- `src-tauri/icons/icon.png`（512×512，平台默认，253KB）
+- `src-tauri/icons/{32x32,128x128,128x128@2x}.png`（各平台尺寸）
+- `src-tauri/icons/{icon.icns, icon.ico}`（macOS / Windows 平台格式）
+- `public/favicon.png`（64×64，web favicon）
+
+原项目 icon 设计：灯塔（深蓝色塔身 + 红色塔顶 + 黄色光束）+ PDF 文档堆叠（米色背景 + 海军蓝边线文字页），app-icon 风格圆角。**比自创版本更具「PDF 工具 + 灯塔指引」双语义**，且与 `src-tauri/` 平台图标 / Folia 视觉风格完全一致。
+
+**结论**：删自创 `docs/icon.svg`，从 `src-tauri/icons/icon-source.png` 衍生：
+
+- `docs/icon-128.png`（128×128，18KB，README inline 用）
+- `docs/icon.png`（512×512，261KB，retina / 应用图标母版）
+
+**README 引用**（保持不变）：`<p align="center"><img src="docs/icon-128.png" alt="FaroPDF" width="128" height="128"></p>`。
+
+教训：项目视觉资产优先用 `src-tauri/icons/icon-source.png` 作为单一真相源，README / 文档 / 营销材料从同一 source 衍生；不重画避免视觉分裂。后续 ISS-028 个人主页的 icon 也从此 source 衍生。
 
 文件输出（`rsvg-convert -w N -h N docs/icon.svg -o docs/icon-NN.png`）：
 
