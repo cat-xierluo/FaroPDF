@@ -266,6 +266,25 @@ Agent 可根据本文件自行判断：
 - 2026-06-05：登记 ISS-028 任务卡（DEC-054 §4 后续路径触发）。**当前分支 `chore/add-license-and-author` 不实现本 ISS**；启动时由 PM 开 brainstorming，按 ISS-007 / ISS-026 模式拆 worker 推进。
 - 下一步：brainstorming（确认仓库位置 / 域名 / 框架 / 内容板块 / 与现有 Folia website 关系）→ 新分支 → 落地。
 
+### ISS-029 跨仓同步：FaroPDF 仓替换 AuthorCard 微信二维码占位为真实图片
+
+- 优先级：P1
+- 类型：品牌 / 跨仓 cleanup
+- 状态：进行中（fix/iss-029-faropdf-real-qr worktree 已创建，资源替换 + 文档同步待 PR 合 review）
+- 建议分支：`fix/iss-029-faropdf-real-qr`
+- 建议 worktree：`.claude/worktrees/iss-029-faropdf-real-qr`
+- 依赖：personal-site `ISS-010`（真实 QR 已入 personal-site 主干，commit `0ef5455` 前已通过 ISS-010 完成单源修正，DEC-009 supersede DEC-007）
+- 范围：`src/assets/wechat-qrcode.png`（1×1 占位 → 734×734 真实 QR，183452 字节）+ `src/assets/QRCODE_LICENSE.md`（占位图说明 → 真实 QR 说明 + 资源单源 + 三仓同步流程）+ `src/components/settings/AuthorCard.css`（CSS 注释从「1×1 占位图 → 真实二维码」说明）+ `src/components/settings/AuthorCard.tsx`（docstring 「占位图 → 真实二维码」+ 引用 ISS-029 / DEC-062）；不动 `src/components/settings/AuthorCard.test.tsx`（单测只验 props 透传，不耦合图片内容）/ `src/modules/settings/sections/AboutSection.tsx`（上游组件不变）/ `package.json` / 锁文件 / `src-tauri/` / `config/**` / 全局样式 / 任何业务模块
+- 资源单源：Folia 仓 `docs/wechat-qr.png` 是真源（734×734 / 184KB / 2026-05-20 入仓），personal-site `src/assets/wechat-qrcode.png` 已 ISS-010 落地，FaroPDF 仓本次 ISS-029 补齐。三仓保持一致；不再各自维护不同文件。
+- 目标：把 ISS-023（DEC-051）当时因「实际添加时 PM 替换」保留的 1×1 占位（`src/assets/wechat-qrcode.png`，67 字节，Python 直接写 PNG 三 chunk 生成）替换为真实微信公众号二维码（734×734 / 184KB）；与 personal-site `ISS-010` / DEC-009 同步跨仓 cleanup 链。
+- 验收：
+  - `src/assets/wechat-qrcode.png` 从 67 字节占位 → 183452 字节真实 QR；`file wechat-qrcode.png` 输出 `PNG image data, 734 x 734, 8-bit gray+alpha, non-interlaced`。
+  - `AuthorCard.tsx` / `AuthorCard.css` / `QRCODE_LICENSE.md` 文案与图片状态一致（占位图 → 真实二维码），引用 ISS-029 / DEC-062。
+  - `npm run typecheck` / `npm run build` / `cargo check --offline` 干净（无业务代码变更，预期 0 回归）。
+  - `git diff main...HEAD --stat` 仅 4 个文件：1 个 PNG + 1 个 LICENSE.md + 1 个 CSS + 1 个 TSX。
+- 当前进度（DEC-062 / 2026-06-05）：`.claude/worktrees/iss-029-faropdf-real-qr` 在 `237aa48` 之上创建，资源已从 personal-site 同步（`cp personal-site/src/assets/wechat-qrcode.png src/assets/wechat-qrcode.png`，183452 字节，734×734），AuthorCard.css / AuthorCard.tsx 注释更新，QRCODE_LICENSE.md 改写为「真实 QR + 三仓同步流程」。
+- 下一步：与 PM 协同 PR 合并 / 验证；验收后归档到 `docs/DECISIONS.md` 的「ISS 任务归档」一节 + 归档任务索引「品牌 / UI」组加 ISS-029。
+
 ## 暂缓任务
 
 ### ISS-015 直接编辑 PDF 原有文字、图片和链接
@@ -313,6 +332,8 @@ Agent 可根据本文件自行判断：
 需要恢复为活跃任务时，先在 `docs/DECISIONS.md` 的归档条目下加"恢复"标注，再回到本文件新增任务卡。
 
 ## 进度日志
+
+- 2026-06-05：ISS-029 落地（fix/iss-029-faropdf-real-qr，资源替换 + AuthorCard 注释 + QRCODE_LICENSE.md 改写 + docs 同步）。
 
 
 
