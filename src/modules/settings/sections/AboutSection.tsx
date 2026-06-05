@@ -7,10 +7,12 @@ import {
   type AppUpdateStatus,
 } from "../../../shared/update";
 import type { SectionProps } from "./types";
+import { AuthorCard } from "../../../components/settings/AuthorCard";
 
 // Vite 在构建时把 PNG 资源处理为 URL 字符串；该文件位于 src-tauri 目录，
 // 但 vite/client 类型声明覆盖了所有图片导入。
 import appIconUrl from "../../../../src-tauri/icons/128x128.png";
+import wechatQrUrl from "../../../assets/wechat-qrcode.png";
 
 export interface AboutSectionProps extends SectionProps {
   /**
@@ -240,27 +242,13 @@ export function AboutSection({ settings: _settings, onChange: _onChange, updateC
         </div>
       </div>
 
-      <div className="settings-author-card" data-testid="about-author">
-        <h3>作者</h3>
-        {metadata.authorName ? (
-          <p>
-            {metadata.authorName}
-            {metadata.repositoryUrl ? (
-              <>
-                {" · "}
-                <a href={metadata.repositoryUrl} rel="noreferrer" target="_blank">
-                  GitHub
-                </a>
-              </>
-            ) : null}
-          </p>
-        ) : (
-          <p className="settings-section__empty">作者信息未配置</p>
-        )}
-        <p className="settings-section__footnote">
-          作者卡暂为占位，公众号二维码和详细联系方式将在后续迭代补齐。
-        </p>
-      </div>
+      <AuthorCard
+        authorName={metadata.authorName ?? ""}
+        githubUrl={metadata.repositoryUrl ?? "https://github.com/cat-xierluo"}
+        wechatQrSrc={wechatQrUrl}
+        wechatQrAlt="微信公众号二维码"
+        scanInstruction="微信扫码关注公众号，获取版本更新与法律材料整理小工具。"
+      />
     </section>
   );
 }

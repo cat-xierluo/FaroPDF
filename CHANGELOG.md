@@ -1,3 +1,20 @@
+## 0.1.0-alpha.11 - 2026-06-05
+
+- ISS-023 作者卡 + 微信二维码占位收口（DEC-051 / `feat/iss-023-author-update`）：把设置页「关于」section 的作者卡从占位 footnote 提升为独立受控组件，覆盖作者姓名 / GitHub 链接 / 微信公众号二维码 / 扫码说明。
+  - **新增** `src/components/settings/AuthorCard.tsx`：受控组件，props 注入 `authorName` / `githubUrl` / `wechatQrSrc` / `wechatQrAlt` / `scanInstruction` / `className`；空 `authorName` 兜底显示「作者信息未配置」，GitHub 链接仍保留不丢失联系入口；`githubUrl` 不兜底，调用方传默认（`metadata.repositoryUrl ?? "https://github.com/cat-xierluo"`）。**不**直接耦合 `readAppMetadata()`，单测可独立传任意数据。
+  - **新增** `src/components/settings/AuthorCard.test.tsx`（6 项）：name 渲染、GitHub 链接 `href` + `target="_blank"` + `rel="noreferrer"`、QR 图片 `src` + `alt`、扫码说明文案、空 name 兜底、caller className 透传叠加到 `.settings-author-card`。
+  - **新增** `src/components/settings/AuthorCard.css`：独立样式，不污染 `src/styles/app.css`；复用 `SettingsPanel.css` 的 `.settings-author-card` 基础壳层，扩展子 class（`__name` / `__author-name` / `__github-link` / `__qr` / `__qr-image` / `__instruction`）；QR 图片 `image-rendering: pixelated` 让 1×1 占位图在 120px 容器内放大仍保持方块感，避免被浏览器平滑模糊掩盖「占位」事实；`@media (max-width: 479px)` 把 `.settings-author-card__qr` 折叠为单列，避免 900px 视口下文字被挤压。
+  - **新增** `src/assets/wechat-qrcode.png`（1×1 像素 8-bit 灰阶 PNG，67 字节）+ `src/assets/QRCODE_LICENSE.md`：Python 直接写 PNG 三 chunk（IHDR + IDAT + IEND）生成，**不**依赖 ImageMagick / opencv；LICENSE 明确约定当前为占位、后续替换流程（推荐 PNG / JPG、正方形 ≥ 240×240 像素）、**不**收录任何账号 / 密码 / Token / 私钥、仅使用项目作者本人拥有或经授权的二维码。
+  - **修改** `src/modules/settings/sections/AboutSection.tsx`：末尾 `<div className="settings-author-card">作者卡暂为占位，公众号二维码和详细联系方式将在后续迭代补齐。</div>` 替换为 `<AuthorCard authorName={metadata.authorName ?? ""} githubUrl={metadata.repositoryUrl ?? "https://github.com/cat-xierluo"} wechatQrSrc={wechatQrUrl} wechatQrAlt="微信公众号二维码" scanInstruction="微信扫码关注公众号，获取版本更新与法律材料整理小工具。" />`；新增 2 个 import（AuthorCard 组件 + `wechat-qrcode.png` 静态资源）。
+  - **修改** `src/modules/settings/sections/AboutSection.test.tsx`：追加 3 项（QR 图片 `alt` 含「微信」字样 + `src` 含 `wechat-qrcode`、扫码说明含「微信扫码/关注」、legacy placeholder footnote 消失），共 12 项全过。
+  - **不修改**「检查更新」逻辑（DEC-048 / PR #31 9 态 `createTauriUpdateClient` 状态机保留原样）；**不修改** `src/shared/update/*` / `src/shared/settings/*` / `src/shared/app/metadata.ts`（AuthorCard 透过 props 注入，不耦合 metadata）；**不修改** `src/components/layout/{Toolbar,Sidebar}.tsx` / `src/App.tsx` / `src/styles/app.css` / `package.json` / 锁文件 / `src-tauri/**` / 任何 reader / search / annotation / forms / export / pages / ocr / preprocess 模块。
+  - 不引入新依赖。
+- 范围严格遵守：仅 `src/components/settings/**` + `src/assets/**` + `src/modules/settings/sections/{AboutSection.tsx, AboutSection.test.tsx}` + 文档；其他模块 / 共享契约 / 锁文件 / Tauri 任何文件均**未修改**。
+- 同步 `docs/DECISIONS.md` 追加 DEC-051（ISS-023 作者卡 + 微信二维码占位方案）；`docs/TASKS.md` ISS-023 任务卡状态从「待处理」推到「第一版收口（DEC-051，待 PM 合 review）」+ 「下一步」改为「公众号二维码替换为真实图片（按 QRCODE_LICENSE.md 流程）+ 与 PM 协同 PR 合并 / 视觉验收」+ 进度日志追加对应记录；`docs/ROADMAP.md` **未改**。
+- 验证：80 个测试文件 / 743 个测试全部通过（新增 9 项：AuthorCard 6 + AboutSection 3；剩余 +34 项为 a271de1 基础之上未计入 DEC-050 基线统计的同 PR 范围外增量，与本 PR 无关）；`npm run typecheck` 干净；`npm run build` 成功（dist 产物包含 Vite 自动 hash 后的 `assets/wechat-qrcode-*.png`）；`cargo check --manifest-path src-tauri/Cargo.toml --offline` 干净（9 个 pre-existing dead_code warning 与本 PR 无关）。
+- 已知限制：当前二维码是 1×1 占位图（`image-rendering: pixelated`），正式发布前必须由作者替换为真实公众号二维码；公众号二维码**不**支持热更新（运行时下载需要走 Tauri command，**不**在本 PR 范围）；AuthorCard 不感知 dark mode（仅跟随全局 CSS variable 切换）；`autoUpdateCheck` 设置项（`src/shared/settings/` 在 ISS-023 forbidden 范围）继续留 follow-up，由 PM 在后续 `feat/auto-update-check` 拆出。
+- 2 个 commit（`[m1] feat(settings): AuthorCard 基础组件（GitHub 链接 + 微信二维码占位）` / `[m2] feat(settings): AboutSection 接 AuthorCard，替换占位`）。
+
 ## 0.1.0-alpha.10 - 2026-06-04
 
 - 批注深化第四阶段收尾（DEC-044 总方案 + DEC-045/046/047 三 milestone / ISS-026 stage 4）：把 `AnnotationOverlay` / `AnnotationToolbar` 从孤岛组件真正挂到 `AppShell` 渲染树；把 `writeAnnotationPdf` 接入 `pdfOperationEngine.exportPdf` 的 `flatten-annotations` draw 策略；stamp 模板选择面板新增 SVG 视觉预览。

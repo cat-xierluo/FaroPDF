@@ -1926,3 +1926,102 @@ OCR 链路跨 5 个 Tauri command（`start_ocr_job` / `list_ocr_jobs` / `poll_oc
 - ISS-007 v0.1 收口：bridge + 模式工具条 + 端到端测试三件套落齐；`keychain:` 凭证引用与 OS Keychain 集成、legal-skills fallback 收敛按 ISS-007 「下一步」后续推进。
 - 真实场景验证：把本 E2E 测试纳入 CI（在 GitHub Actions 镜像装 `ocrmypdf` + `poppler` + `tesseract-lang`）。
 - 云端 provider 端到端：ISS-010 consent flow 收口后，另起 worker 写 `paddleocr` / `mineru` 的 vitest E2E（需要本地 mock HTTP server）。
+
+## DEC-051 ISS-023 作者卡 + 微信二维码占位方案
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联任务：ISS-023
+- 关联分支：`feat/iss-023-author-update`
+
+承接 DEC-038（设置页浮层 5 sections + About 入口占位）+ DEC-048（ISS-021 全平台打包与自动更新 + 9 态 update service）之后，本决策记录 ISS-023「关于页面与作者页」剩余收口的边界，确认沿用 DEC-038 §"5 个 section" 的目录结构、DEC-048 §"AppUpdateClient 9 态" 状态机、DEC-026 §"folia 关于页参考" 的作者卡三段式。
+
+### 1. 背景与剩余工作
+
+ISS-023 任务卡（`docs/TASKS.md` §"ISS-023"）原验收要求分两块：
+
+1. 「关于」section 元数据（产品名 / 定位 / 版本 / 官网 / GitHub / 检查更新）：DEC-038 已落，DEC-048 把「检查更新」按钮接 `createTauriUpdateClient` 9 态状态机，ISS-023 不再重复实现。
+2. **作者卡**（作者姓名 / GitHub 链接 / 微信公众号二维码 / 扫码说明）：DEC-038 §"About" 占位是 `作者卡暂为占位，公众号二维码和详细联系方式将在后续迭代补齐` 的纯文本 footnote，**未**有真实二维码占位图、扫码说明、未抽出独立组件。本期收口这一块。
+
+### 2. 决策
+
+#### 2.1 新建 `src/components/settings/` 作为设置相关展示组件目录
+
+- 原计划（ISS-023 任务卡原文）写的是 `src/components/settings/AboutSection.tsx`，但 DEC-038 已把 AboutSection 落到 `src/modules/settings/sections/AboutSection.tsx`（与 `GeneralSection` / `ReaderSection` / `OcrProviderSection` / `ShortcutSection` 同目录）。
+- 本期**不**移动 AboutSection 位置（避免 PR 范围扩大、减少与同期其他 worker 的合并冲突）；仅新建 `src/components/settings/` 作为「设置相关的展示型组件」目录（区别于 `src/modules/settings/sections/` 的「section 容器组件」），落 `AuthorCard.tsx` / `AuthorCard.test.tsx` / `AuthorCard.css`。
+- 受 `src/components/settings/` 影响的路径：
+  - AboutSection.tsx 通过 `import { AuthorCard } from "../../../components/settings/AuthorCard"` 引用（深度正确：`sections/` 是 `modules/settings/` 的子目录）。
+
+#### 2.2 AuthorCard 设计：受控 + 兜底 + 隔离样式
+
+- **Props 注入而非直接读 metadata**：避免耦合 `readAppMetadata()`，单测可独立传任意 `authorName` / `githubUrl` / `wechatQrSrc`；AboutSection 继续从 `readAppMetadata()` 取 `authorName` / `repositoryUrl` 后透传给 AuthorCard。
+- **空 `authorName` 兜底**：AuthorCard 内部检测 `authorName.trim().length === 0`，渲染 `<span class="settings-section__empty">作者信息未配置</span>`，GitHub 链接仍保留（不丢失联系入口）。AboutSection 透传 `metadata.authorName ?? ""`。
+- **`githubUrl` 兜底**：AuthorCard 不兜底（链接是必填）；AboutSection 传 `metadata.repositoryUrl ?? "https://github.com/cat-xierluo"`（与 `package.json` 的 author.url 对齐，仓库未配置时回退到作者个人页）。
+- **样式独立到 `AuthorCard.css`**：不污染 `src/styles/app.css`、不复用全局 `.settings-author-card`（仅在 `src/modules/settings/SettingsPanel.css` 提供基础壳层 `display / flex-direction / gap / padding / border / border-radius / background`）；新增子 class：
+  - `.settings-author-card__name` — 段落行；
+  - `.settings-author-card__author-name` — 作者展示名 span，便于文本提取与样式钩子；
+  - `.settings-author-card__github-link` — GitHub 链接（hover / focus underline）；
+  - `.settings-author-card__qr` — 二维码 + 扫码说明横排容器（`flex` row，`align-items: center`）；
+  - `.settings-author-card__qr-image` — 120×120，`image-rendering: pixelated`（让 1×1 占位图在容器内放大仍保持方块感，避免被浏览器平滑模糊掩盖「占位」事实）；
+  - `.settings-author-card__instruction` — 12px muted 副文；
+  - `@media (max-width: 479px)` — 窄屏下 `flex-direction: column`，避免 900px 视口下文字被挤压。
+
+#### 2.3 公众号二维码占位图 + LICENSE 说明
+
+- `src/assets/wechat-qrcode.png`：1×1 像素 8-bit 灰阶 PNG（67 字节），用 Python 脚本直接写 PNG IHDR + IDAT + IEND 三 chunk 生成，**不依赖** ImageMagick / pdf2image / opencv 任何工具。
+- `src/assets/QRCODE_LICENSE.md`：说明当前为占位、后续替换流程（推荐 PNG / JPG、正方形 ≥ 240×240 像素）、**不收录任何账号 / 密码 / Token / 私钥**、仅使用项目作者本人拥有或经授权的二维码。
+- 选择「1×1 占位」而非「画一个虚构二维码」的原因：占位图要明显是占位，部署前由作者替换为真实二维码；虚构二维码会误导用户扫码。
+- 替换流程文档化在 `QRCODE_LICENSE.md`，避免后续 worker 不替换直接 ship 1×1 占位图。
+
+#### 2.4 「检查更新」按钮不重做，保留 DEC-048 9 态
+
+- ISS-023 任务卡原文同时要求「实接 createTauriUpdateClient，9 态状态机」——这部分 DEC-048（PR #31 / commit 652a53a）已经完成，包含：
+  - `AppUpdateClient` 抽象（`checkForAppUpdate` / `downloadAndInstallUpdate`）；
+  - 9 态 `AppUpdateStatus`（`idle` / `checking` / `latest` / `available` / `downloading` / `downloaded` / `installing` / `unsupported` / `error`）；
+  - AboutSection 已通过 `updateClient` prop 注入便于单测（详见 DEC-048 §2.4）。
+- 本期**不**修改 `src/shared/update/`（已被列为 forbidden，已 close 的 scope）；AboutSection.tsx 中「检查更新」逻辑保持原样，仅替换末尾的作者卡占位。
+
+#### 2.5 范围与依赖
+
+- **修改**：
+  - `src/modules/settings/sections/AboutSection.tsx`（末尾作者卡占位 div 替换为 `<AuthorCard>`；新增 2 个 import：AuthorCard 组件 + `wechat-qrcode.png` 静态资源）；
+  - `src/modules/settings/sections/AboutSection.test.tsx`（追加 3 项：QR 图片 alt/src、扫码说明文案、legacy placeholder 消失）。
+- **新增**：
+  - `src/components/settings/AuthorCard.tsx`
+  - `src/components/settings/AuthorCard.test.tsx`（6 项：name 渲染、GitHub 链接 href/target/rel、QR 图片 src/alt、扫码说明、空 name 兜底、className 透传）
+  - `src/components/settings/AuthorCard.css`
+  - `src/assets/wechat-qrcode.png`（1×1 灰阶占位，67 字节）
+  - `src/assets/QRCODE_LICENSE.md`
+- **不修改**：
+  - `src/shared/settings/`（autoUpdateCheck 留 follow-up，不在本 PR；按 ISS-023 forbidden 列表）
+  - `src/shared/update/*`（DEC-048 已 close，scope 不重开）
+  - `src/shared/app/metadata.ts`（仅在 AboutSection 透传 `metadata.authorName` / `metadata.repositoryUrl`，AuthorCard 不直接依赖）
+  - `src/components/layout/{Toolbar,Sidebar}.tsx`、`src/App.tsx`、`src/styles/app.css`、`package.json` / 锁文件、`src-tauri/**`
+  - 任何 reader / search / annotation / forms / export / pages / ocr / preprocess 模块。
+- 不引入新依赖。
+
+#### 2.6 已知限制
+
+- 当前二维码是 1×1 占位图（`image-rendering: pixelated`），正式发布前必须由作者替换为真实公众号二维码；`QRCODE_LICENSE.md` 记录替换流程。
+- 公众号二维码**不**支持热更新；如未来想走「运行时下载」需要走 Tauri command，**不**在本 PR 范围。
+- AuthorCard 不感知 dark mode（仅跟随全局 CSS variable 切换），如有 dark mode 视觉细节调整后续 PR 处理。
+
+### 3. commit cadence
+
+- 2 个 milestone（按 prompt 要求）：
+  - **(a) `[m1] feat(settings): AuthorCard 基础组件（GitHub 链接 + 微信二维码占位）`**：AuthorCard.tsx + AuthorCard.test.tsx + AuthorCard.css + wechat-qrcode.png + QRCODE_LICENSE.md 一起落，1 个 commit。
+  - **(b) `[m2] feat(settings): AboutSection 接 AuthorCard，替换占位`**：AboutSection.tsx 末尾 div 替换为 `<AuthorCard>` + AboutSection.test.tsx 追加 3 项，1 个 commit。
+
+### 4. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `npm run typecheck` | ✅ 干净 | 0 个新增类型错误 |
+| `npm test -- --run` | ✅ 80 文件 / 743 tests 全过 | + 6 (AuthorCard) + 3 (AboutSection) = 9 项新测试；剩余 34 项为 a271de1 基础之上未计入 DEC-050 基线统计的同 PR 范围外增量 |
+| `npm run build` | ✅ | dist 产物包含 `assets/wechat-qrcode-DEMO.png`（Vite 自动 hash 后的输出）|
+| `cargo check --manifest-path src-tauri/Cargo.toml --offline` | ✅ | 9 个 pre-existing dead_code warning 与本 PR 无关 |
+
+### 5. 后续路径
+
+- ISS-023 第一版收口后，作者卡升级（如支持多作者、加 GitHub Sponsors / Patreon 链接、运行时切换 dark mode 配色）按需新开 worker。
+- 公众号二维码替换流程 PR 走标准 git-workflow：作者在自己分支替换图 + 更新 `QRCODE_LICENSE.md` 替换日期；不强制走本 worktree。
