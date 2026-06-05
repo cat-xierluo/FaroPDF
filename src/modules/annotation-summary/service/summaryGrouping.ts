@@ -3,7 +3,7 @@ import {
   groupAnnotations,
   type AnnotationSidebarGroupBy,
 } from "../../annotation/sidebarGroups";
-import type { SummaryDimensionResult, SummaryDimension, SummaryGroupEntry, AnnotationSummaryResult } from "../types";
+import type { SummaryDimensionResult, SummaryDimension, AnnotationSummaryResult } from "../types";
 
 const MAX_SAMPLES = 3;
 

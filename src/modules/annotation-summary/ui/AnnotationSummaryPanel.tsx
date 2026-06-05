@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import type { PdfAnnotation } from "../../../shared/pdf/annotation";
 import { useAnnotationSummary } from "../hooks/useAnnotationSummary";
 import { exportChecklistMarkdown } from "../service/exportMarkdown";

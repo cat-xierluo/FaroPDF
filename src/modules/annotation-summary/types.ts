@@ -1,4 +1,4 @@
-import type { PdfAnnotation, PdfAnnotationType } from "../../shared/pdf/annotation";
+import type { PdfAnnotation } from "../../shared/pdf/annotation";
 import type { AnnotationSidebarGroupBy } from "../annotation/sidebarGroups";
 
 /** 摘要分组维度（复用 sidebarGroups 的 4 个维度） */
