@@ -2559,3 +2559,115 @@ useEffect(() => {
 
 - 未来如需「App 启动时自动检查」（不等用户打开设置）：由 layout worker 拆独立 PR，在 `App.tsx` 加 startup useEffect，按 `settings.autoUpdateCheck` 决定是否调 `createTauriUpdateClient().checkForAppUpdate()`；需同步讨论默认 `createTauriUpdateClient()` 与 `AboutSection` 共享的 client 实例（避免双 `checkForAppUpdate` 调用）。
 - 真实生产 pubkey 替换、增量更新回退、移动端打包、CODE_SIGNING 仍按 DEC-048 §6 路径推进。
+
+## DEC-058 ISS-026 批注 Overlay ↔ Sidebar active 联动（activeAnnotationId 双向同步）
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联任务：ISS-026
+- 关联分支：`feat/iss-026-overlay-sidebar-active-sync`
+- 关联 PR：TBD
+- DEC 编号承接 DEC-056 后 +2（057 暂未使用，与历史跳号策略保持一致）
+
+承接 ISS-026 stage 4 收口（DEC-044/045/046/047）中标注的「`AnnotationOverlay` 与 `AnnotationSidebar` 的 active 联动仍未接（`onAnnotationClick` prop 已留好，等下一阶段统一接线）」。本决策记录 batch 注的 5 阶段 active 联动方案：在 `AppShell` 持有单一 `activeAnnotationId` state，透传给 `AnnotationOverlay` 与 `AnnotationSidebar` 实现双向同步。
+
+### 1. 触发原因
+
+DEC-044 §3.2 §3.3 阶段交付里，`AnnotationOverlay` 接收了 `activeAnnotationId?: string | null` 与 `onAnnotationClick?: (annotationId: string) => void` props，`AnnotationSidebar` 同样有 `activeAnnotationId` 与 `onAnnotationClick` props（DEC-037 stage 2 收口），但 `AppShell` 在 stage 4 milestone 2（DEC-046）里只把 `onAnnotationClick` prop 透传，没真正连接。`AnnotationOverlay` 的 `activeAnnotationId={null}` 被硬编码，`AnnotationSidebar` 在 `UtilityPanel` 分支里完全不传 `onAnnotationClick` / `activeAnnotationId`。结果是用户点 overlay 上的某个高亮，sidebar 不会高亮；点 sidebar 行也不会把 overlay 上的对应 glyph 标记为 active——产品体验与 §1 设计预期「点击批注跳转」脱节。
+
+### 2. 关键决策
+
+#### 2.1 状态归属：AppShell 持有 `activeAnnotationId`
+
+`activeAnnotationId: string | null` state 放在 `AppShell`，**不**上提到 `App.tsx`，**不**建 `AnnotationContext` / module-level bridge。
+
+- 优：AppShell 已经是 overlay 与 sidebar 的共同父节点，prop drilling 距离为 0；`App.tsx` 大部分属于 layout worker 的不主动改区域，本期不迫不得已不挪；`AnnotationContext` 会让 mode/panel 切换时的清理逻辑分到多个文件。
+- 劣：`App.tsx` 不感知 active 状态；后续如需「跨 tab/跨窗口同步」需要重新评估。
+- 选择依据：ISS-026 active 联动只与 annotate mode 的工作区局部相关（读者点 → 同步渲染），不需要 App 顶层管控；与既有 `annotationArmed` bundle（DEC-044）形成的「Overlay + Toolbar 共享 state，AppShell 桥」模式保持一致。
+
+#### 2.2 双向同步机制：单一 state + onAnnotationClick setter
+
+```tsx
+const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+// Overlay:
+<AnnotationOverlay
+  activeAnnotationId={activeAnnotationId}
+  onAnnotationClick={(id) => {
+    setActiveAnnotationId(id);
+    onAnnotationClick?.(id);  // 保留 AppShellProps 透传出口（向上抛给 App.tsx 未来使用）
+  }}
+/>
+// Sidebar（UtilityPanel 分支内）：
+<AnnotationSidebar
+  activeAnnotationId={activeAnnotationId}
+  onAnnotationClick={setActiveAnnotationId}
+/>
+```
+
+- 单一 setState 作为 setSource，AppShell 内仅一个 `useState<string | null>(null)`。
+- Overlay 侧保留 `onAnnotationClick?.(id)` 向上传递到原 `AppShellProps.onAnnotationClick`：保留未来 App.tsx 接入「点击批注 → 弹详情面板」「点击批注 → 选中后跳到搜索」等扩展点；当前 App.tsx 未传 `onAnnotationClick`，所以向上调用是 no-op。
+- Sidebar 侧直接传 `setActiveAnnotationId`：不重复包装，因 Sidebar 内部仅需 setState（不需额外「向上抛」场景）。
+
+#### 2.3 mode 切换时清空（避免 stale 选中态）
+
+```tsx
+useEffect(() => {
+  if (activeMode !== "annotate") {
+    setActiveAnnotationId(null);
+  }
+}, [activeMode]);
+```
+
+- 用户点 overlay/sidebar 让某批注 active → 切到 read 模式 → 切回 annotate 模式，active 状态应为空（而不是保留一个不可见的 selection）。
+- 用 `useEffect` 在 `activeMode` 变化时检测，**不**在 mode setter 里 setState（保留 mode setter 幂等性）。
+- 隐式用例：用户切到 ocr / forms / export 模式时 overlay 不渲染（`isAnnotateMode && hasDocument` 条件），切回 annotate 后 overlay 才出现，active 状态已在切换间清空。
+
+#### 2.4 armed toolType 下的点击保护
+
+`AnnotationOverlay.handleAnnotationClick` 已有保护：
+
+```ts
+function handleAnnotationClick(annotationId: string) {
+  if (interaction) {
+    return;
+  }
+  onAnnotationClick?.(annotationId);
+}
+```
+
+- `interaction` 从 `activeToolType` 派生（`ANNOTATION_TOOL_INTERACTION[activeToolType]`）。当用户已 arm 工具（`activeToolType !== null`）时，overlay 的 click 事件被 suppression，避免「点选已有高亮」与「拖拽绘制新批注」冲突。
+- 本期保留该行为：**不**在 `AppShell` 重复判断 armed 状态。新增测试（`activeToolType 已 armed → 点击 Overlay 不触发 active 同步`）保证该保护仍在位。
+
+#### 2.5 范围与依赖
+
+- 修改 `src/components/layout/AppShell.tsx`：`useState<string | null>` + `useEffect` cleanup + `<AnnotationOverlay>` 透传 `activeAnnotationId` / `onAnnotationClick` + `<AnnotationSidebar>` 透传 `activeAnnotationId` / `onAnnotationClick`（在 `UtilityPanel` 函数内）。
+- 修改 `src/components/layout/AppShell.test.tsx`：新增 4 项单测（sidebar→overlay / overlay→sidebar / armed 阻止 / mode 切换清空）。
+- **不修改** `src/components/layout/AnnotationOverlay.tsx`（onAnnotationClick / activeAnnotationId prop 形态 DEC-044 已就位，stage 4 milestone 2 已落硬编码 `null`）。
+- **不修改** `src/components/layout/AnnotationSidebar.tsx`（DEC-037 stage 2 已收口，props 形态完备）。
+- **不修改** `src/components/layout/types.ts`（`AnnotationOverlayAnchor` / `AnnotationArmedStateBundle` / `AnnotationDraftSubmission` 已就位，本期不引入新类型）。
+- **不修改** `src/modules/annotation/AnnotationService.ts`（业务逻辑零改动，service API 形态保持）。
+- **不修改** `src/App.tsx`（保留 forbidden，不上提 state）。
+
+### 3. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `npm run typecheck` | ✅ 干净 | `useState<string \| null>` + `useEffect` 在 AppShell 中可行，UtilityPanel 签名扩展 activeAnnotationId/onAnnotationClick |
+| `npm run lint` | ✅ 43 个错误 | 与 main 基线一致，0 回归（pre-existing：fontLoader + ocr-e2e.test.ts + generate-scan-fixture.mjs） |
+| `npm test` | ✅ 80 文件 / 761 用例 | +4（AppShell 4 项 active 联动测试：sidebar→overlay / overlay→sidebar / armed 阻止 / mode 切换清空） |
+| `npm run build` | ✅ 2022 modules | Vite 成功产出 dist 资产 |
+| `cargo check --offline` | ✅ 干净 | 9 个 pre-existing dead_code warning 与本 PR 无关 |
+
+### 4. 已知限制
+
+- **armed tool 阻止 active 同步**：用户在 annotate mode arm 了 highlight / underline / 矩形 / 箭头 / 手写工具时，点 overlay 上的已有批注不会触发 active 同步；这是 DEC-044 阶段既有的设计，保留以避免「点选 vs 绘制」二义性。如未来要「shift+click 强制 active」语义，扩 `AnnotationOverlay.handleAnnotationClick` 即可，AppShell 状态机无需变。
+- **App.tsx 未参与**：`onAnnotationClick` prop 透传出口已留（`onAnnotationClick?.(id)` 保留），但 App.tsx 当前未传 `onAnnotationClick`，向上调用是 no-op。后续如需「点击批注 → 弹详情面板 / 跳到搜索」，由独立 worker 在 App.tsx 注入 `onAnnotationClick={(id) => showAnnotationDetail(id)}`。
+- **跨模式清空**：`useEffect` 只在切出 annotate 时清空；如果未来引入「跨 mode 保留 active 选中（如 read mode 也展示 active 批注）」需求，需重新评估 useEffect 逻辑。
+- **不处理同一 pageIndex 上多个批注 id 冲突**：active 状态精确到 annotation.id，由 `Overlay.handleAnnotationClick` 派发，无歧义。
+
+### 5. 后续路径
+
+- 后续「点击批注 → 弹详情面板」（如有）由 App.tsx 注入 `onAnnotationClick` 即可，不需重写本联动。
+- 后续「批注 active 高亮几何样式」（如 overlay glyph 加 halo、sidebar row 加左侧色条）由独立 UI worker 收口，本期保留既有 `is-active` class + `aria-current="true"` 契约。
+- ISS-026 余下 milestone（导出工具条「压平批注」按钮 UI 入口、批注 4 milestone 视觉验收）继续按 `docs/TASKS.md` 推进，不受本 PR 影响。
+

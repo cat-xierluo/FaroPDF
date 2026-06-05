@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { PdfAnnotation } from "../../shared";
 import type { ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
@@ -105,6 +106,15 @@ export function AppShell({
   const isAnnotateMode = activeMode === "annotate";
   // stage 4 批注 armed 状态：App.tsx 持有单一真相源；未传时回退到初始 state，保证既有测试不破
   const annotationState: AnnotationToolState = annotationArmed?.state ?? createInitialAnnotationToolState();
+  // 批注 active 联动：AnnotationOverlay 与 AnnotationSidebar 共享选中状态（DEC-058 / ISS-026 active 联动）。
+  // 状态由 AppShell 持有——Overlay 点击 → setActiveAnnotationId → Sidebar 高亮；Sidebar 点击 → setActiveAnnotationId → Overlay 高亮。
+  // 离开 annotate 模式时自动清空，避免切换到 read / pages 等模式后保留 stale 选中态。
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+  useEffect(() => {
+    if (activeMode !== "annotate") {
+      setActiveAnnotationId(null);
+    }
+  }, [activeMode]);
   const document = reader.state.document;
   const hasDocument = document !== null;
   // 当前页 PDF viewport（pt），用于 overlay 真实坐标
@@ -140,7 +150,16 @@ export function AppShell({
         />
       ) : null}
       <div className={showUtilityPanel ? "workspace" : "workspace workspace--full"}>
-        {showUtilityPanel ? <UtilityPanel panel={utilityPanel} reader={reader} search={search} annotations={annotations} /> : null}
+        {showUtilityPanel ? (
+          <UtilityPanel
+            activeAnnotationId={activeAnnotationId}
+            annotations={annotations}
+            onAnnotationClick={setActiveAnnotationId}
+            panel={utilityPanel}
+            reader={reader}
+            search={search}
+          />
+        ) : null}
         <div className="workspace__main" style={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, position: "relative" }}>
           {activeMode === "pages" ? (
             <PageOrganizerWorkspace reader={reader} />
@@ -168,13 +187,16 @@ export function AppShell({
           )}
           {isAnnotateMode && hasDocument && overlayViewport ? (
             <AnnotationOverlay
-              activeAnnotationId={null}
+              activeAnnotationId={activeAnnotationId}
               activeColor={annotationState.color}
               activeStampLabel={annotationState.stampLabel}
               activeStampName={annotationState.stampName}
               activeToolType={annotationState.activeToolType}
               annotations={currentPageAnnotations}
-              onAnnotationClick={onAnnotationClick}
+              onAnnotationClick={(annotationId) => {
+                setActiveAnnotationId(annotationId);
+                onAnnotationClick?.(annotationId);
+              }}
               onAnnotationDraft={
                 onAnnotationDraft
                   ? (input: AnnotationDraftInput) =>
@@ -210,11 +232,15 @@ function OcrWorkspaceUnavailable() {
 }
 
 function UtilityPanel({
+  activeAnnotationId,
+  annotations,
+  onAnnotationClick,
   panel,
   reader,
   search,
-  annotations,
 }: {
+  activeAnnotationId: string | null;
+  onAnnotationClick: (annotationId: string) => void;
   panel: Exclude<UtilityPanelId, "none">;
   reader: ReaderController;
   search: TextSearchController;
@@ -253,9 +279,11 @@ function UtilityPanel({
   if (panel === "annotation") {
     return (
       <AnnotationSidebar
+        activeAnnotationId={activeAnnotationId}
         annotations={annotations ?? []}
         currentPage={reader.state.document?.currentPage}
         hasDocument={reader.state.document !== null}
+        onAnnotationClick={onAnnotationClick}
         onSelectPage={reader.setCurrentPage}
         pageCount={reader.state.document?.pageCount}
       />
