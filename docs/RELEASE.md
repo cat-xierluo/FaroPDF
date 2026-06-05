@@ -120,9 +120,11 @@ git push origin v0.1.0
   `checkForAppUpdate`，手动按钮仍可用；切换实时经 `onChange` → SettingsPanel
   → App 路径持久化（App.tsx 当前是 in-memory，SettingsService 真正落盘由后续
   PR 接入时再加 debounce）。详见 `docs/DECISIONS.md` DEC-056。
-- **增量更新回退完整重装**：未实现。`tauri-plugin-updater` 的下载流若中断会自
-  动重试；网络异常的最终回退路径留给用户手动下载新版本安装包（GitHub Release
-  页面有所有 assets）。
+- **增量更新回退完整重装**：✅ DEC-066 落地。`tauri-plugin-updater` 的下载流若中
+  断（chunk 重试用尽、网络中断、签名校验失败等），前端自动重试一次完整下载；两
+  次均失败时 UI 进入 `fallback` 状态，显示脱敏错误消息 + GitHub Releases 手动下载
+  链接。Rust 端 `update_fallback.rs` 提供错误分类和脱敏逻辑。详见 `docs/DECISIONS.md`
+  DEC-066。
 - **移动端不在 v0.3 scope**：Android / iOS 打包在评估范围；ISS-021 不强制实现。
   后续若启动 ISS-XXX 移动端，需扩展 `release.yml` 矩阵 + 单独签名 keypair +
   `latest.json` platform 字段。
@@ -137,8 +139,9 @@ git push origin v0.1.0
 - `src-tauri/Cargo.toml` — tauri-plugin-updater 依赖
 - `src-tauri/tauri.conf.json` — `bundle.createUpdaterArtifacts` + `plugins.updater`
 - `src-tauri/src/lib.rs` — `tauri_plugin_updater::Builder::new().build()` 接入
+- `src-tauri/src/update_fallback.rs` — ISS-021 增量更新失败回退：错误分类与脱敏
 - `src/shared/update/` — 前端 update 契约（types / service / capability）
-- `src/modules/settings/sections/AboutSection.tsx` — 检查更新 UI
+- `src/modules/settings/sections/AboutSection.tsx` — 检查更新 UI（含 fallback 分支）
 - `scripts/create-updater-manifest.mjs` — `latest.json` 生成器
 - `.github/workflows/release.yml` — 跨平台 CI 流水线
 - `docs/DECISIONS.md` DEC-048 — 架构与限制决策
