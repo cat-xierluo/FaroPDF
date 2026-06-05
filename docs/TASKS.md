@@ -270,7 +270,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：品牌 / 跨仓 cleanup
-- 状态：进行中（fix/iss-029-faropdf-real-qr worktree 已创建，资源替换 + 文档同步待 PR 合 review）
+- 状态：已收口（DEC-062 / PR #49，真实 QR 替换 + 三仓同步完成；commit `8f0be50`）
 - 建议分支：`fix/iss-029-faropdf-real-qr`
 - 建议 worktree：`.claude/worktrees/iss-029-faropdf-real-qr`
 - 依赖：personal-site `ISS-010`（真实 QR 已入 personal-site 主干，commit `0ef5455` 前已通过 ISS-010 完成单源修正，DEC-009 supersede DEC-007）
@@ -326,7 +326,7 @@ Agent 可根据本文件自行判断：
 - **扫描预处理**：ISS-016
 - **设置 / OCR Provider**：ISS-014、ISS-022
 - **法律材料整理**：ISS-019
-- **品牌 / UI**：ISS-020
+- **品牌 / UI**：ISS-020、ISS-029
 - **跨仓协调**：personal-site `ISS-005`（Folio 仓 PR-A / FaroPDF 仓 PR-B 联动，FaroPDF 仓侧见 DEC-058 docs-only 同步）
 
 需要恢复为活跃任务时，先在 `docs/DECISIONS.md` 的归档条目下加"恢复"标注，再回到本文件新增任务卡。
