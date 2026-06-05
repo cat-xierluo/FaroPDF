@@ -30,8 +30,9 @@
   border-radius: 6px;
   background: var(--bg);
   padding: 4px;
-  /* 1x1 占位图在 120px 容器内会被放大；
-     通过 image-rendering: pixelated 保持方块感，避免被浏览器平滑模糊掩盖「占位」事实。 */
+  /* 真实公众号二维码（734×734）在 120px 容器内按 ~6:1 缩小渲染；
+     image-rendering: pixelated 保留 QR 像素边缘锐度，避免被浏览器平滑缩放
+     导致扫码识别率下降。ISS-029 / DEC-062 替换占位图为真实二维码。 */
   image-rendering: pixelated;
   flex-shrink: 0;
 }

@@ -21,7 +21,7 @@ const DEFAULT_QR_ALT = "微信公众号二维码";
 /**
  * 「关于」section 内的作者卡：
  * - 展示作者姓名 + GitHub 个人页链接
- * - 展示微信公众号二维码占位图
+ * - 展示微信公众号二维码图片（ISS-029 替换占位图为真实二维码，详见 DEC-062）
  * - 附扫码说明
  *
  * 设计要点：
@@ -29,7 +29,7 @@ const DEFAULT_QR_ALT = "微信公众号二维码";
  *   方便单测传入任意 `authorName` / `githubUrl` / `wechatQrSrc`。
  * - 样式独立到 `AuthorCard.css`，复用 settings.css 已有的
  *   `.settings-author-card` 作为基础壳层 class，新加 `.settings-author-card__*` 子类。
- * - 不引入新依赖；二维码占位图通过 `wechatQrSrc` 传入（生产环境由 Vite import 处理）。
+ * - 不引入新依赖；二维码图片通过 `wechatQrSrc` 传入（生产环境由 Vite import 处理）。
  */
 export function AuthorCard({
   authorName,

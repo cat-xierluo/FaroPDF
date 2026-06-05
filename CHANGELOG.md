@@ -28,6 +28,17 @@
   - 验证：`grep "官网：待发布" README.md` 不再命中（line 15 已替换为 personal-site 链接；line 19 release 状态占位另说）；`grep "personal-site" README.md docs/ROADMAP.md CHANGELOG.md` 命中；`git diff main...HEAD --stat` 仅 docs 改动。
   - 已知限制：本期不修改 `src/modules/settings/sections/AboutSection.tsx`（ISS-023 v0.3 实际 UI 接入由 v0.3 worker 推进）；`AboutSection` 中"官网"链接将直接复用 DEC-058 固定的 `https://cat-xierluo.github.io/personal-site/faropdf/`。
   - 1 个 commit（`chore(docs): ISS-005 跨仓 cleanup（FaroPDF 仓 PR-B / DEC-058）`）。
+- fix(settings): ISS-029 跨仓同步：FaroPDF 仓替换 AuthorCard 微信二维码占位为真实图片（DEC-062 / `fix/iss-029-faropdf-real-qr`）。承接 ISS-023 / DEC-051 当时显式 defer 的「公众号二维码替换为真实图片」follow-up，与 personal-site `ISS-010` / DEC-009 收尾跨仓 cleanup 下半场。
+  - **资源替换**：`src/assets/wechat-qrcode.png` 从 1×1 占位 PNG（67 字节，8-bit gray）替换为真实微信公众号二维码（734×734 / 183452 字节 / 8-bit gray+alpha / 非隔行）。资源单源 = Folia 仓 `docs/wechat-qr.png`（734×734 / 184KB / 2026-05-20 入仓），FaroPDF 仓与 personal-site 仓都是副本，三仓保持一致。
+  - **新增 / 修改** `src/assets/QRCODE_LICENSE.md`（重写）：从「微信公众号二维码占位图说明」改为「微信公众号二维码图片说明」，新增「资源单源 = Folia docs」与「后续替换：三仓同步流程」两节，明确「不要在三仓之间出现『哪一仓最新』的歧义」。
+  - **修改** `src/components/settings/AuthorCard.css`（CSS 注释 +1 行）：把「1x1 占位图在 120px 容器内会被放大」改为「真实公众号二维码（734×734）在 120px 容器内按 ~6:1 缩小渲染」；`image-rendering: pixelated` 保持不变（真实 QR 也受益于锐边缩放，避免浏览器平滑缩放导致扫码识别率下降）。
+  - **修改** `src/components/settings/AuthorCard.tsx`（docstring 文字 2 处）：「展示微信公众号二维码占位图」改为「展示微信公众号二维码图片（ISS-029 替换占位图为真实二维码，详见 DEC-062）」；「不引入新依赖；二维码占位图通过 `wechatQrSrc` 传入」改为「二维码图片通过 `wechatQrSrc` 传入」。
+  - **不修改** `src/components/settings/AuthorCard.test.tsx`（单测只验 props 透传，不耦合图片内容）/ `src/modules/settings/sections/AboutSection.tsx`（上游组件 props 形态不变）/ `package.json` / 锁文件 / `src-tauri/` / `config/**` / 全局样式 / 任何业务模块 / Vite 配置（Vite 自动以内容 hash 处理 PNG import）。
+  - 范围严格遵守：仅 1 个 PNG（资源替换）+ 1 个 LICENSE.md（重写）+ 1 个 CSS（注释）+ 1 个 TSX（docstring 文字）+ 3 个文档（CHANGELOG / DECISIONS / TASKS）；其他模块 / 共享契约 / 业务代码 / Tauri 任何文件均**未修改**。
+  - 同步 `docs/DECISIONS.md` 追加 DEC-062（背景 / 决策 / 拒绝的方案 / 资源放置 / 验证 / 已知限制 / 后续路径）；`docs/TASKS.md` 新增 ISS-029 任务卡（进行中，fix/iss-029-faropdf-real-qr worktree 已创建）+ 进度日志追加 2026-06-05 记录；`docs/ROADMAP.md` **未改**。
+  - 验证：`file src/assets/wechat-qrcode.png` 输出 `PNG image data, 734 x 734, 8-bit gray+alpha, non-interlaced`（占位 1×1 → 真实 734×734）；`ls -l src/assets/wechat-qrcode.png` 183452 字节（占位 67 字节 → 真实 183452 字节）；`diff -q personal-site/src/assets/wechat-qrcode.png src/assets/wechat-qrcode.png` 无差异（三仓同步，personal-site / FaroPDF 两副本一致）；`grep -n "占位" src/components/settings/AuthorCard.tsx` 不命中（docstring 占位字样已去除）；`grep -n "ISS-029" src/components/settings/AuthorCard.tsx src/components/settings/AuthorCard.css` 命中（引用新 ISS / DEC）；`npm run typecheck` 干净；`npm run build` 成功（Vite 自动 hash 资源，HTML/JS 自动跟随新文件）；`cargo check --offline` 干净（9 个 pre-existing dead_code warning 与本 PR 无关）；`git diff main...HEAD --stat` 仅 4 个文件。
+  - 已知限制：`npm test -- --run` 在 FaroPDF 主工作区与 worktree 都失败（pre-existing `html-encoding-sniffer` / `@exodus/bytes` ESM 不兼容），与本 PR 无关；本期不强制单测通过，仅按既有基线记录。真实 QR 是 `image-rendering: pixelated` 渲染，如果用户启用了浏览器 / Electron 缩放（> 100%），扫码器在某些 Android 客户端可能识别率下降；本配置保留 pixelated 是为「占位被放大时保持方块感」历史约束的延续（DEC-051），实际扫码建议在 100% 缩放下进行。三仓同步目前靠人工 `cp`；未来如需自动化（脚本驱动）属于 chore 范围，不在 ISS-029。
+  - 1 个 commit（`fix(settings): ISS-029 真实微信二维码替换（DEC-062）`）。
 
 ## 0.1.0-alpha.17 - 2026-06-05
 

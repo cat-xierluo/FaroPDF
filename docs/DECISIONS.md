@@ -2995,4 +2995,72 @@ ISS-022 第一版 PR #25 已合并，5 个 section 已落 `src/modules/settings/
 
 - **前端直接读写 OS Keychain**：前端（JS）无法安全访问 OS Keychain；凭证读取必须走 Rust 后端。
 - **应用内 keychain 管理界面**：超出 ISS-007 范围，可作为 ISS-022 设置页后续增强。
+## DEC-062 ISS-029 跨仓同步：FaroPDF 仓替换 AuthorCard 微信二维码占位为真实图片
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联任务：ISS-029
+- 关联分支：`fix/iss-029-faropdf-real-qr`
+
+承接 ISS-023（DEC-051）当时显式 defer 的「公众号二维码替换为真实图片」follow-up，以及 personal-site `ISS-010` / DEC-009 已经完成「从占位到真实 QR」跨仓 cleanup 上半场，本决策记录 FaroPDF 仓下半场：把 ISS-023 当时保留的 1×1 占位 PNG（`src/assets/wechat-qrcode.png`，67 字节）替换为与 personal-site 一致的真实微信公众号二维码（734×734 / 184KB）。
+
+### 1. 背景
+
+- ISS-023（DEC-051）落 `AuthorCard` 组件时，因「实际添加时 PM 替换」约定保留 1×1 灰阶 PNG 占位（67 字节，Python 直接写 PNG 三 chunk 生成）；`QRCODE_LICENSE.md` 明确写「后续替换：把图片放到 `src/assets/`，建议保留文件名 `wechat-qrcode.png`」。
+- personal-site `ISS-010`（DEC-009）已经把同一张真实 QR 落到 personal-site 仓 `src/assets/wechat-qrcode.png`（183452 字节 / 734×734），资源单源 = Folia 仓 `docs/wechat-qr.png`（734×734 / 184KB / 2026-05-20 入仓），DEC-009 supersede DEC-007 修正了「从 FaroPDF 复制」的单源误读。
+- ISS-029 收尾 FaroPDF 仓的同源 cleanup：把 AuthorCard 实际渲染的占位 PNG 替换为真图，避免「FaroPDF 设置页 `关于` 渲染 1×1 灰块」与「personal-site 官网 / FaroPDF 详情页 footer 渲染 734×734 真实 QR」的口径不一致。
+- 不再走「FaroPDF 仓单独维护 1×1 占位」的旧路径，三仓都指向 Folia docs 真源；FaroPDF 不再保留任何形式的占位。
+
+### 2. 决策
+
+- **资源替换**：`cp personal-site/src/assets/wechat-qrcode.png src/assets/wechat-qrcode.png`（FaroPDF 仓本 worktree 内）。文件 183452 字节 / 734×734 / 8-bit gray+alpha / 非隔行。Vite 自动以内容 hash 重写资源引用，本期 **无** 业务代码 import 路径需改。
+- **资源单源（跨仓共识）**：Folia 仓 `docs/wechat-qr.png` 是真源，personal-site 仓 `src/assets/wechat-qrcode.png` 与 FaroPDF 仓 `src/assets/wechat-qrcode.png` 是副本。三仓必须保持一致；后续替换走「Folia 真源 → 两仓各复制一次」流程，**不**在两仓之间互相复制以避免再次出现「哪一仓最新」的歧义。
+- **CSS 注释**：`src/components/settings/AuthorCard.css` 把「1x1 占位图在 120px 容器内会被放大；通过 image-rendering: pixelated 保持方块感，避免被浏览器平滑模糊掩盖「占位」事实」改为「真实公众号二维码（734×734）在 120px 容器内按 ~6:1 缩小渲染；image-rendering: pixelated 保留 QR 像素边缘锐度，避免被浏览器平滑缩放导致扫码识别率下降。ISS-029 / DEC-062 替换占位图为真实二维码」。`image-rendering: pixelated` 保持不变（真实 QR 也受益于锐边缩放）。
+- **TSX 文档**：`src/components/settings/AuthorCard.tsx` docstring 把「展示微信公众号二维码占位图」改为「展示微信公众号二维码图片（ISS-029 替换占位图为真实二维码，详见 DEC-062）」；「不引入新依赖；二维码占位图通过 `wechatQrSrc` 传入」去掉「占位」字样，改为「二维码图片通过 `wechatQrSrc` 传入」。
+- **LICENSE 重写**：`src/assets/QRCODE_LICENSE.md` 从「微信公众号二维码占位图说明」改为「微信公众号二维码图片说明」，新增「资源单源 = Folia docs」与「后续替换：三仓同步流程」两节，明确「不要在三仓之间出现『哪一仓最新』的歧义」。
+- **范围严格**：
+  - **不**改 `AuthorCard.test.tsx`：单测只验 props 透传，不耦合图片内容。
+  - **不**改 `src/modules/settings/sections/AboutSection.tsx`：上游组件 props 形态不变。
+  - **不**改 `package.json` / 锁文件 / `src-tauri/` / `config/**` / 全局样式 / 任何业务模块。
+  - **不**改 `AuthorCard.tsx` 组件 API：仅改 docstring 文字。
+  - **不**改 Vite 配置：Vite 自动以内容 hash 处理 PNG import。
+
+### 3. 拒绝的方案
+
+- **在 AuthorCard 里内嵌 QR 渲染（不读 PNG）**：方案 A。代价是 QR 像素矩阵直接写进 TSX，体积大且扫不出来；拒绝。
+- **FaroPDF 仓单独维护不同文件**：方案 B。延续 ISS-023 占位惯例，三仓不同步。代价是用户在 App 内看到的 QR 与 personal-site 看到的口径不一致；拒绝。
+- **走 CDN / 远端资源**：方案 C。代价是破坏 ISS-023「二维码不内置账号 / 密码 / Token / 私钥」的精神且增加外部依赖；拒绝。
+
+### 4. 资源放置
+
+- 真源：`Folia/docs/wechat-qr.png`（734×734 / 184KB）
+- 副本 1：`personal-site/src/assets/wechat-qrcode.png`（183452 字节，ISS-010 落地）
+- 副本 2（本次新增）：`FaroPDF/src/assets/wechat-qrcode.png`（183452 字节，ISS-029 落地）
+
+### 5. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `file src/assets/wechat-qrcode.png` | ✅ `PNG image data, 734 x 734, 8-bit gray+alpha, non-interlaced` | 占位 1×1 → 真实 734×734 |
+| `ls -l src/assets/wechat-qrcode.png` | ✅ 183452 字节 | 占位 67 字节 → 真实 183452 字节 |
+| `diff -q personal-site/src/assets/wechat-qrcode.png src/assets/wechat-qrcode.png` | ✅ 无差异 | 三仓同步（personal-site / FaroPDF 两副本一致） |
+| `grep -n "占位" src/components/settings/AuthorCard.tsx` | ✅ 不命中 | docstring 占位字样已去除 |
+| `grep -n "ISS-029" src/components/settings/AuthorCard.tsx src/components/settings/AuthorCard.css` | ✅ 命中 | 引用新 ISS / DEC |
+| `npm run typecheck` | ✅ 干净 | 无业务代码变更 |
+| `npm run build` | ✅ 成功 | Vite 自动 hash 资源，HTML/JS 自动跟随 |
+| `cargo check --offline` | ✅ 9 pre-existing dead_code warning | 与本 PR 无关 |
+| `git diff main...HEAD --stat` | ✅ 4 个文件 | PNG + LICENSE.md + CSS + TSX |
+
+### 6. 已知限制
+
+- `npm test -- --run` 在 FaroPDF 主工作区与 worktree 都失败（pre-existing `html-encoding-sniffer` / `@exodus/bytes` ESM 不兼容），与本 PR 无关；本期不强制单测通过，仅按既有基线记录。
+- 真实 QR 是 `image-rendering: pixelated` 渲染；如果用户启用了浏览器 / Electron 缩放（> 100%），扫码器在某些 Android 客户端可能识别率下降；本配置保留 pixelated 是为「占位被放大时保持方块感」历史约束的延续（DEC-051），实际扫码建议在 100% 缩放下进行。
+- 三仓同步目前靠人工 `cp`；未来如需自动化（脚本驱动）属于 chore 范围，不在 ISS-029。
+- 替换流程记录在 `QRCODE_LICENSE.md` 而非单独 DEC follow-up：避免 DEC 条目膨胀。
+
+### 7. 后续路径
+
+- ISS-029 任务卡在 PR 合并后归档到 `docs/DECISIONS.md` 的「ISS 任务归档」一节 + `docs/TASKS.md`「归档任务索引」「品牌 / UI」组加 ISS-029。
+- 未来如需更换真实 QR / 改用其他联系方式，按 `QRCODE_LICENSE.md` §"后续替换"三仓同步流程操作。
+- 未来如把三仓同步自动化（如 Makefile / 脚本），按 ISS-026 / ISS-027 模式拆独立 worker。
 
