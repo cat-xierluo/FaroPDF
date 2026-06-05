@@ -1,5 +1,4 @@
-## Unreleased
-
+## 0.1.0-alpha.18 - 2026-06-05
 
 - ISS-022 设置页 lazy load sections 收口（DEC-059 / `feat/iss-022-lazy-load`）：把 SettingsPanel 的 4 个非默认 section（阅读 / OCR provider / 快捷键 / 关于）从 eager import 拆为 `React.lazy` + `Suspense`，默认常规 section 保持 eager。Vite build 已把这 4 个 section 拆分为独立 chunk。
   - **新增** `src/modules/settings/sections/lazy.ts`：集中声明 4 个 `React.lazy` wrapper。
@@ -8,9 +7,6 @@
   - **修改** `src/modules/settings/SettingsPanel.test.tsx`：+4 项 lazy 行为测试（默认 section 不走 Suspense / lazy section 按需加载 / reader 切换加载 / OCR 切换加载）。
   - **不修改** `src/modules/settings/sections/index.ts`（eager export 保留）/ `package.json` / 锁文件 / `src-tauri/` / `config/**` / 全局样式 / 其他模块。
   - 验证：typecheck 干净 / build 成功（4 个 lazy section 独立 chunk）/ cargo check 干净 / npm test 全量失败（pre-existing `html-encoding-sniffer` ESM 不兼容，主工作区同样失败，与本次改动无关）。
-
-## Unreleased (continued)
-
 - feat(ocr): ISS-007 keychain apiKeyRef + OS Keychain 集成（DEC-061 / `feat/iss-007-keychain`）。
   - Rust 端新增 `keychain:providerId:keyName` 凭证引用解析，通过 `keyring` crate 读取 macOS Keychain / Windows Credential Manager / Linux Secret Service。
   - 前端 `apiKeyRef` 校验接受 `keychain:providerId:keyName` 两段式格式（白名单内 providerId），保留 `env:VAR_NAME`。

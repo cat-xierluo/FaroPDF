@@ -334,6 +334,7 @@ Agent 可根据本文件自行判断：
 ## 进度日志
 
 - 2026-06-05：ISS-029 落地（fix/iss-029-faropdf-real-qr，资源替换 + AuthorCard 注释 + QRCODE_LICENSE.md 改写 + docs 同步）。
+- 2026-06-05：封箱 0.1.0-alpha.18（release/0.1.0-alpha.18，DEC-063）：合并 4 条 Unreleased 条目为 `## 0.1.0-alpha.18 - 2026-06-05` 段 + `package.json` / `src-tauri/tauri.conf.json` 版本号 bump 到 `0.1.0-alpha.18` + ROADMAP v0.1 状态从「待开始」改为「进行中（alpha.0~18 已封箱）」+ release.yml tag pattern 从 `v*.*.*` 扩到 `["v*.*.*", "v*.*.*-*"]` 让 prerelease 也能触发 CI；详见 DEC-063。是否实际打 `v0.1.0-alpha.18` tag 触发 release.yml 由 PM 在 PR 合并后决定（占位 pubkey 不打 tag；PM 重新生成 keypair 替换 + 配 GitHub Secrets 后再打 tag）。
 
 
 

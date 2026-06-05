@@ -1,6 +1,6 @@
 # FaroPDF 路线图
 
-> Last updated: 2026-06-02
+> Last updated: 2026-06-05
 
 ## 项目愿景
 
@@ -11,7 +11,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 | 阶段 | 目标摘要 | 状态 |
 | --- | --- | --- |
 | v0.0 上下文初始化 | 固定项目名、定位、技术选型、文档体系 | 已完成 |
-| v0.1 完整基础版 | 快读、检索、批注、OCR/扫描、页面整理、常用导出、表单签署、设置 | 待开始 |
+| v0.1 完整基础版 | 快读、检索、批注、OCR/扫描、页面整理、常用导出、表单签署、设置 | 进行中（alpha.0 ~ 0.1.0-alpha.18 已封箱；详细子项审计留 follow-up，下一版起逐节刷新） |
 | v0.2 法律增强 | 批注摘要、证据目录、材料拆合并、Bates 编号深化 | 待开始 |
 | v0.3 性能与发布 | 大卷宗性能、自动更新、跨平台打包、官网与文档站（迁出 personal-site） | 待开始 |
 
@@ -139,3 +139,4 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - 2026-06-04：ISS-013 第二阶段（真实压缩 + 中文字体）worker 启动后即触发 scope-fontkit 物理冲突（pdf-lib 嵌入自定义字体需 `@pdf-lib/fontkit`，与 worker prompt 的"不修改 package.json / 不引入 npm 字体包"约束冲突），按 DEC-036 延期到下一波；当前 wave 3 收口 2 个 PR（PR #22 阅读模式深化 / PR #23 表单填写与签署），整体推进度足够。重启条件：重写 worker prompt 明确"@pdf-lib/fontkit 是 pdf-lib 官方 devDep，可装"+ 选开源协议中文字体（OFL / Apache 2.0 / MIT）。
 - 2026-06-03：合并 `ISS-017` OCR 质量检查第一版（可检索页比例、关键词命中、CER、体积比、耗时和问题页）和 `ISS-018` 证据图片 A4 编排计划器第一版（auto 布局、方向检测、边距校验、安全输出路径）。
 - 2026-06-05：跨仓 cleanup（personal-site `ISS-005` 联动 / DEC-058）：官网 / 文档站入口由 `cat-xierluo/personal-site` 仓统一维护；FaroPDF 仓 README / ROADMAP 同步指向 `https://cat-xierluo.github.io/personal-site/faropdf/`，不引入 `website/` 子目录或独立的 GitHub Pages workflow。
+- 2026-06-05：封箱 0.1.0-alpha.18（DEC-063）：把 `## Unreleased`（ISS-022 lazy load）+ `## Unreleased (continued)`（DEC-061 keychain / DEC-058 跨仓 cleanup / DEC-062 ISS-029 真实 QR）四条 Unreleased 条目合并为 `## 0.1.0-alpha.18 - 2026-06-05` 段；`package.json` / `src-tauri/tauri.conf.json` 版本号 `0.1.0` → `0.1.0-alpha.18`；v0.1 阶段状态从「待开始」更正为「进行中（alpha.0 ~ 0.1.0-alpha.18 已封箱）」；本段详细子项审计留 follow-up，alpha.19 起的 CHANGELOG / ROADMAP 同步按已完成能力逐节刷新；`v*.*.*` tag pattern 改 `["v*.*.*", "v*.*.*-*"]` 让 `v0.1.0-alpha.18` 也能触发 release.yml。
