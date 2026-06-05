@@ -3091,3 +3091,137 @@ ISS-022 第一版 PR #25 已合并，5 个 section 已落 `src/modules/settings/
 
 - 批量填写 / 字段校验规则引擎 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件（DEC-035 §"目标" 范围）留作后续 worker，与本 PR 解耦。
 - ISS-008 任务卡从 TASKS.md 归档到 DECISIONS.md「ISS 任务归档」一节。
+
+## DEC-065 ISS-021 正式 Tauri updater keypair + macOS Keychain 密码管理 SOP（跨项目可复用）
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联任务：ISS-021
+- 关联分支：`chore/iss-021-real-pubkey`
+- 跨项目影响：Folia、Funes 等本机所有需要 Tauri updater signing 的项目可参照本 DEC 的 SOP
+
+### 1. 背景
+
+- ISS-021 M1 写入的 pubkey `RWSY2kf529U0Slz45EjOfrRqDun8QXiUCrYCtb8+NOQWkyAEaTyff3jx` 是占位 key，对应的私钥不在仓库管理员手中，正式发布前必须替换为可用 keypair（DEC-048 / `docs/RELEASE.md` §3.1 已声明）。
+- 0.1.0-alpha.18 封箱（PR #51 / DEC-063）已就位，下一步是推 `v0.1.0-alpha.18` tag 触发 `release.yml`；如果不先替换 pubkey 并配置 GitHub Secrets，CI 会因 `TAURI_SIGNING_PRIVATE_KEY` 缺失或与 pubkey 不匹配而 fail。
+- 同时审计发现 `src-tauri/Cargo.toml` 的 `version` 字段仍是 `"0.1.0"`，未跟随 PR #51 同步到 `"0.1.0-alpha.18"`；`src-tauri/src/scan_preprocess/pdf_probe.rs:232` 使用 `env!("CARGO_PKG_VERSION")` 读取 Cargo 编译期版本，意味着不修正会让运行时 PDF probe metadata 上报旧版本号。
+- 用户委托 PM 代为生成 keypair；密码管理需求是「密码由用户手动输入、不入仓库、不写明文脚本、未来在本机能稳定取出」。
+
+### 2. 决策
+
+#### 2.1 三处版本号统一
+
+| 文件 | 字段 | 原值 | 新值 |
+| --- | --- | --- | --- |
+| `package.json` | `version` | `0.1.0-alpha.18` | 保持 |
+| `src-tauri/tauri.conf.json` | `version` | `0.1.0-alpha.18` | 保持 |
+| `src-tauri/Cargo.toml` | `[package].version` | `0.1.0` | `0.1.0-alpha.18` |
+
+规则：今后所有 alpha / beta / rc / stable 版本 bump，必须三处同步；任一文件落单视为发布阻塞。
+
+#### 2.2 替换 pubkey
+
+`src-tauri/tauri.conf.json` `plugins.updater.pubkey`：
+
+```
+RWSY2kf529U0Slz45EjOfrRqDun8QXiUCrYCtb8+NOQWkyAEaTyff3jx  // 旧（M1 占位）
+↓
+RWS8WkTIW8ht2pmQPiablJPY8vRrsXleS6NxLsalJ/Tyn+1tKpHGxREc  // 新（2026-06-05 生成）
+```
+
+对应私钥本机路径：`~/.tauri/faropdf.key`（348 bytes，未入仓库；`.gitignore` 已覆盖整个 `~/.tauri/` 目录由用户级 git 忽略保证）。
+
+#### 2.3 密码管理 SOP（macOS Keychain + osascript）
+
+适用于本机所有需要"用户级密码"的场景（Tauri signer、Apple Developer key、API token 等）：
+
+1. **不要**在 shell 提示输入（`read -s` 在 Bash 子进程或 Claude Code Bash tool 中 stdin 不是 TTY，会 fail）。
+2. **不要**在脚本里写明文密码或读 `.envrc`。
+3. **使用 osascript 弹出 hidden-answer 对话框**让用户手动输入：
+
+   ```bash
+   FAROPDF_KEYPW=$(osascript -e 'text returned of (display dialog "FaroPDF Tauri Signer Password" default answer "" with hidden answer)')
+   ```
+
+4. **立即写入 Keychain，让原始变量随 shell 退出消失**：
+
+   ```bash
+   security add-generic-password \
+     -a "$USER" \
+     -s "FaroPDF Tauri Signer Password" \
+     -w "$FAROPDF_KEYPW" \
+     -T "/Users/$USER/.cargo/bin/cargo" \
+     -U
+   unset FAROPDF_KEYPW
+   ```
+
+   - `-s` service 名按 `<Project> <Purpose>` 命名（如 `FaroPDF Tauri Signer Password` / `Folia Tauri Signer Password` / `Funes API Token`），便于跨项目区分。
+   - `-T` 必须用 cargo 二进制的**真实路径**（`/Users/$USER/.cargo/bin/cargo`），不能用 `$(which cargo)`；后者在某些 shell 下返回 `/usr/bin/cargo` 这种 stub，`security` 会报 `SecTrustedApplicationCreateFromPath: UNIX[No such file or directory]`。
+   - `-U` 允许 update 已存在条目，避免每次重跑 fail。
+
+5. **后续需要密码时从 Keychain 读取**（无 GUI 提示，cargo 已被 trust）：
+
+   ```bash
+   FAROPDF_KEYPW=$(security find-generic-password -a "$USER" -s "FaroPDF Tauri Signer Password" -w)
+   ```
+
+6. **GitHub Secrets 写入**：
+
+   ```bash
+   gh secret set TAURI_SIGNING_PRIVATE_KEY -b "$(base64 < ~/.tauri/faropdf.key | tr -d '\n')"
+   gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD -b "$(security find-generic-password -a "$USER" -s "FaroPDF Tauri Signer Password" -w)"
+   ```
+
+   secret 写完即从本地内存释放；CI 端通过 `secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 引用。
+
+### 3. 拒绝的方案
+
+- **方案 A：`read -s` + 环境变量**。Claude Code Bash tool / 非交互 shell 中 stdin 不是 TTY，`stty -echo` / `read -s` 会报错；且明文密码会进入 Bash 子进程内存且可能被 shell history 捕获。拒绝。
+- **方案 B：1Password CLI（`op`）**。需要登录 + biometric 触发，本机 PM 当前未安装且对自动化不友好；同时引入对外部 vendor 的依赖。本期拒绝（未来可在「ISS-XXX 引入 1Password 统一管理 secrets」单独 PR 评估）。
+- **方案 C：`.envrc` + direnv**。明文落盘，违反"不写明文脚本"约束。拒绝。
+- **方案 D：把私钥本身写进 Keychain，base64 解出来 sign**。增加一层间接，且 `cargo tauri signer sign` 期望读文件路径或环境变量；不带来额外安全收益。拒绝。
+
+### 4. 变更范围
+
+| 文件 | 变更 |
+| --- | --- |
+| `src-tauri/Cargo.toml` | `version` 0.1.0 → 0.1.0-alpha.18 |
+| `src-tauri/tauri.conf.json` | `plugins.updater.pubkey` 占位 → 真实 pubkey |
+| `docs/RELEASE.md` | §3.1 注释更新 + 新增 macOS Keychain SOP 段（osascript / security add / find） |
+| `docs/DECISIONS.md` | 追加 DEC-065（本条目） |
+
+### 5. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `cargo tauri signer generate` | ✅ 已执行 | 生成 `~/.tauri/faropdf.key` (348B) + `~/.tauri/faropdf.key.pub` (152B) |
+| `security add-generic-password` | ✅ 已执行 | service: `FaroPDF Tauri Signer Password`, account: `maoking` |
+| `security find-generic-password` | ✅ 可取出 | 无 GUI 提示（cargo 已 trust） |
+| pubkey 提取 | ✅ `RWS8WkTIW8ht2pmQPiablJPY8vRrsXleS6NxLsalJ/Tyn+1tKpHGxREc`（56 chars） | `base64 -d < ~/.tauri/faropdf.key.pub \| sed -n '2p'` |
+| `npm run typecheck` | 见 PR | 与 ISS-008（DEC-064）一致 |
+| `npm run build` | 见 PR | Vite 构建通过 |
+
+### 6. 已知限制 / 安全注意
+
+- **密码强度**：当前密码 13 字符，低于 NIST 推荐 16 字符；为了不阻塞 alpha.18 发布暂时接受，建议后续轮换为 ≥ 16 字符 + 同步更新 Keychain 和 GitHub Secret。轮换流程见 `docs/RELEASE.md` §3.1。
+- **key rotation**：minisign 不支持 key rotation；若 `~/.tauri/faropdf.key` 泄露，所有用户的现有客户端将拒绝新签名，必须发布到 1.0.0 才能借机更换 keypair。本期不在 scope。
+- **macOS 平台限定**：本 SOP 仅适用 macOS。Linux 可用 `secret-tool`（libsecret），Windows 用 `cmdkey` 或 Credential Manager；跨平台 PM 需要按平台扩展 SOP。
+- **`-T` 路径硬编码**：`/Users/$USER/.cargo/bin/cargo` 假设 rustup 标准安装路径；非 rustup 安装（如 Homebrew rust）需替换为对应路径。
+- **第一次 osascript 弹窗**会出现 macOS 安全提示「Claude Code 想要使用 osascript」，需用户在 System Settings → Privacy 授权一次。
+
+### 7. 跨项目复用（Folia / Funes / 其他 Tauri 项目）
+
+本 DEC 的 §2.3 SOP 不绑定 FaroPDF 的具体细节，可直接复用：
+
+1. **Service 命名**：`<ProjectName> <PurposeLabel>`，例：`Folia Tauri Signer Password`、`Funes OpenAI API Key`。
+2. **私钥文件路径**：`~/.tauri/<project>.key`，由 `cargo tauri signer generate -w` 指定。
+3. **GitHub Secrets 命名**：保持 Tauri 官方约定 `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`（不要项目前缀，否则 release.yml 模板要改）。
+4. **`-T` cargo 路径**：所有 macOS 项目共用 `/Users/$USER/.cargo/bin/cargo`，无需重新 trust。
+5. **复用入口**：新项目首次发布前，复制 §2.3 的 6 步到该项目的 `docs/RELEASE.md`，把 `FAROPDF_KEYPW` / `FaroPDF` 替换为新项目名即可。
+6. **跨项目避免冲突**：每个项目使用独立 Keychain service 名 + 独立私钥文件，不复用同一 keypair（防止单 key 泄露污染所有项目；与 minisign 无 rotation 的限制相呼应）。
+
+### 8. 后续路径
+
+- 推 `v0.1.0-alpha.18` tag 触发 `release.yml`，验收 CI 通过和 GitHub Release 生成（任务卡 ISS-021 后续步骤）。
+- 密码强度升级（13 → ≥16 字符）作为 alpha.19 / beta 前的安全维护项。
+- 未来 `macOS notarize + Windows EV cert` 由独立 ISS 推进（不在 ISS-021 scope）。

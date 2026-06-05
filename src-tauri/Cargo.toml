@@ -1,6 +1,6 @@
 [package]
 name = "faropdf"
-version = "0.1.0"
+version = "0.1.0-alpha.18"
 description = "FaroPDF desktop application"
 authors = ["maoscripts"]
 edition = "2021"
