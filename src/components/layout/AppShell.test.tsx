@@ -538,3 +538,180 @@ describe("AppShell annotate toolbar integration (ISS-026 stage 4 milestone 2)", 
   });
 });
 
+describe("AppShell AnnotationOverlay ↔ AnnotationSidebar active 联动 (ISS-026 active 联动 / DEC-058)", () => {
+  function makeReadyReader(pageCount: number, currentPage: number = 1): ReaderController {
+    return makeReader({
+      state: {
+        status: "ready",
+        defaults: { viewMode: "continuous", zoom: 1 },
+        document: {
+          documentId: "doc-1",
+          path: "test.pdf",
+          fingerprint: "fp-1",
+          name: "test.pdf",
+          currentPage,
+          pageCount,
+          zoom: 1,
+          viewMode: "continuous",
+          rotation: 0,
+          textLayerStatus: "available",
+          ocrStatus: "not-needed",
+          dirty: false,
+        },
+        pageViewports: [
+          { pageIndex: 0, width: 612, height: 792, rotation: 0, scale: 1 },
+          { pageIndex: 1, width: 612, height: 792, rotation: 0, scale: 1 },
+        ],
+        renderRange: { startPage: 1, endPage: pageCount, pageNumbers: [1, 2] },
+        errorMessage: undefined,
+      },
+    });
+  }
+
+  test("点击 Sidebar 行 → Overlay 同步高亮该批注（activeAnnotationId 双向流转）", async () => {
+    const user = userEvent.setup();
+    const reader = makeReadyReader(2);
+    const annotations = [
+      makeAnnotation({ id: "ann-page1", pageIndex: 0, type: "highlight" }),
+      makeAnnotation({ id: "ann-page2", pageIndex: 1, type: "note", content: "需要复核" }),
+    ];
+    renderAppShell({ activeMode: "annotate", annotations, reader, utilityPanel: "annotation" });
+
+    // 初始：overlay 内 ann-page1 的高亮 glyph 没有 is-active class
+    const overlay = screen.getByLabelText("第 1 页批注叠加层");
+    const overlayGlyph = within(overlay).getByLabelText("高亮");
+    expect(overlayGlyph).not.toHaveClass("is-active");
+
+    // 点击 Sidebar 中 ann-page1 的 row
+    const sidebarRow = document.querySelector('[data-annotation-row-id="ann-page1"]') as HTMLElement;
+    expect(sidebarRow).not.toBeNull();
+    await user.click(sidebarRow);
+
+    // Overlay 内 ann-page1 的 glyph 同步获得 is-active
+    const updatedOverlay = screen.getByLabelText("第 1 页批注叠加层");
+    const updatedGlyph = within(updatedOverlay).getByLabelText("高亮");
+    expect(updatedGlyph).toHaveClass("is-active");
+
+    // Sidebar 行自身也维持 active class + aria-current="true"
+    const updatedSidebarRow = document.querySelector('[data-annotation-row-id="ann-page1"]') as HTMLElement;
+    expect(updatedSidebarRow).toHaveClass("annotation-sidebar__row-button--active");
+    expect(updatedSidebarRow).toHaveAttribute("aria-current", "true");
+  });
+
+  test("点击 Overlay 批注 → Sidebar 同步高亮该行（双向）", async () => {
+    const user = userEvent.setup();
+    const reader = makeReadyReader(2);
+    const annotations = [
+      makeAnnotation({ id: "ann-page1", pageIndex: 0, type: "highlight" }),
+      makeAnnotation({ id: "ann-page2", pageIndex: 1, type: "note", content: "需要复核" }),
+    ];
+    renderAppShell({ activeMode: "annotate", annotations, reader, utilityPanel: "annotation" });
+
+    // 初始：sidebar ann-page1 行未 active
+    const sidebarRow = document.querySelector('[data-annotation-row-id="ann-page1"]') as HTMLElement;
+    expect(sidebarRow).not.toHaveClass("annotation-sidebar__row-button--active");
+
+    // 点击 Overlay 内的 ann-page1 glyph
+    const overlay = screen.getByLabelText("第 1 页批注叠加层");
+    const overlayGlyph = within(overlay).getByLabelText("高亮");
+    await user.click(overlayGlyph);
+
+    // Sidebar ann-page1 行同步 active
+    const updatedSidebarRow = document.querySelector('[data-annotation-row-id="ann-page1"]') as HTMLElement;
+    expect(updatedSidebarRow).toHaveClass("annotation-sidebar__row-button--active");
+    expect(updatedSidebarRow).toHaveAttribute("aria-current", "true");
+
+    // Overlay 自身也维持 active
+    const updatedOverlay = screen.getByLabelText("第 1 页批注叠加层");
+    expect(within(updatedOverlay).getByLabelText("高亮")).toHaveClass("is-active");
+  });
+
+  test("activeToolType 已 armed → 点击 Overlay 不触发 active 同步（避免与新建批注冲突）", async () => {
+    const user = userEvent.setup();
+    const reader = makeReadyReader(2);
+    const annotations = [
+      makeAnnotation({ id: "ann-page1", pageIndex: 0, type: "highlight" }),
+    ];
+    // 主动 arm highlight 工具
+    const annotationState = { ...createInitialAnnotationToolState(), activeToolType: "highlight" as const };
+    const onStateChange = vi.fn();
+    renderAppShell({
+      activeMode: "annotate",
+      annotationArmed: { onStateChange, state: annotationState },
+      annotations,
+      reader,
+      utilityPanel: "annotation",
+    });
+
+    // 点击 ann-page1 glyph
+    const overlay = screen.getByLabelText("第 1 页批注叠加层");
+    const overlayGlyph = within(overlay).getByLabelText("高亮");
+    await user.click(overlayGlyph);
+
+    // Sidebar 行仍未 active
+    const sidebarRow = document.querySelector('[data-annotation-row-id="ann-page1"]') as HTMLElement;
+    expect(sidebarRow).not.toHaveClass("annotation-sidebar__row-button--active");
+  });
+
+  test("activeMode 切出 annotate 模式 → activeAnnotationId 自动清空", async () => {
+    const user = userEvent.setup();
+    const reader = makeReadyReader(2);
+    const annotations = [
+      makeAnnotation({ id: "ann-page1", pageIndex: 0, type: "highlight" }),
+    ];
+    const onModeChange = vi.fn();
+    const { rerender } = renderAppShell({
+      activeMode: "annotate",
+      annotations,
+      onModeChange,
+      reader,
+      utilityPanel: "annotation",
+    });
+
+    // 先点击 Sidebar 行让 ann-page1 处于 active 状态
+    const sidebarRow = document.querySelector('[data-annotation-row-id="ann-page1"]') as HTMLElement;
+    await user.click(sidebarRow);
+    expect(sidebarRow).toHaveClass("annotation-sidebar__row-button--active");
+    expect(sidebarRow).toHaveAttribute("aria-current", "true");
+
+    // 模拟 mode 切到 read（rerender）
+    rerender(
+      <AppShell
+        activeMode="read"
+        annotationArmed={undefined}
+        annotations={annotations}
+        onModeChange={onModeChange}
+        onUtilityPanelChange={vi.fn()}
+        reader={reader}
+        search={makeSearch()}
+        settings={createDefaultAppSettings()}
+        utilityPanel="summary"
+        ocr={makeOcrController()}
+      />,
+    );
+
+    // 切到 read 后，AnnotationOverlay 不再渲染
+    expect(screen.queryByLabelText(/第 \d+ 页批注叠加层/)).not.toBeInTheDocument();
+
+    // 切回 annotate + utilityPanel=annotation → active 状态应已清空
+    rerender(
+      <AppShell
+        activeMode="annotate"
+        annotationArmed={undefined}
+        annotations={annotations}
+        onModeChange={onModeChange}
+        onUtilityPanelChange={vi.fn()}
+        reader={reader}
+        search={makeSearch()}
+        settings={createDefaultAppSettings()}
+        utilityPanel="annotation"
+        ocr={makeOcrController()}
+      />,
+    );
+
+    const sidebarAfterReturn = document.querySelector('[data-annotation-row-id="ann-page1"]') as HTMLElement;
+    expect(sidebarAfterReturn).not.toHaveClass("annotation-sidebar__row-button--active");
+    expect(sidebarAfterReturn.getAttribute("aria-current")).not.toBe("true");
+  });
+});
+
