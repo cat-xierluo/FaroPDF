@@ -122,18 +122,6 @@ export function AnnotationSidebar({
     );
   }
 
-  if (view === "summary") {
-    return (
-      <AnnotationSummaryPanel
-        annotations={annotations}
-        documentLabel={`PDF（${annotations.length} 个批注）`}
-        hasDocument={true}
-        onAnnotationClick={onAnnotationClick}
-        onSelectPage={onSelectPage}
-      />
-    );
-  }
-
   const hasActiveFilters =
     Boolean(filters.query) ||
     Boolean(filters.types?.length) ||
@@ -182,17 +170,26 @@ export function AnnotationSidebar({
     });
   }
 
+  if (view === "summary") {
+    return (
+      <AnnotationSummaryPanel
+        annotations={annotations}
+        documentLabel={`PDF（${annotations.length} 个批注）`}
+        hasDocument={true}
+        onAnnotationClick={onAnnotationClick}
+        onSelectPage={onSelectPage}
+      />
+    );
+  }
+
   return (
     <aside className="annotation-sidebar" aria-label="批注侧边栏">
       <header className="annotation-sidebar__header">
         <h2>批注（{filtered.length} / {annotations.length}）</h2>
         <div className="annotation-sidebar__view-toggle">
           <button
-            aria-pressed={view === "list"}
-            className={
-              "annotation-sidebar__view-btn" +
-              (view === "list" ? " annotation-sidebar__view-btn--active" : "")
-            }
+            aria-pressed={true}
+            className="annotation-sidebar__view-btn annotation-sidebar__view-btn--active"
             data-testid="sidebar-view-list"
             onClick={() => setView("list")}
             type="button"
@@ -200,11 +197,8 @@ export function AnnotationSidebar({
             列表
           </button>
           <button
-            aria-pressed={view === "summary"}
-            className={
-              "annotation-sidebar__view-btn" +
-              (view === "summary" ? " annotation-sidebar__view-btn--active" : "")
-            }
+            aria-pressed={false}
+            className="annotation-sidebar__view-btn"
             data-testid="sidebar-view-summary"
             onClick={() => setView("summary")}
             type="button"
