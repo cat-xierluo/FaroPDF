@@ -1,3 +1,17 @@
+## 0.1.0-alpha.14 - 2026-06-05
+
+- LICENSE + 项目身份收尾（DEC-054 / `chore/add-license-and-author`）：补齐项目正式身份三件套（开源协议 + 作者名 + 项目图标）。
+  - **新增** `LICENSE`（191 行，标准 Apache License 2.0 文本）：从 [Folia](https://github.com/cat-xierluo/Folia) `LICENSE` 复制（Apache-2.0 文本是标准协议，不需按项目改文件本身）。完整协议文本落地后，README §许可 可去掉 TODO 占位。
+  - **修改** `package.json` author.name：`"maoking"`（GitHub 用户名） → `"杨卫薪律师"`（与 README §作者 + DEC-051 AuthorCard + DEC-052 §2.6 实际展示名一致）。user explicit 指示「author name 的话，以这个 read me 的为主优先」。`author.url` 保持 `https://github.com/cat-xierluo`（GitHub 个人页不变）。
+  - **新增** `docs/icon.svg`（2.1KB）+ `docs/icon.png`（512×512，33KB）+ `docs/icon-128.png`（128×128，5.6KB）：项目图标 SVG 源 + PNG 衍生。设计主题：灯塔（呼应 `Faro` = 灯塔 / 指引之意，与 Folia 灯塔 logo 一脉相承）+ 红白条灯塔塔身 + 黄灯光晕 + 深蓝圆角方形 app-icon 风格底 + 右下角低透明度 "FaroPDF" 水印。`rsvg-convert` 从 SVG 衍出 PNG 两种尺寸（512 retina + 128 README inline）。
+  - **修改** `README.md`：顶部加 `<p align="center"><img src="docs/icon-128.png" alt="FaroPDF" width="128" height="128"></p>`；§许可 替换 TODO 占位为「本项目基于 Apache License 2.0 开源，与 Folia 保持一致。完整协议见 `LICENSE`」。
+  - **不修改** `src/**` / `src-tauri/**` / 锁文件 / 任何业务模块 / 任何构建配置 / DEC-053 已收口的 `config/` 子目录。
+- 范围严格遵守：仅 `LICENSE`（新增）+ `package.json`（author.name 改 1 行）+ `docs/icon.{svg,png}` + `docs/icon-128.png`（4 文件新增）+ `README.md`（顶部加 img + §许可 重写）+ 3 个文档（CHANGELOG / DECISIONS / TASKS）。
+- 同步 `docs/DECISIONS.md` 追加 DEC-054（身份收尾 / 与 Folia 对齐 / author.name 优先级 / icon 设计说明）；`docs/TASKS.md` 追加 ISS-028 个人主页任务卡（chore / future work，本 PR 不实现）。
+- 验证：图片文件 512×512 / 128×128 实际像素正确（`sips -g pixelWidth -g pixelHeight`）；LICENSE 全文 191 行（与 Folia 完全一致，`diff -q` 无差异）；`npm run typecheck` / `lint` / `test` / `build` / `cargo check` 全部干净（无业务代码 / 配置变更，预期 0 回归）。
+- 已知限制：icon 是 SVG 手绘（v1），后续如需品牌化（不同主题色 / 单色 / 高对比度版本）按需开 worker；`docs/icon-128.png` 仅用于 README inline，主 README 渲染场景之外的应用图标（macOS .icns / Windows .ico）首版 release 前单独处理。
+- 1 个 commit（`chore: LICENSE + author.name 对齐 + 项目 icon 落地（DEC-054）`）。
+
 ## 0.1.0-alpha.13 - 2026-06-05
 
 - 根目录配置收束到 `config/` 子目录（DEC-053 / `chore/consolidate-configs`）：参照 Folia 项目结构把 `eslint.config.js` / `tsconfig.json` / `tsconfig.node.json` / `vite.config.ts` / `vitest.config.ts` 5 个根目录配置搬到新 `config/` 子目录，根目录只保留说明文档 + `package.json` + `package-lock.json` + `index.html` + `LICENSE`（Folia 风格）。

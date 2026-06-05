@@ -2291,3 +2291,73 @@ Vite 以 cwd 为 project root，`--config config/vite.config.ts` 不影响 root 
 - 与 PM 协同 PR 合并（PR 在 `chore/consolidate-configs` 分支上）。合并后调用 doc-curator subagent 跑文档体检。
 - 后续 chore 类工作（如整理 `tests/fixtures/` 体积、清理 pre-existing lint 错误）按需拆 worker。
 - Folia 对齐度进阶（如删除 `package.json` 中冗余 dep、统一 `tsconfig.app.json` 三段拆分）放到 0.2 阶段再议。
+
+## DEC-054 项目身份收尾（LICENSE + author.name + icon）
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联任务：ISS-028（个人主页规划，本 DEC 不实现）
+- 关联分支：`chore/add-license-and-author`
+
+承接 DEC-052（README 重写，§许可 标 TODO）、DEC-053（根目录配置收束，提到 `LICENSE` 留待首版 release 落地）后，本决策记录项目正式身份三件套（开源协议 + 作者名 + 项目图标）的最终对齐方案，**与 Folia 项目保持一致**（同一作者、同一协议、同一图标风格家族）。
+
+### 1. 背景
+
+- **LICENSE 缺失**：FaroPDF 仓库此前未提交 LICENSE 文件；README §许可 标 TODO；首版 release 前需补齐。
+- **author.name 错位**：`package.json` author.name 是 `"maoking"`（GitHub 用户名），但 README §作者 + DEC-051 AuthorCard + DEC-052 §2.6 都明确以「**杨卫薪律师**」为实际展示名；user explicit 指示「author name 的话，以这个 read me 的为主优先」。
+- **icon 缺失**：Folia README 顶部有 `docs/icon.png`（灯塔主题），FaroPDF README（DEC-052 重写时）刻意不插入 img 标签（`docs/icon.png` 不存在，避免 404 引用）。本批补齐。
+
+### 2. 决策
+
+#### 2.1 LICENSE 沿用 Folia 的 Apache-2.0 文本
+
+- Folia 仓库已有 `LICENSE`（191 行，标准 Apache License 2.0 文本）。
+- **Apache-2.0 文本是标准协议**，不需按项目改文件本身（不像 MIT / BSD 需要在文件顶部写版权年份和持有人）。
+- **直接复制** Folia 的 `LICENSE` 文本到 FaroPDF 仓库根（`diff -q` 无差异）。
+- 理由：同一作者、同一协议、Folia 已采用，**最大化对齐**；Apache-2.0 包含专利授权 + 商标剥离 + 责任限制，比 MIT / BSD 更适合法律工具类项目。
+
+#### 2.2 `package.json` author.name 以 README 为准
+
+- `author.name`: `"maoking"` → `"杨卫薪律师"`
+- `author.url`: 保持 `https://github.com/cat-xierluo`（GitHub 个人页）
+- 优先级规则（user explicit）：**`author.name` 字段以 README 实际展示名为准**。`maoking` 是 GitHub 操作系统用户名 / commit author 字段用，不应混用到 author.name。
+- 后续约束：所有面向用户的展示（README、AuthorCard、settings §关于、CHANGELOG）统一用「**杨卫薪律师**」；`package.json` 内部字段也保持一致；`git config user.name` 仍可用 `maoking`（开发环境字段，与展示解耦）。
+
+#### 2.3 项目 icon：SVG 源 + 两种 PNG 尺寸
+
+设计主题（呼应 `Faro` = 灯塔 / 指引，与 Folia logo 一脉相承）：
+
+- **底色**：深蓝渐变（`#1A2940` → `#0F1B2D`），app-icon 风格圆角（`rx=48`）
+- **灯塔塔身**：白（`#F5F5F5`）+ 红色横条（`#C73E3A`）—— 经典灯塔视觉符号
+- **灯光**：黄（`#FFC847`）+ 径向 halo（`url(#glow)`）—— 散发指引之意
+- **底座 + 窗**：深灰（`#2C3E50`）+ 黄色窗内光（透明度 0.4）
+- **水印**：右下角低透明度（0.18）"FaroPDF" 文字
+
+文件输出（`rsvg-convert -w N -h N docs/icon.svg -o docs/icon-NN.png`）：
+
+- `docs/icon.svg`（2.1KB，源文件，README inline 用 `<img src="docs/icon.svg">` 也可直接渲染）
+- `docs/icon.png`（512×512，33KB，retina / 应用图标母版）
+- `docs/icon-128.png`（128×128，5.6KB，README inline 显式引用，与 Folia 尺寸对齐）
+
+README 顶部加 `<p align="center"><img src="docs/icon-128.png" alt="FaroPDF" width="128" height="128"></p>`。
+
+#### 2.4 范围
+
+- **新增**：`LICENSE`（191 行）+ `docs/icon.svg` + `docs/icon.png` + `docs/icon-128.png`（4 文件）
+- **修改**：`package.json`（author.name 改 1 行）+ `README.md`（顶部加 img 标签 + §许可 重写 TODO 为实际协议引用）
+- **不修改**：`src/**` / `src-tauri/**` / 锁文件 / `config/**`（DEC-053 已收口）/ 任何业务模块
+
+### 3. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `diff -q` Folia LICENSE | ✅ 无差异 | 191 行标准 Apache-2.0 |
+| PNG 像素 | ✅ | `sips -g pixelWidth -g pixelHeight` 512×512 / 128×128 |
+| `npm run typecheck` / `lint` / `test` / `build` | ✅ 干净 | 无业务代码 / 配置变更，预期 0 回归 |
+| README 引用 | ✅ | `<img src="docs/icon-128.png">` 不再 404 |
+
+### 4. 后续路径
+
+- 个人主页（`ISS-028`）：杨卫薪律师个人主页 + 展示 Folia / FaroPDF 两产品。本 DEC 不实现，仅在 `docs/TASKS.md` 登记任务卡。
+- icon 后续优化（如单色 / 高对比度 / 多语言）按需开 worker；首版 release 前由 PM 决定是否生成 macOS `.icns` / Windows `.ico` / Linux `.desktop` 等平台特定图标。
+- `package.json` author.email 暂留空（`author.name` 已有，email 留待作者本人补充）。

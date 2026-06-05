@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/icon-128.png" alt="FaroPDF" width="128" height="128">
+</p>
+
 # FaroPDF
 
 面向律师的独立 PDF 阅读器 —— 打开卷宗、证据、判决、合同和扫描材料时能「快读、检索、批注、整理、OCR、表单签署」一条龙。
@@ -178,7 +182,7 @@ npm run tauri build
 
 ## 许可
 
-**TODO**：当前仓库尚未提交 LICENSE 文件。计划遵循与 Folia 一致的 **Apache License 2.0**，但需在首个 release 前确认与定稿。在 LICENSE 文件落地前，本项目源码默认保留作者所有权利。
+本项目基于 **Apache License 2.0** 开源，与 [Folia](https://github.com/cat-xierluo/Folia) 保持一致。完整协议见 [`LICENSE`](LICENSE)。
 
 ## 文档
 
