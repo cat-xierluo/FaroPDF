@@ -11,6 +11,7 @@ import {
   type AnnotationSidebarFilterState,
   type AnnotationSidebarGroupBy,
 } from "../../modules/annotation/sidebarGroups";
+import { AnnotationSummaryPanel } from "../../modules/annotation-summary";
 
 const ANNOTATION_TYPE_ICONS: Record<PdfAnnotationType, string> = {
   highlight: "▮",
@@ -75,6 +76,7 @@ export function AnnotationSidebar({
   onSelectPage,
   pageCount,
 }: AnnotationSidebarProps) {
+  const [view, setView] = useState<"list" | "summary">("list");
   const [groupBy, setGroupBy] = useState<AnnotationSidebarGroupBy>("page");
   const [filters, setFilters] = useState<AnnotationSidebarFilterState>({});
   const groupById = useId();
@@ -90,6 +92,9 @@ export function AnnotationSidebar({
   const groups = useMemo(() => groupAnnotations(filtered, groupBy), [filtered, groupBy]);
 
   if (!hasDocument) {
+    if (view === "summary") {
+      return <AnnotationSummaryPanel hasDocument={false} annotations={[]} />;
+    }
     return (
       <aside className="annotation-sidebar" aria-label="批注侧边栏">
         <div className="annotation-sidebar__empty" role="status">
@@ -100,6 +105,9 @@ export function AnnotationSidebar({
   }
 
   if (annotations.length === 0) {
+    if (view === "summary") {
+      return <AnnotationSummaryPanel hasDocument={true} annotations={[]} />;
+    }
     return (
       <aside className="annotation-sidebar" aria-label="批注侧边栏">
         <header className="annotation-sidebar__header">
@@ -162,10 +170,42 @@ export function AnnotationSidebar({
     });
   }
 
+  if (view === "summary") {
+    return (
+      <AnnotationSummaryPanel
+        annotations={annotations}
+        documentLabel={`PDF（${annotations.length} 个批注）`}
+        hasDocument={true}
+        onAnnotationClick={onAnnotationClick}
+        onSelectPage={onSelectPage}
+      />
+    );
+  }
+
   return (
     <aside className="annotation-sidebar" aria-label="批注侧边栏">
       <header className="annotation-sidebar__header">
         <h2>批注（{filtered.length} / {annotations.length}）</h2>
+        <div className="annotation-sidebar__view-toggle">
+          <button
+            aria-pressed={true}
+            className="annotation-sidebar__view-btn annotation-sidebar__view-btn--active"
+            data-testid="sidebar-view-list"
+            onClick={() => setView("list")}
+            type="button"
+          >
+            列表
+          </button>
+          <button
+            aria-pressed={false}
+            className="annotation-sidebar__view-btn"
+            data-testid="sidebar-view-summary"
+            onClick={() => setView("summary")}
+            type="button"
+          >
+            摘要
+          </button>
+        </div>
         <p className="annotation-sidebar__hint">支持搜索、筛选、跳转与分组</p>
       </header>
 

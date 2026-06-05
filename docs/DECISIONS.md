@@ -3303,3 +3303,50 @@ RWS8WkTIW8ht2pmQPiablJPY8vRrsXleS6NxLsalJ/Tyn+1tKpHGxREc  // 新（2026-06-05 �
 - alpha 阶段累计的 v0.1.0-alpha.18 ~ alpha.20 段保留在 CHANGELOG（用户按版本号回溯时仍能看到逐次变更），但**不**单独打 tag。
 - 0.1.0-rc.1 / 0.1.0 stable 视 v0.3 follow-ups（移动端 / CODE_SIGNING / key rotation）完成度推进；当前 v0.1 → 完成的判定标准是 ROADMAP v0.1 子项审计 + 上述 follow-ups 全部 close。
 - 封箱后启动 v0.2 法律增强（详见 DEC-068 / ROADMAP v0.2 行）。
+
+## DEC-068 v0.2 批注摘要分组面板 + 案件材料核查清单导出
+
+- 日期：2026-06-06
+- 状态：已采纳
+- 关联：ISS-026（4 阶段全部已合）、DEC-037（4 维分组纯函数）、ROADMAP v0.2 第一条
+
+### 1. 方案概述
+
+在 ISS-026 的 `applyAnnotationSidebarFilters` 4 维分组纯函数（DEC-037）之上，新增独立「批注摘要」面板模块 `src/modules/annotation-summary/`：
+
+- 复用 `sidebarGroups` 的 `groupAnnotations` / `groupAnnotationsByPage` / `groupAnnotationsByColor` / `groupAnnotationsByType` / `groupAnnotationsByLabel` 纯函数，包装为按维度返回 `Group[] = { dimension, groups: Array<{ key, count, samples }> }` 结构
+- 4 维度 UI：按 dimension tab 切换（页码 / 颜色 / 标签 / 类型），每组显示 key + 数量 badge + 最多 3 个示例批注（点击跳转 / 高亮）
+- 导出 Markdown：模板 `# 批注摘要\n\n## {dimension}\n\n- {key} ({count})\n  - [ ] {sample}`（含 checkbox 核查清单）
+- 导出 HTML：`<details>` 折叠 + `<input type="checkbox">` + 内嵌 CSS
+- 与 AnnotationSidebar 解耦：摘要面板是独立入口（不替换既有 sidebar，只增加「列表/摘要」视图切换按钮）
+
+### 2. 文件范围
+
+| 文件 | 类型 | 说明 |
+|------|------|------|
+| `src/modules/annotation-summary/types.ts` | 新增 | SummaryDimension / SummaryGroupEntry / SummaryDimensionResult / AnnotationSummaryResult |
+| `src/modules/annotation-summary/service/summaryGrouping.ts` | 新增 | buildDimensionSummary / buildFullSummary |
+| `src/modules/annotation-summary/service/exportMarkdown.ts` | 新增 | exportChecklistMarkdown |
+| `src/modules/annotation-summary/service/exportHtml.ts` | 新增 | exportChecklistHtml |
+| `src/modules/annotation-summary/hooks/useAnnotationSummary.ts` | 新增 | useAnnotationSummary hook |
+| `src/modules/annotation-summary/ui/AnnotationSummaryPanel.tsx` | 新增 | 主面板组件 |
+| `src/modules/annotation-summary/ui/AnnotationSummaryPanel.css` | 新增 | 样式 |
+| `src/modules/annotation-summary/ui/AnnotationSummaryPanel.test.tsx` | 新增 | 测试 |
+| `src/modules/annotation-summary/index.ts` | 新增 | re-export |
+| `src/modules/annotation/index.ts` | 修改 | re-export 摘要相关 helper |
+| `src/components/layout/AnnotationSidebar.tsx` | 修改 | 新增「列表/摘要」视图切换 |
+
+### 3. 不采纳
+
+- 不替换既有 AnnotationSidebar 的 4 维分组：摘要面板是独立能力，不破坏既有分组 UX
+- 不引入新依赖：所有导出用纯字符串拼接 + Blob download
+
+### 4. 验证
+
+| 命令 | 结果 |
+|------|------|
+| `npm run typecheck` | ✅ 干净 |
+| 纯函数测试（summaryGrouping + exportMarkdown + exportHtml） | ✅ 16 项通过 |
+| UI 测试 | ⚠️ 7 项因 pre-existing html-encoding-sniffer ESM 问题失败（与 main 基线一致） |
+| `npm run build` | ✅ 成功 |
+| `cargo check --offline` | ✅ 干净（17 pre-existing dead_code warning） |

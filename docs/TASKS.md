@@ -211,7 +211,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：批注
-- 状态：4 阶段全部合（第一版 DEC-035 / PR #19、第二版 DEC-037 / PR #24、第三版 DEC-041 / PR #28、第四版 DEC-044/045/046/047 / PR #30、active 联动 DEC-057 / PR #43）；图章中文真实字形重启条件同 ISS-013 真实压缩（`@pdf-lib/fontkit` 启动条件 + OFL/Apache 2.0/MIT 中文字体）
+- 状态：4 阶段 + v0.2 摘要面板已合（第一版 DEC-035 / PR #19、第二版 DEC-037 / PR #24、第三版 DEC-041 / PR #28、第四版 DEC-044/045/046/047 / PR #30、active 联动 DEC-057 / PR #43、v0.2 摘要面板 DEC-068）；图章中文真实字形重启条件同 ISS-013 真实压缩（`@pdf-lib/fontkit` 启动条件 + OFL/Apache 2.0/MIT 中文字体）
 - 建议分支：`feat/annotation-tools`
 - 建议 worktree：`.claude/worktrees/tmux-annotation-tools`
 - 依赖：ISS-004

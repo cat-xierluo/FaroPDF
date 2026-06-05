@@ -83,3 +83,21 @@ export type {
 } from "./annotationPdfWriter";
 export { resolveStampFont } from "./annotationStampFont";
 export type { ResolveStampFontOptions } from "./annotationStampFont";
+export {
+  AnnotationSummaryPanel,
+  buildDimensionSummary,
+  buildFullSummary,
+  exportChecklistMarkdown,
+  exportChecklistHtml,
+  SUMMARY_DIMENSIONS,
+  SUMMARY_DIMENSION_LABELS,
+  useAnnotationSummary,
+} from "../annotation-summary";
+export type {
+  AnnotationSummaryPanelProps,
+  UseAnnotationSummaryResult,
+  SummaryDimension,
+  SummaryDimensionResult,
+  SummaryGroupEntry,
+  AnnotationSummaryResult,
+} from "../annotation-summary";
