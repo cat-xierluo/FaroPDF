@@ -8,5 +8,7 @@ export { setActiveFormController, getActiveFormController } from "./activeFormCo
 export { FormsPanel } from "./ui/FormsPanel";
 export {
   FORMS_PANEL_NARROW_BREAKPOINT,
+  FORMS_PANEL_DRAWER_BREAKPOINT,
   formsPanelNarrowMediaQuery,
+  formsPanelDrawerMediaQuery,
 } from "./breakpoints";

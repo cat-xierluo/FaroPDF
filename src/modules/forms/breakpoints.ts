@@ -15,10 +15,21 @@
 /** FormsPanel 浮层切换为底部抽屉（bottom sheet）的视口宽度上限。 */
 export const FORMS_PANEL_NARROW_BREAKPOINT = 480;
 
+/** FormsPanel 从 utility panel 切换为 drawer 浮层的视口宽度上限。 */
+export const FORMS_PANEL_DRAWER_BREAKPOINT = 720;
+
 /**
  * 构造传给 `window.matchMedia` 的 media query 表达式。
  * 形如 `(max-width: 479px)`：与 CSS `@media (max-width: 479px)` 保持一致。
  */
 export function formsPanelNarrowMediaQuery(): string {
   return `(max-width: ${FORMS_PANEL_NARROW_BREAKPOINT - 1}px)`;
+}
+
+/**
+ * 构造 drawer 断点 media query：`(max-width: 719px)`。
+ * 视口 < 720px 时 FormsPanel 不走 utility panel，改用 drawer / bottom-sheet。
+ */
+export function formsPanelDrawerMediaQuery(): string {
+  return `(max-width: ${FORMS_PANEL_DRAWER_BREAKPOINT - 1}px)`;
 }

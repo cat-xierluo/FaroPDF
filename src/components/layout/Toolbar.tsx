@@ -129,6 +129,16 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
           <PanelTop size={16} />
           <span>视图设置</span>
         </button>
+        <button
+          aria-pressed={utilityPanel === "forms" && activeMode !== "pages"}
+          className="tool-button tool-button--icon"
+          onClick={() => openUtilityPanel("forms")}
+          title="填写和签名"
+          type="button"
+        >
+          <FormInput size={16} />
+          <span>填写和签名</span>
+        </button>
       </div>
       <div className="toolbar__group" aria-label="文件操作">
         <input

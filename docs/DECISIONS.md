@@ -3026,3 +3026,68 @@ ISS-022 第一版 PR #25 已合并，5 个 section 已落 `src/modules/settings/
 - **alpha.19 起的封箱 SOP**：本 PR 把「合并 Unreleased + 版本号 bump + release.yml tag pattern」三件套跑通；后续每个 alpha / beta / rc 封箱都按同一 SOP（不需要再开新 DEC，由 PM 在合并时直接执行）。
 - **ROADMAP v0.1 子项审计**：作为独立 follow-up，由 `chore/roadmap-v01-audit` worker 推进，参照 DEC-052 README 重写 + DEC-053 配置收束模式；不在本 PR 范围。
 - **CHANGELOG 下半部分 alpha.7~10 重复 header 合并**：作为独立 follow-up，由 `chore/changelog-dedup` worker 推进；不在本 PR 范围。
+
+## DEC-064 ISS-008 FormsPanel 从全局浮层迁入 AppShell 左侧 utility panel
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联任务：ISS-008
+- 关联分支：`feat/iss-008-forms-utility-panel`
+
+> DEC 编号修正：原 worker 选 DEC-063，与 PR #51（封箱 0.1.0-alpha.18）撞车，PM 收口时 renumber 为 DEC-064。本条目由 PM amend 修正（commit message 同步）。
+
+### 1. 背景
+
+- FormsPanel 是 v0.1 表单与签署的 UI 入口（DEC-035），此前以 `position: fixed` 浮层形式渲染在 ReaderCanvas 右上方。
+- v0.1 设计系统（ISS-009 / DEC-049）已合入 AppShell utility panel 路由（`UtilityPanelId: "summary" | "view" | "settings" | "annotation" | "none"`），左侧面板已承载文档摘要、视图设置、批注列表等工具。
+- FormsPanel 仍停在浮层路径，与 PDF Expert 信息架构（中央阅读优先、左侧按需工具区）不一致。
+- 窄屏（< 480px）已有 DEC-055 底部 sheet 兜底。
+
+### 2. 决策
+
+- FormsPanel 改为 utility panel 渲染：通过 `layoutMode="utility-panel"` prop 由 AppShell UtilityPanel 挂载，不再 `position: fixed`。
+- 新增 `"forms"` 到 `UtilityPanelId` 联合类型。
+- AppShell 持有 `useFormController(reader)` 创建 form controller，替代之前未集成的 `FormProvider`。
+- Toolbar 工具区新增「填写和签名」utility panel toggle（与「文档摘要」「视图设置」一致风格）。
+- 响应式布局三档：
+  - **大屏（> 720px）**：utility panel（嵌入左侧面板区，无 fixed 定位）
+  - **中屏（480–720px）**：drawer 浮动抽屉（靠左，280px 宽）
+  - **窄屏（< 480px）**：bottom-sheet（保留 DEC-055 行为）
+- 新增 `FORMS_PANEL_DRAWER_BREAKPOINT = 720` 断点常量。
+- FormsPanel `layoutMode` prop 支持 `"auto" | "utility-panel" | "drawer" | "floating" | "bottom-sheet"` 五种模式。
+
+### 3. 拒绝的方案
+
+- **保留浮层 + 仅加 utility panel 入口**：方案 A。两套渲染路径增加维护成本；拒绝。
+- **FormProvider 包裹 AppShell**：方案 B。FormProvider 未被 App.tsx 使用，且 AppShell 直接持有 controller 更简洁；拒绝。
+
+### 4. 变更范围
+
+| 文件 | 变更 |
+| --- | --- |
+| `src/components/layout/types.ts` | `UtilityPanelId` 新增 `"forms"` |
+| `src/modules/forms/breakpoints.ts` | 新增 `FORMS_PANEL_DRAWER_BREAKPOINT = 720` |
+| `src/modules/forms/ui/FormsPanel.tsx` | 新增 `layoutMode` prop，支持 utility-panel / drawer / auto 模式 |
+| `src/modules/forms/ui/FormsPanel.css` | 按 data-layout 分离样式（utility-panel / drawer / floating / bottom-sheet） |
+| `src/components/layout/AppShell.tsx` | 创建 form controller + UtilityPanel 加 `"forms"` 分支 |
+| `src/components/layout/Toolbar.tsx` | 工具区加「填写和签名」utility panel toggle |
+| `src/modules/forms/ui/FormsPanel.test.tsx` | 新增 utility panel 路径测试 |
+| `src/modules/forms/index.ts` | 导出新断点 |
+
+### 5. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `npm run typecheck` | ✅ 干净 | 无类型错误 |
+| `npm run build` | ✅ 成功 | Vite 构建通过 |
+| `npm test -- --run` | ⚠️ 全量失败 | pre-existing ESM 不兼容（html-encoding-sniffer），与本 PR 无关 |
+
+### 6. 已知限制
+
+- 暂无 Sidebar tab 入口；当前通过 Toolbar toggle 切换 utility panel（与 `summary` / `view` 一致）。后续如需 Sidebar 统一入口可由独立 worker 推进。
+- 浏览器视觉验收（不重叠、不截断）由 PM 在 4 个断点截图后留 DEC-049 §"已知限制" 闭环。
+
+### 7. 后续路径
+
+- 批量填写 / 字段校验规则引擎 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件（DEC-035 §"目标" 范围）留作后续 worker，与本 PR 解耦。
+- ISS-008 任务卡从 TASKS.md 归档到 DECISIONS.md「ISS 任务归档」一节。

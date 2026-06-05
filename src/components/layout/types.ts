@@ -1,6 +1,6 @@
 export type AppModeId = "read" | "annotate" | "export" | "forms" | "ocr" | "pages";
 
-export type UtilityPanelId = "summary" | "view" | "settings" | "annotation" | "none";
+export type UtilityPanelId = "summary" | "view" | "settings" | "annotation" | "forms" | "none";
 
 /** 批注 overlay 停靠位置。
  *  当前 stage 4 只实现 "workspace-main"（覆盖 ReaderCanvas 的主区域）；

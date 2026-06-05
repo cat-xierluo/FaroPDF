@@ -7,7 +7,9 @@ import type { FormController } from "../useFormController";
 import type { PdfFormState } from "../../../shared/pdf/form";
 import {
   FORMS_PANEL_NARROW_BREAKPOINT,
+  FORMS_PANEL_DRAWER_BREAKPOINT,
   formsPanelNarrowMediaQuery,
+  formsPanelDrawerMediaQuery,
 } from "../breakpoints";
 
 /**
@@ -425,5 +427,93 @@ describe("FormsPanel 窄屏适配", () => {
     expect(screen.getByRole("list", { name: "表单字段列表" })).toBeInTheDocument();
     const editor = screen.getByRole("region", { name: "填值编辑器" });
     expect(within(editor).getByRole("textbox")).toHaveValue("Alice");
+  });
+});
+
+/**
+ * ISS-008 utility panel 路径测试：
+ * - layoutMode="utility-panel" 时强制 utility-panel 布局
+ * - layoutMode="drawer" 时强制 drawer 布局
+ * - auto 模式下：480-720px 切 drawer，>= 720px 切 floating
+ * - utility-panel 模式不阻塞首屏渲染
+ */
+describe("FormsPanel utility panel 路径", () => {
+  test("layoutMode='utility-panel' 强制 data-layout='utility-panel'", () => {
+    const controller = makeStubController();
+    render(<FormsPanel controller={controller} layoutMode="utility-panel" />);
+    expect(screen.getByTestId("forms-panel")).toHaveAttribute("data-layout", "utility-panel");
+  });
+
+  test("layoutMode='drawer' 强制 data-layout='drawer'", () => {
+    const controller = makeStubController();
+    render(<FormsPanel controller={controller} layoutMode="drawer" />);
+    expect(screen.getByTestId("forms-panel")).toHaveAttribute("data-layout", "drawer");
+  });
+
+  test("layoutMode='utility-panel' 不阻塞首屏（字段列表可渲染）", () => {
+    const controller = makeStubController({ formState: SAMPLE_FORM_STATE });
+    render(<FormsPanel controller={controller} layoutMode="utility-panel" />);
+    expect(screen.getByRole("list", { name: "表单字段列表" })).toBeInTheDocument();
+  });
+
+  test("utility-panel 模式下 tab 切换正确（选中字段 + fill 编辑器）", async () => {
+    const controller = makeStubController({
+      formState: SAMPLE_FORM_STATE,
+      panelMode: "fill",
+      selectedFieldId: "name",
+      draftValue: "Bob",
+    });
+    render(<FormsPanel controller={controller} layoutMode="utility-panel" />);
+
+    const editor = screen.getByRole("region", { name: "填值编辑器" });
+    expect(within(editor).getByRole("textbox")).toHaveValue("Bob");
+  });
+
+  test("FORMS_PANEL_DRAWER_BREAKPOINT 常量为 720", () => {
+    expect(FORMS_PANEL_DRAWER_BREAKPOINT).toBe(720);
+    expect(formsPanelDrawerMediaQuery()).toBe("(max-width: 719px)");
+  });
+
+  test("auto 模式：480-720px 视口切 drawer", () => {
+    // jsdom 不支持真视口，用 matchMedia mock 模拟 480-720px 区间
+    const narrowFalse = { matches: false, media: formsPanelNarrowMediaQuery(), addEventListener: () => {}, removeEventListener: () => {}, onchange: null, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false };
+    const drawerTrue = { matches: true, media: formsPanelDrawerMediaQuery(), addEventListener: () => {}, removeEventListener: () => {}, onchange: null, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false };
+
+    const matchMedia = vi.fn((query: string) => {
+      if (query === formsPanelNarrowMediaQuery()) return narrowFalse;
+      if (query === formsPanelDrawerMediaQuery()) return drawerTrue;
+      return { matches: false, media: query, addEventListener: () => {}, removeEventListener: () => {}, onchange: null, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false };
+    });
+
+    const original = window.matchMedia;
+    window.matchMedia = matchMedia as unknown as typeof window.matchMedia;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 600, writable: true });
+
+    const controller = makeStubController();
+    render(<FormsPanel controller={controller} layoutMode="auto" />);
+    expect(screen.getByTestId("forms-panel")).toHaveAttribute("data-layout", "drawer");
+
+    window.matchMedia = original;
+  });
+
+  test("auto 模式：>= 720px 视口切 floating", () => {
+    const narrowFalse = { matches: false, media: formsPanelNarrowMediaQuery(), addEventListener: () => {}, removeEventListener: () => {}, onchange: null, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false };
+    const drawerFalse = { matches: false, media: formsPanelDrawerMediaQuery(), addEventListener: () => {}, removeEventListener: () => {}, onchange: null, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false };
+
+    const matchMedia = vi.fn((query: string) => {
+      if (query === formsPanelNarrowMediaQuery()) return narrowFalse;
+      if (query === formsPanelDrawerMediaQuery()) return drawerFalse;
+      return { matches: false, media: query, addEventListener: () => {}, removeEventListener: () => {}, onchange: null, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false };
+    });
+
+    const original = window.matchMedia;
+    window.matchMedia = matchMedia as unknown as typeof window.matchMedia;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024, writable: true });
+
+    const controller = makeStubController();
+    render(<FormsPanel controller={controller} layoutMode="auto" />);
+    expect(screen.getByTestId("forms-panel")).toHaveAttribute("data-layout", "floating");
+
+    window.matchMedia = original;
   });
 });

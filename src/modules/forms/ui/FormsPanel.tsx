@@ -1,42 +1,40 @@
 /**
- * forms mode 浮层面板
+ * forms mode 面板
  *
- * 渲染在 activeMode === "forms" 时挂在 reader canvas 右侧的浮层。提供：
- * - 头部：标题、关闭按钮、错误/成功提示条
- * - 字段列表：按 type 分组（text / checkbox / radio / dropdown / button）展示 id / name / page / 必填
- * - 填值面板：选中字段后输入 draftValue + 应用按钮
- * - 签名面板：选中字段后选择 PNG / JPG 图片 + 应用按钮
+ * 支持多种布局模式（ISS-008 utility panel 路径）：
+ * - utility-panel：嵌入 AppShell 左侧 utility panel 区域（大屏 > 720px）
+ * - drawer：中屏（480–720px）浮动抽屉，靠左或靠右
+ * - floating：桌面浮层（保留向后兼容）
+ * - bottom-sheet：窄屏（< 480px）底部 sheet（DEC-055）
  *
- * 样式遵循 docs/DESIGN.md 视觉系统（暖白 / 低噪音 / 单一强调色）。
- * 不修改全局 app.css——所有新样式都通过本组件的内联类名（class 形式）复用既有 .tool-button / .context-tool。
- *
- * 窄屏适配（ISS-008 / DEC-055）：
- * - FormsPanel 浮层在 < 480px 视口下与主工具栏（56px）+ 上下文工具条（42px）
- *   重叠；通过 matchMedia 监听视口宽度，在窄屏时把面板切换为底部 sheet
- *   （data-layout="bottom-sheet"），由 CSS @media 把 fixed top:72 right:16 浮层
- *   改为 bottom:0 left:0 right:0 全宽，最大高度 70vh，避开工具栏并保留
- *   字段列表可读。
- * - 桌面视口（>= 480px）保持原有 right-top 浮层，不影响现有用户视觉。
+ * 通过 layoutMode prop 由父组件控制渲染模式；auto 模式下根据视口自动选择。
  */
 
 import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import type { PdfFormField } from "../../../shared/pdf/form";
 import {
   FORMS_PANEL_NARROW_BREAKPOINT,
+  FORMS_PANEL_DRAWER_BREAKPOINT,
   formsPanelNarrowMediaQuery,
+  formsPanelDrawerMediaQuery,
 } from "../breakpoints";
 import type { FormController } from "../useFormController";
 import "./FormsPanel.css";
 
 interface FormsPanelProps {
   controller: FormController;
+  /** 布局模式；默认 "auto" 根据视口自动选择 */
+  layoutMode?: "auto" | "utility-panel" | "drawer" | "floating" | "bottom-sheet";
 }
 
-type FormsPanelLayout = "floating" | "bottom-sheet";
+type FormsPanelLayout = "utility-panel" | "drawer" | "floating" | "bottom-sheet";
 
-function detectNarrowLayout(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.innerWidth < FORMS_PANEL_NARROW_BREAKPOINT;
+function detectAutoLayout(): FormsPanelLayout {
+  if (typeof window === "undefined") return "floating";
+  const w = window.innerWidth;
+  if (w < FORMS_PANEL_NARROW_BREAKPOINT) return "bottom-sheet";
+  if (w < FORMS_PANEL_DRAWER_BREAKPOINT) return "drawer";
+  return "floating";
 }
 
 const FIELD_TYPE_LABELS: Record<PdfFormField["type"], string> = {
@@ -47,7 +45,7 @@ const FIELD_TYPE_LABELS: Record<PdfFormField["type"], string> = {
   button: "按钮",
 };
 
-export function FormsPanel({ controller }: FormsPanelProps) {
+export function FormsPanel({ controller, layoutMode = "auto" }: FormsPanelProps) {
   const {
     formState,
     loading,
@@ -74,23 +72,35 @@ export function FormsPanel({ controller }: FormsPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftValueId = useId();
 
-  // 窄屏视口检测：浮层在 < 480px 切到底部 sheet，避免与主工具栏（56px）+ 上下文工具条（42px）重叠。
-  // 使用 matchMedia 监听而非 resize，避免每像素触发 re-render。
-  const [isNarrow, setIsNarrow] = useState<boolean>(detectNarrowLayout);
+  // 视口响应式布局检测（auto 模式下根据断点切换布局）
+  const [autoLayout, setAutoLayout] = useState<FormsPanelLayout>(detectAutoLayout);
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return;
-    }
-    const mediaQuery = window.matchMedia(formsPanelNarrowMediaQuery());
-    const handleChange = (event: MediaQueryListEvent) => {
-      setIsNarrow(event.matches);
-    };
-    setIsNarrow(mediaQuery.matches);
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
+    if (layoutMode !== "auto") return;
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
 
-  const layout: FormsPanelLayout = isNarrow ? "bottom-sheet" : "floating";
+    const narrowMq = window.matchMedia(formsPanelNarrowMediaQuery());
+    const drawerMq = window.matchMedia(formsPanelDrawerMediaQuery());
+
+    const syncLayout = () => {
+      if (narrowMq.matches) {
+        setAutoLayout("bottom-sheet");
+      } else if (drawerMq.matches) {
+        setAutoLayout("drawer");
+      } else {
+        setAutoLayout("floating");
+      }
+    };
+
+    syncLayout();
+    narrowMq.addEventListener("change", syncLayout);
+    drawerMq.addEventListener("change", syncLayout);
+    return () => {
+      narrowMq.removeEventListener("change", syncLayout);
+      drawerMq.removeEventListener("change", syncLayout);
+    };
+  }, [layoutMode]);
+
+  const layout: FormsPanelLayout = layoutMode === "auto" ? autoLayout : layoutMode;
 
   const fields = formState?.fields ?? [];
   const selectedField = fields.find((field) => field.id === selectedFieldId) ?? null;

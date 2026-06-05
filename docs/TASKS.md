@@ -100,7 +100,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：表单
-- 状态：v0.1 表单与签署收口（第一版 DEC-035 / PR #23、窄屏底部 sheet DEC-055 / PR #40）；FormsPanel 走 utility panel 路径在 `feat/pdf-expert-shell-ia` 收口时统一处理（DEC-049 已规划）；签名图片限定 PNG / JPG（pdf-lib embed 限制）；批量填写 / 字段校验 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件待后续 worker
+- 状态：v0.1 表单与签署收口 + utility panel 路径已合（DEC-063 / `feat/iss-008-forms-utility-panel`）；签名图片限定 PNG / JPG（pdf-lib embed 限制）；批量填写 / 字段校验 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件待后续 worker
 - 建议分支：`feat/forms-signing` + `fix/iss-008-forms-narrow`
 - 建议 worktree：`.claude/worktrees/tmux-forms-signing` + `.claude/worktrees/fix-iss-008-forms-narrow`
 - 依赖：ISS-002、ISS-005
