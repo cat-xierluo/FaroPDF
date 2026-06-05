@@ -1,68 +1,192 @@
 # FaroPDF
 
-FaroPDF 是一个独立 PDF 阅读器，面向律师日常处理卷宗、证据、判决、合同和扫描材料。
+面向律师的独立 PDF 阅读器 —— 打开卷宗、证据、判决、合同和扫描材料时能「快读、检索、批注、整理、OCR、表单签署」一条龙。
 
-`Faro` 有灯塔、指引的含义。FaroPDF 的产品目标是在厚重 PDF 材料中快速照亮重点：打开得快、读得清楚、搜得到、批注能汇总、扫描件能识别、页面能整理。
+`Faro` 取灯塔、指引之意。FaroPDF 想在厚重 PDF 材料里为法律工作者照亮重点：打开快、读得清、搜得到、批注能整理、扫描件能识别、页面能重排、交付能另存。
 
-## 当前状态
+## 官方仓库
 
-当前阶段已完成 Foundation Gate，并接入 PDF.js 阅读底座、设置/OCR provider 配置、PDF Expert 风格基础 Shell、批注 sidecar 模型、扫描预处理 bridge 基础和文本层搜索第一版。搜索第一版支持按需页文本索引、命中列表、上下一个命中、当前页轻量高亮和扫描件 OCR 提示；应用 Shell 后续仍需继续做 UI polish 和真实功能接入。
+- 源码：[https://github.com/cat-xierluo/FaroPDF](https://github.com/cat-xierluo/FaroPDF)
+- Issue / 讨论：见上方 GitHub 仓库的 Issues 区
+- 官网：待发布（v0.1 阶段尚未搭建独立官网页面）
 
-已固定：
+## 下载与安装
 
-- 独立项目，不并入 Folia。
-- 技术方向：Tauri v2 + React + TypeScript + Vite + PDF.js + pdf-lib。
-- 首版目标：快读、检索、批注、OCR/扫描、页面整理、常用导出、表单签署和设置。
-- 安全边界：默认不覆盖原始 PDF，高风险操作另存或导出。
-- 并行策略：Foundation Gate 合并后按 `docs/TASKS.md` 拆分多分支、多 worktree。
+**当前状态：待发布**。FaroPDF 仍处于 `0.1.0-alpha` 阶段，全平台打包与自动更新流水线已就位（`docs/RELEASE.md` 记录了发布流程），但**尚未生成任何公开 release**。本节给出 release 上线后的下载入口占位说明，避免在 release 真正发布前误导用户。
 
-## 首版能力目标
+release 上线后，预期下载入口如下：
 
-- 快读：打开大 PDF、连续/单页阅读、缩放、页码跳转、缩略图、目录、最近文件。
-- 检索：文字层检测、全文搜索、命中列表、当前页高亮、无文字层提示 OCR。
-- 批注：高亮、下划线、删除线、备注、文本框、矩形、箭头、手写、图章、批注列表与导出摘要。
-- 页面整理：旋转、删除、重排、插入、提取、合并、添加页码和 Bates 编号。
-- OCR/扫描：检测无文字层页面，调用 OCR bridge 生成双层 PDF，并展示质量检查状态。
-- 常用导出：添加文字/图片水印、压缩预设、批注扁平化、表单扁平化和另存输出。
-- 表单签署：AcroForm 填写、基础签名图片或手写签名、导出扁平化 PDF。
-- 设置：默认保存目录、最近文件、OCR provider、PaddleOCR/MinerU API 配置和联网 OCR 隐私确认。
+- macOS Apple Silicon：`.dmg`（文件名带 `aarch64` / `arm64` 字样）
+- macOS Intel：`.dmg`（文件名带 `x64` / `x86_64` 字样）
+- Windows：`.exe` 或 `.msi` 安装包
 
-## 设计原则
+### macOS 首次运行（未来指引）
 
-- 内容优先：PDF 页面是主角，工具栏和侧边栏默认保持克制。
-- 速度优先：采用虚拟化渲染，只渲染可见页和邻近页。
-- 法律友好：重点支持长卷宗、扫描件、证据材料、批注汇总和页面编号。
-- 离线优先：本地能力优先，联网 OCR 或云端处理必须让用户明确知情。
-- 可回退：批注和页面操作先保留可编辑状态，导出时再写入新 PDF。
+由于发布流水线尚未走 Apple Developer 公证，未来首个 release 在 macOS 上首次运行时可能提示「无法验证开发者」或「已损坏」。届时用户可先把 `FaroPDF.app` 拖到「应用程序」，再在终端执行：
 
-## 开发命令
+```bash
+xattr -dr com.apple.quarantine /Applications/FaroPDF.app
+open /Applications/FaroPDF.app
+```
+
+> 该命令仅在用户确认应用来源可信时执行；具体首次运行步骤以届时 release 的 README 与 `docs/RELEASE.md` 为准。
+
+## 功能
+
+以下能力基于 0.1.0-alpha.0 至 0.1.0-alpha.11 实际交付范围（详见 `CHANGELOG.md`）：
+
+### 阅读与检索
+
+- 打开本地 PDF（对话框 / 拖拽），PDF.js worker 独立加载，不阻塞主线程
+- 页面虚拟化：只渲染可见页和邻近页，大卷宗打开轻快
+- 4 种视图模式：连续 / 单页 / 双页 / 适合宽度
+- 8 项缩放预设（50/75/100/125/150/200% / 适合宽度 / 适合页面）+ 顺 / 逆时针 90° 旋转
+- 键盘翻页（PageUp / PageDown / 方向键 / Space / Home / End）
+- 左侧文档摘要：真实缩略图、按页码跳转、当前页高亮、批注 / 搜索 / OCR 状态标记
+- 阅读位置本地恢复（按 PDF fingerprint 持久化 currentPage / zoom / viewMode / rotation）
+- 全文搜索：按需建立页文本索引、命中列表、上下文片段、当前页轻量高亮、上下一个命中跳转
+- 搜索结果层：索引计数、命中页码 chip、当前命中高亮、自动滚到对应页
+- 纯扫描或文字层缺失时提示跳转 OCR 模式
+
+### 批注
+
+- 9 种批注类型：高亮 / 下划线 / 删除线 / 备注 / 文本框 / 矩形 / 箭头 / 手写 / 图章
+- 6 色色板 + 5 套图章模板（矩形 / 圆角 / 椭圆 / 横幅 4 种 shape）
+- 批注侧边栏：批注列表 + 当前页 / 总页数 + 选中跳页
+- AnnotationOverlay 挂到阅读区（点击 / 拖拽 / 手写 3 种交互模式）
+- AnnotationToolbar 挂到上下文工具条
+- 中文图章真实绘制（思源黑体 SC + pdf-lib fontkit 嵌入）
+- 默认保存为可编辑 sidecar（JSON，schema version 1）；导出时可扁平化到 PDF
+- 批注摘要导出为 Markdown / HTML（不包含真实用户文件名）
+
+### 页面整理
+
+- 页面旋转、删除、重排（pdf-lib 真实改写）
+- 多选 + shift+click 区间选择 + 删除前 RiskConfirmDialog
+- 另存为新 PDF 时弹 ExportRiskDialog（不覆盖原始文件）
+- 占位 Undo 按钮（计数 + 视觉 enabled 切换）
+- 默认输出 `*-organized.pdf`，绝不覆盖原始 PDF
+
+### OCR / 扫描
+
+- OCR bridge 真实接入：本地后端走 `ocrmypdf`（`local-ocrmypdf` / `legal-skills`）
+- 云端 provider 走 HTTPS 端点（PaddleOCR / MinerU），未授权时 guard 拒绝
+- 任务队列持久化到 `app_config_dir/ocr-jobs.json`，启动时回收残留 running 任务为 cancelled
+- 4 个 Tauri command：`list_ocr_jobs` / `poll_ocr_job` / `cancel_ocr_job` / `extract_ocr_text`
+- 凭证引用仅接受 `env:NAME` 安全形式；明文 API Key 仍被 `isSafeApiKeyRef` 拒绝
+- OCR 完成后 `pdftotext` 抽页面文本喂给质量检查服务
+- OCR 模式工具条接入 AppShell：识别文本 / 输出双层 PDF / 质量检查 / 任务列表
+- OCR 工作台：左侧任务列表（选 / 取消 / 打开报告）+ 右侧质量报告视图
+- 质量报告：可检索页比例、关键词命中、CER（Levenshtein 距离）、体积比和耗时
+- 扫描预处理（lopdf 真实清洁）：validating → preprocessing → writing-output → completed 状态机，裁边、方向检测 plan-only
+
+### 导出
+
+- 导出引擎（pdf-lib）：复制、删除、重排、旋转真实改写
+- 表单扁平化：`form.flatten()`，单次 `PDFDocument.load` 后批量执行 fill / sign / flatten
+- 批注扁平化：plan-only 与 draw 双策略，draw 走 `writeAnnotationPdf`
+- 文字 / 图片水印、Bates 编号、普通页码写入 PDF
+- 证据图片 A4 编排：JPEG / PNG 真实拾取、PDF 页面真实嵌入、按 A4 1 / 2 / 3 / 4 张每页自动编排
+- 压缩预设 plan-only（真实图像重编码留 follow-up）
+- 默认输出 `*-delivery.pdf` / `*-organized.pdf` / `*-evidence-pack.pdf` 等新文件
+
+### 表单签署
+
+- 读取 AcroForm 字段（text / dropdown / checkbox / radio）
+- FormsPanel 浮层：按字段类型分组渲染 + 填值编辑器
+- 签名图片（PNG / JPG）+ 签名位置调整
+- 表单扁平化导出（单条失败封装为 `status: "failed"`，不中断后续操作）
+- reader 暴露 `getFileBytes` / `saveUpdatedBytes`，导出走浏览器原生 `<a download>`
+
+### 设置
+
+- 默认保存目录、最近文件、默认缩放和阅读布局
+- OCR provider 配置：本地 `ocrmypdf`、PaddleOCR、MinerU
+- 联网 OCR 隐私确认策略（云端 OCR 必须用户主动确认）
+- API Key 脱敏：不写入版本库，不在 UI / 日志 / 错误报告中完整输出
+- 检查更新：基于 `tauri-plugin-updater` 9 态状态机（idle / checking / latest / available / downloading / downloaded / installing / unsupported / error）
+
+## 技术栈
+
+- 桌面壳：Tauri v2（`@tauri-apps/api` ^2 / `@tauri-apps/cli` ^2）
+- 前端：React 19 + TypeScript 5.8 + Vite 7
+- PDF 渲染：PDF.js（`pdfjs-dist` 6.0.227）
+- PDF 页面操作与导出：pdf-lib 1.17.1 + @pdf-lib/fontkit 1.1.1（中文图章字体嵌入）
+- 状态管理：React useReducer / useState（reader / annotation / forms / ocr 各模块独立）
+- 测试：Vitest 4.1.8 + Testing Library 16 + jsdom
+- Lint / 格式：ESLint 10 + typescript-eslint 8
+- 自动更新：@tauri-apps/plugin-updater 2.10.1
+- Tauri 插件：dialog 2.7.1 / fs 2.5.1 / opener ^2
+
+## 作者
+
+**杨卫薪律师** —— 专注于技术类纠纷领域，包括知识产权、数据与 AI 相关争议，同时长期关注 AI 技术在法律实务、知识管理和专业写作中的应用。
+
+FaroPDF 是我在法律文档处理和 AI 协作实践中沉淀出来的桌面工具：解决卷宗 / 证据 / 扫描件 / 表单的快读、批注、OCR、页面整理和签署交付，让律师把更多时间留给案件本身。
+
+- GitHub: [cat-xierluo](https://github.com/cat-xierluo)
+- 微信：`ywxlaw`
+
+## 开发环境
+
+本地开发需要先安装：
+
+- Node.js 与 npm
+- Rust stable toolchain
+- macOS 构建还需要 Xcode 或 Xcode Command Line Tools
+
+Tauri CLI 已作为项目开发依赖安装（`@tauri-apps/cli`），不需要额外全局安装。更完整的系统依赖可参考 [Tauri 官方前置条件](https://v2.tauri.app/start/prerequisites/)。
+
+启动桌面开发模式：
 
 ```bash
 npm install
-npm run dev
-npm run typecheck
-npm test
-npm run lint
-npm run build
 npm run tauri dev
+```
+
+只调试前端页面时，也可以运行：
+
+```bash
+npm run dev
+```
+
+常用验证命令：
+
+```bash
+npm run typecheck   # TypeScript 类型检查
+npm test            # Vitest 单测
+npm run lint        # ESLint
+```
+
+## 构建
+
+只验证前端构建：
+
+```bash
+npm run build
+```
+
+本地打包桌面应用：
+
+```bash
 npm run tauri build
 ```
 
-当前基础验证命令：
+构建产物通常位于 `src-tauri/target/release/bundle/`（macOS 产出 `.dmg` / `.app`，Windows 产出 `.exe` / `.msi`，Linux 产出 `.AppImage` / `.deb`）。
 
-```bash
-npm run typecheck
-npm test
-npm run lint
-npm run build
-cd src-tauri && cargo check
-```
+发布流程、产物矩阵、`latest.json` schema 与 keypair 管理见 `docs/RELEASE.md`。
+
+## 许可
+
+**TODO**：当前仓库尚未提交 LICENSE 文件。计划遵循与 Folia 一致的 **Apache License 2.0**，但需在首个 release 前确认与定稿。在 LICENSE 文件落地前，本项目源码默认保留作者所有权利。
 
 ## 文档
 
-- `AGENTS.md`：协作规则和 PDF 安全边界。
-- `docs/ROADMAP.md`：路线图和首版范围。
-- `docs/TASKS.md`：唯一任务源，记录待办、缺陷、技术债、算法素材、候选议题和 worktree 分组建议。
-- `docs/DECISIONS.md`：关键决策记录。
-- `docs/ARCHITECTURE.md`：技术架构和接口模型。
-- `docs/DESIGN.md`：视觉与交互规范。
+- `AGENTS.md`：协作规则与 PDF 安全边界（默认不覆盖原始 PDF，高风险操作另存为新文件）
+- `docs/ROADMAP.md`：项目愿景、阶段状态与 v0.1 / v0.2 / v0.3 路线图
+- `docs/TASKS.md`：唯一任务源，记录待办、缺陷、技术债、算法素材、候选议题和 worktree 分组建议
+- `docs/DECISIONS.md`：关键决策与工作日志（含每条 ISS 的方案、范围、验证与已知限制）
+- `docs/ARCHITECTURE.md`：技术架构、模块边界与接口模型
+- `docs/DESIGN.md`：视觉与交互规范
+- `docs/RELEASE.md`：发布流水线、`latest.json` schema 与 keypair 管理
+- `CHANGELOG.md`：用户可见变更记录（按 0.1.0-alpha.X 顺序）

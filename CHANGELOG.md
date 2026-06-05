@@ -1,3 +1,19 @@
+## 0.1.0-alpha.12 - 2026-06-05
+
+- README 重写（DEC-052 / `docs/readme-rewrite`）：把 `README.md` 从 70 行散段重写为与 Folia 同结构的项目门面，覆盖官方仓库、下载与安装（标「待发布」）、功能、技术栈、作者、开发环境、构建、许可、文档指针 9 个一级 section。
+  - **修改** `README.md`：完全重写。从「项目介绍 + 当前状态 + 首版能力目标 + 设计原则 + 开发命令 + 文档」单线叙述升级为「项目名 + 一句话定位 + 官方仓库 + 下载与安装 + 功能（按阅读与检索 / 批注 / 页面整理 / OCR 扫描 / 导出 / 表单签署 / 设置 7 个子节列实际已交付能力）+ 技术栈 + 作者 + 开发环境 + 构建 + 许可 + 文档指针」的标准 README 结构。
+  - **功能清单严格对照 0.1.0-alpha.0 ~ 0.1.0-alpha.11 CHANGELOG 实际交付范围**：阅读与检索（PDF.js 加载、worker 独立、4 视图模式、8 缩放预设、旋转、键盘翻页、缩略图、阅读位置本地恢复、搜索结果层、扫描件 OCR 提示）、批注（9 类型 + 6 色 + 5 图章模板 + sidecar + 中文图章真实绘制 + AnnotationOverlay/Toolbar/Sidebar 挂到 AppShell + Markdown/HTML 摘要）、页面整理（旋转 / 删除 / 重排真实改写 + 多选 + 风险确认 + 默认另存）、OCR 扫描（ocrmypdf 本地后端 + PaddleOCR/MinerU 云端 + 4 command + 任务队列持久化 + 9 态质量检查 + 扫描预处理 lopdf 真实清洁）、导出（pdf-lib 真实改写 + 表单 / 批注 flatten + 水印 / Bates / 页码 + 证据图片 A4 编排 + 压缩 plan-only）、表单签署（AcroForm 读取 + fill/sign/flatten 批量 + FormsPanel 浮层 + 签名图片）、设置（保存目录 / OCR provider / 隐私确认 / API Key 脱敏 / 9 态更新检查）。
+  - **不发明未交付能力**：所有 feature bullet 都能在 `CHANGELOG.md` 找到对应版本号；不确定的能力（如真实高亮绘制、增量更新、Keychain 集成、autoUpdateCheck 设置项）**不**写入 README。
+  - **下载与安装** 标「**待发布**」：ISS-021 全平台打包与自动更新流水线已就位（`docs/RELEASE.md`），但**尚未生成任何公开 release**；macOS 首次运行 `xattr -dr com.apple.quarantine` 标「未来指引」而非「当前步骤」。
+  - **许可** 标「**TODO**」：当前仓库未提交 LICENSE 文件；建议与 Folia 对齐采用 Apache-2.0，但需首个 release 前 PM 确认与定稿；**不**在本 PR 创建 LICENSE。
+  - **作者卡**：沿用 ISS-023 / DEC-051 收口的 AuthorCard 数据：作者展示名「**杨卫薪律师**」+ GitHub `[cat-xierluo](https://github.com/cat-xierluo)` + 微信 `ywxlaw`；`package.json` author.name 是 `maoking`（GitHub 用户名），README 以 AuthorCard 实际展示名为准。
+  - **图标**：`docs/icon.png` 不存在（搜索 `*.png` 确认），README 不插入 logo `<img>` 标签，避免 404 资源引用。
+  - 同步 `docs/DECISIONS.md` 追加 DEC-052（README 重写方案 + 范围 + 验证）；`docs/TASKS.md` **未改**（README 重写不在活跃 ISS 任务源，由 PM 直接派发 worker）；`docs/ROADMAP.md` **未改**。
+  - 1 个 commit（`docs: README 参照 Folia 模板重写（DEC-052）`）。
+- 范围严格遵守：未修改 `src/**` / `src-tauri/**` / `package.json` / 锁文件 / 任何构建 / Lint / 类型检查配置（与并行 `chore/consolidate-configs` 分支解耦）；未修改 `docs/ROADMAP.md` / `docs/ARCHITECTURE.md` / `docs/DESIGN.md` / `docs/TASKS.md` / `docs/RELEASE.md` / `AGENTS.md` / `CLAUDE.md`；未创建 `LICENSE` 文件；未修改 `.gitignore` / `.github/**` / `scripts/**`。
+- 验证：`git status --short` 干净（仅 `M README.md` + `M CHANGELOG.md` + `M docs/DECISIONS.md` 三项）；README 不引用任何不存在文件 / 不存在的 release URL；feature 列表与 CHANGELOG 0.1.0-alpha.0 ~ 0.1.0-alpha.11 实际交付一致。
+- 已知限制：README 是项目门面快照，与功能持续迭代存在天然滞后；后续每条 ISS 收口后，由 PM 在合并时同步更新 README 对应 bullet（或开 docs-only 维护 PR）；官网入口（`https://cat-xierluo.github.io/FaroPDF/`）在 v0.1 阶段尚未搭建，README 标「待发布」避免给假链接；「macOS 首次运行」指引基于未来 release 形态预测，实际首次运行步骤以 release 时 `docs/RELEASE.md` 为准。
+
 ## 0.1.0-alpha.11 - 2026-06-05
 
 - ISS-023 作者卡 + 微信二维码占位收口（DEC-051 / `feat/iss-023-author-update`）：把设置页「关于」section 的作者卡从占位 footnote 提升为独立受控组件，覆盖作者姓名 / GitHub 链接 / 微信公众号二维码 / 扫码说明。
