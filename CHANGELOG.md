@@ -1,3 +1,41 @@
+## 0.1.0 - 2026-06-06
+
+> v0.1 正式版。在 beta.1 基础上修复 updater 签名链断裂 + 跨平台 CI 依赖；本版本不含 v0.2 后续新增的「批注摘要分组面板」「法院上传压缩预设」等 feature（ISS-021 修复 + DEC-065/066/067/068/069 拆分）。
+
+与 beta.1 相比的修复项：
+
+- ✅ **updater 私钥 Secret 修正**（ISS-021）：`TAURI_SIGNING_PRIVATE_KEY` 之前被 `cat ~/.tauri/faropdf.key | base64 -w0` 双重 base64 编码，minisign 解码失败。修正为文件原文（一层 base64），与 `cargo tauri signer sign` / `cargo tauri build` 内部 `base64::decode` 流程对齐。本地 `cargo tauri signer sign` 试签通过（13 字符密码从 macOS Keychain 取）。
+- ✅ **CI npm ci 解封**：合并 PR #56（release.yml 适配 stable Rust 2026-05 移除 `universal-apple-darwin` rust-std、jammy 仓库 `libappindicator3-dev` → `libayatana-appindicator3-dev` 切换）+ 同步 `package-lock.json` 与 `package.json`。
+- ✅ **@types/node devDep 补齐**：`vite` / `vitest` 标 `@types/node` 为可选 peer dep（peerDependenciesMeta），npm 7+ 不自动装。本地 Node 25 自带 `node:*` 类型不暴露，CI Node 20 缺。显式加进 devDependencies。
+
+封箱范围（与 0.1.0-beta.1 一致；本版本不含 v0.2 feature）：
+
+- ✅ **快读**：PDF.js 加载 / worker 独立 / 4 视图模式（连续 / 单页 / 双页 / 适合宽度）/ 8 缩放预设 / 旋转 / 键盘翻页 / 缩略图 / 阅读位置恢复（DEC-034）
+- ✅ **检索**：按需内存索引 / 全文搜索 / 命中列表 / 当前页高亮 / OCR 提示（DEC-003 / PR #18）
+- ✅ **批注**：9 类型（高亮 / 下划线 / 删除线 / 备注 / 文本框 / 矩形 / 箭头 / 手写 / 图章）/ 6 色色板 / 5 图章模板 / 4 维度分组（页码 / 颜色 / 标签 / 类型）/ 真实 PDF 绘制 + flatten / 侧边栏 + AppShell 挂载 + active 联动（DEC-035 / 037 / 041 / 044-047 / 057）
+- ✅ **页面整理**：旋转 / 删除 / 重排真实改写 / 多选 / 风险确认 / 撤销 / 默认另存 / 证据图片 A4 编排（DEC-033 / PR #21）
+- ✅ **OCR 扫描**：ocrmypdf 本地后端 / PaddleOCR / MinerU 云端 / 4 command / 任务队列持久化 / 9 态质量检查 / 扫描预处理 lopdf 真实清洁（DEC-018 / 020 / 030 / 042 / 050 / PR #18 / 27 / 29 / 33）
+- ✅ **导出**：pdf-lib 真实改写 / 表单 / 批注 flatten / 水印 / Bates / 页码 / 证据图片 A4 / 压缩 plan-only（DEC-026 / 039 / PR #26）
+- ✅ **表单签署**：AcroForm 读取 / fill / sign / flatten / 批量操作 / 签名图片 / FormsPanel utility panel（DEC-035 / 055 / 064 / PR #23 / 40 / 53）
+- ✅ **设置**：保存目录 / OCR provider / 隐私确认 / API Key 脱敏 / 9 态更新检查 / 10 态 fallback（DEC-038 / 048 / 056 / 066 / PR #25 / 31 / 41 / 53 / 54）
+- ✅ **自动更新**：跨平台 build matrix / latest.json / softprops GitHub Release / 真实 pubkey 替换（DEC-048 / 065 / PR #31 / 55）
+
+v0.3 follow-ups（已在 `docs/RELEASE.md §4` 文档化，不阻塞 0.1.0）：
+
+- ⚠️ 移动端（Android / iOS）打包在评估范围
+- ⚠️ 平台级 CODE_SIGNING（macOS notarization / Windows EV 证书）
+- ⚠️ updater pubkey 轮换
+
+封箱变更：
+
+- `package.json` version `0.1.0-beta.1` → `0.1.0`
+- `src-tauri/tauri.conf.json` version `0.1.0-beta.1` → `0.1.0`
+- `src-tauri/Cargo.toml` version `0.1.0-alpha.18` → `0.1.0`
+- GitHub Secret `TAURI_SIGNING_PRIVATE_KEY`：从 double-base64 改为单层 base64（与 `cargo tauri build` / `signer sign` 内部 `base64::decode` 对齐）
+- 触发方式：`git tag v0.1.0 && git push origin v0.1.0` → `.github/workflows/release.yml` 三平台 build matrix（macOS universal / Windows x64 / Linux x64）
+
+---
+
 ## 0.1.0-beta.1 - 2026-06-06
 
 > v0.1 主功能封箱，标记 beta.1。后续 0.1.0-rc.1 → 0.1.0 stable 走标准 semver 节奏。
