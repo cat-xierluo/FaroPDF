@@ -1,3 +1,21 @@
+## 0.1.0-alpha.16 - 2026-06-05
+
+- ISS-021 follow-up autoUpdateCheck 设置项 + About section toggle 收口（DEC-056 / `feat/iss-021-auto-update-check`）：把 `AppSettings.autoUpdateCheck` 写入 + About section 顶部「自动检查更新」checkbox 接入，关闭时跳过 mount 时自动检查，手动按钮始终可用。
+  - **修改** `src/shared/settings/types.ts`：`AppSettings` 增 `autoUpdateCheck: boolean` 必填字段（默认 `true`，注释指向 ISS-021 follow-up / DEC-056）。
+  - **修改** `src/shared/settings/defaults.ts`：`createDefaultAppSettings` 增 `autoUpdateCheck: true`；`normalizeAppSettings` 增 boolean 类型 guard（`typeof input.autoUpdateCheck === "boolean" ? input.autoUpdateCheck : defaults.autoUpdateCheck`，旧 release payload 缺字段退回默认 `true`）。
+  - **修改** `src/modules/settings/sections/AboutSection.tsx`：去掉 `_settings` / `_onChange` 的 void 忽略（现在实际消费）；新增 `useEffect` mount 一次性 auto-check（`useRef(false)` guard 防止 React 18+ strict mode 双调用 + 切到 true 不会重复触发）+ `handleAutoUpdateToggle` 切换回调；About card body 插入 `<label>` 包裹 checkbox + 「自动检查更新」label + 「关闭后仅在手动点击「检查更新」时触发；切换实时保存」hint（data-testid `about-auto-update-toggle`，`htmlFor="auto-update-check"`）。
+  - **修改** `src/modules/settings/sections/AboutSection.test.tsx`：6 个 manual-check 测试改 `autoUpdateCheck: false`（隔离 mount auto-check 对 call-count 断言的干扰）；新增 6 项单测（toggle 默认值 / 切到 false 持久化 / 切回 true 持久化 / mount 时 auto-check 在 true 下触发 / mount 时 auto-check 在 false 下不触发 / 关闭时手动按钮仍可用）。共 18 项全过。
+  - **修改** `src/shared/settings/defaults.test.ts`：createDefaultAppSettings 断言补 `autoUpdateCheck === true`（默认契约）。
+  - **修改** `src/shared/settings/service.test.ts`：新增 2 项（`autoUpdateCheck: false` 持久化不覆盖 / 旧 payload 缺字段退回默认 `true`），共 5 项全过。
+  - **修改** `src/shared/contracts.test.ts`：`AppSettings` 字面量补 `autoUpdateCheck: true` 字段（typecheck 通过）。
+  - **修改** `src/modules/settings/SettingsPanel.css`：新增 `.settings-about-card__auto-toggle`（margin-bottom 12px / align-items flex-start / gap 8px）/ `__auto-toggle-hint`（muted / 12px / flex 1）样式，与既有 `.settings-row` 协同；窄屏折叠由 `.settings-row` 既有 `@media (max-width: 479px)` 规则覆盖。
+  - 9 态 update 状态机（`AppUpdateStatus` 9 态 + `createTauriUpdateClient` 累计 progress adapter + `detectUpdateCapability`）零改动（DEC-048 / src/shared/update/* 全文件**未**触碰）。
+- 范围严格遵守：仅 `src/shared/settings/{types,defaults}.ts` + `src/shared/settings/{defaults,service,contracts}.test.ts` + `src/modules/settings/sections/AboutSection.{tsx,test.tsx}` + `src/modules/settings/SettingsPanel.css` + 文档；**未**改 `src/shared/update/*`（DEC-048 已 close）/ `src/components/layout/*` / `src/App.tsx` / `src/styles/app.css` / `package.json` / 锁文件 / `src-tauri/**` / `config/**`（DEC-053 收口）/ 任何 reader / search / annotation / forms / export / pages / ocr / preprocess 模块。
+- 同步 `docs/DECISIONS.md` 追加 DEC-056（autoUpdateCheck 设置项 / About toggle / mount 触发 / ref guard / 9 态零改动验证 / known limits）；`docs/TASKS.md` ISS-021 任务卡状态从「第一版已交付」推到「第二版已交付」+ 验收「autoUpdateCheck 设置项可关闭自动检查」改为 ✅ M2 + 进度日志追加 2026-06-05 记录；`docs/RELEASE.md` §4 把「自动检查更新未实现」从限制列表移到「✅ DEC-056 落地」说明；`docs/ROADMAP.md` **未改**。
+- 验证：80 个测试文件 / 751 个测试全部通过（+8：AboutSection 6 + SettingsService 2；剩余 +34 项为 a271de1 / 20ee1b5 / 6841da0 / 4dac567 / 2dd793d 基础之上未计入 DEC-050/051/052/053/054 基线统计的同 PR 范围外增量，与本 PR 无关）；`npm run typecheck` 干净；`npm run lint` 43 个错误（与 main 基线一致，pre-existing 0 回归）；`npm run build` 成功（2022 modules，dist 产物正常）；`cargo check --manifest-path src-tauri/Cargo.toml` 干净（9 个 pre-existing dead_code warning 0 回归）。
+- 已知限制：auto-check 触发点是「About section mount」（用户首次打开设置 → 关于），**不**是 App 启动时刻（避免触碰 forbidden 的 `App.tsx` / `AppShell.tsx`）；debounce 500ms 未实现（App.tsx 当前 `onChange` 是同步 in-memory，SettingsService 真正落盘由 future PR 接入时再加）；增量更新失败回退 / 移动端 / CODE_SIGNING 仍 follow-up。
+- 1 个 commit（`feat(settings): autoUpdateCheck 设置项 + About section toggle 收口（DEC-056）`）。
+
 ## 0.1.0-alpha.15 - 2026-06-05
 
 - FormsPanel 窄屏底部 sheet 适配（DEC-055 / `fix/iss-008-forms-narrow`）：ISS-008 FormsPanel 浮层在 < 480px 视口下与主工具栏（56px）+ 上下文工具条（42px）顶部重叠，本 PR 在 forms 模块内用 CSS 媒体查询 + React `matchMedia` 状态实现窄屏底部 sheet 自适应，作为 ISS-009 utility panel 收口前的过渡修复。

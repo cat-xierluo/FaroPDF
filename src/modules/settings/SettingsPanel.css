@@ -407,6 +407,23 @@
   font-size: 12px;
 }
 
+.settings-about-card__auto-toggle {
+  margin: 0 0 12px;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.settings-about-card__auto-toggle input[type="checkbox"] {
+  margin-top: 2px;
+}
+
+.settings-about-card__auto-toggle-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+  flex: 1;
+}
+
 .settings-about-card__links {
   display: flex;
   gap: 8px;

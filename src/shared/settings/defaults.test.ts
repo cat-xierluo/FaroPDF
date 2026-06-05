@@ -17,6 +17,7 @@ describe("default app settings", () => {
     expect(settings.defaultViewMode).toBe("continuous");
     expect(settings.defaultSavePolicy).toBe("always-export-copy");
     expect(settings.requireNetworkOcrConfirmation).toBe(true);
+    expect(settings.autoUpdateCheck).toBe(true);
     expect(settings.recentFiles).toEqual([]);
     expect(settings.ocrProviders.map((provider) => provider.type)).toEqual([
       "local-ocrmypdf",
