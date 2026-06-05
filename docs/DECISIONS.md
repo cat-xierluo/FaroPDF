@@ -2372,3 +2372,77 @@ README 顶部加 `<p align="center"><img src="docs/icon-128.png" alt="FaroPDF" w
 - 个人主页（`ISS-028`）：杨卫薪律师个人主页 + 展示 Folia / FaroPDF 两产品。本 DEC 不实现，仅在 `docs/TASKS.md` 登记任务卡。
 - icon 后续优化（如单色 / 高对比度 / 多语言）按需开 worker；首版 release 前由 PM 决定是否生成 macOS `.icns` / Windows `.ico` / Linux `.desktop` 等平台特定图标。
 - `package.json` author.email 暂留空（`author.name` 已有，email 留待作者本人补充）。
+
+## DEC-055 ISS-008 FormsPanel 窄屏底部 sheet 适配
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联分支：`fix/iss-008-forms-narrow`
+- 关联任务：ISS-008（窄屏适配收口，不触碰 layout worker 范围）
+- 关联决策：DEC-035（ISS-008 第一版，浮层 `position: fixed; top: 72px; right: 16px` 路线）；DEC-049（ISS-009 PDF Expert Shell UI 收口，把 forms 改走 utility panel 路径在 `feat/pdf-expert-shell-ia` 收口时统一处理，本 DEC 是该收口前的前置修复）
+
+承接 DEC-035 已知限制「FormsPanel 浮层在窄屏（< 360px）会与主工具栏重叠」，本决策记录 **不** 改 layout worker 范围内的 `AppShell / Toolbar / Sidebar`，在 forms 模块内部用 CSS 媒体查询 + React `matchMedia` 状态实现窄屏自适应，作为 ISS-009 utility panel 收口前的过渡修复。
+
+### 1. 方案选择
+
+| 方案 | 优点 | 缺点 | 评估 |
+| --- | --- | --- | --- |
+| **底部 sheet（采纳）** | 桌面浮层视觉保留，窄屏自然避开工具栏；CSS-only + React 状态；不改 layout；标准 PDF 阅读器移动端模式 | 仍占用视口下半部分 | ✅ 采纳 |
+| 全屏 modal | 最大化填值 / 签名可用面积 | 遮罩整个阅读区，违背「PDF 页面始终是主视觉」原则 | 拒绝 |
+| 侧抽屉（右滑入） | 类似 PDF Expert 移动端 | 改变交互模型，需新增 open / close 动画；与 desktop 浮层体验断层 | 拒绝 |
+| 窄屏自动隐藏 | 改动最小 | 用户在窄屏下完全无法填表 | 拒绝 |
+| 切到 utility panel 路径 | 终极方案 | 属 layout worker 范围（ISS-009 收口），与本次窄屏 worker 文件范围冲突 | 留 ISS-009 |
+
+### 2. 实现细节
+
+#### 2.1 断点常量（`src/modules/forms/breakpoints.ts` 新增）
+
+- `FORMS_PANEL_NARLOW_BREAKPOINT = 480`（与 `AuthorCard` 480 对齐，避免在 AppShell 尚未统一收口断点前再制造新数值）。
+- `formsPanelNarrowMediaQuery()` 返回 `"(max-width: 479px)"`，与 CSS `@media (max-width: 479px)` 保持一致。
+- 通过 `src/modules/forms/index.ts` 导出，让 `FormsPanel` 组件和测试都能引用同一数值。
+
+#### 2.2 组件状态（`src/modules/forms/ui/FormsPanel.tsx` 修改）
+
+- 新增 `useState<boolean>(detectNarrowLayout)`，初始值由 `window.innerWidth < 480` 决定（避免 SSR / jsdom 默认 1024 时初始误判）。
+- 新增 `useEffect` 监听 `matchMedia(formsPanelNarrowMediaQuery())` 的 `change` 事件，实时同步 `isNarrow` 状态（不监听 `resize`，避免每像素 re-render）。
+- 新增 `FormsPanelLayout = "floating" | "bottom-sheet"` 字面量联合，渲染时输出 `<aside data-layout={layout}>`。
+- **不**修改组件 props、controller 接口或任何外部 API 形状；现有 16 项单测全部无需改动。
+
+#### 2.3 样式（`src/modules/forms/ui/FormsPanel.css` 新增）
+
+- 新增 `@media (max-width: 479px) { .forms-panel { top: auto; right: 0; bottom: 0; left: 0; width: 100%; max-height: 70vh; border-radius: 12px 12px 0 0; padding: 14px 12px 16px; box-shadow: 0 -10px 28px rgb(24 32 38 / 18%); } }`。
+- 同步新增 `.forms-panel[data-layout="bottom-sheet"]` 选择器：原因：jsdom 不实现真视口 + CSS 媒体查询不会响应，但 React `data-layout` 属性会按状态切换；测试覆盖两种环境（真视口 / jsdom）时都能用 `data-layout` 断言，CSS 在真视口被 `data-layout` 强制覆盖避免冲突。
+- 桌面端（>= 480px）保留原 `top: 72px; right: 16px; width: min(340px, calc(100vw - 32px))`，不影响现有桌面用户体验。
+
+#### 2.4 测试覆盖（`src/modules/forms/ui/FormsPanel.test.tsx` 新增 6 项）
+
+- 断点常量对齐测试：`FORMS_PANEL_NARROW_BREAKPOINT === 480` + `formsPanelNarrowMediaQuery() === "(max-width: 479px)"`。
+- 桌面视口（>= 480px）默认 `data-layout="floating"`。
+- 360px 视口（典型手机竖屏）切换为 `data-layout="bottom-sheet"`。
+- 窗口缩放跨过 480px 断点时 `data-layout` 在 `matchMedia.change` 后切换（双向验证）。
+- 480px 边界（>= 480 视为桌面）保持 `floating`。
+- 窄屏布局下字段列表 + 填值编辑器内容仍可正常渲染（不破坏已有功能）。
+- 自定义 `createMatchMediaMock(initialMatches)` helper：模拟 jsdom 默认 `matchMedia` stub，提供 `setMatches(true|false)` 同步触发已注册 listener，匹配 React 真实订阅语义。
+
+### 3. 范围严格遵守
+
+- **修改**：`src/modules/forms/breakpoints.ts`（新增，22 行）+ `src/modules/forms/ui/FormsPanel.tsx`（+19 行：状态 + effect + 文档说明）+ `src/modules/forms/ui/FormsPanel.css`（+20 行：媒体查询 + 属性选择器）+ `src/modules/forms/ui/FormsPanel.test.tsx`（+99 行：6 项新测试 + 1 个 mock helper + 1 个新 describe block）+ `src/modules/forms/index.ts`（+3 行：导出断点常量）。
+- **不修改**：`src/components/layout/{AppShell,Toolbar,Sidebar}.tsx`（layout worker 范围，避免与 `feat/pdf-expert-shell-ia` 共享冲突）/ `src-tauri/**`（Tauri 范围）/ `config/**`（DEC-053 已收口）/ `package.json` scripts（DEC-053 已加 `--config`）/ 锁文件 / `docs/ROADMAP.md`（PM 决定）/ 任何 reader / search / annotation / ocr / export / pages / preprocess 模块。
+- **不引入新依赖**，CSS-only + React 原生 `matchMedia`，与 `SettingsPanel` 的 `NARROW_BREAKPOINT` 模式一致但定位为 forms 模块内私有，避免在 AppShell 统一断点收口前再制造跨模块耦合。
+
+### 4. 验证结果
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `npm test -- --run src/modules/forms/ui/FormsPanel.test.tsx` | ✅ 22 / 22 | 16 旧 + 6 新 |
+| `npm test`（全套） | ✅ 738 / 738 | worktree 中 `src/App.test.tsx` + `src/modules/reader/pdfReaderService.test.ts` 2 个 suite 因 vite `fs.allow` 拒绝访问 worktree 外部 `node_modules` 失败（pre-existing，0 tests reported；与本 PR 无关；非 worktree 场景通过） |
+| `npm run typecheck` | ✅ 干净 | 无新增 TS 错误 |
+| `npm run lint` | ✅ 干净 | 本 PR 文件 0 错误；全局 43 个 pre-existing 错误（与 main 基线一致：fontLoader 4 处 + `tests/e2e/ocr-e2e.test.ts` parserOptions.project 找不到 + tests/fixtures/ocr/generate-scan-fixture.mjs `Buffer`/`process` 4 处；与本 PR 无关，遵守「pre-existing 不试图修复」） |
+| `npm run build` | ✅ 成功 | 2022 modules 产物正常 |
+
+### 5. 已知限制
+
+- 当前窄屏样式不包含「拖动把手 / 关闭手势」，按底部 sheet 固定 70vh 设计；后续如需拖拽调节可由 layout worker 二次扩展。
+- 切到 utility panel 路径仍是 ISS-009 终极目标，本 DEC 是过渡方案；layout worker 收口时可一次性删掉底部 sheet 媒体查询并把 forms 改走 utility panel。
+- 真视口验证需在 Chromium DevTools device toolbar 切换 360 / 480 / 768 / 1024 四档；jsdom 不实现真视口，单测用 `data-layout` 属性 + `matchMedia` mock 验证状态切换。
+- 断点 480 与 `AuthorCard` 对齐，是 forms 模块内临时值；后续 AppShell 收口断点时可统一为 `BREAKPOINTS.narrow` 共享常量。

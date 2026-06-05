@@ -9,15 +9,34 @@
  *
  * 样式遵循 docs/DESIGN.md 视觉系统（暖白 / 低噪音 / 单一强调色）。
  * 不修改全局 app.css——所有新样式都通过本组件的内联类名（class 形式）复用既有 .tool-button / .context-tool。
+ *
+ * 窄屏适配（ISS-008 / DEC-055）：
+ * - FormsPanel 浮层在 < 480px 视口下与主工具栏（56px）+ 上下文工具条（42px）
+ *   重叠；通过 matchMedia 监听视口宽度，在窄屏时把面板切换为底部 sheet
+ *   （data-layout="bottom-sheet"），由 CSS @media 把 fixed top:72 right:16 浮层
+ *   改为 bottom:0 left:0 right:0 全宽，最大高度 70vh，避开工具栏并保留
+ *   字段列表可读。
+ * - 桌面视口（>= 480px）保持原有 right-top 浮层，不影响现有用户视觉。
  */
 
-import { useId, useRef, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import type { PdfFormField } from "../../../shared/pdf/form";
+import {
+  FORMS_PANEL_NARROW_BREAKPOINT,
+  formsPanelNarrowMediaQuery,
+} from "../breakpoints";
 import type { FormController } from "../useFormController";
 import "./FormsPanel.css";
 
 interface FormsPanelProps {
   controller: FormController;
+}
+
+type FormsPanelLayout = "floating" | "bottom-sheet";
+
+function detectNarrowLayout(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.innerWidth < FORMS_PANEL_NARROW_BREAKPOINT;
 }
 
 const FIELD_TYPE_LABELS: Record<PdfFormField["type"], string> = {
@@ -55,6 +74,24 @@ export function FormsPanel({ controller }: FormsPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftValueId = useId();
 
+  // 窄屏视口检测：浮层在 < 480px 切到底部 sheet，避免与主工具栏（56px）+ 上下文工具条（42px）重叠。
+  // 使用 matchMedia 监听而非 resize，避免每像素触发 re-render。
+  const [isNarrow, setIsNarrow] = useState<boolean>(detectNarrowLayout);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+    const mediaQuery = window.matchMedia(formsPanelNarrowMediaQuery());
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsNarrow(event.matches);
+    };
+    setIsNarrow(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  const layout: FormsPanelLayout = isNarrow ? "bottom-sheet" : "floating";
+
   const fields = formState?.fields ?? [];
   const selectedField = fields.find((field) => field.id === selectedFieldId) ?? null;
 
@@ -78,7 +115,12 @@ export function FormsPanel({ controller }: FormsPanelProps) {
   }
 
   return (
-    <aside className="forms-panel" aria-label="填写和签名面板" data-testid="forms-panel">
+    <aside
+      aria-label="填写和签名面板"
+      className="forms-panel"
+      data-layout={layout}
+      data-testid="forms-panel"
+    >
       <header className="forms-panel__header">
         <div>
           <h2>填写和签名</h2>

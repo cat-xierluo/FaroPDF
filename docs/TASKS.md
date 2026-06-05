@@ -100,15 +100,16 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：表单
-- 状态：进行中（第一版契约 + formService execute 升级 + reader 扩展 + useFormController + FormsPanel 浮层 + 4 件套验证已落 `feat/forms-signing`）
-- 建议分支：`feat/forms-signing`
-- 建议 worktree：`.claude/worktrees/tmux-forms-signing`
+- 状态：进行中（第一版契约 + formService execute 升级 + reader 扩展 + useFormController + FormsPanel 浮层 + 4 件套验证已落 `feat/forms-signing`；**窄屏（< 480px）底部 sheet 适配收口 DEC-055，已落 `fix/iss-008-forms-narrow` 待 PM 合 review**）
+- 建议分支：`feat/forms-signing` + `fix/iss-008-forms-narrow`
+- 建议 worktree：`.claude/worktrees/tmux-forms-signing` + `.claude/worktrees/fix-iss-008-forms-narrow`
 - 依赖：ISS-002、ISS-005
 - 范围：`src/modules/forms/`、`src/shared/pdf/form*`、表单签署相关测试 + `src/modules/reader/useReaderController.ts`（加 3 个方法，不破坏 API 形状）
 - 目标：支持 AcroForm 字段识别、填写、签名图片、手写签名、日期、勾号、叉号、图章、图片和扁平化导出。
 - 验收：常见 PDF 表单可填写并导出为不可编辑提交版；填写和签名模式工具条覆盖文本、签名、日期、勾号、叉号、图章、图片和导出为压平。
 - 当前进度：在 `feat/forms-signing` 完成第一版（DEC-035）：`src/shared/pdf/form.ts` 扩展 `PdfFormOperation` / `PdfFormBatchRequest` / `PdfFormBatchResult` / `PdfFormFlattenSummary` + helper；`formService` 真实 `pageIndex`（PDFDict → pageIndex 查找表）+ `flattenForm` + `applyFormOperations` 批量入口；`useReaderController` 暴露 `getFileBytes` / `getCurrentFileName` / `saveUpdatedBytes`（浏览器 `<a download>`，不依赖 Tauri）；`useFormController` 13 个动作维护 formState / panelMode / 草稿 / 签名图片，文档切换 reset；`activeFormController` 模块级桥让 mode 工具 onClick 拿到 controller；`registerFormsToolbarTools` 按 DEC-032 §"W3 Forms" 注册 4 个 forms mode 工具（refresh / fill / signature / flatten）到 `registerModeTools("forms", [...])`；`FormProvider` + `FormsPanel` 浮层在 `activeMode === "forms"` 时挂载，独立 `FormsPanel.css` 不污染全局样式。`src/components/layout/Toolbar.tsx` / `src/App.tsx` / 全局样式 / 路由 / `package.json` / 锁文件 / `src-tauri/Cargo.toml` **未修改**。82 项新测试通过；总测试 419 / 419；`npm run typecheck` / `npm run build` / `npm test -- --run` / `cargo check --manifest-path src-tauri/Cargo.toml --offline` 全绿。
-- 下一步：FormsPanel 浮层在窄屏（< 360px）会与主工具栏重叠，需要 layout worker 在 `feat/pdf-expert-shell-ia` 收口时把 forms 改走 utility panel 路径；签名图片限定 PNG / JPG（pdf-lib embed 限制）；批量填写 / 字段校验规则引擎 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件待后续 worker 推进。
+- **窄屏适配收口（DEC-055 / `fix/iss-008-forms-narrow`，待 PM 合 review）**：`FormsPanel` 浮层在 < 480px 视口下与主工具栏（56px）+ 上下文工具条（42px）顶部重叠；新增 `src/modules/forms/breakpoints.ts` 暴露 `FORMS_PANEL_NARROW_BREAKPOINT = 480` 常量 + `formsPanelNarrowMediaQuery()` helper；`FormsPanel.tsx` 用 `matchMedia` 监听视口切换 `data-layout="floating" | "bottom-sheet"` 属性；`FormsPanel.css` 新增 `@media (max-width: 479px)` + `[data-layout="bottom-sheet"]` 选择器把浮层改为 `bottom:0 left:0 right:0` 全宽 `70vh` 最大高度的底部 sheet，避开工具栏；新增 6 项窄屏单测（断点常量 / 桌面默认 / 360px 切换 / 视口缩放动态切换 / 480px 边界 / 窄屏下字段列表+编辑器内容仍可渲染），总测试 22 / 22 通过；`npm run typecheck` / `npm run lint` 干净（pre-existing 43 errors 与本 PR 无关）/ `npm run build` 成功；`src/components/layout/{AppShell,Toolbar,Sidebar}.tsx` / `package.json` / 锁文件 / `src-tauri/**` / 全局样式 / 其他模块均**未修改**，符合 layout worker 范围隔离协议。
+- 下一步：FormsPanel 走 utility panel 路径在 `feat/pdf-expert-shell-ia` 收口时统一处理（DEC-049 已规划），本 worker 只做窄屏底部 sheet 自适应；签名图片限定 PNG / JPG（pdf-lib embed 限制）；批量填写 / 字段校验规则引擎 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件待后续 worker 推进。
 
 ### ISS-009 设计系统落地
 
