@@ -60,7 +60,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：OCR
-- 状态：进行中（bridge 真实接入第二版已完成，等待合并 / 后续 UI 接入）
+- 状态：v0.1 OCR 任务全部收口（bridge 真实接入 DEC-030 / PR #18、UI 接线 DEC-042 / PR #29、E2E 联调 DEC-050 / PR #33、keychain + OS Keychain 集成 DEC-061 / PR #47）；下一波 OCR 后处理（ISS-025 Agent 集成）暂缓到 v0.3
 - 建议分支：`feat/ocr-bridge`
 - 建议 worktree：`.claude/worktrees/tmux-ocr-bridge`
 - 依赖：ISS-003、ISS-014、ISS-017
@@ -75,7 +75,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：OCR
-- 状态：进行中（端到端测试基础设施 + E2E 集成测试已落 feat/ocr-e2e，等待 PM 合 review）
+- 状态：已收口（DEC-050 / PR #33）；E2E 基础设施 + 1 case + pdftotext 参数顺序修复全部合到 main
 - 建议分支：`feat/ocr-e2e`
 - 建议 worktree：`.claude/worktrees/tmux-ocr-e2e`
 - 依赖：ISS-007 第二版（DEC-030 / DEC-042）
@@ -100,7 +100,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：表单
-- 状态：进行中（第一版契约 + formService execute 升级 + reader 扩展 + useFormController + FormsPanel 浮层 + 4 件套验证已落 `feat/forms-signing`；**窄屏（< 480px）底部 sheet 适配收口 DEC-055，已落 `fix/iss-008-forms-narrow` 待 PM 合 review**）
+- 状态：v0.1 表单与签署收口（第一版 DEC-035 / PR #23、窄屏底部 sheet DEC-055 / PR #40）；FormsPanel 走 utility panel 路径在 `feat/pdf-expert-shell-ia` 收口时统一处理（DEC-049 已规划）；签名图片限定 PNG / JPG（pdf-lib embed 限制）；批量填写 / 字段校验 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件待后续 worker
 - 建议分支：`feat/forms-signing` + `fix/iss-008-forms-narrow`
 - 建议 worktree：`.claude/worktrees/tmux-forms-signing` + `.claude/worktrees/fix-iss-008-forms-narrow`
 - 依赖：ISS-002、ISS-005
@@ -115,7 +115,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：UI
-- 状态：进行中（结构草案，未达到 UI 验收）
+- 状态：第二阶段 4 个 milestone（M1-M4）已合（DEC-049 / PR #32，0.1.0-alpha.10）；后续 browser 截图视觉验收由 PM 推进；页面管理 Undo 接 pageOrganizer service 真实 history/undo 留作后续导出 worker；OCR 参数区接「设置 → OCR provider」section 跳转（ISS-022 浮层收口时合并）
 - 建议分支：`feat/pdf-expert-shell-ia`
 - 建议 worktree：当前 checkout 已切到 `feat/pdf-expert-shell-ia`；后续如并行推进，再从最新 `main` 创建 `.claude/worktrees/tmux-pdf-expert-shell-ia`
 - 依赖：ISS-012
@@ -130,7 +130,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：发布 / 工程
-- 状态：第二版已交付（autoUpdateCheck 设置项 + About toggle）；移动端 / 增量回退 / CODE_SIGNING 仍 follow-up
+- 状态：v0.1 桌面三平台打包目标达成（第一版 DEC-048 / PR #31、第二版 autoUpdateCheck + About toggle DEC-056 / PR #41）；增量更新失败回退 / 移动端 / CODE_SIGNING 留 v0.3 follow-up；pubkey 是 CI 弱密码生成的占位（正式发布前必须重生成，详见 DEC-048 §2.3 + docs/RELEASE.md §3.1）
 - 建议分支：`feat/app-distribution`
 - 建议 worktree：`.claude/worktrees/tmux-app-distribution`
 - 依赖：ISS-001、ISS-009
@@ -170,7 +170,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：UI / 品牌
-- 状态：第一版收口（DEC-051，feat/iss-023-author-update 待 PM 合 review）
+- 状态：v0.1 作者卡收口（DEC-051 / PR #34 + DEC-038 / PR #25）；公众号二维码替换为真实图片（按 `QRCODE_LICENSE.md` 流程）；AuthorCard 不感知 dark mode（仅跟随全局 CSS variable）
 - 建议分支：`feat/iss-023-author-update`（独立推进，避免与 `feat/settings-page` / `feat/app-distribution` 同时改设置模块）
 - 建议 worktree：`.claude/worktrees/tmux-iss-023-author-update`
 - 依赖：ISS-021、ISS-022
@@ -190,7 +190,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：开发协作 / 工具链
-- 状态：进行中（首版部署完成；本机基线已建；symlink 治理另案 — DEC-043）
+- 状态：首版部署完成 + 本机基线建立（DEC-024 / PR #17 + DEC-043）；项目级 skill 治理（`private-skills/` vs 仓库内置 vs 选择性 fork 副本）作为单独议题延后
 - 建议分支：主目录直接维护（symlink 形式不入仓）
 - 建议 worktree：无
 - 依赖：—
@@ -211,7 +211,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P0
 - 类型：批注
-- 状态：进行中（第一版 UI 与 model 已落盘 / 第四阶段 AppShell 接线 + Overlay 渲染 / Toolbar 接入 / 导出引擎 + stamp 预览 / active 联动均已落盘，等待合并）
+- 状态：4 阶段全部合（第一版 DEC-035 / PR #19、第二版 DEC-037 / PR #24、第三版 DEC-041 / PR #28、第四版 DEC-044/045/046/047 / PR #30、active 联动 DEC-057 / PR #43）；图章中文真实字形重启条件同 ISS-013 真实压缩（`@pdf-lib/fontkit` 启动条件 + OFL/Apache 2.0/MIT 中文字体）
 - 建议分支：`feat/annotation-tools`
 - 建议 worktree：`.claude/worktrees/tmux-annotation-tools`
 - 依赖：ISS-004
@@ -229,7 +229,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：项目卫生（chore / 工具链）
-- 状态：第一版收口（DEC-053，待 PM 合 review）
+- 状态：已收口（DEC-053 / PR #36，0.1.0-alpha.13）；后续 chore 类工作（`tests/fixtures/` 体积、pre-existing lint 清理）按需拆 worker；Folia 对齐度（删除 `package.json` 中 Tauri 配置/多余 deps）等 0.2 再议
 - 建议分支：`chore/consolidate-configs`
 - 建议 worktree：`.claude/worktrees/tmux-consolidate-configs`
 - 依赖：无
