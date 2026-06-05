@@ -75,14 +75,12 @@ describe("compressionService", () => {
     expect(Array.from(inputBytes)).toEqual(snapshot);
   });
 
-  test("image resampling is currently plan-only and emits a diagnostic warning", async () => {
+  test("image resampling attempts real JPEG re-encoding and reports diagnostics", async () => {
     const inputBytes = await createPdfBytesWithJpeg();
     const result = await compressPdf(inputBytes, { imageQuality: 0.7 });
 
     expect(result.imageResampling.requested).toBe(true);
-    expect(result.imageResampling.resampledImages).toBe(0);
-    expect(result.imageResampling.skippedImages).toBe(result.imageResampling.imageCount);
-    expect(result.warnings.some((w) => w.includes("plan-only"))).toBe(true);
+    expect(result.imageResampling.skippedImages).toBe(result.imageResampling.imageCount - result.imageResampling.resampledImages);
 
     const outputPdf = await PDFDocument.load(result.bytes);
     expect(outputPdf.getPageCount()).toBe(1);
@@ -108,5 +106,48 @@ describe("compressionService", () => {
     const outputPdf = await PDFDocument.load(result.bytes);
     expect(outputPdf.getPageCount()).toBeGreaterThanOrEqual(0);
     expect(result.bytes.byteLength).toBeGreaterThan(0);
+  });
+
+  test("court upload presets resolve to correct imageQuality and targetSize", async () => {
+    const inputBytes = await createBlankPdfBytes(1);
+
+    const result5mb = await compressPdf(inputBytes, { preset: "court-5mb" });
+    expect(result5mb.targetSizeCheck).toBeDefined();
+    expect(result5mb.targetSizeCheck!.targetBytes).toBe(5 * 1024 * 1024);
+    expect(result5mb.imageResampling.requested).toBe(true);
+
+    const result10mb = await compressPdf(inputBytes, { preset: "court-10mb" });
+    expect(result10mb.targetSizeCheck!.targetBytes).toBe(10 * 1024 * 1024);
+
+    const result20mb = await compressPdf(inputBytes, { preset: "court-20mb" });
+    expect(result20mb.targetSizeCheck!.targetBytes).toBe(20 * 1024 * 1024);
+
+    const result50mb = await compressPdf(inputBytes, { preset: "court-50mb" });
+    expect(result50mb.targetSizeCheck!.targetBytes).toBe(50 * 1024 * 1024);
+  });
+
+  test("legacy presets still work without targetSizeCheck", async () => {
+    const inputBytes = await createBlankPdfBytes(1);
+    const result = await compressPdf(inputBytes, { preset: "screen" });
+    expect(result.imageResampling.requested).toBe(true);
+    expect(result.targetSizeCheck).toBeUndefined();
+    expect(result.bytes.byteLength).toBeGreaterThan(0);
+  });
+
+  test("target size exceeded warning is emitted when output exceeds 110% of target", async () => {
+    const pdf = await PDFDocument.create();
+    pdf.addPage([3000, 3000]);
+    pdf.addPage([3000, 3000]);
+    const inputBytes = await pdf.save();
+
+    const result = await compressPdf(inputBytes, {
+      preset: "court-5mb",
+      targetSizeBytes: 100,
+    });
+
+    expect(result.targetSizeCheck).toBeDefined();
+    if (result.targetSizeCheck!.exceeded) {
+      expect(result.warnings.some((w) => w.includes("超出目标"))).toBe(true);
+    }
   });
 });

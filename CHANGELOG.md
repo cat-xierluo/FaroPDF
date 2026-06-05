@@ -4,6 +4,11 @@
 
 - ✅ **批注摘要**：4 维度分组面板（页码 / 颜色 / 标签 / 类型），每组统计 + 前 3 个示例批注，支持 Markdown / HTML 导出为案件材料核查清单（DEC-068）
 - ✅ **AnnotationSidebar 视图切换**：新增「列表/摘要」切换入口，不替换既有 4 维分组侧边栏
+- ✅ **法院上传压缩预设**：4 档体积目标预设（5MB / 10MB / 20MB / 50MB），每档含 imageQuality + maxDPI + targetSize 参数（DEC-069）
+- ✅ **真实 JPEG 重编码**：DCTDecode 图像通过 Canvas API 以目标 quality 重编码，替换 PDF 内的 JPEG XObject（DEC-069）
+- ✅ **压缩后体积验证**：实际输出 vs 目标体积对比，超过 10% 警告但仍输出文件
+- ✅ **保守路径**：CMYK JPEG / FlateDecode / 其他 Filter 保留原图；非 Canvas 环境（Node/vitest）跳过重编码
+- ✅ **已知限制**：DPI-based 缩放未实现；CMYK JPEG 保留原图；Rust image crate fallback 待后续实现
 
 ## 0.1.0-beta.1 - 2026-06-06
 

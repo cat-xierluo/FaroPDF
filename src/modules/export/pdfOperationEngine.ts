@@ -20,7 +20,7 @@ import { resolveTextFont } from "./fontAwareWatermark";
 import { compressPdf } from "./compressionService";
 
 const PAGE_OPERATIONS_PLAN_ONLY_WARNING = "页面操作当前仅生成导出计划，尚未改写页面几何或顺序。";
-const COMPRESSION_PLAN_ONLY_WARNING = "PDF 压缩当前仅生成导出计划，尚未执行图像重编码或降采样。";
+const COMPRESSION_PLAN_ONLY_WARNING = "PDF 压缩当前仅生成导出计划，尚未执行图像重编码。";
 
 export interface PdfOperationEngine {
   exportPdf: (request: PdfExportRequest) => Promise<PdfExportResult>;
@@ -436,21 +436,18 @@ async function applyCompression(
   // engine 已在 outputPdf.save({useObjectStreams:true}) 阶段对所有导出应用基础对象流压缩。
   // 此处调用 compressionService 是为了给用户主动请求的压缩提供：ratio + image inventory
   // 诊断信息（图像重采样本身仍 plan-only，真实像素重采样由 PyMuPDF bridge 提供）。
-  const presetToQuality: Record<PdfCompressionOperation["preset"], number | undefined> = {
-    screen: 0.5,
-    ebook: 0.7,
-    print: 0.9,
-    "court-upload": 0.6,
-  };
-
   const beforeBytes = await pdf.save({ useObjectStreams: true });
   const compressionResult = await compressPdf(beforeBytes, {
     useObjectStreams: true,
-    imageQuality: presetToQuality[operation.preset],
+    preset: operation.preset,
   });
 
   const ratio = compressionResult.ratio;
-  const label = `${operation.preset} (ratio ${ratio.toFixed(2)}×, ${compressionResult.inputBytes}→${compressionResult.outputBytes} bytes, useObjectStreams: ${compressionResult.useObjectStreams}, 图像重采样 plan-only: ${compressionResult.imageResampling.imageCount} 张)`;
+  const imageInfo = compressionResult.imageResampling;
+  const imageLabel = imageInfo.requested
+    ? `图像 ${imageInfo.imageCount} 张（重编码 ${imageInfo.resampledImages} / 保留 ${imageInfo.skippedImages}）`
+    : "无图像处理";
+  const label = `${operation.preset} (ratio ${ratio.toFixed(2)}×, ${compressionResult.inputBytes}→${compressionResult.outputBytes} bytes, ${imageLabel})`;
 
   return {
     label,

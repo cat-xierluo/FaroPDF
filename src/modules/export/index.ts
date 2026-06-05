@@ -4,3 +4,15 @@ export { createMemoryPdfExportStorage, createPdfExportService } from "./pdfExpor
 export type { PdfExportService, PdfExportStorage } from "./pdfExportService";
 export { createPdfOutputToolsExportRequest, suggestPdfOutputToolsPath } from "./outputTools";
 export type { CreatePdfOutputToolsExportRequestInput } from "./outputTools";
+export { compressPdf } from "./compressionService";
+export type { CompressionOptions, CompressionResult } from "./compressionService";
+export {
+  COURT_UPLOAD_PRESETS,
+  COURT_UPLOAD_PRESET_TINY,
+  COURT_UPLOAD_PRESET_SMALL,
+  COURT_UPLOAD_PRESET_MEDIUM,
+  COURT_UPLOAD_PRESET_LARGE,
+  COURT_UPLOAD_PRESET_ORDER,
+  isCourtUploadPreset,
+} from "./presets/courtUploadPresets";
+export type { CourtUploadPresetId, CourtUploadPresetConfig } from "./presets/courtUploadPresets";
