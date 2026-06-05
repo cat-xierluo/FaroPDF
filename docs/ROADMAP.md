@@ -13,7 +13,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 | v0.0 上下文初始化 | 固定项目名、定位、技术选型、文档体系 | 已完成 |
 | v0.1 完整基础版 | 快读、检索、批注、OCR/扫描、页面整理、常用导出、表单签署、设置 | 待开始 |
 | v0.2 法律增强 | 批注摘要、证据目录、材料拆合并、Bates 编号深化 | 待开始 |
-| v0.3 性能与发布 | 大卷宗性能、自动更新、跨平台打包、官网文档 | 待开始 |
+| v0.3 性能与发布 | 大卷宗性能、自动更新、跨平台打包、官网与文档站（迁出 personal-site） | 待开始 |
 
 ## v0.1 完整基础版
 
@@ -117,9 +117,9 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 - [ ] ISS-021 全平台打包与自动更新：接入 `tauri-plugin-updater`，建立 GitHub release 跨平台矩阵和 updater manifest 签名。
 - [ ] ISS-022 设置页面 UI 整合：把扁平 `SettingsPanel` 升级为左侧导航 + 多 section 浮层，至少包含「常规 / 阅读 / OCR provider / 快捷键 / 关于」。
-- [ ] ISS-023 关于页面与作者页：在设置页「关于」section 展示应用 icon、版本、定位、官网 / GitHub 链接、当前更新状态和作者卡。
+- [ ] ISS-023 关于页面与作者页：在设置页「关于」section 展示应用 icon、版本、定位、官网（指向 personal-site 仓） / GitHub 链接、当前更新状态和作者卡。
 - [ ] 移动端（Android / iOS）打包能力与自动更新在 v0.3 评估范围，记录限制和后续计划。
-- [ ] 官网与文档站。
+- [x] 官网与文档站入口迁移：v0.1 阶段的官网占位条目由 `https://cat-xierluo.github.io/personal-site/faropdf/` 承接（详见 DEC-058 跨仓 cleanup）。FaroPDF 仓本身不维护 `website/` 子目录或独立的 GitHub Pages workflow；后续官网 / 文档站的所有更新都在 `cat-xierluo/personal-site` 仓推进。
 
 ## 进度日志
 
@@ -138,3 +138,4 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - 2026-06-02：完成 `ISS-013` PDF 交付工具底座第一版：文字/图片水印、页码和 Bates 编号导出 operation 与 pdf-lib 写入已落地，默认 `*-delivery.pdf` 新输出路径和压缩 plan-only 摘要已建立；真实压缩和中文字体接入继续后续深化。
 - 2026-06-04：ISS-013 第二阶段（真实压缩 + 中文字体）worker 启动后即触发 scope-fontkit 物理冲突（pdf-lib 嵌入自定义字体需 `@pdf-lib/fontkit`，与 worker prompt 的"不修改 package.json / 不引入 npm 字体包"约束冲突），按 DEC-036 延期到下一波；当前 wave 3 收口 2 个 PR（PR #22 阅读模式深化 / PR #23 表单填写与签署），整体推进度足够。重启条件：重写 worker prompt 明确"@pdf-lib/fontkit 是 pdf-lib 官方 devDep，可装"+ 选开源协议中文字体（OFL / Apache 2.0 / MIT）。
 - 2026-06-03：合并 `ISS-017` OCR 质量检查第一版（可检索页比例、关键词命中、CER、体积比、耗时和问题页）和 `ISS-018` 证据图片 A4 编排计划器第一版（auto 布局、方向检测、边距校验、安全输出路径）。
+- 2026-06-05：跨仓 cleanup（personal-site `ISS-005` 联动 / DEC-058）：官网 / 文档站入口由 `cat-xierluo/personal-site` 仓统一维护；FaroPDF 仓 README / ROADMAP 同步指向 `https://cat-xierluo.github.io/personal-site/faropdf/`，不引入 `website/` 子目录或独立的 GitHub Pages workflow。

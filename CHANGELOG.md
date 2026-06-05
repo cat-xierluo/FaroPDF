@@ -1,3 +1,17 @@
+## Unreleased
+
+- 跨仓 cleanup（personal-site `ISS-005` 联动 / DEC-058 / `chore/iss-005-faropdf-cleanup`）：FaroPDF 仓 docs-only 同步官网 / 文档站入口迁出。
+  - **修改** `README.md` §"官方仓库" line 15：官网占位 `- 官网：待发布（v0.1 阶段尚未搭建独立官网页面）` 改为 `- 官网：https://cat-xierluo.github.io/personal-site/faropdf/`，与 Folia 仓 README（已指向 `personal-site/folia`）口径一致。
+  - **修改** `docs/ROADMAP.md`：§"阶段状态速览" v0.3 行描述从「官网文档」调整为「官网与文档站（迁出 personal-site）」；§"9. 全平台发布与设置 UI" 末尾"官网与文档站"任务项标记为 `- [x]`，加注释指向 personal-site 仓；ISS-023 任务描述补充「官网（指向 personal-site 仓）」；§"进度日志" 追加 2026-06-05 记录。
+  - **修改** `docs/DECISIONS.md`：追加 DEC-058（跨仓 cleanup 决策：触发原因 / 关键决策 / 与 Folia 仓 PR-A 口径一致性 / 验证 / 已知限制 / 后续路径）。
+  - **修改** `docs/TASKS.md` §"归档任务索引"：新增「跨仓协调」领域条目，引用 personal-site `ISS-005` / DEC-058。
+  - **不修改** `src/` / `src-tauri/` / `package.json` / 锁文件 / `config/**` / `docs/ARCHITECTURE.md` / `docs/DESIGN.md` / `docs/RELEASE.md` / `.github/workflows/**`。
+  - **不新增** `website/` 子目录、`scripts/run-website.mjs` 或 `deploy-website.yml`：FaroPDF 仓自始不存在这些项；与 Folia 仓 PR-A（已删）形成一致口径。
+  - 范围严格遵守：仅 4 个文档（README / ROADMAP / DECISIONS / TASKS）+ 1 个 CHANGELOG 顶部 Unreleased 段；无代码 / 依赖 / workflow / 共享契约改动。
+  - 验证：`grep "官网：待发布" README.md` 不再命中（line 15 已替换为 personal-site 链接；line 19 release 状态占位另说）；`grep "personal-site" README.md docs/ROADMAP.md CHANGELOG.md` 命中；`git diff main...HEAD --stat` 仅 docs 改动。
+  - 已知限制：本期不修改 `src/modules/settings/sections/AboutSection.tsx`（ISS-023 v0.3 实际 UI 接入由 v0.3 worker 推进）；`AboutSection` 中"官网"链接将直接复用 DEC-058 固定的 `https://cat-xierluo.github.io/personal-site/faropdf/`。
+  - 1 个 commit（`chore(docs): ISS-005 跨仓 cleanup（FaroPDF 仓 PR-B / DEC-058）`）。
+
 ## 0.1.0-alpha.17 - 2026-06-05
 
 - ISS-026 批注 Overlay ↔ Sidebar active 联动收口（DEC-057 / `feat/iss-026-overlay-sidebar-active-sync`）：把 `AnnotationOverlay` 与 `AnnotationSidebar` 共享的 `activeAnnotationId` 状态在 `AppShell` 内落地为单一真相源（`useState<string | null>(null)`），实现「点 overlay → sidebar 同步高亮 / 点 sidebar → overlay 同步高亮」的双向 active 联动，承接 DEC-044 stage 4 末尾标注的「`onAnnotationClick` prop 留好，等下一阶段统一接线」follow-up。

@@ -310,6 +310,7 @@ Agent 可根据本文件自行判断：
 - **设置 / OCR Provider**：ISS-014
 - **法律材料整理**：ISS-019
 - **品牌 / UI**：ISS-020
+- **跨仓协调**：personal-site `ISS-005`（Folio 仓 PR-A / FaroPDF 仓 PR-B 联动，FaroPDF 仓侧见 DEC-058 docs-only 同步）
 
 需要恢复为活跃任务时，先在 `docs/DECISIONS.md` 的归档条目下加"恢复"标注，再回到本文件新增任务卡。
 
