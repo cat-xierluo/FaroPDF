@@ -12,6 +12,10 @@ import {
 } from "../../modules/ocr";
 import { createInitialAnnotationToolState } from "../../modules/annotation";
 import type { AnnotationToolState } from "../../modules/annotation";
+import { useFormController } from "../../modules/forms/useFormController";
+import { setActiveFormController } from "../../modules/forms/activeFormController";
+import { registerFormsToolbarTools } from "../../modules/forms/registerFormsToolbarTools";
+import { FormsPanel } from "../../modules/forms/ui/FormsPanel";
 import { ReaderCanvas } from "./ReaderCanvas";
 import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
 import { AnnotationSidebar } from "./AnnotationSidebar";
@@ -115,6 +119,17 @@ export function AppShell({
       setActiveAnnotationId(null);
     }
   }, [activeMode]);
+  // forms controller：在 AppShell 层创建以供 utility panel 使用
+  const formController = useFormController(reader);
+  useEffect(() => {
+    setActiveFormController(formController);
+    return () => setActiveFormController(null);
+  }, [formController]);
+  useEffect(() => {
+    if (activeMode === "forms") {
+      registerFormsToolbarTools();
+    }
+  }, [activeMode]);
   const document = reader.state.document;
   const hasDocument = document !== null;
   // 当前页 PDF viewport（pt），用于 overlay 真实坐标
@@ -154,6 +169,7 @@ export function AppShell({
           <UtilityPanel
             activeAnnotationId={activeAnnotationId}
             annotations={annotations}
+            formController={formController}
             onAnnotationClick={setActiveAnnotationId}
             panel={utilityPanel}
             reader={reader}
@@ -234,6 +250,7 @@ function OcrWorkspaceUnavailable() {
 function UtilityPanel({
   activeAnnotationId,
   annotations,
+  formController,
   onAnnotationClick,
   panel,
   reader,
@@ -245,6 +262,7 @@ function UtilityPanel({
   reader: ReaderController;
   search: TextSearchController;
   annotations?: PdfAnnotation[];
+  formController: import("../../modules/forms/useFormController").FormController;
 }) {
   if (panel === "view") {
     const document = reader.state.document;
@@ -288,6 +306,10 @@ function UtilityPanel({
         pageCount={reader.state.document?.pageCount}
       />
     );
+  }
+
+  if (panel === "forms") {
+    return <FormsPanel controller={formController} layoutMode="utility-panel" />;
   }
 
   return (

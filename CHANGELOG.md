@@ -1,3 +1,13 @@
+## 0.1.0-alpha.19 - 2026-06-05
+
+- feat(forms): ISS-008 FormsPanel 从全局浮层迁入 AppShell 左侧 utility panel（DEC-064 / `feat/iss-008-forms-utility-panel`）。
+  - FormsPanel 改为 utility panel 渲染（`layoutMode="utility-panel"`），不再 `position: fixed` 浮层。
+  - `UtilityPanelId` 新增 `"forms"`，AppShell UtilityPanel 在 `panel === "forms"` 时挂 FormsPanel。
+  - Toolbar 工具区新增「填写和签名」utility panel toggle（与「文档摘要」「视图设置」一致风格）。
+  - 响应式三档：大屏（> 720px）utility panel / 中屏（480–720px）drawer / 窄屏（< 480px）bottom-sheet。
+  - 新增 `FORMS_PANEL_DRAWER_BREAKPOINT = 720` 断点常量。
+  - 验证：typecheck 干净 / build 成功 / npm test 全量失败（pre-existing ESM 不兼容，与本次无关）。
+
 ## 0.1.0-alpha.18 - 2026-06-05
 
 - ISS-022 设置页 lazy load sections 收口（DEC-059 / `feat/iss-022-lazy-load`）：把 SettingsPanel 的 4 个非默认 section（阅读 / OCR provider / 快捷键 / 关于）从 eager import 拆为 `React.lazy` + `Suspense`，默认常规 section 保持 eager。Vite build 已把这 4 个 section 拆分为独立 chunk。
