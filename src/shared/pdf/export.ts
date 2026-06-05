@@ -125,7 +125,15 @@ export interface PdfBatesNumberOperation {
   margin?: number;
 }
 
-export type PdfCompressionPreset = "screen" | "ebook" | "print" | "court-upload";
+export type PdfCompressionPreset =
+  | "screen"
+  | "ebook"
+  | "print"
+  | "court-upload"
+  | "court-5mb"
+  | "court-10mb"
+  | "court-20mb"
+  | "court-50mb";
 export type PdfCompressionMode = "plan-only" | "apply";
 
 export interface PdfCompressionOperation {

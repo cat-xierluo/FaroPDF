@@ -3350,3 +3350,53 @@ RWS8WkTIW8ht2pmQPiablJPY8vRrsXleS6NxLsalJ/Tyn+1tKpHGxREc  // 新（2026-06-05 �
 | UI 测试 | ⚠️ 7 项因 pre-existing html-encoding-sniffer ESM 问题失败（与 main 基线一致） |
 | `npm run build` | ✅ 成功 |
 | `cargo check --offline` | ✅ 干净（17 pre-existing dead_code warning） |
+
+## DEC-069 ISS-013 法院上传体积压缩预设 4 档 + 真实 JPEG 重编码
+
+- 日期：2026-06-06
+- 状态：已采纳
+- 关联任务：ISS-013 第二阶段（v0.2 法律增强）
+- 关联分支：`feat/iss-013-court-compression-presets`
+
+承接 DEC-039 §"已知限制"中"图像重采样是 plan-only fallback"和 ROADMAP v0.2 §"法院上传体积限制下的压缩预设"，把 plan-only 框架落地为可工作能力。
+
+### 1. 决策
+
+- 4 档法院上传体积预设常量：
+  - `COURT_UPLOAD_PRESET_TINY`（5MB）：targetSize=5MB, imageQuality=0.4, maxDPI=150
+  - `COURT_UPLOAD_PRESET_SMALL`（10MB）：targetSize=10MB, imageQuality=0.55, maxDPI=200
+  - `COURT_UPLOAD_PRESET_MEDIUM`（20MB）：targetSize=20MB, imageQuality=0.7, maxDPI=300
+  - `COURT_UPLOAD_PRESET_LARGE`（50MB）：targetSize=50MB, imageQuality=0.85, maxDPI=600
+- 真实 JPEG 重编码：DCTDecode 图像通过 Canvas API 以目标 quality 重编码，替换 PDF 内的 JPEG XObject
+- 压缩后体积验证：实际输出 vs 目标体积对比，超过 10% 警告但仍输出（不阻塞用户）
+- 保守路径：CMYK JPEG / FlateDecode / 其他 Filter 保留原图
+- 导出工具条接入 4 档 preset selector
+
+### 2. 拒绝的方案
+
+- **Rust image crate 重编码**：方案 A。本机 native lib（libimagequant / libvips）依赖复杂；本 PR 走纯 JS Canvas API 路径，Rust fallback 留后续 worker。
+- **DPI-based 缩放**：方案 B。当前实现只走 imageQuality，maxDPI 仅作为元数据记录；实际 DPI 缩放需要 pdf-lib 的 imageStream 重新嵌入 + 几何变换，超出本 PR scope。
+- **阻塞式体积验证**：方案 C。超过 10% 警告但仍输出，不阻塞用户；理由：法院上传通常接受轻微超出，让用户手动再压缩比阻塞更友好。
+
+### 3. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `cargo check --manifest-path src-tauri/Cargo.toml --offline` | ✅ 干净 | 17 pre-existing dead_code warning |
+| `npm run typecheck` | ✅ 干净 | |
+| `npm test -- --run` | ⚠️ UI 测试 7 项因 pre-existing html-encoding-sniffer ESM 失败 | 与 main 基线一致 |
+| `npm run build` | ✅ 成功 | |
+| `courtUploadPresets.test.ts` | ✅ 5 项 4 档预设 | |
+| `compressionService.test.ts` | ✅ 14 项 真实重编码 + 保守路径 + 体积验证 | |
+
+### 4. 已知限制
+
+- DPI-based 缩放未实现（DPI 仅作为元数据）
+- CMYK JPEG 保留原图（Canvas API 不支持 CMYK 编码）
+- Rust image crate fallback 待后续实现（如果走 pure JS 路径无法满足某些大文档场景）
+
+### 5. 后续路径
+
+- 走纯 JS 路径在浏览器环境足够（Canvas API），但 Node SSR / 后端批处理场景需要 Rust fallback
+- 法院上传体积目标可能因法院 / 律师协会证据库不同而调整，预设元数据可由 PM 在 `courtUploadPresets.ts` 集中维护
+- 关联：DEC-039（plan-only 框架）/ ROADMAP v0.2 §"法院上传体积限制下的压缩预设"

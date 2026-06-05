@@ -389,7 +389,7 @@ describe("pdf operation engine", () => {
         label: "court-upload",
       },
     ]);
-    expect(result.summary.warnings).toContain("PDF 压缩当前仅生成导出计划，尚未执行图像重编码或降采样。");
+    expect(result.summary.warnings).toContain("PDF 压缩当前仅生成导出计划，尚未执行图像重编码。");
   });
 
   test("rejects unsupported page operation mode and out-of-range page indexes", async () => {
@@ -515,6 +515,62 @@ describe("pdf operation engine", () => {
     expect(compressionEntry?.label ?? "").toMatch(/^court-upload \(ratio /);
     // apply 模式下不再发 plan-only 警告；只断言无空输出。
     expect(result.bytes.byteLength).toBeGreaterThan(0);
+  });
+
+  test("applies court-5mb preset in apply mode with target size check", async () => {
+    const inputBytes = await createPdfWithBlankPages(2);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-compress-court-5mb",
+      source: { bytes: inputBytes },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "compress-court-5mb",
+          type: "compress",
+          preset: "court-5mb",
+          mode: "apply",
+        },
+      ],
+      requestedAt: "2026-06-02T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+    expect(outputPdf.getPageCount()).toBe(2);
+    const entry = result.summary.outputToolPlan?.entries[0];
+    expect(entry?.status).toBe("applied");
+    expect(entry?.label).toMatch(/^court-5mb \(ratio /);
+  });
+
+  test("applies court-20mb preset in plan-only mode as planned entry", async () => {
+    const inputBytes = await createPdfWithBlankPages(1);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-compress-court-20mb-plan",
+      source: { bytes: inputBytes },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "compress-court-20mb-plan",
+          type: "compress",
+          preset: "court-20mb",
+          mode: "plan-only",
+        },
+      ],
+      requestedAt: "2026-06-02T00:00:00.000Z",
+    });
+
+    expect(result.summary.outputToolPlan?.entries).toEqual([
+      {
+        operationId: "compress-court-20mb-plan",
+        type: "compress",
+        pageIndexes: [0],
+        status: "planned",
+        label: "court-20mb",
+      },
+    ]);
   });
 
   test("rejects invalid page number and Bates numbering inputs", async () => {
