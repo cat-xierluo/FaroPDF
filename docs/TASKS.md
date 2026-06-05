@@ -270,7 +270,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：品牌 / 跨仓 cleanup
-- 状态：进行中（fix/iss-029-faropdf-real-qr worktree 已创建，资源替换 + 文档同步待 PR 合 review）
+- 状态：已收口（DEC-062 / PR #49，真实 QR 替换 + 三仓同步完成；commit `8f0be50`）
 - 建议分支：`fix/iss-029-faropdf-real-qr`
 - 建议 worktree：`.claude/worktrees/iss-029-faropdf-real-qr`
 - 依赖：personal-site `ISS-010`（真实 QR 已入 personal-site 主干，commit `0ef5455` 前已通过 ISS-010 完成单源修正，DEC-009 supersede DEC-007）
