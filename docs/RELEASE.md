@@ -57,12 +57,36 @@ cargo tauri signer generate -p "<STRONG_PASSWORD>" -w ~/.tauri/faropdf.key
 
 # 把 pubkey 写入 src-tauri/tauri.conf.json：
 #   plugins.updater.pubkey = "<.pub 第二行 base64>"
-# （ISS-021 M1 已写入占位 key，正式发布前必须替换）
+# （2026-06-05 已替换 ISS-021 M1 占位 key 为正式 keypair，见 DEC-065）
 
 # GitHub Secrets（仓库 Settings → Secrets and variables → Actions）：
 #   TAURI_SIGNING_PRIVATE_KEY          = <cat ~/.tauri/faropdf.key | base64 -w0>
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD = <STRONG_PASSWORD>
 ```
+
+**macOS 推荐**：密码不要明文写本地脚本或 `.envrc`，统一通过系统 Keychain 管理。
+首次落库（已完成于 2026-06-05）：
+
+```bash
+# 用 osascript 弹出 hidden answer 对话框输入密码（避免 shell 历史 / 日志泄露）
+FAROPDF_KEYPW=$(osascript -e 'text returned of (display dialog "FaroPDF Tauri Signer Password" default answer "" with hidden answer)')
+
+# 写入 macOS Keychain（service / account 标识便于跨项目区分）
+security add-generic-password \
+  -a "$USER" \
+  -s "FaroPDF Tauri Signer Password" \
+  -w "$FAROPDF_KEYPW" \
+  -T "/Users/$USER/.cargo/bin/cargo" \
+  -U
+```
+
+后续在本地需要密码时（如 PM 重签 / 本地调试）从 Keychain 读取：
+
+```bash
+FAROPDF_KEYPW=$(security find-generic-password -a "$USER" -s "FaroPDF Tauri Signer Password" -w)
+```
+
+详细 SOP（含跨项目 Folia / Funes 的复用方式）见 `docs/DECISIONS.md` DEC-065。
 
 **注意**：`TAURI_SIGNING_PRIVATE_KEY` 推荐以 base64 字符串存进 Secret，CI 中
 `cargo tauri signer sign` 接受 `cat <file>` 的原内容。Tauri 文档建议写入文件：
