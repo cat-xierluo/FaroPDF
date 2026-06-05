@@ -100,7 +100,7 @@ Agent 可根据本文件自行判断：
 
 - 优先级：P1
 - 类型：表单
-- 状态：v0.1 表单与签署收口 + utility panel 路径已合（DEC-063 / `feat/iss-008-forms-utility-panel`）；签名图片限定 PNG / JPG（pdf-lib embed 限制）；批量填写 / 字段校验 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件待后续 worker
+- 状态：v0.1 表单与签署收口 + utility panel 路径已合（DEC-064 / `feat/iss-008-forms-utility-panel`）；签名图片限定 PNG / JPG（pdf-lib embed 限制）；批量填写 / 字段校验 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件待后续 worker
 - 建议分支：`feat/forms-signing` + `fix/iss-008-forms-narrow`
 - 建议 worktree：`.claude/worktrees/tmux-forms-signing` + `.claude/worktrees/fix-iss-008-forms-narrow`
 - 依赖：ISS-002、ISS-005
@@ -143,7 +143,7 @@ Agent 可根据本文件自行判断：
   - `.github/workflows/release.yml` 在 `v*` tag push 时跨平台矩阵构建、生成 `latest.json` 与签名、自动发布到 GitHub Releases。✅ M3
   - 应用内 `checkForAppUpdate` 走 `tauri-plugin-updater`，能拉到新版本并支持下载安装；`autoUpdateCheck` 设置项可关闭自动检查。✅ M2（手动检查 M2-1 + `autoUpdateCheck` 设置项 M2-2 / DEC-056）
   - 更新密钥通过本地 `tauri signer generate` 生成，私钥不入库，公钥写入 `tauri.conf.json`。⚠️ 占位 pubkey 已写，正式发布前由 PM 重生成（见 DEC-048 §2.3 + docs/RELEASE.md §3.1）
-  - 增量更新失败时回退到完整重装路径，不阻塞用户阅读。❌ 留 v0.3+ follow-up（tauri-plugin-updater 内置 chunk 重试；失败需用户手动去 GitHub Releases 下载）
+  - 增量更新失败时回退到完整重装路径，不阻塞用户阅读。✅ DEC-066 落地（前端自动重试 + Rust 错误分类脱敏 + UI fallback 分支 + GitHub Releases 链接）
   - 移动端（Android / iOS）打包在 v0.3 评估范围，先在 `docs/RELEASE.md` 记录限制与后续计划，不在 ISS-021 内强制实现。✅ docs/RELEASE.md §1 + §4 记录
 - 进度日志：
   - 2026-06-04：在 `feat/app-distribution` 推进 ISS-021 第一版（DEC-048）：新增 `src/shared/update/` 5 文件（types / updateService 累计 progress adapter / updateCapability / index + 3 测试文件，14 项新单测）+ `src/modules/settings/sections/AboutSection.tsx` 接 `createTauriUpdateClient` 9 态状态机（手动检查 → available → 下载并安装 → 重启提示；AboutSection.test.tsx 9 项）+ `src-tauri/Cargo.toml` 加 `tauri-plugin-updater = "2.10.1"` + `src-tauri/src/lib.rs` 注册 plugin + `src-tauri/tauri.conf.json` `bundle.createUpdaterArtifacts` + `plugins.updater` 配置块 + `package.json` 加 `@tauri-apps/plugin-updater@2.10.1` + `tsconfig.json` lib ES2020→ES2022（解锁 27 个 pre-existing `Array.prototype.at` 错误）+ `.github/workflows/release.yml`（3 平台 matrix：macos-universal / windows-x64 / linux-x64 → artifacts → `scripts/create-updater-manifest.mjs` → latest.json + softprops/action-gh-release@v2 发布）+ `scripts/create-updater-manifest.mjs`（纯 ESM，零 npm 依赖，扫描 .app.tar.gz / .msi / .AppImage 调 `cargo tauri signer sign`）+ `docs/RELEASE.md`（产物矩阵 / 密钥管理 / 发布流程 / 5 项限制）。**未**改 `src/components/...`（除 update 入口）/ `src/styles/` / `Toolbar.tsx` / `App.tsx` / `Sidebar.tsx` / `src-tauri/src/{ocr,scan_preprocess,forms}/` / 其他 reader/search/annotation/forms/export/pages/ocr/preprocess 模块 / `src/shared/{pdf,ocr,preprocess,annotation,form,export,settings}/` / `assets/fonts/`。pubkey 写占位 `RWSY2kf...`（CI 弱密码生成的 base64 段），私钥已 rm 丢弃；首次生产发布前必须由 PM 重生成。验证：76 文件 / 689 测试（+5：updateService 7 / updateCapability 2 / AboutSection 新增 6 + 替换 3）；typecheck / build / cargo check 全绿；增量更新失败回退 / autoUpdateCheck / 移动端 / CODE_SIGNING 留 follow-up（详见 DEC-048 + docs/RELEASE.md §4）。

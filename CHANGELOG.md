@@ -1,3 +1,15 @@
+## 0.1.0-alpha.20 - 2026-06-05
+
+- ISS-021 增量更新失败回退（DEC-066 / `fix/iss-021-update-fallback`）：当 `tauri-plugin-updater` 增量更新失败（chunk 重试用尽、网络中断、签名校验失败等），自动重试一次完整下载；两次均失败时 UI 进入 `fallback` 状态，显示脱敏错误消息 + GitHub Releases 手动下载链接。
+  - **新增** `src-tauri/src/update_fallback.rs`：Rust 端错误分类（5 类：chunk retry / network / signature / cancelled / unknown）+ 脱敏（移除路径 / token / URL query）+ 单元测试 11 项。
+  - **修改** `src/shared/update/types.ts`：`AppUpdateStatus` 新增 `"fallback"` 第 10 态；`AppUpdateApplyResult` 新增 `{ kind: "fallback"; message; releasesUrl }`。
+  - **修改** `src/shared/update/updateService.ts`：`downloadAndInstallUpdate` 首次失败后自动重试一次；两次均失败返回 fallback 结果（含脱敏错误消息 + GitHub Releases URL）；新增 `classifyFallbackMessage` / `sanitizeErrorMessage` 函数。
+  - **修改** `src/modules/settings/sections/AboutSection.tsx`：9→10 态状态机新增 `fallback` 分支；STATUS_LABELS 加 `"fallback": "正在回退到完整安装…"`；`handleInstallUpdate` 处理 `fallback` result；渲染 `showFallbackLink` 时显示「去 GitHub Releases 手动下载」链接。
+  - **修改** `src-tauri/src/lib.rs`：`mod update_fallback` 注册。
+  - **测试**：`updateService.test.ts` +5 项（retry once / retry succeed / chunk classification / signature classification / fallback result）；`AboutSection.test.tsx` +3 项（fallback UI / no install button / re-enabled check button）。
+  - **文档**：DEC-066 / RELEASE.md §4 更新 / TASKS.md ISS-021 状态更新。
+  - **不修改** `src/components/**`（除 settings/ 子目录）/ `package.json` / 锁文件 / `src/App.tsx` / `src/styles/` / 其他模块 / `.github/workflows/**` / `scripts/**`。
+
 ## 0.1.0-alpha.19 - 2026-06-05
 
 - feat(forms): ISS-008 FormsPanel 从全局浮层迁入 AppShell 左侧 utility panel（DEC-064 / `feat/iss-008-forms-utility-panel`）。
@@ -10,7 +22,6 @@
 
 ## 0.1.0-alpha.18 - 2026-06-05
 
-- ISS-022 设置页 lazy load sections 收口（DEC-059 / `feat/iss-022-lazy-load`）：把 SettingsPanel 的 4 个非默认 section（阅读 / OCR provider / 快捷键 / 关于）从 eager import 拆为 `React.lazy` + `Suspense`，默认常规 section 保持 eager。Vite build 已把这 4 个 section 拆分为独立 chunk。
   - **新增** `src/modules/settings/sections/lazy.ts`：集中声明 4 个 `React.lazy` wrapper。
   - **修改** `src/modules/settings/SettingsPanel.tsx`：import 改为 lazy + Suspense 包裹（默认常规 section 仍为 eager）。
   - **修改** `src/modules/settings/SettingsPanel.css`：+5 行 `settings-section-skeleton` Suspense fallback 样式。

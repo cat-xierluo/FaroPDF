@@ -3225,3 +3225,26 @@ RWS8WkTIW8ht2pmQPiablJPY8vRrsXleS6NxLsalJ/Tyn+1tKpHGxREc  // 新（2026-06-05 �
 - 推 `v0.1.0-alpha.18` tag 触发 `release.yml`，验收 CI 通过和 GitHub Release 生成（任务卡 ISS-021 后续步骤）。
 - 密码强度升级（13 → ≥16 字符）作为 alpha.19 / beta 前的安全维护项。
 - 未来 `macOS notarize + Windows EV cert` 由独立 ISS 推进（不在 ISS-021 scope）。
+
+## DEC-066 ISS-021 增量更新失败回退到完整重装 + 用户引导
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联任务：ISS-021
+- 关联分支：`fix/iss-021-update-fallback`
+
+> DEC 编号修正：原 worker 选 DEC-063，与 PR #51（封箱 0.1.0-alpha.18）撞车；后续 PR #53（DEC-064）/ PR #55（DEC-065）连续占号，PM 收口时 renumber 为 DEC-066。本条目由 PM amend 修正（commit message 同步）。
+
+### 1. 背景
+
+- v0.1 桌面三平台打包目标达成（DEC-048 / PR #31 + DEC-056 / PR #41），但增量更新失败仍需用户手动去 GitHub Releases 下载完整包。
+- `tauri-plugin-updater` 内部 chunk 重试在断网 / 签名失败 / 用户取消等场景下仍会失败，需要应用层兜底。
+- 真实 pubkey 已在 PR #55 / DEC-065 重新生成（`RWSY2kf...` 占位已替换），生产 release 路径打通，本 PR 补齐失败兜底。
+
+### 2. 决策
+
+- 增量更新失败 → 自动重试一次完整下载（不依赖 chunk retry 路径）。
+- 两次均失败 → UI 进入新 `fallback` 状态（`AppUpdateStatus` 第 10 态），显示脱敏错误消息 + GitHub Releases 手动下载链接。
+- 错误分类（5 类）+ 脱敏（移除路径 / token / URL query 参数）+ 单元测试覆盖 4 路径（chunk retry / network / signature / cancelled / unknown）。
+- 前端 9 态状态机扩为 10 态，新增 `fallback` 分支。
+- 11 项 Rust 单元测试 + 5 项新增前端测试覆盖 16 项 total。

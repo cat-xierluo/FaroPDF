@@ -16,6 +16,7 @@ mod ocr_dispatch;
 mod ocr_queue;
 mod ocr_text_extract;
 mod scan_preprocess;
+mod update_fallback;
 
 use ocr_credentials::{read_keychain_secret, resolve_credential_reference, CredentialResolution};
 use ocr_dispatch::{dispatch_ocr, OcrDispatchBackend, OcrDispatchError, OcrDispatchRequest};

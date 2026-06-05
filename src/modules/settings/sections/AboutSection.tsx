@@ -38,6 +38,7 @@ const STATUS_LABELS: Record<AppUpdateStatus, string> = {
   installing: "正在安装更新…",
   unsupported: "当前环境不支持自动更新",
   error: "检查更新失败",
+  fallback: "正在回退到完整安装…",
 };
 
 /**
@@ -173,6 +174,9 @@ export function AboutSection({ settings, onChange, updateClient }: AboutSectionP
         case "error":
           setSafeStatus("error", result.message);
           break;
+        case "fallback":
+          setSafeStatus("fallback", result.message);
+          break;
       }
     } catch (error) {
       setSafeStatus("error", error instanceof Error ? error.message : String(error));
@@ -184,6 +188,7 @@ export function AboutSection({ settings, onChange, updateClient }: AboutSectionP
   }
 
   const showInstallButton = status === "available" && available !== null;
+  const showFallbackLink = status === "fallback";
   const checkButtonDisabled = isWorking || status === "checking" || status === "downloading";
   const progressText = renderProgress(progress);
 
@@ -273,6 +278,16 @@ export function AboutSection({ settings, onChange, updateClient }: AboutSectionP
               >
                 下载并安装
               </button>
+            ) : null}
+            {showFallbackLink ? (
+              <a
+                data-testid="about-fallback-releases-link"
+                href="https://github.com/cat-xierluo/FaroPDF/releases"
+                rel="noreferrer"
+                target="_blank"
+              >
+                去 GitHub Releases 手动下载
+              </a>
             ) : null}
           </div>
         </div>
