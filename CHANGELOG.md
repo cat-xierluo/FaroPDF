@@ -1,6 +1,6 @@
 ## 0.1.0-alpha.17 - 2026-06-05
 
-- ISS-026 批注 Overlay ↔ Sidebar active 联动收口（DEC-058 / `feat/iss-026-overlay-sidebar-active-sync`）：把 `AnnotationOverlay` 与 `AnnotationSidebar` 共享的 `activeAnnotationId` 状态在 `AppShell` 内落地为单一真相源（`useState<string | null>(null)`），实现「点 overlay → sidebar 同步高亮 / 点 sidebar → overlay 同步高亮」的双向 active 联动，承接 DEC-044 stage 4 末尾标注的「`onAnnotationClick` prop 留好，等下一阶段统一接线」follow-up。
+- ISS-026 批注 Overlay ↔ Sidebar active 联动收口（DEC-057 / `feat/iss-026-overlay-sidebar-active-sync`）：把 `AnnotationOverlay` 与 `AnnotationSidebar` 共享的 `activeAnnotationId` 状态在 `AppShell` 内落地为单一真相源（`useState<string | null>(null)`），实现「点 overlay → sidebar 同步高亮 / 点 sidebar → overlay 同步高亮」的双向 active 联动，承接 DEC-044 stage 4 末尾标注的「`onAnnotationClick` prop 留好，等下一阶段统一接线」follow-up。
   - **修改** `src/components/layout/AppShell.tsx`（+5 行 + 2 处透传）：
     - 文件顶部追加 `import { useEffect, useState }`。
     - AppShell 函数体内追加 `const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null)` + `useEffect` 监听 `activeMode`，切出 annotate 模式时 `setActiveAnnotationId(null)` 清理 stale 选中。
@@ -13,10 +13,10 @@
   - **不修改** `package.json` / 锁文件 / `Toolbar.tsx`（DEC-032 协议）/ `Sidebar.tsx` / `src/styles/app.css` / `src-tauri/` / 全局样式 / 路由 / 其他模块（reader / search / forms / export / pages / ocr / preprocess / settings）。
   - **新增** 4 项 `AppShell.test.tsx` 单测：sidebar 行点击 → overlay glyph 同步 `is-active` + `aria-current="true"` / overlay glyph 点击 → sidebar 行同步 `annotation-sidebar__row-button--active` + `aria-current="true"`（双向）/ armed toolType 下点击 overlay 不触发 active 同步（既有 `if (interaction) return` 保护验证）/ 切出 annotate 模式后切回 → active 状态自动清空（useEffect cleanup 验证）。
 - 范围严格遵守：仅 `src/components/layout/AppShell.tsx` + `src/components/layout/AppShell.test.tsx` + 3 个文档（CHANGELOG / DECISIONS / TASKS）；其他模块 / 共享契约 / 锁文件 / 业务代码 / Tauri 任何文件均**未修改**。
-- 同步 `docs/DECISIONS.md` 追加 DEC-058（ISS-026 active 联动方案 + state 归属 / 双向同步机制 / mode 切换清空 / armed 保护 / 范围 / 验证 / 已知限制 / 后续路径）；`docs/TASKS.md` ISS-026 任务卡状态从「进行中（第一版 UI 与 model 已落盘）」推到「进行中（第一版 + 第四阶段 + active 联动均已落盘）」+ 进度日志追加对应记录；`docs/ROADMAP.md` **未改**。
+- 同步 `docs/DECISIONS.md` 追加 DEC-057（ISS-026 active 联动方案 + state 归属 / 双向同步机制 / mode 切换清空 / armed 保护 / 范围 / 验证 / 已知限制 / 后续路径）；`docs/TASKS.md` ISS-026 任务卡状态从「进行中（第一版 UI 与 model 已落盘）」推到「进行中（第一版 + 第四阶段 + active 联动均已落盘）」+ 进度日志追加对应记录；`docs/ROADMAP.md` **未改**。
 - 验证：80 个测试文件 / 761 个测试全部通过（+4：AppShell 4 项 active 联动测试）；`npm run typecheck` 干净；`npm run lint` 43 个错误（与 main 基线一致，0 回归）；`npm run build` 成功（2022 modules，dist 产物正常）；`cargo check --offline` 干净（9 个 pre-existing dead_code warning 与本 PR 无关）。
 - 已知限制：armed toolType 下点 overlay 不触发 active 同步（既有 `if (interaction) return` 行为，保留以避免与新建批注冲突）；App.tsx 未参与（`onAnnotationClick` 透传出口已留，no-op；后续如需「点击批注 → 详情面板」由 App.tsx 注入 `onAnnotationClick` 即可，AppShell 状态机不变）；不处理「跨 mode 保留 active 选中」（useEffect 主动清空）——如有需求由独立 worker 扩 useEffect 逻辑。
-- 1 个 commit（`feat(annotation): ISS-026 Overlay ↔ Sidebar active 联动（DEC-058）`）。
+- 1 个 commit（`feat(annotation): ISS-026 Overlay ↔ Sidebar active 联动（DEC-058）`——DEC 编号后续由 PM 在本 PR 之外调整为 DEC-057 以保持编号连续性，详见 DECISIONS.md §DEC-057 末尾「DEC 编号说明」）。
 
 ## 0.1.0-alpha.16 - 2026-06-05
 

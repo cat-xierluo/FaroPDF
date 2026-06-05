@@ -2560,7 +2560,9 @@ useEffect(() => {
 - 未来如需「App 启动时自动检查」（不等用户打开设置）：由 layout worker 拆独立 PR，在 `App.tsx` 加 startup useEffect，按 `settings.autoUpdateCheck` 决定是否调 `createTauriUpdateClient().checkForAppUpdate()`；需同步讨论默认 `createTauriUpdateClient()` 与 `AboutSection` 共享的 client 实例（避免双 `checkForAppUpdate` 调用）。
 - 真实生产 pubkey 替换、增量更新回退、移动端打包、CODE_SIGNING 仍按 DEC-048 §6 路径推进。
 
-## DEC-058 ISS-026 批注 Overlay ↔ Sidebar active 联动（activeAnnotationId 双向同步）
+## DEC-057 ISS-026 批注 Overlay ↔ Sidebar active 联动（activeAnnotationId 双向同步）
+
+> **DEC 编号说明**：本决策最初由 worker 在 PR #43 commit message 中编为 `DEC-058`（沿用项目历史跳号策略），但 doc-curator post-merge 体检报 hard 失败（编号不连续），由 PM 在 docs-only 维护 commit 中将后续所有引用统一为 `DEC-057` 以恢复编号连续性。DEC-058 这个编号在历史上未使用过；commit message 本身保留 `DEC-058` 字样以反映实际 commit 内容，但本决策条目以 `DEC-057` 为正式编号。
 
 - 日期：2026-06-05
 - 状态：已采纳
