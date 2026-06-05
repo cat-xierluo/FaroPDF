@@ -12,7 +12,7 @@
 
 - 源码：[https://github.com/cat-xierluo/FaroPDF](https://github.com/cat-xierluo/FaroPDF)
 - Issue / 讨论：见上方 GitHub 仓库的 Issues 区
-- 官网：待发布（v0.1 阶段尚未搭建独立官网页面）
+- 官网：https://cat-xierluo.github.io/personal-site/faropdf/
 
 ## 下载与安装
 

@@ -2673,3 +2673,109 @@ function handleAnnotationClick(annotationId: string) {
 - 后续「批注 active 高亮几何样式」（如 overlay glyph 加 halo、sidebar row 加左侧色条）由独立 UI worker 收口，本期保留既有 `is-active` class + `aria-current="true"` 契约。
 - ISS-026 余下 milestone（导出工具条「压平批注」按钮 UI 入口、批注 4 milestone 视觉验收）继续按 `docs/TASKS.md` 推进，不受本 PR 影响。
 
+## DEC-058 官网 / 文档站入口迁出到 personal-site 仓（跨仓 cleanup）
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联任务：personal-site `ISS-005` 跨仓 cleanup（Folia 仓 PR-A / FaroPDF 仓 PR-B 联动）
+- 关联分支：`chore/iss-005-faropdf-cleanup`
+- 关联 PR：TBD
+- DEC 编号承接 DEC-057 后 +1
+
+承接 personal-site `ISS-005` 跨仓 cleanup 任务卡中"FaroPDF 仓 docs-only 同步"段落：Folio 仓已删除 `website/` 子目录、`scripts/run-website.mjs` 转发脚本和 GitHub Pages workflow（PR #30 已合并，Folio DEC-073 记录），FaroPDF 仓本期同步把官网 / 文档站入口从 v0.1 阶段的"待发布占位"切换为指向 `cat-xierluo/personal-site` 仓统一维护的 `https://cat-xierluo.github.io/personal-site/faropdf/`。
+
+### 1. 触发原因
+
+FaroPDF 仓 README §"官方仓库" 当前官网占位为：
+
+> 官网：待发布（v0.1 阶段尚未搭建独立官网页面）
+
+而 personal-site 仓 Phase 3（任务卡 #13）已经把 FaroPDF 详情页重写为全结构并通过 GitHub Actions 自动部署到 `https://cat-xierluo.github.io/personal-site/faropdf/`。两仓独立维护"官网"会引入 3 个问题：
+
+1. **入口漂移**：README 写"待发布"，用户在 GitHub 仓库首页看不到实际可用官网链接；同样的产品在 Folia 仓 README 指向 `personal-site/folia`，FaroPDF 仓却指向占位。
+2. **更新责任错位**：Folio 仓已用 `personal-site` 仓作为唯一官网来源；FaroPDF 仓若未来在仓内新增 `website/` 子目录，会与 personal-site 仓的 FaroPDF 详情页内容分叉、重复维护。
+3. **CHANGELOG / ROADMAP 命名口径不齐**：Folio 仓 ROADMAP 已在 v0.3 行写"官网（迁出 personal-site）"；FaroPDF 仓 ROADMAP 仍写"官网文档"语义，不体现仓库间职责切分。
+
+Folio 仓侧 PR-A 已在 `docs/DECISIONS.md` DEC-073 收口 cleanup 决策；FaroPDF 仓侧 PR-B 通过本决策同步收口 docs-only 改动。
+
+### 2. 关键决策
+
+#### 2.1 README 官网占位改为 personal-site 链接
+
+`README.md` §"官方仓库" line 15 由：
+
+```markdown
+- 官网：待发布（v0.1 阶段尚未搭建独立官网页面）
+```
+
+改为：
+
+```markdown
+- 官网：https://cat-xierluo.github.io/personal-site/faropdf/
+```
+
+- 与 Folia 仓 README §"官方网站" 链接（已指向 `https://cat-xierluo.github.io/personal-site/folia/`）形成一致口径。
+- 后续如 personal-site 仓调整部署 URL，README 一行可改；不引入 `website/` 子目录或仓内 GitHub Pages workflow。
+
+#### 2.2 ROADMAP v0.3 行补充「迁出 personal-site」
+
+`docs/ROADMAP.md` §"v0.3 性能与发布" 行的描述从「大卷宗性能、自动更新、跨平台打包、官网文档」调整为「大卷宗性能、自动更新、跨平台打包、官网与文档站（迁出 personal-site）」；§"9. 全平台发布与设置 UI" 末尾"官网与文档站"任务项由 `- [ ]` 标记为 `- [x]`，并加注释指向 personal-site 仓。
+
+- 口径与 Folia 仓 ROADMAP 一致：仓库路线图显式声明"官网入口由 personal-site 仓统一维护"。
+- v0.3 阶段不再为 FaroPDF 仓新建 `website/` 子目录；官网 / 文档站所有变更都走 personal-site 仓 `src/pages/faropdf.astro` 路由。
+
+#### 2.3 ISS-023 官网字段保持指向 personal-site
+
+`docs/ROADMAP.md` §"9. ISS-023 关于页面与作者页" 任务描述补充「官网（指向 personal-site 仓）」，让 v0.3 设置页"关于"section 的官网字段（DEC-051 ISS-023 阶段已落盘）有明确的链接依据。
+
+- 不修改 `src/` 或 `src-tauri/`：ISS-023 实际 UI 接入是 v0.3 worker 工作，本期只声明链接来源。
+- `AboutSection` 中 `官网：{url}` 文案将由 v0.3 阶段 worker 用本决策固定的 `https://cat-xierluo.github.io/personal-site/faropdf/` 字符串直接渲染。
+
+#### 2.4 范围与依赖
+
+- 修改 `README.md`（line 15 单行替换）。
+- 修改 `docs/ROADMAP.md`（§"阶段状态速览" v0.3 行 / §"9. 全平台发布与设置 UI" ISS-023 行 + 官网与文档站条目 / §"进度日志" 追加 2026-06-05 记录）。
+- 修改 `CHANGELOG.md`（顶部新增 Unreleased 段记录 docs-only 同步）。
+- 修改 `docs/TASKS.md` §"归档任务索引" 增「跨仓协调」领域并把 personal-site `ISS-005` 列入。
+- 追加 `docs/DECISIONS.md` 本条目（DEC-058）。
+- **不修改** `src/` / `src-tauri/` / `package.json` / 锁文件 / `config/**` / `docs/ARCHITECTURE.md` / `docs/DESIGN.md` / `docs/RELEASE.md` / `.github/workflows/**`。
+- **不新增** `website/` 子目录、`scripts/run-website.mjs` 或 `deploy-website.yml`（Folio 仓侧 PR-A 已删，FaroPDF 仓侧 PR-B 也明确不引入）。
+
+#### 2.5 与 Folia 仓 PR-A 的口径一致性
+
+| 项 | Folia 仓 PR-A（Folio DEC-073） | FaroPDF 仓 PR-B（本决策 DEC-058） |
+| --- | --- | --- |
+| 仓内 `website/` 目录 | 删除 | 不引入（自始不存在） |
+| 仓内 `scripts/run-website.mjs` | 删除 | 不引入 |
+| `deploy-website.yml` workflow | 删除 | 不引入 |
+| `package.json` website scripts | 删除 3 个 | 无（自始不存在） |
+| `README.md` 官网链接 | 改为 `personal-site/folia/` | 改为 `personal-site/faropdf/` |
+| `docs/ARCHITECTURE.md` 引用 | 改为引用 personal-site 仓 | 不改（FaroPDF 仓架构文档无官网段落） |
+| `CHANGELOG.md` 记录 | Unreleased 段已落 | Unreleased 段同步落 |
+| `docs/ROADMAP.md` v0.3 口径 | 已写"迁出 personal-site" | 本期补齐同口径 |
+
+### 3. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `git diff main...HEAD -- README.md docs/ROADMAP.md docs/DECISIONS.md docs/TASKS.md CHANGELOG.md` | ✅ 仅 docs | 无 `src/` / `src-tauri/` / `package.json` / 锁文件 / workflow 改动 |
+| `grep -R "website" README.md docs/ROADMAP.md` | ✅ 仅保留"v0.3 官网与文档站入口迁移"小节 | 仓内不引入 `website/` 子目录或脚本 |
+| `grep "官网：待发布" README.md` | ✅ 不再命中 | 官网占位已替换为 personal-site 链接（`下载与安装` section 的 release `待发布` 占位另说） |
+| `grep "personal-site" README.md docs/ROADMAP.md CHANGELOG.md` | ✅ 命中 | 链接 / 跨仓引用一致 |
+| `npm run typecheck` / `npm run lint` / `npm test` | ✅ 不变 | docs-only 改动，0 回归 |
+| `gh pr diff` | ✅ 仅 docs | 跨模块污染检查通过 |
+
+### 4. 已知限制
+
+- **不修改 `AboutSection` 实际渲染**：本期不修改 `src/modules/settings/sections/AboutSection.tsx`；ISS-023 实际落地由 v0.3 worker 在 `AboutSection` 渲染 `官网：https://cat-xierluo.github.io/personal-site/faropdf/` 链接，本决策仅声明链接来源。
+- **personal-site 仓的 FaroPDF 详情页内容仍由 personal-site 仓独立推进**：本决策只把"入口指向"从占位替换为真实链接；详情页的内容更新（功能、截图、版本号同步）走 personal-site 仓 `src/pages/faropdf.astro`。
+- **CHANGELOG Unreleased 段可能存在多个 commit 同步叠加**：FaroPDF 仓 v0.1 阶段 CHANGELOG 由 release worker 维护；本决策 Unreleased 段先以"跨仓 cleanup"分类记录本次改动，release 时由 release worker 合并。
+- **`docs/ROADMAP.md` v0.3 行追加"迁出 personal-site"措辞**：本决策选择直接改 ROADMAP v0.3 状态行，避免在 §"9. 全平台发布与设置 UI" 之外另起小节。
+
+### 5. 后续路径
+
+- 后续 personal-site 仓调整 FaroPDF 详情页 URL / 路径时，本仓 README 一行可改；不引入仓内 build / deploy 脚本。
+- ISS-023 v0.3 worker 在 `AboutSection` 落地"官网"链接时，直接复用本决策固定的 `https://cat-xierluo.github.io/personal-site/faropdf/`。
+- personal-site 仓 ISS-006（中英文切换）/ ISS-007（微信二维码）/ ISS-008（自定义域）的官网 / 文档站更新都走 personal-site 仓；FaroPDF 仓 README 链接在 personal-site 部署 URL 变更时由 docs-only 维护 commit 同步。
+- 跨仓 cleanup 的"占位 → personal-site"切分完成后，FaroPDF 仓和 Folia 仓对官网维护职责归零：两仓 README / ROADMAP 都不再预留 `website/` 子目录入口。
+
