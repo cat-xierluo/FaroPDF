@@ -1,9 +1,53 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { act } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { FormsPanel } from "./FormsPanel";
 import type { FormController } from "../useFormController";
 import type { PdfFormState } from "../../../shared/pdf/form";
+import {
+  FORMS_PANEL_NARROW_BREAKPOINT,
+  formsPanelNarrowMediaQuery,
+} from "../breakpoints";
+
+/**
+ * 创建可控的 matchMedia mock：
+ * - 初始 matches 由 `initialMatches` 决定；
+ * - 调用 setMatches(true|false) 同步触发已注册的 change 监听器。
+ * jsdom 不实现 matchMedia，src/test/setup.ts 提供默认 stub；
+ * 本测试为窄屏布局验证覆盖 4 个视口档位（360 / 480 / 768 / 1024）。
+ */
+function createMatchMediaMock(initialMatches: boolean) {
+  const listeners = new Set<(event: { matches: boolean; media: string }) => void>();
+  const media = formsPanelNarrowMediaQuery();
+  const matchMedia = vi.fn((query: string) => ({
+    matches: initialMatches,
+    media: query,
+    onchange: null,
+    addEventListener: (_: string, listener: (event: { matches: boolean; media: string }) => void) => {
+      listeners.add(listener);
+    },
+    removeEventListener: (_: string, listener: (event: { matches: boolean; media: string }) => void) => {
+      listeners.delete(listener);
+    },
+    addListener: (listener: (event: { matches: boolean; media: string }) => void) => {
+      listeners.add(listener);
+    },
+    removeListener: (listener: (event: { matches: boolean; media: string }) => void) => {
+      listeners.delete(listener);
+    },
+    dispatchEvent: () => false,
+  }));
+  return {
+    matchMedia,
+    media,
+    setMatches(next: boolean) {
+      for (const listener of listeners) {
+        listener({ matches: next, media });
+      }
+    },
+  };
+}
 
 function makeStubController(overrides: Partial<FormController> = {}): FormController {
   return {
@@ -263,5 +307,123 @@ describe("FormsPanel", () => {
     const editor = screen.getByRole("region", { name: "填值编辑器" });
     expect(within(editor).getByRole("button", { name: "应用到字段并导出" })).toBeDisabled();
     expect(within(editor).getByText(/此字段为只读/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * 窄屏视口适配（ISS-008 / DEC-055）：
+ * FormsPanel 浮层在 < FORMS_PANEL_NARROW_BREAKPOINT (480px) 视口下应切到
+ * `data-layout="bottom-sheet"`，避免与主工具栏（56px）+ 上下文工具条（42px）重叠；
+ * 桌面视口（>= 480px）保持 `data-layout="floating"` 浮层。
+ *
+ * 测试覆盖 4 个视口档位：
+ * - 360px（典型手机竖屏）
+ * - 480px（断点；jsdom 不实现真视口，按 media query 命中与否判断）
+ * - 768px（平板竖屏）
+ * - 1024px（桌面 / 平板横屏）
+ *
+ * jsdom 不响应 CSS 媒体查询，因此用 matchMedia mock 直接控制 isNarrow 状态；
+ * 验证手段是 React 输出侧的 data-layout 属性。
+ */
+describe("FormsPanel 窄屏适配", () => {
+  let originalMatchMedia: typeof window.matchMedia;
+  let originalInnerWidth: number;
+
+  beforeEach(() => {
+    originalMatchMedia = window.matchMedia;
+    originalInnerWidth = window.innerWidth;
+    // jsdom 视口默认 1024，固定为 1024 让浮层分支为基线
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024, writable: true });
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalInnerWidth, writable: true });
+  });
+
+  test("breakpoint 常量对齐：FORMS_PANEL_NARROW_BREAKPOINT === 480", () => {
+    expect(FORMS_PANEL_NARROW_BREAKPOINT).toBe(480);
+    expect(formsPanelNarrowMediaQuery()).toBe("(max-width: 479px)");
+  });
+
+  test("桌面视口（>= 480px）默认 data-layout='floating'", () => {
+    const mock = createMatchMediaMock(false);
+    window.matchMedia = mock.matchMedia as unknown as typeof window.matchMedia;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024, writable: true });
+
+    const controller = makeStubController();
+    render(<FormsPanel controller={controller} />);
+
+    const panel = screen.getByTestId("forms-panel");
+    expect(panel).toHaveAttribute("data-layout", "floating");
+  });
+
+  test("360px 视口（典型手机）切换为 data-layout='bottom-sheet'", () => {
+    const mock = createMatchMediaMock(true);
+    window.matchMedia = mock.matchMedia as unknown as typeof window.matchMedia;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 360, writable: true });
+
+    const controller = makeStubController();
+    render(<FormsPanel controller={controller} />);
+
+    const panel = screen.getByTestId("forms-panel");
+    expect(panel).toHaveAttribute("data-layout", "bottom-sheet");
+  });
+
+  test("窗口缩放跨过 480px 断点：data-layout 在 media change 后切换", () => {
+    const mock = createMatchMediaMock(false);
+    window.matchMedia = mock.matchMedia as unknown as typeof window.matchMedia;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024, writable: true });
+
+    const controller = makeStubController();
+    render(<FormsPanel controller={controller} />);
+
+    const panel = screen.getByTestId("forms-panel");
+    expect(panel).toHaveAttribute("data-layout", "floating");
+
+    // 模拟从桌面缩到手机：matchMedia 触发 change
+    act(() => {
+      mock.setMatches(true);
+    });
+    expect(panel).toHaveAttribute("data-layout", "bottom-sheet");
+
+    // 模拟从手机放回桌面
+    act(() => {
+      mock.setMatches(false);
+    });
+    expect(panel).toHaveAttribute("data-layout", "floating");
+  });
+
+  test("480px 视口（断点边界）保持 data-layout='floating'（>= 480 视为桌面）", () => {
+    const mock = createMatchMediaMock(false);
+    window.matchMedia = mock.matchMedia as unknown as typeof window.matchMedia;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 480, writable: true });
+
+    const controller = makeStubController();
+    render(<FormsPanel controller={controller} />);
+
+    const panel = screen.getByTestId("forms-panel");
+    expect(panel).toHaveAttribute("data-layout", "floating");
+  });
+
+  test("窄屏布局下 field 列表与编辑器仍可正常渲染（不破坏内容）", () => {
+    const mock = createMatchMediaMock(true);
+    window.matchMedia = mock.matchMedia as unknown as typeof window.matchMedia;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 360, writable: true });
+
+    const controller = makeStubController({
+      formState: SAMPLE_FORM_STATE,
+      panelMode: "fill",
+      selectedFieldId: "name",
+      draftValue: "Alice",
+    });
+    render(<FormsPanel controller={controller} />);
+
+    const panel = screen.getByTestId("forms-panel");
+    expect(panel).toHaveAttribute("data-layout", "bottom-sheet");
+    // 字段列表 + 填值编辑器照常可见
+    expect(screen.getByRole("list", { name: "表单字段列表" })).toBeInTheDocument();
+    const editor = screen.getByRole("region", { name: "填值编辑器" });
+    expect(within(editor).getByRole("textbox")).toHaveValue("Alice");
   });
 });

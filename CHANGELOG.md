@@ -1,3 +1,17 @@
+## 0.1.0-alpha.15 - 2026-06-05
+
+- FormsPanel 窄屏底部 sheet 适配（DEC-055 / `fix/iss-008-forms-narrow`）：ISS-008 FormsPanel 浮层在 < 480px 视口下与主工具栏（56px）+ 上下文工具条（42px）顶部重叠，本 PR 在 forms 模块内用 CSS 媒体查询 + React `matchMedia` 状态实现窄屏底部 sheet 自适应，作为 ISS-009 utility panel 收口前的过渡修复。
+  - **新增** `src/modules/forms/breakpoints.ts`（22 行）：`FORMS_PANEL_NARROW_BREAKPOINT = 480` 常量 + `formsPanelNarrowMediaQuery()` helper，输出 `"(max-width: 479px)"` 与 CSS `@media` 保持一致。
+  - **修改** `src/modules/forms/ui/FormsPanel.tsx`（+19 行）：新增 `useState<boolean>(detectNarrowLayout)` + `useEffect` 监听 `matchMedia(formsPanelNarrowMediaQuery())` 的 `change` 事件；新增 `FormsPanelLayout = "floating" | "bottom-sheet"` 字面量联合；`<aside>` 增加 `data-layout={layout}` 属性。
+  - **修改** `src/modules/forms/ui/FormsPanel.css`（+20 行）：新增 `@media (max-width: 479px) { .forms-panel { ... } }` + `.forms-panel[data-layout="bottom-sheet"]` 选择器，把浮层改为 `bottom: 0; left: 0; right: 0; width: 100%; max-height: 70vh; border-radius: 12px 12px 0 0;` 顶部圆角 + 阴影反方向的底部 sheet，避开工具栏。
+  - **修改** `src/modules/forms/index.ts`（+3 行）：导出 `FORMS_PANEL_NARROW_BREAKPOINT` / `formsPanelNarrowMediaQuery`，让 `FormsPanel` 组件和测试都能引用同一数值。
+  - **修改** `src/modules/forms/ui/FormsPanel.test.tsx`（+99 行）：新增 6 项窄屏单测（断点常量对齐 / 桌面默认 floating / 360px 切换 bottom-sheet / 视口缩放动态切换 / 480px 边界 / 窄屏下字段列表+编辑器内容仍可渲染）+ 1 个 `createMatchMediaMock(initialMatches)` helper（模拟 jsdom 默认 matchMedia stub，提供 setMatches 同步触发已注册 listener）。
+  - 范围严格遵守：**不**修改 `src/components/layout/{AppShell,Toolbar,Sidebar}.tsx`（layout worker 范围，避免与 `feat/pdf-expert-shell-ia` 共享冲突）/ `src-tauri/**` / `config/**` / `package.json` scripts / 锁文件 / `docs/ROADMAP.md` / 任何 reader / search / annotation / ocr / export / pages / preprocess 模块。
+  - 同步 `docs/DECISIONS.md` 追加 DEC-055（方案选择 / 实现细节 / 范围 / 验证 / 已知限制）；`docs/TASKS.md` ISS-008 任务卡追加「窄屏适配收口」进度日志 + `fix/iss-008-forms-narrow` 分支建议 + 下一步指向 ISS-009 utility panel 路径。
+  - 验证：`npm test -- --run src/modules/forms/ui/FormsPanel.test.tsx` 22 / 22（16 旧 + 6 新）；`npm test` 全套 738 / 738（worktree 场景下 2 个 suite 因 vite `fs.allow` 拒绝访问 worktree 外部 `node_modules` 加载失败，pre-existing 现象，0 tests reported，非 worktree 场景通过）；`npm run typecheck` 干净；`npm run lint` 干净（本 PR 文件 0 错误，全局 43 个 pre-existing 错误与 main 基线一致：fontLoader 4 + e2e/ocr-e2e.test.ts parserOptions.project 找不到 + tests/fixtures/ocr/generate-scan-fixture.mjs `Buffer`/`process` 4 + fontLoader 一处 irregular whitespace；与本 PR 无关）；`npm run build` 成功。
+  - 已知限制：窄屏样式不含「拖动把手 / 关闭手势」，按底部 sheet 固定 70vh 设计；切到 utility panel 路径仍是 ISS-009 终极目标，本 PR 是过渡方案；断点 480 与 `AuthorCard` 对齐，是 forms 模块内临时值，后续 AppShell 收口断点时可统一为 `BREAKPOINTS.narrow` 共享常量。
+  - 1 个 commit（`fix(forms): ISS-008 FormsPanel 窄屏底部 sheet 适配（DEC-055）`）。
+
 ## 0.1.0-alpha.14 - 2026-06-05
 
 - LICENSE + 项目身份收尾（DEC-054 / `chore/add-license-and-author`）：补齐项目正式身份三件套（开源协议 + 作者名 + 项目图标）。
