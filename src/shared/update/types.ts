@@ -20,7 +20,8 @@ export type AppUpdateStatus =
   | "downloaded"
   | "installing"
   | "unsupported"
-  | "error";
+  | "error"
+  | "fallback";
 
 /** 检查更新的结果（不区分 UI 状态，仅是 outcome）。 */
 export type AppUpdateCheckOutcome =
@@ -41,7 +42,8 @@ export interface AppUpdateProgress {
 export type AppUpdateApplyResult =
   | { kind: "installed" }
   | { kind: "cancelled" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string }
+  | { kind: "fallback"; message: string; releasesUrl: string };
 
 /** 当前环境是否支持「应用内检查更新」。 */
 export interface AppUpdateCapability {

@@ -138,17 +138,35 @@ export function createTauriUpdateClient(): AppUpdateClient {
         return { kind: "error", message: describeError(error) };
       }
 
-      try {
-        const result = await plugin.check();
-        if (!result) {
-          return { kind: "error", message: "未检测到可用更新。" };
+      // ISS-021 增量更新失败回退：首次尝试失败后自动重试一次完整下载。
+      // tauri-plugin-updater 内部已有 chunk 级别重试；此处是 chunk 重试用尽后的兜底。
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const result = await plugin.check();
+          if (!result) {
+            return { kind: "error", message: "未检测到可用更新。" };
+          }
+          const adapter = onProgress ? createProgressAdapter(onProgress) : undefined;
+          await result.downloadAndInstall(adapter);
+          return { kind: "installed" };
+        } catch (error) {
+          const rawMessage = describeError(error);
+          if (attempt === 0) {
+            // 首次失败：继续循环进入第二次尝试
+            continue;
+          }
+          // 第二次也失败：返回 fallback 结果
+          const message = classifyFallbackMessage(sanitizeErrorMessage(rawMessage));
+          return {
+            kind: "fallback",
+            message,
+            releasesUrl: GITHUB_RELEASES_URL,
+          };
         }
-        const adapter = onProgress ? createProgressAdapter(onProgress) : undefined;
-        await result.downloadAndInstall(adapter);
-        return { kind: "installed" };
-      } catch (error) {
-        return { kind: "error", message: describeError(error) };
       }
+
+      // 理论上不可达（循环必在 return/continue 中退出），TS 需要兜底。
+      return { kind: "error", message: "更新失败。" };
     },
   };
 }
@@ -170,4 +188,55 @@ function describeError(error: unknown): string {
     return error;
   }
   return "未知错误";
+}
+
+const GITHUB_RELEASES_URL = "https://github.com/cat-xierluo/FaroPDF/releases";
+
+/**
+ * 分类更新错误为用户友好的消息（与 Rust 端 `update_fallback.rs` 同步的分类规则）。
+ */
+function classifyFallbackMessage(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("chunk") || lower.includes("retry")) {
+    return "增量更新下载重试已用尽，正在回退到完整安装包。";
+  }
+  if (
+    lower.includes("network") ||
+    lower.includes("timeout") ||
+    lower.includes("connection") ||
+    lower.includes("timed out")
+  ) {
+    return "网络连接中断，正在回退到完整安装包。";
+  }
+  if (
+    lower.includes("signature") ||
+    lower.includes("hash mismatch") ||
+    lower.includes("checksum")
+  ) {
+    return "更新包签名校验失败，正在回退到完整安装包。";
+  }
+  if (lower.includes("cancel") || lower.includes("abort")) {
+    return "用户已取消更新。";
+  }
+  return "更新失败，正在回退到完整安装包。";
+}
+
+/**
+ * 脱敏错误消息：移除本地路径和 URL query 参数。
+ */
+function sanitizeErrorMessage(message: string): string {
+  let result = message;
+  // 替换常见路径前缀
+  result = result.replace(/\/Users\/[^\s]+/g, "[path]");
+  result = result.replace(/\/home\/[^\s]+/g, "[path]");
+  result = result.replace(/\/tmp\/[^\s]+/g, "[path]");
+  result = result.replace(/\/var\/folders\/[^\s]+/g, "[path]");
+  result = result.replace(/C:\\Users\\[^\s]+/g, "[path]");
+  // 移除 URL query 参数（含 token）
+  result = result.replace(/\?[^\s]+/, "");
+  // 截断
+  if (result.length > 200) {
+    result = result.slice(0, 200) + "…";
+  }
+  return result;
 }

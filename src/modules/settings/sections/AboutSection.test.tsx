@@ -357,4 +357,114 @@ describe("AboutSection", () => {
     });
     expect(screen.getByText("已是最新版本")).toBeInTheDocument();
   });
+
+  // ISS-021 增量更新失败回退：9→10 态 fallback 分支测试。
+
+  test("install shows fallback status and GitHub Releases link when fallback result returned", async () => {
+    const user = userEvent.setup();
+    const client = createMockUpdateClient({
+      outcome: {
+        kind: "available",
+        currentVersion: "0.1.0",
+        availableVersion: "0.2.0",
+      },
+      applyResult: {
+        kind: "fallback",
+        message: "网络连接中断，正在回退到完整安装包。",
+        releasesUrl: "https://github.com/cat-xierluo/FaroPDF/releases",
+      },
+    });
+    const settings = { ...createDefaultAppSettings(), autoUpdateCheck: false };
+    render(
+      <AboutSection
+        settings={settings}
+        onChange={() => undefined}
+        updateClient={client}
+      />,
+    );
+
+    await user.click(screen.getByTestId("about-check-update"));
+    const installButton = await screen.findByTestId("about-install-update");
+    await user.click(installButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("正在回退到完整安装…")).toBeInTheDocument();
+    });
+    expect(screen.getByText(/网络连接中断/)).toBeInTheDocument();
+    const fallbackLink = screen.getByTestId("about-fallback-releases-link");
+    expect(fallbackLink).toHaveAttribute(
+      "href",
+      "https://github.com/cat-xierluo/FaroPDF/releases",
+    );
+  });
+
+  test("fallback status does not show install button", async () => {
+    const user = userEvent.setup();
+    const client = createMockUpdateClient({
+      outcome: {
+        kind: "available",
+        currentVersion: "0.1.0",
+        availableVersion: "0.2.0",
+      },
+      applyResult: {
+        kind: "fallback",
+        message: "增量更新下载重试已用尽，正在回退到完整安装包。",
+        releasesUrl: "https://github.com/cat-xierluo/FaroPDF/releases",
+      },
+    });
+    const settings = { ...createDefaultAppSettings(), autoUpdateCheck: false };
+    render(
+      <AboutSection
+        settings={settings}
+        onChange={() => undefined}
+        updateClient={client}
+      />,
+    );
+
+    await user.click(screen.getByTestId("about-check-update"));
+    const installButton = await screen.findByTestId("about-install-update");
+    await user.click(installButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("正在回退到完整安装…")).toBeInTheDocument();
+    });
+    // fallback 状态下不应显示"下载并安装"按钮
+    expect(screen.queryByTestId("about-install-update")).not.toBeInTheDocument();
+  });
+
+  test("check update button is re-enabled after fallback", async () => {
+    const user = userEvent.setup();
+    const client = createMockUpdateClient({
+      outcome: {
+        kind: "available",
+        currentVersion: "0.1.0",
+        availableVersion: "0.2.0",
+      },
+      applyResult: {
+        kind: "fallback",
+        message: "更新包签名校验失败，正在回退到完整安装包。",
+        releasesUrl: "https://github.com/cat-xierluo/FaroPDF/releases",
+      },
+    });
+    const settings = { ...createDefaultAppSettings(), autoUpdateCheck: false };
+    render(
+      <AboutSection
+        settings={settings}
+        onChange={() => undefined}
+        updateClient={client}
+      />,
+    );
+
+    await user.click(screen.getByTestId("about-check-update"));
+    const installButton = await screen.findByTestId("about-install-update");
+    await user.click(installButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("正在回退到完整安装…")).toBeInTheDocument();
+    });
+
+    // 检查更新按钮应可再次点击
+    const checkButton = screen.getByTestId("about-check-update");
+    expect(checkButton).not.toBeDisabled();
+  });
 });
