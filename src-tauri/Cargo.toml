@@ -20,3 +20,4 @@ serde_json = "1"
 url = "2"
 lopdf = { version = "0.33", default-features = false, features = ["pom_parser"] }
 tauri-plugin-updater = "2.10.1"
+keyring = "3"

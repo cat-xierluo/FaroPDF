@@ -1,5 +1,6 @@
 ## Unreleased
 
+
 - ISS-022 设置页 lazy load sections 收口（DEC-059 / `feat/iss-022-lazy-load`）：把 SettingsPanel 的 4 个非默认 section（阅读 / OCR provider / 快捷键 / 关于）从 eager import 拆为 `React.lazy` + `Suspense`，默认常规 section 保持 eager。Vite build 已把这 4 个 section 拆分为独立 chunk。
   - **新增** `src/modules/settings/sections/lazy.ts`：集中声明 4 个 `React.lazy` wrapper。
   - **修改** `src/modules/settings/SettingsPanel.tsx`：import 改为 lazy + Suspense 包裹（默认常规 section 仍为 eager）。
@@ -10,6 +11,12 @@
 
 ## Unreleased (continued)
 
+- feat(ocr): ISS-007 keychain apiKeyRef + OS Keychain 集成（DEC-061 / `feat/iss-007-keychain`）。
+  - Rust 端新增 `keychain:providerId:keyName` 凭证引用解析，通过 `keyring` crate 读取 macOS Keychain / Windows Credential Manager / Linux Secret Service。
+  - 前端 `apiKeyRef` 校验接受 `keychain:providerId:keyName` 两段式格式（白名单内 providerId），保留 `env:VAR_NAME`。
+  - 脱敏路径保留 `keychain:` 引用格式不变；错误消息提及 provider/key 但不泄露密钥值。
+  - Rust 端 11 项单元测试（mock 覆盖 keychain hit/miss / env hit/miss / 空值 / 未知 provider / 无效格式 / dispatch 读取），前端 14 项测试（覆盖两种 prefix / 白名单 / summarize）。
+  - 验证：`cargo check --offline` / `npm run typecheck` / `npm run build` / `cargo test --offline --lib`（49 passed）全通过。
 - 跨仓 cleanup（personal-site `ISS-005` 联动 / DEC-058 / `chore/iss-005-faropdf-cleanup`）：FaroPDF 仓 docs-only 同步官网 / 文档站入口迁出。
   - **修改** `README.md` §"官方仓库" line 15：官网占位 `- 官网：待发布（v0.1 阶段尚未搭建独立官网页面）` 改为 `- 官网：https://cat-xierluo.github.io/personal-site/faropdf/`，与 Folia 仓 README（已指向 `personal-site/folia`）口径一致。
   - **修改** `docs/ROADMAP.md`：§"阶段状态速览" v0.3 行描述从「官网文档」调整为「官网与文档站（迁出 personal-site）」；§"9. 全平台发布与设置 UI" 末尾"官网与文档站"任务项标记为 `- [x]`，加注释指向 personal-site 仓；ISS-023 任务描述补充「官网（指向 personal-site 仓）」；§"进度日志" 追加 2026-06-05 记录。

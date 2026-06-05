@@ -2779,6 +2779,7 @@ Folio 仓侧 PR-A 已在 `docs/DECISIONS.md` DEC-073 收口 cleanup 决策；Far
 - personal-site 仓 ISS-006（中英文切换）/ ISS-007（微信二维码）/ ISS-008（自定义域）的官网 / 文档站更新都走 personal-site 仓；FaroPDF 仓 README 链接在 personal-site 部署 URL 变更时由 docs-only 维护 commit 同步。
 - 跨仓 cleanup 的"占位 → personal-site"切分完成后，FaroPDF 仓和 Folia 仓对官网维护职责归零：两仓 README / ROADMAP 都不再预留 `website/` 子目录入口。
 
+
 ## DEC-060 Sentinel 状态机 synonym 缺口（Wave 6 实战发现）
 
 - 日期：2026-06-05
@@ -2932,4 +2933,66 @@ ISS-022 第一版 PR #25 已合并，5 个 section 已落 `src/modules/settings/
 - 后续新增 section 时，在 `lazy.ts` 追加对应 lazy wrapper 即可。
 - 如果单个 section 体积增长到 > 100KB，可考虑该 section 内部再做 code-split。
 - ISS-022 任务卡从 TASKS.md 归档到 DECISIONS.md「ISS 任务归档」一节。
+## DEC-061 ISS-007 keychain apiKeyRef + OS Keychain 集成
+
+- 日期：2026-06-05
+- 状态：已采纳
+- 关联任务：ISS-007
+- 关联分支：`feat/iss-007-keychain`
+
+承接 DEC-030 §"凭证引用解析"中显式 defer 的 `keychain:` 凭证引用，本决策记录把 `apiKeyRef` 解析从"只接受 `env:`"扩展到"接受 `keychain:providerId:keyName` 形式"，Rust 端用 `keyring` crate 走 OS Keychain（macOS Keychain / Windows Credential Manager / Linux Secret Service）。
+
+### 凭证引用格式
+
+- `env:VAR_NAME`：从环境变量读取（已有，保持不变）。
+- `keychain:providerId:keyName`：从 OS Keychain 读取。`providerId` 必须在白名单内（`paddleocr` / `mineru` / `local-ocrmypdf` / `legal-skills`），`keyName` 为自由格式标识符。
+- 旧式 `keychain:xxx`（单段）不再支持，前端和 Rust 端均返回明确错误提示正确格式。
+- 其他引用形式（`credential:` / `credential-ref:` / `api-key-ref:`）保持不变。
+
+### Rust 端实现
+
+- `src-tauri/Cargo.toml` 新增 `keyring = "3"` 依赖。
+- `ocr_credentials.rs`：
+  - `CredentialResolution` 新增 `MissingKeychainEntry { provider_id, key_name }` variant。
+  - `resolve_keychain_reference` 解析 `keychain:providerId:keyName`，校验白名单，通过 `keyring::Entry::new("FaroPDF", "{provider_id}/{key_name}")` 访问 OS Keychain。
+  - 新增 `read_keychain_secret` 函数供 dispatch 路径读取实际密钥值。
+  - 测试用 thread-local `HashMap` mock 覆盖 4 路径（keychain hit / keychain miss / env hit / env miss）+ 空值 miss + 未知 provider + 无效格式 + dispatch 读取 hit/miss，共 11 项测试。
+- `lib.rs`：
+  - `resolve_api_key_for_dispatch` 新增 `keychain:` 分支，调用 `read_keychain_secret` 读取实际密钥。
+  - `start_ocr_job` 凭证处理新增 `MissingKeychainEntry` match arm，返回脱敏错误消息。
+  - 错误消息中的 `keychain:` 引用提及 provider/key 但不泄露密钥值。
+
+### 前端契约更新
+
+- `credentialRef.ts`：
+  - 解析 `keychain:providerId:keyName` 两段式格式，白名单内 providerId 设 `backendResolvable: true`。
+  - 旧式 `keychain:xxx` 单段格式标记为 `backendResolvable: false`，提示正确格式。
+  - `summarizeCredentialReference` 对有效 keychain 引用直接显示格式，对无效/未知 provider 添加说明。
+  - 新增 `providerId` 字段到 `CredentialReferenceInfo`。
+- 测试 14 项：覆盖 env / keychain 两段（白名单命中/未知 provider）/ keychain 单段（旧式）/ credential / api-key-ref / placeholder / unknown / summarize 各路径。
+
+### 脱敏与审计
+
+- `is_credential_reference` 已包含 `keychain:` 前缀（无需修改），`sanitize_api_key_ref` 会保留 `keychain:` 引用不变。
+- 错误消息中 `keychain:providerId:keyName` 格式本身不含密钥值，可直接出现在 audit log 中。
+
+### 验证结果
+
+- `cargo check --manifest-path src-tauri/Cargo.toml --offline`：通过（11 pre-existing dead_code warnings）。
+- `npm run typecheck`：干净。
+- `npm run build`：成功（3.25s）。
+- `cargo test --manifest-path src-tauri/Cargo.toml --offline --lib`：49 passed。
+- 前端 credentialRef 测试：14 passed（`--environment=node` 绕过 pre-existing jsdom ESM 问题）。
+- `npm test -- --run`：pre-existing `@exodus/bytes` ESM 错误导致 0 tests run；与本 PR 无关。
+
+### 已知限制
+
+- Linux 上 `keyring` crate 依赖 `libsecret`（如未安装会编译失败），记录 `cargo check --offline` 为 floor。
+- 用户需要通过系统工具（macOS Keychain Access / Windows Credential Manager / Linux Secret Service）手动预先写入密钥条目（service = "FaroPDF"，account = "{providerId}/{keyName}"）。
+- 前端无"写入 keychain"入口——这是 OS 级操作，不属于应用内功能。
+
+### 不采纳
+
+- **前端直接读写 OS Keychain**：前端（JS）无法安全访问 OS Keychain；凭证读取必须走 Rust 后端。
+- **应用内 keychain 管理界面**：超出 ISS-007 范围，可作为 ISS-022 设置页后续增强。
 

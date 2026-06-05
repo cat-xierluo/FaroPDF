@@ -17,7 +17,7 @@ mod ocr_queue;
 mod ocr_text_extract;
 mod scan_preprocess;
 
-use ocr_credentials::{resolve_credential_reference, CredentialResolution};
+use ocr_credentials::{read_keychain_secret, resolve_credential_reference, CredentialResolution};
 use ocr_dispatch::{dispatch_ocr, OcrDispatchBackend, OcrDispatchError, OcrDispatchRequest};
 use ocr_queue::{
     current_iso_timestamp, empty_path_summary, redact_path, OcrJobQueue, OcrJobQueueState,
@@ -316,6 +316,12 @@ fn start_ocr_job(
             CredentialResolution::MissingEnvVar(slot) => {
                 return Err(format!(
                     "{} 凭证不可用：环境变量 {slot} 未设置。",
+                    ocr_provider_display_name(&request.provider)
+                ));
+            }
+            CredentialResolution::MissingKeychainEntry { provider_id, key_name } => {
+                return Err(format!(
+                    "{} 凭证不可用：OS Keychain 中未找到 keychain:{provider_id}:{key_name} 对应的条目。",
                     ocr_provider_display_name(&request.provider)
                 ));
             }
@@ -759,7 +765,8 @@ fn resolve_api_key_for_dispatch(api_key_ref: Option<&str>) -> Result<Option<Stri
     let Some(reference) = api_key_ref else {
         return Ok(None);
     };
-    if let Some(rest) = reference.trim().strip_prefix("env:") {
+    let trimmed = reference.trim();
+    if let Some(rest) = trimmed.strip_prefix("env:") {
         match env::var(rest) {
             Ok(value) if !value.trim().is_empty() => return Ok(Some(value)),
             _ => {
@@ -769,9 +776,13 @@ fn resolve_api_key_for_dispatch(api_key_ref: Option<&str>) -> Result<Option<Stri
             }
         }
     }
-    // 其他引用（keychain / credential: / credential-ref:）不在 Tauri 进程内
-    // 解析；调用方必须确保已接入对应解析器或改用 env:。
-    Err("当前仅支持 env:&lt;NAME&gt; 形式的 API Key 引用。".to_string())
+    if let Some(rest) = trimmed.strip_prefix("keychain:") {
+        let parts: Vec<&str> = rest.splitn(2, ':').collect();
+        if parts.len() == 2 {
+            return read_keychain_secret(parts[0], parts[1]).map(Some);
+        }
+    }
+    Err("当前仅支持 env:&lt;NAME&gt; 和 keychain:&lt;providerId&gt;:&lt;keyName&gt; 形式的 API Key 引用。".to_string())
 }
 
 fn stored_to_command_job(stored: &OcrStoredJob, request: &OcrCommandRequest) -> OcrCommandJob {
