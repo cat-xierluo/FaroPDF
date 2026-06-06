@@ -79,14 +79,14 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 ### 6. OCR/扫描
 
-- [ ] 检测纯扫描页、低文字量页和疑似 OCR 失败页。
+- [x] 检测纯扫描页、低文字量页和疑似 OCR 失败页（`OcrQualityReport` 契约 + `ocrQualityCheckService` 报告服务，DEC-017 / DEC-050）。
 - [ ] 支持扫描件清洁校正：粗方向检测、微倾斜校正、可选裁边和分块处理。（已建立 preprocess-only job/bridge stub，真实处理待接入）
-- [ ] 提供 OCR bridge，优先连接本地 Legal Skills / `ocrmypdf`。
-- [ ] PaddleOCR / MinerU 等联网 OCR 需用户明确确认。
-- [ ] OCR 任务后台运行，显示进度、后端、输出路径和失败原因。
-- [ ] OCR 后生成双层 PDF，并执行文字搜索质量抽查。（已建立质量检查报告服务；真实 PDF 解析和 OCR 执行待接入）
-- [ ] 支持只 OCR 指定页码范围。
-- [ ] 在设置页配置 PaddleOCR / MinerU 等外部 OCR provider 的 API 参数。
+- [x] 提供 OCR bridge，优先连接本地 Legal Skills / `ocrmypdf`（`start_ocr_job` 按 provider 分发到 `ocrmypdf` 子进程，DEC-030 / PR #18）。
+- [x] PaddleOCR / MinerU 等联网 OCR 需用户明确确认（`ocrPrivacyConsentGuard` notice/consent 双匹配 + 桥接 fingerprint/nonce/有效期，DEC-010 / PR #47）。
+- [x] OCR 任务后台运行，显示进度、后端、输出路径和失败原因（`createTauriOcrJobController` + `OcrJobList`，DEC-042 / PR #29）。
+- [x] OCR 后生成双层 PDF，并执行文字搜索质量抽查（`extract_ocr_text` 调 `pdftotext` 抽取 + `OcrQualityReportView`，DEC-030 / DEC-050 / PR #33）。
+- [x] 支持只 OCR 指定页码范围（`startOcrJob` 请求体 `pageRange` 字段）。
+- [x] 在设置页配置 PaddleOCR / MinerU 等外部 OCR provider 的 API 参数（`SettingsService` + `OcrProviderSection`，DEC-014 / PR #25）。
 
 ### 7. 表单与签署
 
