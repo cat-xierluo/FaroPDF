@@ -3466,3 +3466,99 @@ https://github.com/cat-xierluo/FaroPDF/releases/tag/v0.1.0）。
 - release-workflow skill `config/projects.yaml` 已加 `faropdf` 段（windows_format: msi / platforms: macos-universal / linux-x64 / windows-x64；注 macos-universal 是 v0.1.0 临时决定，下版本起改 macos-aarch64 + macos-x64）
 - 跨项目（Folia / Funes）同步：3 个项目 `~/.tauri/*.key` 状态都是 double-base64（一层文件 + 文档里又 `base64 -w0` 一次）。下次维护密钥 SOP 时一并修
 - 关联：DEC-065 / DEC-066 / DEC-067
+
+## DEC-071 ISS-021 v0.1.1 Folia release workflow 全面对齐
+
+> ISS-021 release workflow 第二次大改：v0.1.0 4 轮 CI 修完后（DEC-070），
+> 把整份 release.yml 改成 Folia 模板，让后续 release 零差异复用。
+> 关联：DEC-048（Folia release 架构）/ DEC-065（pubkey + Keychain SOP）/
+> DEC-070（v0.1.0 修复复盘）/ `docs/plans/2026-06-06-v0.1.1-folia-workflow-alignment-design.md`。
+
+### 1. 背景
+
+v0.1.0 release 6 月 5 日发布成功后，发现 release workflow（手写 `cargo tauri build`
++ `softprops/action-gh-release`）跟 Folia 仓的模板（`tauri-apps/tauri-action@v0` +
+`releaseDraft: true` + Gitee sync + .sig 旁车 + macOS 拆 aarch64/x64）有显著差距。
+v0.1.0 release 本身不动（user 决策：第一个版本不重做），但下一版 v0.1.1 patch 必须
+对齐 Folia 模板，避免后续 v0.2 / v0.1.2 / 任何 patch 再次踩同样坑。
+
+### 2. 实施内容
+
+#### 2.1 release.yml 整文件重写
+
+旧（v0.1.0，4 个 build job + 手写）：
+- macOS 单一 `universal-apple-darwin` build
+- Windows `x86_64-pc-windows-msvc`（同时产 .msi + .exe）
+- Linux `x86_64-unknown-linux-gnu`（同时产 .AppImage + .deb）
+- 手写 `cargo install tauri-cli` + `pnpm install` + `npm run build` + `cargo tauri build` + `actions/upload-artifact`
+- `concurrency.cancel-in-progress: false`（4 轮 cancel 排队卡住）
+- `softprops/action-gh-release` 单 release 公开
+
+新（v0.1.1，Folia 模板，3 个 build job + tauri-action）：
+- macOS 拆 `aarch64-apple-darwin` + `x86_64-apple-darwin` 两个独立 build
+- Windows `windows-latest` 默认（tauri-action 默认 NSIS .exe，不发 .msi）
+- 删除 Linux（Folia 不发）
+- `tauri-apps/tauri-action@v0` 一步包：`pnpm install` + `cargo tauri build` + 签 .sig 旁车 + draft release 上传
+- `concurrency.cancel-in-progress: true`（重试链不再卡）
+- `releaseDraft: true` → publish job 灌写 latest.json + `--draft=false` 公开
+
+#### 2.2 包管理器切 pnpm
+
+Folia 用 `pnpm/action-setup@v4` + `pnpm install`。Folia release notes 明确说 npm 跨平台
+optional deps 有 bug。FaroPDF 切 pnpm：
+- 删 `package-lock.json`，生成 `pnpm-lock.yaml`
+- `package.json` 加 `engines.pnpm: ">=10"` + `packageManager: "pnpm@10.24.0"`
+- release.yml 用 `pnpm install --frozen-lockfile`
+- 加项目级 `.npmrc`：`lockfile=true`（覆盖用户 `~/.npmrc` 的 `package-lock=false`）
+
+#### 2.3 scripts/create-updater-manifest.mjs 重写
+
+v0.1.0 流程：自签（`cargo tauri signer sign`）+ `TAURI_SIGNING_PRIVATE_KEY` 直通 + 不校验 platform + URL 用 `relative()`（带子目录错）。
+
+v0.1.1 流程：
+- **不再自签**——`.sig` 旁车由 tauri-action 在 build job 产出，publish job 只读
+- **env var 全部用 `FAROPDF_*` project prefix**（避免跨仓污染）
+- **Tauri 标准 platform key**：`darwin-aarch64` / `darwin-x86_64` / `windows-x86_64`（v0.1.0 用的是 `darwin-universal` 非标准）
+- **URL 用 `basename(file)`**（DEC-070 修过，softprops 上传只用 basename）
+- **`FAROPDF_REQUIRE_PLATFORMS` 校验**：缺必填 platform 的 sig 即 fail（防 release 出去时签名不全）
+
+#### 2.4 3 处版本号 bump
+
+`0.1.0` → `0.1.1`：
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
+### 3. 拒绝的方案
+
+- **保留手写 build**：方案 A。v0.1.0 那一套已修好可以重跑，但跟 Folia 漂着，下一版再改一次更贵。直接对齐
+- **只换 tauri-action 不切 pnpm**：方案 B。Folia 走 pnpm，npm 跨平台 optional deps 已知有 bug；不切 pnpm 就没完全对齐
+- **保留 macOS universal**：方案 C。Folia 拆 aarch64 + x64 独立 build，client 端按 arch 拉对应 bundle 体积减半；universal 反向 50% 体积换兼容性，不值得
+
+### 4. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| `pnpm install` 本地干净跑 | ✅ 2974 行 pnpm-lock.yaml 出来 | |
+| `pnpm typecheck` 本地 | ✅ 干净 | |
+| macOS build aarch64 + x64 独立 build | ⏳ v0.1.1 tag 触发后验 | |
+| Windows build NSIS .exe（无 .msi） | ⏳ | |
+| `*.sig` 旁车文件（macOS × 2 + Windows） | ⏳ | |
+| publish job 读 sigs → latest.json → upload → publish | ⏳ | |
+| Gitee 镜像同步 | ⏳（缺 secret 则跳过） | |
+| 客户端 updater 拉 latest.json + bundle | ⏳ | 旧版 v0.1.0 客户端拉 v0.1.1 release 走 aarch64/x64 路径 |
+
+### 5. 已知限制
+
+- **Gitee 同步需 secret**：`GITEE_TOKEN` / `GITEE_OWNER` 还没申请，PM 找运维
+- **平台级代码签名**：macOS notarization / Windows EV 证书——`docs/RELEASE.md §4` 标 v0.3 follow-up
+- **updater pubkey 轮换**：同 §4 v0.3 follow-up
+- **移动端（Android / iOS）打包**：同 §4 v0.3 follow-up
+- **macOS universal 已退**：v0.1.1 起 Apple Silicon 拿 aarch64 镜像、Intel Mac 拿 x64 镜像；universal 镜像不再发
+
+### 6. 后续路径
+
+- v0.1.1 tag 触发 release.yml → 盯 3 build + 1 publish job
+- 验证：3 个 bundles（macOS aarch64 + macOS x64 + Windows x64）+ 6 个 .sig 旁车 + latest.json + Gitee 镜像
+- 旧 v0.1.0 客户端通过 updater 拉到 v0.1.1 latest.json（keynum / pubkey 不变，签名链通）
+- 关联：DEC-048 / DEC-065 / DEC-070 / Folia `.github/workflows/release.yml`

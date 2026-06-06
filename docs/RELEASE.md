@@ -128,14 +128,32 @@ transcript / CI log。
 ### 3.2 触发发布
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
-`.github/workflows/release.yml` 监听 `v*.*.*` 形式的 tag push，自动：
-1. 矩阵构建 3 个平台（macOS universal / Windows x64 / Linux x64）
-2. 拉取所有 artifacts，调用 `scripts/create-updater-manifest.mjs` 生成 `latest.json`
-3. 创建 GitHub Release 并上传所有 assets + `latest.json`
+`.github/workflows/release.yml` 监听 `v*.*.*` / `v*.*.*-*` 形式的 tag push，**v0.1.1 Folia
+对齐版**自动跑：
+1. **build 矩阵 × 3**：`tauri-apps/tauri-action@v0` 一站包
+   - `macos-latest` + `--target aarch64-apple-darwin`（Apple Silicon 镜像）
+   - `macos-latest` + `--target x86_64-apple-darwin`（Intel Mac 镜像）
+   - `windows-latest` 默认（NSIS .exe，无 .msi）
+   - 每平台自动：pnpm install / cargo tauri build / 签 .sig 旁车 / 上传 draft release
+2. **publish job × 1**（needs: build, ubuntu-latest）：
+   - 拉 draft release 的 `*.sig`
+   - 跑 `pnpm run updater:manifest` 拼 `latest.json`（Folia 标准 platform key）
+   - 上传 `latest.json`（`--clobber` 兜底覆盖）
+   - `gh release edit --draft=false` 公开
+   - Gitee 镜像同步（缺 `GITEE_TOKEN` / `GITEE_OWNER` secret 时跳过，`continue-on-error: true`）
+
+预期产物：
+- **bundles（3）**：`FaroPDF_<ver>_aarch64.dmg` + `FaroPDF_aarch64.app.tar.gz` + `FaroPDF_<ver>_x64.dmg` + `FaroPDF_x64.app.tar.gz` + `FaroPDF_<ver>_x64-setup.exe`
+- **sigs（3）**：每个 updater bundle 一个 `.sig` 旁车（`.app.tar.gz.sig` × 2 + `.exe.sig` × 1）
+- **updater manifest（1）**：`latest.json` 含 `darwin-aarch64` / `darwin-x86_64` / `windows-x86_64` 三平台签名 + URL
+- **Gitee 镜像（条件）**：上面 7 个 assets + 一份 `latest-gitee.json` 同步上传
+
+`concurrency: cancel-in-progress: true` 让重打 tag 时旧 run 立即被新 run 顶掉
+（v0.1.0 的 `false` 会卡重试链 5-15 分钟）。
 
 ### 3.3 验证
 
