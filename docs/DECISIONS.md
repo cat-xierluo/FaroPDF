@@ -718,6 +718,14 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 - **ISS-018 证据图片 A4 编排**（P1，页面管理/证据材料，已完成第一版 plan-only 编排计划器）— `feat/evidence-image-pack`：`imagePackPlanner` 纯函数规划器（auto 3/auto 1/平手回落/显式 2/4/逐项方向/固定方向/单元格纵横比/页边距/输出路径安全/空 items/越界/负 margin/零或 NaN 尺寸/`sort=name`/混合 image+pdf-page）。真实目录拾取、像素渲染、image/PDF I/O 待后续。
 - **ISS-019 文书整理 manifest 与规范命名**（P1，法律材料整理，已完成第一版 manifest 服务）— `feat/document-organizer-manifest`：页级检查索引、文书边界建议、拆分/合并 manifest、规范命名建议。真实 PDF 解析和 UI 接入待后续。
 - **ISS-020 临时应用图标**（P1，品牌/UI，已完成）— 暂用最初生成的灯塔图标，覆盖 `src-tauri/icons/` 和 `public/favicon.png`；后续正式品牌图标再继续简化。
+- **ISS-007 OCR bridge（含 ISS-007 端到端联调 worker）**（P0，OCR/质量，已完成 v0.1 收口）— `feat/ocr-bridge` → `feat/iss-007-keychain` → PR #18 / #29 / #33 / #47：bridge 真实接入（`start_ocr_job` 按 provider 分发到 `ocrmypdf` / PaddleOCR / MinerU）+ UI 接线（OCR 模式工具条 + OcrJobList + OcrQualityReportView）+ 端到端 fixture 验证（`tests/e2e/ocr-e2e.test.ts` 4 case + Rust `ocr_e2e_tests`）+ keychain apiKeyRef + OS Keychain 集成（DEC-030 / DEC-042 / DEC-050 / DEC-061）。下一波 OCR 后处理（ISS-025 Agent 集成）暂缓到 v0.3。
+- **ISS-008 表单填写与签署**（P1，表单/签署，已完成 v0.1 收口）— `feat/forms-signing` → `feat/iss-008-forms-utility-panel`：AcroForm 字段识别、批量填写/flatten、签名图片限定 PNG/JPG、FormsPanel 浮层 + 窄屏底部 sheet 自适应（`FORMS_PANEL_NARROW_BREAKPOINT=480`）+ AppShell 左侧 utility panel 收口（DEC-035 / DEC-055 / DEC-064）。批量填写规则引擎 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件留后续 worker。
+- **ISS-009 设计系统落地**（P0，UI/信息架构，已完成 v0.1 收口）— `feat/pdf-expert-shell-ia` → PR #32：PDF Expert 风格主工具栏/左侧按需工具区/上下文工具条/独立页面管理工作台/状态栏/设置入口；M1 阅读态视觉 polish + M2 搜索结果层 + M3 页面管理多选撤销 + M4 OCR 任务参数区 4 个 milestone 全部完成（DEC-049）。浏览器截图视觉验收由 PM 推进。
+- **ISS-021 全平台打包与自动更新（含 v0.1.0 / v0.1.1 发布）**（P1，发布/工程，已完成 v0.1 收口）— `feat/app-distribution` → PR #31 / #41 / #55 / #56 / #60：tauri-plugin-updater 接入、9 态 updater 状态机、autoUpdateCheck 设置项、真实 keypair 替换（DEC-065）、release.yml 跨平台矩阵 + tauri-action 切换 + Gitee 同步（DEC-070 / DEC-071）。v0.1.0 + v0.1.1 成功发布；增量更新失败回退（DEC-066）/ 移动端 / CODE_SIGNING 留 v0.3 follow-up。
+- **ISS-023 关于页面与作者页**（P1，UI/品牌，已完成 v0.1 收口）— `feat/iss-023-author-update`：AuthorCard 独立组件 + 关于 section 替换占位 div + 1×1 灰阶 PNG 占位二维码 + `QRCODE_LICENSE.md` 替换说明（DEC-038 / DEC-051）。真实公众号二维码按 `QRCODE_LICENSE.md` 流程后续替换（ISS-029 联动）。
+- **ISS-024 文档瘦身 subagent（doc-curator）**（P1，工程协作/工具链，已完成首版部署）— PR #17 + DEC-043：项目级 doc-curator skill 落地、本机基线建立、AGENTS.md Skill 强制调用表加 doc-curator 行。后续 v0.1 PR 创建/合并后自动跑体检 + 必要时提 maintenance PR。
+- **ISS-026 批注深化（高亮/手写/图章/搜索）**（P0，批注/检索，已完成 v0.1 + v0.2 收口）— PR #19 / #24 / #28 / #30 / #43：4 阶段批注 sidecar（颜色/作者/时间/页码/几何）+ active 联动（Overlay↔Sidebar）+ v0.2 摘要分组面板（DEC-068）。9 类型批注 + 6 色色板 + 5 图章模板 + 4 维度分组 + 真实 PDF 绘制 flatten 全部完成。
+- **ISS-027 根目录配置收束**（P2，工程基础，已完成）— PR #36 / DEC-053：`docs/` 架构收口 + 文档体系统一。Folia 对齐度（删 `package.json` 冗余 Tauri 配置 / 切换 pnpm / Gitee 同步等）按需另起 worker。
 
 ## 工作日志
 
