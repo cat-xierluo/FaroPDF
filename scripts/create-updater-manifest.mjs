@@ -13,7 +13,7 @@
 //        - darwin-aarch64 / darwin-x86_64 / windows-x86_64
 //        - url 用 basename(file)（Folia 对齐：softprops 上传只用 basename，
 //          不带 artifact 名子目录，DEC-070 修复）
-//   4. 写出 FAROPDF MANIFEST_OUTPUT / FAROPDF_GITEE MANIFEST_OUTPUT（后者选填）
+//   4. 写出 FAROPDF_MANIFEST_OUTPUT / FAROPDF_GITEE_MANIFEST_OUTPUT（后者选填）
 //
 // 用法（GitHub Actions publish job 上下文）：
 //   FAROPDF_SIGNATURE_DIR=sigs \
@@ -70,7 +70,7 @@ function printHelp() {
 Optional env:
   FAROPDF_UPDATE_NOTES          Short release notes line (embedded in latest.json? no, dropped).
   FAROPDF_UPDATE_GITEE_REPO     Gitee repo URL (overrides GitHub for asset URLs in latest-gitee.json).
-  FAROPDF_GITEE MANIFEST_OUTPUT Output file path for the Gitee-specific latest.json
+  FAROPDF_GITEE_MANIFEST_OUTPUT Output file path for the Gitee-specific latest.json
                                 (typically latest-gitee.json).`);
 }
 
@@ -118,7 +118,7 @@ async function main() {
   const version = readEnv("FAROPDF_UPDATE_VERSION");
   const tag = readEnv("FAROPDF_UPDATE_TAG");
   const repo = readEnv("FAROPDF_UPDATE_REPO");
-  const outputPath = readEnv("FAROPDF MANIFEST_OUTPUT");
+  const outputPath = readEnv("FAROPDF_MANIFEST_OUTPUT");
   const requiredPlatforms = parseRequiredPlatforms(
     readEnv("FAROPDF_REQUIRE_PLATFORMS"),
   );
@@ -130,7 +130,7 @@ async function main() {
   }
 
   const giteeRepo = process.env["FAROPDF_UPDATE_GITEE_REPO"] || null;
-  const giteeOutputPath = process.env["FAROPDF_GITEE MANIFEST_OUTPUT"] || null;
+  const giteeOutputPath = process.env["FAROPDF_GITEE_MANIFEST_OUTPUT"] || null;
 
   // 1. 扫 sigs/ 目录，匹配 platform
   const { readdir } = await import("node:fs/promises");
