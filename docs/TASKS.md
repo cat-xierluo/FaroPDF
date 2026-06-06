@@ -6,17 +6,6 @@
 
 `docs/TASKS.md` 是 FaroPDF 的活跃任务入口：当前正在推进、待开工或暂缓的任务保留详细任务卡；已经完成或第一版已合并的任务迁移到 `docs/DECISIONS.md` 的「ISS 任务归档」，TASKS.md 本身保持精简。
 
-FaroPDF v0.1 先到达一个可并行开发的基础状态，再用多分支、多 worktree 推进完整基础版功能。
-
-基础状态完成前，优先只在 `main` 或单一 foundation 分支推进，避免多个 worker 同时修改脚手架、依赖、Tauri 配置和共享类型。基础状态完成后，各 worker 从最新 `main` 创建独立分支和 worktree，按本文件声明的范围修改文件。
-
-Agent 可根据本文件自行判断：
-
-- 哪些素材可以晋升为正式 ISS 任务。
-- 哪些 ISS 可以合并到同一个 worktree 分支顺序推进。
-- 哪些任务必须拆成独立 worktree，避免共享文件冲突。
-- 哪些任务仍只是素材或调研，不应立即开工。
-
 ### 基础状态门槛
 
 满足以下条件后，才进入多 worktree 并行：
@@ -28,31 +17,23 @@ Agent 可根据本文件自行判断：
 - `src/modules/` 下 reader、search、annotation、pages、export、ocr、forms、settings 模块边界已建立。
 - worker 文件范围和验证命令已写入对应任务。
 
-### 并行执行规则
+### 并行执行 + Worktree 分组
 
-- 分支名使用任务语义，例如 `feat/reader-core`，不要带 `tmux-`、`team-`、`subagent-` 前缀。
-- worktree 路径使用本地执行来源前缀，例如 `.claude/worktrees/tmux-reader-core`。
-- 每个 worker 默认只修改自己任务的 `范围` 文件；需要改共享契约时先回到 PM 会话确认。
-- `package.json`、锁文件、`src-tauri/`、`src/shared/`、`src/App.tsx`、全局样式和路由由 foundation 或 PM 统一收口。
-- worker 完成后提交、推送并创建 PR；PM 检查 diff 范围、验证结果和文档同步后再合并。
+分支命名、worktree 路径、worker 范围隔离、PM 收口流程、Wave 调度规则等**通用规范全部见 `multi-agent-orchestration` skill**（项目级 `.claude/skills/multi-agent-orchestration/SKILL.md`）的 §3 标准流程 / §3.1 Wave-Based / §4 命名规则 / §8 收口。本文件不再重复表述，避免上下文冗余。
+
+FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
+
+- `package.json`、锁文件、`src-tauri/`、`src/shared/`、`src/App.tsx`、全局样式和路由由 foundation 或 PM 统一收口（不随意散到各 worker）。
 - 不得把 Agent skill CLI 流程原样变成 UI 逻辑；脚本只能作为算法来源、后台 bridge 或 sidecar 参考。
 
-### Worktree 分组原则
+历史上已合并的合并组（v0.1 阶段）：
 
-同一 worktree 分支可以包含多个 ISS，但必须满足：
-
-- 文件范围高度重合，且不会和其他 worker 争抢 `package.json`、锁文件、`src-tauri/`、`src/shared/` 或全局布局。
-- 任务存在明确依赖顺序，放在同一分支能减少重复改动。
-- 验收命令一致，且最终 PR 能清楚说明覆盖的 ISS。
-
-建议合并组：
-
-- `feat/foundation-scaffold`：ISS-001、ISS-011、ISS-012（已合并到 main）。
-- `feat/pdf-output-tools`：ISS-005、ISS-013，可在导出引擎稳定后合并推进。
-- `feat/ocr-pipeline`：ISS-007、ISS-016、ISS-017，可在设置页和文本层完成后合并推进。
-- `feat/page-organizer-suite`：ISS-006、ISS-018、ISS-019，可在阅读底座和导出引擎完成后合并推进。
-- `feat/app-distribution`：ISS-021，单独推进收口后再合并，避免与设置页 UI 互相阻塞。
-- `feat/settings-page`：ISS-022、ISS-023，建议合并推进，集中在 `src/components/settings/` 和 `src/modules/settings/`，避免与 ISS-021 同时改 `src-tauri/`。
+- `feat/foundation-scaffold`：ISS-001、ISS-011、ISS-012（已合并到 main）
+- `feat/pdf-output-tools`：ISS-005、ISS-013
+- `feat/ocr-pipeline`：ISS-007、ISS-016、ISS-017
+- `feat/page-organizer-suite`：ISS-006、ISS-018、ISS-019
+- `feat/app-distribution`：ISS-021
+- `feat/settings-page`：ISS-022、ISS-023
 
 ## 活跃任务
 
