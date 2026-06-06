@@ -55,20 +55,49 @@ schema 遵循 tauri-plugin-updater v2 manifest：
 # 本地生成 ed25519 签名 keypair
 cargo tauri signer generate -p "<STRONG_PASSWORD>" -w ~/.tauri/faropdf.key
 
-# 把 pubkey 写入 src-tauri/tauri.conf.json：
-#   plugins.updater.pubkey = "<.pub 第二行 base64>"
-# （2026-06-05 已替换 ISS-021 M1 占位 key 为正式 keypair，见 DEC-065）
-
-# GitHub Secrets（仓库 Settings → Secrets and variables → Actions）：
-#   TAURI_SIGNING_PRIVATE_KEY          = <cat ~/.tauri/faropdf.key | base64 -w0>
-#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD = <STRONG_PASSWORD>
+# 查看产物结构（debug 用）：
+#   ~/.tauri/faropdf.key     348 字节单行 base64（一层）
+#   ~/.tauri/faropdf.key.pub 152 字节单行 base64（一层）
+#   两者都是 minisign 私钥 / 公钥 文件的 base64 编码形式。
+#   base64 -d 后才是 minisign 2 行格式（untrusted comment + key blob）。
+#   2026-06-06 v0.1.0 修复后已替换 ISS-021 M1 占位 key 为正式 keypair，见 DEC-070。
 ```
 
-**macOS 推荐**：密码不要明文写本地脚本或 `.envrc`，统一通过系统 Keychain 管理。
-首次落库（已完成于 2026-06-05）：
+**写入 `tauri.conf.json` 的 pubkey 字段**（`plugins.updater.pubkey`）：
+
+Tauri CLI 内部 `pub_key` 流程是 `decode_key` → `PublicKeyBox::from_string` →
+`pk_box.into_public_key`，而 `decode_key` 会对字段值先 base64-decode 再 UTF-8 转换。
+所以字段期望的是 **`base64(2 行 minisign 公钥文本)`**（含
+`untrusted comment: minisign public key: <KEYNUM>` 那行 header），不是
+`.pub` 文件第二行原文 `RWS8...`（填原文会被 base64 decode 出二进制
+minisign 公钥 bytes，`str::from_utf8` 报 `invalid utf-8 sequence of 1 bytes
+from index 2`）。
 
 ```bash
-# 用 osascript 弹出 hidden answer 对话框输入密码（避免 shell 历史 / 日志泄露）
+# 正确格式（一行 base64 字符串，含两行原文）：
+PUBKEY_B64=$(cat ~/.tauri/faropdf.key.pub | base64 -d | base64 -w0)
+
+# 写入 src-tauri/tauri.conf.json：
+#   plugins.updater.pubkey = "${PUBKEY_B64}"
+# 可验证：echo -n "$PUBKEY_B64" | base64 -d 应回显两行 minisign 公钥文本
+```
+
+**写入 GitHub Secrets**（仓库 Settings → Secrets and variables → Actions）：
+
+```bash
+# TAURI_SIGNING_PRIVATE_KEY 直接灌 ~/.tauri/faropdf.key 的文件内容（已是一层 base64）
+# ⚠️ 不要 `cat ... | base64 -w0` ——那会再包一层（double-base64），
+#    minisign 解码失败 → Build Tauri bundle 报
+#    "failed to decode secret key: incorrect updater private key password:
+#     Missing encoded key in secret key"
+gh secret set TAURI_SIGNING_PRIVATE_KEY          < ~/.tauri/faropdf.key
+gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD "<STRONG_PASSWORD>"
+```
+
+**macOS Keychain 管理密码**（避免明文落本地脚本 / `.envrc`）：
+
+```bash
+# 首次落库（已完成于 2026-06-05）：
 FAROPDF_KEYPW=$(osascript -e 'text returned of (display dialog "FaroPDF Tauri Signer Password" default answer "" with hidden answer)')
 
 # 写入 macOS Keychain（service / account 标识便于跨项目区分）
@@ -78,21 +107,23 @@ security add-generic-password \
   -w "$FAROPDF_KEYPW" \
   -T "/Users/$USER/.cargo/bin/cargo" \
   -U
-```
 
-后续在本地需要密码时（如 PM 重签 / 本地调试）从 Keychain 读取：
-
-```bash
+# 后续本地需要时从 Keychain 读取：
 FAROPDF_KEYPW=$(security find-generic-password -a "$USER" -s "FaroPDF Tauri Signer Password" -w)
 ```
 
-详细 SOP（含跨项目 Folia / Funes 的复用方式）见 `docs/DECISIONS.md` DEC-065。
+**重要环境变量名差异**（v0.1.0 修复踩坑）：
 
-**注意**：`TAURI_SIGNING_PRIVATE_KEY` 推荐以 base64 字符串存进 Secret，CI 中
-`cargo tauri signer sign` 接受 `cat <file>` 的原内容。Tauri 文档建议写入文件：
-在 workflow 启动时 echo 到临时文件再 `TAURI_SIGNING_PRIVATE_KEY=<path>`。当前
-`scripts/create-updater-manifest.mjs` 通过环境变量透传，需配合 job 端的 echo
-步骤（如果以后改用文件路径则需调整）。
+- `cargo tauri build`（tplugin-updater 自动签名）读 `TAURI_SIGNING_PRIVATE_KEY` + `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+- `cargo tauri signer sign`（独立签名命令，`scripts/create-updater-manifest.mjs` 调）读 `TAURI_PRIVATE_KEY` + `TAURI_PRIVATE_KEY_PASSWORD`（**无 SIGNING 前缀**）
+
+release.yml 配的是前者；`scripts/create-updater-manifest.mjs` 配的也是前者（CI 用
+`TAURI_SIGNING_PRIVATE_KEY` 给 `cargo tauri signer sign`）。两边字段值相同。
+
+**安全注意**：`cargo tauri signer sign --help` 会把 `TAURI_PRIVATE_KEY_PASSWORD`
+明文 dump 到 stderr（clap 默认打印 env var 默认值）。**不要**在含密钥的
+shell session 里跑 `cargo tauri signer sign --help` 之类的命令——会泄密钥到
+transcript / CI log。
 
 ### 3.2 触发发布
 

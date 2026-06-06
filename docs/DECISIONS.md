@@ -3400,3 +3400,69 @@ RWS8WkTIW8ht2pmQPiablJPY8vRrsXleS6NxLsalJ/Tyn+1tKpHGxREc  // 新（2026-06-05 �
 - 走纯 JS 路径在浏览器环境足够（Canvas API），但 Node SSR / 后端批处理场景需要 Rust fallback
 - 法院上传体积目标可能因法院 / 律师协会证据库不同而调整，预设元数据可由 PM 在 `courtUploadPresets.ts` 集中维护
 - 关联：DEC-039（plan-only 框架）/ ROADMAP v0.2 §"法院上传体积限制下的压缩预设"
+
+## DEC-070 ISS-021 v0.1.0 正式版发布：4 轮 CI 修复 + 密钥链 / pubkey / 跨平台 shell 排坑
+
+> ISS-021 release 链路上 4 轮失败 + 1 轮手修 latest.json URL 的复盘。  
+> 关联：DEC-065（pubkey + Keychain SOP）/ DEC-066（增量回退）/ DEC-067（beta.1 封箱）/ DEC-068 / DEC-069（v0.2 features 不进 v0.1.0）。
+
+### 1. 背景
+
+v0.1.0-beta.1 封箱后推 v0.1.0-beta.1 tag 触发的 release.yml 跑 4 轮全部失败，加上
+manifest 脚本 URL bug 1 轮手修，共 5 轮才正式发布 v0.1.0（URL：
+https://github.com/cat-xierluo/FaroPDF/releases/tag/v0.1.0）。
+
+### 2. 4 轮真实失败 + 根因
+
+| 轮次 | Run | tag | 卡在哪 | 根因 |
+| --- | --- | --- | --- | --- |
+| 1 | 27024647388 | v0.1.0-alpha.18 | Setup Rust toolchain（macOS） + Install Linux system dependencies | stable Rust 2026-05 移除 `universal-apple-darwin` rust-std component；jammy 仓库没有 `libappindicator3-dev`（只有 ayatana 变体且冲突） |
+| 2 | 27025375977 | v0.1.0-alpha.18 | Install npm dependencies | `package-lock.json` 没跟着 PR #54（新增 @tauri-apps/plugin-updater）+ PR #57（新增 @pdf-lib/fontkit）一起更新，npm ci EUSAGE |
+| 3 | 27026191943 | v0.1.0-beta.1 | Build frontend | `tsc TS2307: Cannot find module 'node:zlib' / 'node:fs' / 'node:url' / 'node:path'` — `@types/node` 是 vite/vitest 的 optional peer dep，npm 7+ 不自动装；本地 Node 25 自带 `node:*` types 暴露不出，CI Node 20 缺 |
+| 4 | 27027049446 | v0.1.0-beta.1 | Build Tauri bundle | **`TAURI_SIGNING_PRIVATE_KEY` 是 double-base64**——docs/RELEASE.md §3.1 当时写 `cat ~/.tauri/faropdf.key \| base64 -w0`，而 `cargo tauri signer generate` 输出的 `.key` 文件本身就是一层 base64，再包一层 minisign 解不出 → `Missing encoded key in secret key` |
+
+### 3. 修复明细（按 commit 顺序）
+
+1. **`fix(ci): release.yml 适配 stable Rust 2026-05 移除 universal-apple-darwin`（PR #56）**
+   - `matrix.macos-universal.rust_targets` 拆成 `aarch64-apple-darwin,x86_64-apple-darwin`，Tauri CLI 用 lipo 合并 universal
+   - `Install Linux system dependencies` apt 列表去掉 `libappindicator3-dev`，只装 `libayatana-appindicator3-dev`（jammy 唯一可用变体）
+2. **`chore(release): 同步 package-lock.json 与 package.json`**（PR #57 之后）— 修 #2 EUSAGE
+3. **`chore(deps): 把 @types/node 加进 devDependencies`**（fa67a92）— 修 #3 TS2307
+4. **`gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/faropdf.key`**（v0.1.0 修复时）— 修 #4 double-base64。Secret 灌文件原文（一层 base64），**不再 `base64 -w0`**
+5. **`fix(updater): pubkey 字段改为 base64(2 行 minisign 文本)`**（4ce915d → eb7b430）— `tauri.conf.json.plugins.updater.pubkey` 字段期望 `base64(2 行 minisign 公钥文件内容)`（含 `untrusted comment: minisign public key: <KEYNUM>` header），不是 `.pub` 文件第二行原文 `RWS8...`。中间出过 `base64(单行 RWS8...)` 的中间版本（缺 header 行），PK 校验步骤报 `Missing encoded key in public key`
+6. **`fix(ci): Build Tauri bundle step 强制 shell: bash`**（9671c80）— Windows runner 默认 PowerShell 7，`cargo tauri build \` 反斜杠续行被吃掉变 PowerShell 表达式 `Missing expression after unary operator '--'`。macOS / Linux 一直用 bash，没暴露。npm ci 修好之后 Windows 终于跑到 Build Tauri bundle 才暴露
+7. **`fix(updater): create-updater-manifest.mjs URL 用 basename 而非 relative path`**（e833feb）— `softprops/action-gh-release@v2` 用 `files: artifacts/**/*.dmg` glob 上传时只用 basename（如 `FaroPDF_0.1.0_amd64.AppImage`），但脚本用 `relative(releaseDir, file)` 算 URL 把 artifact 名子目录带进去了（`faropdf-linux-x64/appimage/...`），与实际 release asset 路径对不上 → updater 客户端拉都 404。修：URL 用 `basename(file)`
+
+### 4. 拒绝的方案
+
+- **本地手动 `gh release create` 手拼 bundle + 手动签名**：方案 A。所有产物需本地 macOS / Windows / Linux 装交叉编译工具链；不实际（PM 也没三台设备），且绕过 release.yml 后续 fix 不复现
+- **改用 `tauri-apps/tauri-action@v0`**：方案 B。该 action 用 `releaseDraft: true` 一步建 draft + sigs，Folia 已用。但本版本 v0.1.0 已接近发出，再迁要重测，下版本起切（见 DEC-072 计划）
+- **保留 `release/v0.1.0` 分支**：方案 C。不需要 backport（v0.1.0 是 final，不做 patch），tag v0.1.0 仍能拉回所有 commit。已删
+
+### 5. 验证
+
+| 验证项 | 结果 | 备注 |
+| --- | --- | --- |
+| macOS Build 14 步 | ✅ success | FaroPDF.app + .dmg + .app.tar.gz + sigs |
+| Linux Build 15 步 | ✅ success | AppImage + deb |
+| Windows Build 14 步 | ✅ success | NSIS .exe + MSI |
+| Publish Release 10 步 | ✅ success | create-updater-manifest.mjs 签名 + 写 latest.json + softprops 上传 |
+| 7 个 release assets uploaded | ✅ | 6 个 bundles + latest.json |
+| `gh release view v0.1.0 --json assets` 校验 | ✅ state=uploaded | |
+| `TAURI_PRIVATE_KEY` 本地试签 | ✅ | `cargo tauri signer sign` 拿到 base64(2 行文件) 后正确签出 |
+
+### 6. 已知限制 / v0.1.0 不做但已识别的差距（对比 Folia 模板）
+
+- **macOS universal vs aarch64/x64 split**：Folia 拆开打两个独立 .dmg + .app.tar.gz + sigs，platform key 是 `darwin-aarch64` / `darwin-x86_64`（Tauri 标准 schema）；FaroPDF v0.1.0 用 universal 单一 build，platform key 是 `darwin-universal`（非标准）。v0.1.0 不重做，下版本起对齐
+- **缺独立 .sig 旁车文件**：Folia 每个 updater bundle 附 `.sig`（tauri-action 默认行为），FaroPDF v0.1.0 只在 latest.json 里有 base64 签名
+- **没 Gitee 镜像同步**：Folia publish job 内同步，FaroPDF 没有
+- **`concurrency.cancel-in-progress: false`**：Folia 用 `true`，v0.1.0 这条路上 4 轮 cancel 排队卡住就是这导致
+
+### 7. 后续路径
+
+- v0.2 起对齐 Folia 模板：`tauri-action@v0` + `releaseDraft: true` + macOS 拆 aarch64/x64 + Gitee 同步 + `.sig` 旁车 + concurrency cancel-in-progress
+- docs/RELEASE.md §3.1 已重写：明确「`TAURI_SIGNING_PRIVATE_KEY` 灌文件原文一层 base64，不要再 `base64 -w0`」+「`pubkey` 字段值是 `base64(2 行 minisign 公钥文件内容)`」+「不要在含密钥 shell session 跑 `cargo tauri signer --help`（clap 会 dump 密码到 stderr）」
+- release-workflow skill `references/ci-troubleshooting.md` + `references/tauri-release.md` 已同步扩 Tauri-specific 排坑（Tauri secret 格式 / pubkey 字段 / Windows PowerShell / `create-updater-manifest.mjs` URL 陷阱）
+- release-workflow skill `config/projects.yaml` 已加 `faropdf` 段（windows_format: msi / platforms: macos-universal / linux-x64 / windows-x64；注 macos-universal 是 v0.1.0 临时决定，下版本起改 macos-aarch64 + macos-x64）
+- 跨项目（Folia / Funes）同步：3 个项目 `~/.tauri/*.key` 状态都是 double-base64（一层文件 + 文档里又 `base64 -w0` 一次）。下次维护密钥 SOP 时一并修
+- 关联：DEC-065 / DEC-066 / DEC-067
