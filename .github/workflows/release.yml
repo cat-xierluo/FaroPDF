@@ -6,192 +6,231 @@ on:
       - "v*.*.*"
       - "v*.*.*-*"
 
-# ISS-021 跨平台打包 + 自动更新发布流水线。
+# ISS-021 跨平台打包 + 自动更新发布流水线（v0.1.1 Folia 对齐版）。
 #
 # 触发条件：推送形如 vX.Y.Z（stable）或 vX.Y.Z-prerelease（alpha / beta / rc）的 tag（带 v 前缀）。
-# 流程：
-#   1. build 矩阵（macOS universal / Windows / Linux）各自 `cargo tauri build` 产出 updater bundle
-#   2. 三个 build 完成后，release job 拉取所有 artifacts
-#   3. 运行 scripts/create-updater-manifest.mjs：
-#      - 识别每个 artifact 所属的 updater platform（macOS / Windows / Linux）
-#      - 调用 `cargo tauri signer sign` 产出 .sig 旁车文件
-#      - 读 .sig 内容生成 latest.json（tauri-plugin-updater v2 manifest schema）
-#   4. 用 softprops/action-gh-release 发布 release：
-#      - 上传所有 dmg / msi / AppImage / deb / macOS .app.tar.gz
-#      - 上传 latest.json（updater 入口固定 URL）
+#
+# 流程（Folia 模板，对齐 tauri-apps/tauri-action@v0 + releaseDraft + Gitee sync）：
+#   1. build 矩阵（macos-aarch64 / macos-x64 / windows-x64）各自跑 tauri-action：
+#      - macOS 拆 2 个独立 build（不再 universal）
+#      - tauri-action 自动：pnpm install / cargo tauri build / 签 .sig 旁车 / 上传 draft release
+#      - Windows 走 NSIS .exe（不发 .msi；与 Folia 一致）
+#   2. publish job 拉 draft release 的 *.sig → 跑 `npm run updater:manifest` 拼 latest.json →
+#      上传 latest.json → --draft=false 公开 → Gitee 镜像同步
 #
 # 关键环境变量（GitHub Secrets）：
-#   - TAURI_SIGNING_PRIVATE_KEY          tauri signer generate 输出的私钥字符串
-#   - TAURI_SIGNING_PRIVATE_KEY_PASSWORD  私钥密码（若创建时设置了）
-#   - GITHUB_TOKEN                       默认提供，用于创建 release
+#   - TAURI_SIGNING_PRIVATE_KEY          tauri signer generate 输出的私钥文件原文（一层 base64）
+#   - TAURI_SIGNING_PRIVATE_KEY_PASSWORD 私钥密码
+#   - GITHUB_TOKEN                       默认提供，用于创建 / 公开 release
+#   - GITEE_TOKEN + GITEE_OWNER           Gitee 镜像同步（缺则跳过，continue-on-error）
 #
-# 首次发布前由 PM 在本地跑 `cargo tauri signer generate` 生成 keypair，把 pubkey
-# 写进 src-tauri/tauri.conf.json 的 plugins.updater.pubkey（ISS-021 M1 已占位），
-# 私钥 + 密码保存到 GitHub Secrets。
+# 关联：DEC-070（v0.1.0 4 轮 CI 修复复盘）/ DEC-071（v0.1.1 Folia 对齐设计）。
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    name: Build ${{ matrix.label }}
-    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - label: macos-universal
-            os: macos-latest
-            target: universal-apple-darwin
-            # `universal-apple-darwin` was removed from the stable Rust distribution
-            # in 2026-05 (rust-lang/rustup components). Install both underlying
-            # arch targets; Tauri CLI builds both then runs `lipo` to produce
-            # the universal bundle under `target/universal-apple-darwin/`.
-            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
-            bundles: app,dmg
-            artifact_glob: |
-              src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app
-              src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz
-              src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
-          - label: windows-x64
-            os: windows-latest
-            target: x86_64-pc-windows-msvc
-            rust_targets: x86_64-pc-windows-msvc
-            bundles: msi,nsis
-            artifact_glob: |
-              src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
-              src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-          - label: linux-x64
-            os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            rust_targets: x86_64-unknown-linux-gnu
-            bundles: appimage,deb
-            artifact_glob: |
-              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
-              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: windows-latest
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workdir: src-tauri
+
+      - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.rust_targets }}
+      - name: Install pnpm dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-          shared-key: ${{ matrix.target }}
-
-      - name: Install Linux system dependencies
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          # NOTE: jammy (Ubuntu 22.04) only ships `libayatana-appindicator3-dev`;
-          # `libappindicator3-dev` is not in the repo and conflicts with the
-          # ayatana variant via `Conflicts:`. Install the ayatana one only.
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            librsvg2-dev \
-            patchelf \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev
-
-      - name: Install Tauri CLI (Rust)
-        run: cargo install tauri-cli --version "^2" --locked
-
-      - name: Install npm dependencies
-        run: npm ci
-
-      - name: Build frontend
-        run: npm run build
-
-      - name: Build Tauri bundle
+      - uses: tauri-apps/tauri-action@v0
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          CI: "true"
-        run: |
-          cargo tauri build \
-            --target ${{ matrix.target }} \
-            --bundles ${{ matrix.bundles }}
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
         with:
-          name: faropdf-${{ matrix.label }}
-          if-no-files-found: error
-          retention-days: 7
-          path: ${{ matrix.artifact_glob }}
+          tagName: ${{ github.ref_name }}
+          releaseName: "FaroPDF ${{ github.ref_name }}"
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: false
+          args: ${{ matrix.args }}
 
-  release:
-    name: Publish Release
+  publish:
     needs: build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
 
-      - name: Install Tauri CLI (Rust)
-        run: cargo install tauri-cli --version "^2" --locked
+      - name: Install pnpm dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Create updater manifest (latest.json)
+      - name: Generate latest.json
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          TAURI_UPDATER_REPO: "cat-xierluo/FaroPDF"
-          TAURI_UPDATER_TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          node scripts/create-updater-manifest.mjs \
-            --release-dir artifacts \
-            --repo "$TAURI_UPDATER_REPO" \
-            --tag "$TAURI_UPDATER_TAG" \
-            --output latest.json
+          TAG="${{ github.ref_name }}"
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          REPO="${{ github.repository }}"
+
+          mkdir -p sigs
+          gh release download "$TAG" --repo "$REPO" --pattern "*.sig" --dir sigs
+
+          FAROPDF_SIGNATURE_DIR=sigs \
+          FAROPDF_UPDATE_VERSION="$VERSION" \
+          FAROPDF_UPDATE_TAG="$TAG" \
+          FAROPDF_UPDATE_NOTES="FaroPDF $VERSION" \
+          FAROPDF_UPDATE_REPO="https://github.com/$REPO" \
+          FAROPDF_MANIFEST_OUTPUT=latest.json \
+          FAROPDF_REQUIRE_PLATFORMS="darwin-aarch64,darwin-x86_64,windows-x86_64" \
+          pnpm run updater:manifest
 
       - name: Show generated latest.json
         if: always()
         run: cat latest.json
 
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: ${{ github.ref_name }}
-          generate_release_notes: true
-          fail_on_unmatched_files: false
-          files: |
-            latest.json
-            artifacts/**/*.dmg
-            artifacts/**/*.msi
-            artifacts/**/*.AppImage
-            artifacts/**/*.deb
-            artifacts/**/*.app.tar.gz
-            artifacts/**/*.exe
-            artifacts/**/*.app
+      - name: Upload latest.json and publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" latest.json \
+            --repo "${{ github.repository }}" --clobber
+          gh release edit "${{ github.ref_name }}" \
+            --draft=false --repo "${{ github.repository }}"
+
+      - name: Sync to Gitee
+        continue-on-error: true
+        timeout-minutes: 20
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITEE_OWNER: ${{ secrets.GITEE_OWNER }}
+        run: |
+          if [ -z "${GITEE_TOKEN}" ] || [ -z "${GITEE_OWNER}" ]; then
+            echo "Gitee secrets are not configured, skipping sync"
+            exit 0
+          fi
+
+          TAG="${{ github.ref_name }}"
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          REPO="${GITEE_OWNER}/FaroPDF"
+
+          curl_gitee() {
+            curl --silent --show-error --connect-timeout 20 --max-time 90 --retry 1 --retry-delay 2 "$@"
+          }
+
+          extract_release_id() {
+            RELEASE_RESPONSE="$1" python3 - <<'PY'
+          import json
+          import os
+          try:
+              print(json.loads(os.environ.get("RELEASE_RESPONSE", "")).get("id", ""))
+          except Exception:
+              print("")
+          PY
+          }
+
+          # Create Gitee release (or reuse existing one)
+          RELEASE_RESPONSE=$(curl_gitee -X POST \
+            "https://gitee.com/api/v5/repos/${REPO}/releases" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"access_token\": \"${GITEE_TOKEN}\",
+              \"tag_name\": \"${TAG}\",
+              \"name\": \"FaroPDF ${VERSION}\",
+              \"body\": \"FaroPDF ${VERSION} - 自动同步自 GitHub\",
+              \"target_commitish\": \"main\",
+              \"prerelease\": false
+            }" || true)
+          RELEASE_ID=$(extract_release_id "$RELEASE_RESPONSE")
+
+          if [ -z "$RELEASE_ID" ]; then
+            echo "Gitee release may already exist, trying to reuse ${TAG}"
+            RELEASE_RESPONSE=$(curl_gitee \
+              "https://gitee.com/api/v5/repos/${REPO}/releases/tags/${TAG}?access_token=${GITEE_TOKEN}" || true)
+            RELEASE_ID=$(extract_release_id "$RELEASE_RESPONSE")
+          fi
+
+          if [ -z "$RELEASE_ID" ]; then
+            echo "Failed to create Gitee release, skipping sync"
+            exit 0
+          fi
+          echo "Gitee release ID: ${RELEASE_ID}"
+
+          # Download GitHub release assets (excluding latest.json)
+          mkdir -p release-assets
+          if ! timeout 300s gh release download "$TAG" --repo "${{ github.repository }}" --dir release-assets; then
+            echo "Failed to download GitHub release assets, skipping Gitee sync"
+            exit 0
+          fi
+
+          # Upload build artifacts to Gitee (skip latest.json, we'll generate a Gitee version)
+          for FILE in release-assets/*; do
+            FILENAME=$(basename "$FILE")
+            if [ "$FILENAME" = "latest.json" ]; then continue; fi
+            echo "Uploading ${FILENAME} to Gitee..."
+            if ! curl_gitee --fail-with-body -X POST \
+              "https://gitee.com/api/v5/repos/${REPO}/releases/${RELEASE_ID}/attach_files" \
+              -F "access_token=${GITEE_TOKEN}" \
+              -F "file=@${FILE}" > /dev/null; then
+              echo "Failed to upload ${FILENAME} to Gitee, continuing"
+            fi
+          done
+
+          # Generate Gitee-specific latest.json with exact tag download URLs
+          FAROPDF_SIGNATURE_DIR=sigs \
+          FAROPDF_UPDATE_VERSION="$VERSION" \
+          FAROPDF_UPDATE_TAG="$TAG" \
+          FAROPDF_UPDATE_NOTES="FaroPDF $VERSION" \
+          FAROPDF_UPDATE_GITEE_REPO="https://gitee.com/${REPO}" \
+          FAROPDF_MANIFEST_OUTPUT=/tmp/latest-github.json \
+          FAROPDF_GITEE_MANIFEST_OUTPUT=latest-gitee.json \
+          FAROPDF_REQUIRE_PLATFORMS="darwin-aarch64,darwin-x86_64,windows-x86_64" \
+          pnpm run updater:manifest
+
+          # Upload Gitee latest.json (named latest.json on Gitee)
+          if ! curl_gitee --fail-with-body -X POST \
+            "https://gitee.com/api/v5/repos/${REPO}/releases/${RELEASE_ID}/attach_files" \
+            -F "access_token=${GITEE_TOKEN}" \
+            -F "file=@latest-gitee.json;filename=latest.json" > /dev/null; then
+            echo "Failed to upload latest.json to Gitee, continuing"
+          fi
+
+          echo "Gitee release sync complete"

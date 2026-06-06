@@ -2,200 +2,97 @@
 // scripts/create-updater-manifest.mjs
 //
 // ISS-021：跨平台打包后，从 release artifacts 生成 tauri-plugin-updater v2 所需的
-// latest.json 清单。流程：
-//   1. 递归扫描 --release-dir 下的产物，匹配 updater 兼容的 bundle：
-//        - .app.tar.gz  → darwin-universal
-//        - .msi         → windows-x86_64
-//        - .AppImage    → linux-x86_64
-//        - .deb         → linux-x86_64（deb 是非 updater 路径，仅发布到 release）
-//   2. 对每个 updater 兼容的 bundle 调用 `cargo tauri signer sign` 生成 <file>.sig
-//   3. 读 .sig 文本，组装 tauri-plugin-updater v2 manifest 的 platforms 子表
-//   4. 写出 --output 路径（默认 latest.json）
+// latest.json 清单（v0.1.1 Folia 对齐版）。
 //
-// 用法（GitHub Actions 上下文）：
-//   TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD 由 secret 注入
-//   node scripts/create-updater-manifest.mjs \
-//     --release-dir artifacts \
-//     --repo cat-xierluo/FaroPDF \
-//     --tag v0.1.0 \
-//     --output latest.json
+// 流程：
+//   1. 读 FAROPDF_SIGNATURE_DIR 下的 *.sig 旁车文件（这些 sig 由
+//      tauri-apps/tauri-action@v0 在 build job 产出 .tar.gz / .exe 时
+//      自动签好，publish job 只需把 sig 内容嵌进 latest.json）
+//   2. 用 FAROPDF_REQUIRE_PLATFORMS 校验必填 platform 都有 sig（缺即 fail）
+//   3. 拼 tauri-plugin-updater v2 manifest：
+//        - darwin-aarch64 / darwin-x86_64 / windows-x86_64
+//        - url 用 basename(file)（Folia 对齐：softprops 上传只用 basename，
+//          不带 artifact 名子目录，DEC-070 修复）
+//   4. 写出 FAROPDF MANIFEST_OUTPUT / FAROPDF_GITEE MANIFEST_OUTPUT（后者选填）
 //
-// 退出码：0 成功；1 参数错误 / 找不到 updater bundle；2 signing 失败；3 IO 失败。
+// 用法（GitHub Actions publish job 上下文）：
+//   FAROPDF_SIGNATURE_DIR=sigs \
+//   FAROPDF_UPDATE_VERSION=0.1.1 \
+//   FAROPDF_UPDATE_TAG=v0.1.1 \
+//   FAROPDF_UPDATE_NOTES="FaroPDF 0.1.1" \
+//   FAROPDF_UPDATE_REPO=https://github.com/cat-xierluo/FaroPDF \
+//   FAROPDF_MANIFEST_OUTPUT=latest.json \
+//   FAROPDF_REQUIRE_PLATFORMS=darwin-aarch64,darwin-x86_64,windows-x86_64 \
+//   pnpm run updater:manifest
+//
+// 退出码：0 成功；1 必填 env 缺失 / 找不到 sig / 缺必填 platform；3 IO 失败。
 
-import { spawn } from "node:child_process";
-import { readFile, writeFile, stat } from "node:fs/promises";
-import { join, relative, resolve, sep } from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
+import { join, basename } from "node:path";
 
 const UPDATER_PLATFORM_KEYS = {
-  "darwin-universal": "darwin-universal",
   "darwin-aarch64": "darwin-aarch64",
   "darwin-x86_64": "darwin-x86_64",
   "windows-x86_64": "windows-x86_64",
-  "linux-x86_64": "linux-x86_64",
 };
 
-const UPDATER_PATTERNS = [
-  { regex: /\.app\.tar\.gz$/i, platform: "darwin-universal" },
-  { regex: /_aarch64\.dmg$/i, platform: "darwin-aarch64" },
-  { regex: /_x64\.dmg$/i, platform: "darwin-x86_64" },
-  { regex: /_aarch64\.app\.tar\.gz$/i, platform: "darwin-aarch64" },
-  { regex: /_x64\.app\.tar\.gz$/i, platform: "darwin-x86_64" },
-  { regex: /\.msi$/i, platform: "windows-x86_64" },
-  { regex: /\.AppImage$/i, platform: "linux-x86_64" },
+// sig 文件名格式：<bundle-name>.sig，比如
+//   FaroPDF_aarch64.app.tar.gz.sig
+//   FaroPDF_x64.app.tar.gz.sig
+//   FaroPDF_0.1.1_x64-setup.exe.sig
+const SIG_PATTERNS = [
+  { regex: /_aarch64\.app\.tar\.gz\.sig$/i, platform: "darwin-aarch64" },
+  { regex: /_x64\.app\.tar\.gz\.sig$/i, platform: "darwin-x86_64" },
+  { regex: /_x64-setup\.exe\.sig$/i, platform: "windows-x86_64" },
 ];
 
-function parseArgs(argv) {
-  const args = {
-    releaseDir: null,
-    repo: null,
-    tag: null,
-    output: "latest.json",
-  };
-  for (let i = 0; i < argv.length; i += 1) {
-    const flag = argv[i];
-    const value = argv[i + 1];
-    switch (flag) {
-      case "--release-dir":
-        args.releaseDir = value;
-        i += 1;
-        break;
-      case "--repo":
-        args.repo = value;
-        i += 1;
-        break;
-      case "--tag":
-        args.tag = value;
-        i += 1;
-        break;
-      case "--output":
-        args.output = value;
-        i += 1;
-        break;
-      case "-h":
-      case "--help":
-        printHelp();
-        process.exit(0);
-        break;
-      default:
-        if (flag?.startsWith("--")) {
-          console.error(`[create-updater-manifest] unknown flag: ${flag}`);
-          process.exit(1);
-        }
-        break;
-    }
-  }
-  if (!args.releaseDir || !args.repo || !args.tag) {
-    printHelp();
+function readEnv(name, { required = true } = {}) {
+  const value = process.env[name];
+  if (required && !value) {
+    console.error(`[updater:manifest] missing required env var: ${name}`);
     process.exit(1);
   }
-  return args;
+  return value;
 }
 
 function printHelp() {
-  console.log(`Usage: node scripts/create-updater-manifest.mjs [options]
+  console.log(`[updater:manifest] Required env:
+  FAROPDF_SIGNATURE_DIR         Directory containing *.sig sidecar files
+                                (typically the publish job downloads them to sigs/).
+  FAROPDF_UPDATE_VERSION       Version to embed in latest.json (e.g. 0.1.1, no v prefix).
+  FAROPDF_UPDATE_TAG            Release tag name (with v prefix, e.g. v0.1.1).
+  FAROPDF_UPDATE_REPO           GitHub repo URL for asset download URLs
+                                (e.g. https://github.com/cat-xierluo/FaroPDF).
+  FAROPDF_MANIFEST_OUTPUT       Output file path for latest.json (default: latest.json).
+  FAROPDF_REQUIRE_PLATFORMS     Comma-separated list of required updater platform keys
+                                (e.g. darwin-aarch64,darwin-x86_64,windows-x86_64).
 
-Options:
-  --release-dir <dir>   Directory containing release artifacts (recursively scanned).
-  --repo <owner/name>   GitHub repo slug, e.g. cat-xierluo/FaroPDF.
-  --tag <vX.Y.Z>        Release tag (with v prefix).
-  --output <path>       Output file path (default: latest.json).
-  -h, --help            Show this help.
-
-Required env (when signing):
-  TAURI_SIGNING_PRIVATE_KEY
-  TAURI_SIGNING_PRIVATE_KEY_PASSWORD (only if your key has a password)`);
+Optional env:
+  FAROPDF_UPDATE_NOTES          Short release notes line (embedded in latest.json? no, dropped).
+  FAROPDF_UPDATE_GITEE_REPO     Gitee repo URL (overrides GitHub for asset URLs in latest-gitee.json).
+  FAROPDF_GITEE MANIFEST_OUTPUT Output file path for the Gitee-specific latest.json
+                                (typically latest-gitee.json).`);
 }
 
-async function walk(dir) {
-  const out = [];
-  const stack = [dir];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    let entries;
-    try {
-      entries = await stat(current);
-    } catch {
-      continue;
-    }
-    if (entries.isFile()) {
-      out.push(current);
-      continue;
-    }
-    if (!entries.isDirectory()) {
-      continue;
-    }
-    const { readdir } = await import("node:fs/promises");
-    const children = await readdir(current, { withFileTypes: true });
-    for (const child of children) {
-      const childPath = join(current, child.name);
-      if (child.isDirectory()) {
-        stack.push(childPath);
-      } else if (child.isFile()) {
-        out.push(childPath);
-      }
-    }
-  }
-  return out;
+function parseRequiredPlatforms(raw) {
+  return raw
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
 }
 
-function matchUpdaterPlatform(filename) {
-  const base = filename.split(sep).pop() ?? filename;
-  for (const { regex, platform } of UPDATER_PATTERNS) {
-    if (regex.test(base)) {
+function matchSigToPlatform(filename) {
+  for (const { regex, platform } of SIG_PATTERNS) {
+    if (regex.test(filename)) {
       return platform;
     }
   }
   return null;
 }
 
-async function signFile(filePath) {
-  const env = { ...process.env, CI: "true" };
-  return await new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn("cargo", ["tauri", "signer", "sign", filePath], {
-      env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stderr = "";
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-    child.on("error", (error) => {
-      rejectPromise(new Error(`failed to spawn cargo tauri signer sign: ${error.message}`));
-    });
-    child.on("exit", (code) => {
-      if (code === 0) {
-        resolvePromise();
-        return;
-      }
-      rejectPromise(
-        new Error(
-          `cargo tauri signer sign exited with code ${code}: ${stderr.trim() || "no stderr"}`,
-        ),
-      );
-    });
-  });
-}
-
-async function readSignature(filePath) {
-  const sigPath = `${filePath}.sig`;
-  const content = await readFile(sigPath, "utf8");
-  return content.trim();
-}
-
-function buildAssetUrl(repo, tag, relativePath) {
+function buildAssetUrl(repo, tag, assetName) {
   const tagNoV = tag.replace(/^v/, "");
-  return `https://github.com/${repo}/releases/download/${tagNoV}/${relativePath
-    .split(sep)
-    .join("/")}`;
-}
-
-function stripTag(tag) {
-  const stripped = tag.replace(/^v/, "");
-  if (!/^\d+\.\d+\.\d+/.test(stripped)) {
-    return "0.0.0";
-  }
-  const [major, minor, patch] = stripped.split(/[.-]/);
-  return `${major}.${minor}.${patch}`;
+  return `${repo.replace(/\/+$/, "")}/releases/download/${tagNoV}/${assetName}`;
 }
 
 function buildManifest({ version, pubDate, platforms }) {
@@ -212,78 +109,118 @@ function buildManifest({ version, pubDate, platforms }) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const releaseDir = resolve(args.releaseDir);
-  const outputPath = resolve(args.output);
-  const repoRoot = process.cwd();
-  const allFiles = await walk(releaseDir);
-  if (allFiles.length === 0) {
-    console.error(`[create-updater-manifest] no files under ${releaseDir}`);
-    process.exit(1);
+  if (process.argv.includes("-h") || process.argv.includes("--help")) {
+    printHelp();
+    process.exit(0);
   }
 
-  const candidates = [];
-  for (const file of allFiles) {
-    const platform = matchUpdaterPlatform(file);
-    if (platform) {
-      candidates.push({ file, platform });
-    }
-  }
-
-  if (candidates.length === 0) {
+  const signatureDir = readEnv("FAROPDF_SIGNATURE_DIR");
+  const version = readEnv("FAROPDF_UPDATE_VERSION");
+  const tag = readEnv("FAROPDF_UPDATE_TAG");
+  const repo = readEnv("FAROPDF_UPDATE_REPO");
+  const outputPath = readEnv("FAROPDF MANIFEST_OUTPUT");
+  const requiredPlatforms = parseRequiredPlatforms(
+    readEnv("FAROPDF_REQUIRE_PLATFORMS"),
+  );
+  if (requiredPlatforms.length === 0) {
     console.error(
-      `[create-updater-manifest] no updater-compatible bundles found under ${releaseDir} (expected .app.tar.gz / .msi / .AppImage)`,
+      "[updater:manifest] FAROPDF_REQUIRE_PLATFORMS is empty; must list at least one platform",
     );
     process.exit(1);
   }
 
-  // Per platform: pick the first candidate (deterministic, by sorted path).
-  candidates.sort((a, b) => a.file.localeCompare(b.file));
+  const giteeRepo = process.env["FAROPDF_UPDATE_GITEE_REPO"] || null;
+  const giteeOutputPath = process.env["FAROPDF_GITEE MANIFEST_OUTPUT"] || null;
+
+  // 1. 扫 sigs/ 目录，匹配 platform
+  const { readdir } = await import("node:fs/promises");
+  let entries;
+  try {
+    entries = await readdir(signatureDir, { withFileTypes: true });
+  } catch (error) {
+    console.error(
+      `[updater:manifest] failed to read signature dir ${signatureDir}: ${error.message}`,
+    );
+    process.exit(1);
+  }
+
+  const sigFiles = entries
+    .filter((e) => e.isFile() && e.name.endsWith(".sig"))
+    .map((e) => e.name);
+
+  if (sigFiles.length === 0) {
+    console.error(
+      `[updater:manifest] no *.sig files in ${signatureDir}; tauri-action must sign each updater bundle`,
+    );
+    process.exit(1);
+  }
+
+  // Per platform: pick the first matching sig (deterministic by sort).
+  sigFiles.sort();
   const byPlatform = new Map();
-  for (const candidate of candidates) {
-    if (!byPlatform.has(candidate.platform)) {
-      byPlatform.set(candidate.platform, candidate.file);
-    }
+  for (const sigName of sigFiles) {
+    const platform = matchSigToPlatform(sigName);
+    if (!platform || byPlatform.has(platform)) continue;
+    byPlatform.set(platform, sigName);
   }
 
-  if (!process.env.TAURI_SIGNING_PRIVATE_KEY) {
+  // 2. 校验必填 platform 都在
+  const missing = requiredPlatforms.filter((p) => !byPlatform.has(p));
+  if (missing.length > 0) {
     console.error(
-      "[create-updater-manifest] TAURI_SIGNING_PRIVATE_KEY env is required for signing",
+      `[updater:manifest] missing .sig for required platforms: ${missing.join(", ")} (have: ${[...byPlatform.keys()].join(", ") || "none"})`,
     );
-    process.exit(2);
+    process.exit(1);
   }
 
+  // 3. 读每个 sig，拼 manifest
+  const assetUrlBase = giteeRepo || repo;
   const platforms = {};
-  for (const [platform, file] of byPlatform) {
-    if (!UPDATER_PLATFORM_KEYS[platform]) {
-      continue;
-    }
-    console.log(`[create-updater-manifest] signing ${platform}: ${relative(repoRoot, file)}`);
-    try {
-      await signFile(file);
-    } catch (error) {
-      console.error(
-        `[create-updater-manifest] signing failed for ${file}: ${error.message}`,
-      );
-      process.exit(2);
-    }
-    const signature = await readSignature(file);
-    const url = buildAssetUrl(args.repo, args.tag, relative(releaseDir, file));
+  for (const platform of requiredPlatforms) {
+    const sigName = byPlatform.get(platform);
+    if (!sigName) continue; // 已经上面 missing 校验过了
+    const sigPath = join(signatureDir, sigName);
+    const signature = (await readFile(sigPath, "utf8")).trim();
+    // 派生 bundle asset 名：去掉 .sig 后缀
+    const assetName = basename(sigName, ".sig");
+    const url = buildAssetUrl(assetUrlBase, tag, assetName);
     platforms[platform] = { signature, url };
+    console.log(`[updater:manifest] ${platform}: ${assetName} (${signature.length} chars)`);
   }
 
   const manifest = buildManifest({
-    version: stripTag(args.tag),
+    version,
     pubDate: new Date().toISOString(),
     platforms,
   });
 
   await writeFile(outputPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-  console.log(`[create-updater-manifest] wrote ${outputPath}`);
-  console.log(`[create-updater-manifest] platforms: ${Object.keys(platforms).join(", ")}`);
+  console.log(`[updater:manifest] wrote ${outputPath}`);
+  console.log(`[updater:manifest] platforms: ${Object.keys(platforms).join(", ")}`);
+
+  // 4. 可选：再写一份 Gitee 专版 manifest（asset URL 走 gitee.com）
+  if (giteeOutputPath) {
+    const giteePlatforms = {};
+    for (const platform of requiredPlatforms) {
+      const sigName = byPlatform.get(platform);
+      const assetName = basename(sigName, ".sig");
+      const signature = platforms[platform].signature;
+      giteePlatforms[platform] = {
+        signature,
+        url: buildAssetUrl(giteeRepo, tag, assetName),
+      };
+    }
+    const giteeManifest = buildManifest({
+      version,
+      pubDate: new Date().toISOString(),
+      platforms: giteePlatforms,
+    });
+    await writeFile(giteeOutputPath, `${JSON.stringify(giteeManifest, null, 2)}\n`, "utf8");
+    console.log(`[updater:manifest] wrote ${giteeOutputPath}`);
+  }
 }
 
 main().catch((error) => {
-  console.error(`[create-updater-manifest] unexpected error: ${error.message}`);
+  console.error(`[updater:manifest] unexpected error: ${error.message}`);
   process.exit(3);
 });

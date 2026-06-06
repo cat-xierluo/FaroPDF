@@ -1,3 +1,31 @@
+## 0.1.1 - 2026-06-06
+
+> ISS-021 release workflow 全面对齐 Folia 模板；含 DEC-068 / DEC-069 已落 main
+> 的 feature；不含新功能。
+
+封箱变更（workflow only）：
+
+- `.github/workflows/release.yml` 整文件重写（Folia 对齐）：
+  - 用 `tauri-apps/tauri-action@v0` 替代手写 `cargo tauri build` + `softprops/action-gh-release`
+  - macOS 拆 `aarch64` + `x64` 独立 build（不再 universal）
+  - 删除 Linux build（与 Folia 一致）
+  - `concurrency.cancel-in-progress: true`（v0.1.0 的 false 会卡重试链）
+  - `releaseDraft: true` → publish job 灌写 latest.json + Gitee 同步
+- 包管理器切 pnpm 10.x（Folia 一致；npm 跨平台 optional deps 有 bug）
+- `package.json` version 0.1.0 → 0.1.1
+- `src-tauri/Cargo.toml` version 0.1.0 → 0.1.1
+- `src-tauri/tauri.conf.json` version 0.1.0 → 0.1.1
+- `scripts/create-updater-manifest.mjs` 改用 `FAROPDF_*` env vars + 不再自签（tauri-action 在 build job 已签 .sig 旁车）
+- `package-lock.json` → `pnpm-lock.yaml`
+- `.npmrc` 加 `lockfile=true` 覆盖用户级 npmrc 的 `package-lock=false`
+
+新功能（来自 main，自动随 tag 出来）：
+
+- DEC-068 批注摘要分组面板 + 案件材料核查清单导出
+- DEC-069 法院上传体积压缩 4 档 + 真实 JPEG 图像重编码
+
+---
+
 ## 0.2.0-alpha.1 - 2026-06-06
 
 > v0.2 法律增强启动。第一条：批注摘要分组面板 + 案件材料核查清单导出。
