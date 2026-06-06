@@ -1,6 +1,6 @@
 # FaroPDF 路线图
 
-> Last updated: 2026-06-05
+> Last updated: 2026-06-06（v0.1.0 + v0.1.1 发布后逐节审计）
 
 ## 项目愿景
 
@@ -37,10 +37,10 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - [x] 使用 PDF.js 打开本地 PDF 二进制文件。
 - [x] PDF.js worker 独立加载，不阻塞主线程。
 - [x] 实现页面虚拟化，只渲染可见页和邻近页。
-- [ ] 支持连续滚动、单页、双页和适合宽度阅读。
-- [ ] 支持缩放、旋转视图、页码跳转和键盘翻页。
-- [ ] 支持左侧缩略图和文档目录。
-- [ ] 支持恢复上次阅读页码和缩放。
+- [x] 支持连续滚动、单页、双页和适合宽度阅读（`defaultViewMode: "continuous"` + `"single" | "double" | "fit-width"`）。
+- [x] 支持缩放、旋转视图、页码跳转和键盘翻页（`reader/setRotation` action + `useReaderKeyboard` PageUp/PageDown/Arrow）。
+- [x] 支持左侧缩略图和文档目录（`Sidebar.thumbnail-list` + `thumbnail-item--current` 标记）。
+- [x] 支持恢复上次阅读页码和缩放（`PdfRecentFile.lastPage` + `AppSettings` 持久化）。
 
 ### 3. 检索与文字层
 
@@ -52,11 +52,11 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 ### 4. 批注
 
-- [ ] 支持文本选择高亮、下划线、删除线。
-- [ ] 支持备注、文本框、矩形、箭头和自由手写。
-- [ ] 支持常用图章，例如已阅、重点、待核、证据。
+- [x] 支持文本选择高亮、下划线、删除线（`PdfAnnotationType: "highlight" | "underline" | "strikeout"`）。
+- [x] 支持备注、文本框、矩形、箭头和自由手写（`PdfAnnotationType: "note" | "textbox" | "rectangle" | "arrow" | "ink"`）。
+- [x] 支持常用图章（`"stamp"` + 5 图章模板）。
 - [x] 支持批注颜色、作者、时间和页码。
-- [ ] 支持批注列表、批注搜索和点击跳转。
+- [x] 支持批注列表、批注搜索和点击跳转（`AnnotationSidebar` + `annotation-sidebar-search` + `listAnnotations`）。
 - [x] 支持导出批注摘要为 Markdown 或 HTML。
 - [x] 默认先保存可编辑 sidecar 状态，导出时再写入或扁平化到 PDF。
 
@@ -90,34 +90,34 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 ### 7. 表单与签署
 
-- [ ] 读取 AcroForm 字段并高亮可填写区域。
-- [ ] 支持文本框、复选框、单选框和下拉字段填写。
-- [ ] 支持签名图片、手写签名和签名位置调整。
-- [ ] 支持表单扁平化导出。
+- [x] 读取 AcroForm 字段并高亮可填写区域（`FormService.readFormFields`）。
+- [x] 支持文本框、复选框、单选框和下拉字段填写（`FormService.fillFormField` + `applyFormOperations` 批量）。
+- [ ] 支持签名图片、手写签名和签名位置调整（**部分**：签名图片限定 PNG/JPG 已落地；手写签名 / 签名位置调整待后续 worker）。
+- [x] 支持表单扁平化导出（`FormService.flattenForm`，pdf-lib `form.flatten()`）。
 
 ### 8. 设置与安全
 
 - [x] 支持最近文件、默认缩放、阅读布局、默认保存目录和 OCR 后端设置。
 - [x] 支持 PaddleOCR / MinerU API 配置，不在 UI、日志和仓库中暴露完整密钥。
 - [x] 联网 OCR 必须要求用户主动确认。
-- [ ] 所有改变 PDF 的操作默认另存为新 PDF。
+- [x] 所有改变 PDF 的操作默认另存为新 PDF（`pdfOperationEngine` 路径型新文件 + `outputToolPlan` 计划摘要 + `writeNewFile` 仅新建语义）。
 
 ## v0.2 法律增强
 
-- [ ] 批注摘要按页码、颜色、标签和批注类型分组。
-- [ ] 批注摘要支持导出为案件材料核查清单。
+- [x] 批注摘要按页码、颜色、标签和批注类型分组（`AnnotationSummaryPanel` + `AnnotationSidebarGroupBy: "page" | "color" | "type" | "label"`）。
+- [x] 批注摘要支持导出为案件材料核查清单（`AnnotationSummaryPanel` Markdown / HTML 导出，DEC-068）。
 - [ ] 支持证据材料页码区间管理。
 - [ ] 支持根据文字层生成页面索引草稿。
 - [ ] 支持文书拆分、合并和规范命名的工作台入口。
-- [ ] 支持法院上传体积限制下的压缩预设。
+- [x] 支持法院上传体积限制下的压缩预设（4 档 preset + 真实 JPEG DCTDecode 重编码 + 目标体积验证，DEC-069）。
 
 ## v0.3 性能与发布
 
 ### 9. 全平台发布与设置 UI
 
-- [ ] ISS-021 全平台打包与自动更新：接入 `tauri-plugin-updater`，建立 GitHub release 跨平台矩阵和 updater manifest 签名。
-- [ ] ISS-022 设置页面 UI 整合：把扁平 `SettingsPanel` 升级为左侧导航 + 多 section 浮层，至少包含「常规 / 阅读 / OCR provider / 快捷键 / 关于」。
-- [ ] ISS-023 关于页面与作者页：在设置页「关于」section 展示应用 icon、版本、定位、官网（指向 personal-site 仓） / GitHub 链接、当前更新状态和作者卡。
+- [x] ISS-021 全平台打包与自动更新：接入 `tauri-plugin-updater`，建立 GitHub release 跨平台矩阵和 updater manifest 签名。v0.1.0 + v0.1.1 已成功发布（DEC-048 / DEC-056 / DEC-065 / DEC-066 / DEC-067 / DEC-070 / DEC-071）。
+- [x] ISS-022 设置页面 UI 整合：扁平 `SettingsPanel` 升级为左侧导航 + 多 section 浮层，含「常规 / 阅读 / OCR provider / 快捷键 / 关于」5 个 section + lazy load 收口（DEC-038 / DEC-059）。
+- [x] ISS-023 关于页面与作者页：在设置页「关于」section 展示应用 icon、版本、定位、官网（指向 personal-site 仓） / GitHub 链接、当前更新状态和作者卡（DEC-038 / DEC-051）。
 - [ ] 移动端（Android / iOS）打包能力与自动更新在 v0.3 评估范围，记录限制和后续计划。
 - [x] 官网与文档站入口迁移：v0.1 阶段的官网占位条目由 `https://cat-xierluo.github.io/personal-site/faropdf/` 承接（详见 DEC-058 跨仓 cleanup）。FaroPDF 仓本身不维护 `website/` 子目录或独立的 GitHub Pages workflow；后续官网 / 文档站的所有更新都在 `cat-xierluo/personal-site` 仓推进。
 
