@@ -50,45 +50,13 @@ button {
 
 .toolbar {
   display: grid;
-  grid-template-columns: 156px max-content max-content minmax(230px, 1fr) max-content minmax(190px, 250px);
+  grid-template-columns: max-content max-content minmax(230px, 1fr) max-content minmax(190px, 250px);
   align-items: center;
   gap: 8px;
-  min-height: 56px;
+  min-height: 48px;
   padding: 0 10px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
-}
-
-.toolbar__brand {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 10px;
-}
-
-.brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  color: var(--accent);
-  font-weight: 700;
-}
-
-.toolbar h1 {
-  margin: 0;
-  font-size: 14px;
-  line-height: 18px;
-}
-
-.toolbar p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 16px;
 }
 
 .toolbar__group,
@@ -113,9 +81,26 @@ button {
   overflow-x: auto;
 }
 
-.toolbar__group--utility {
-  padding-right: 4px;
-  border-right: 1px solid var(--border);
+.toolbar__group--layout {
+  gap: 2px;
+}
+
+.tool-button--compact {
+  min-width: 32px;
+  width: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+}
+
+.tool-button--compact:hover {
+  background: var(--accent-soft);
+}
+
+.tool-button--compact[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .tool-button,
@@ -502,6 +487,7 @@ select.zoom-control {
 }
 
 .reader {
+  flex: 1;
   min-height: 0;
   overflow: auto;
   background: #e4e8eb;
@@ -511,10 +497,9 @@ select.zoom-control {
   display: grid;
   grid-template-columns: minmax(220px, 420px) minmax(260px, 520px);
   grid-template-areas:
-    "convert open"
-    "recent open";
+    "convert open";
   gap: 22px;
-  align-content: start;
+  align-content: center;
   justify-content: center;
   min-height: 100%;
   padding: 54px 34px;
@@ -864,81 +849,6 @@ select.zoom-control {
   font-weight: 600;
 }
 
-.settings-panel {
-  padding: 14px;
-}
-
-.settings-panel h2 {
-  margin: 0 0 14px;
-  font-size: 15px;
-  line-height: 20px;
-}
-
-.settings-panel h3 {
-  margin: 18px 0 10px;
-  font-size: 13px;
-  line-height: 18px;
-}
-
-.field {
-  display: grid;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.field input,
-.field select {
-  height: 34px;
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0 9px;
-  background: var(--surface-strong);
-  color: var(--fg);
-}
-
-.panel-placeholder {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.setting-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  margin-top: 14px;
-  color: var(--fg);
-  font-size: 13px;
-}
-
-.settings-list {
-  display: grid;
-  gap: 1px;
-  margin-top: 14px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.settings-list__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 56px 64px;
-  gap: 8px;
-  min-height: 34px;
-  align-items: center;
-  padding: 0 10px;
-  background: var(--surface-strong);
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.settings-list__row span:first-child {
-  color: var(--fg);
-}
-
 .status-bar {
   display: flex;
   align-items: center;
@@ -954,7 +864,7 @@ select.zoom-control {
 
 @media (max-width: 1500px) {
   .toolbar {
-    grid-template-columns: 132px max-content max-content 326px max-content minmax(180px, 240px);
+    grid-template-columns: max-content max-content 326px max-content minmax(180px, 240px);
   }
 
   .toolbar__group--modes .tool-button {
@@ -983,7 +893,7 @@ select.zoom-control {
   }
 
   .toolbar {
-    grid-template-columns: 132px max-content max-content 286px max-content 150px;
+    grid-template-columns: max-content max-content 286px max-content 150px;
     gap: 6px;
   }
 
@@ -1021,19 +931,17 @@ select.zoom-control {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       "open"
-      "convert"
-      "recent";
+      "convert";
   }
 }
 
 @media (max-width: 920px) {
   .toolbar {
-    grid-template-columns: 44px max-content max-content 212px max-content minmax(112px, 1fr);
+    grid-template-columns: max-content max-content 212px max-content minmax(112px, 1fr);
     gap: 4px;
     padding: 0 8px;
   }
 
-  .toolbar__brand > div:last-child,
   select.zoom-control {
     display: none;
   }
@@ -1052,7 +960,7 @@ select.zoom-control {
     min-width: 44px;
   }
 
-  .toolbar__group--utility .tool-button,
+  .toolbar__group--layout .tool-button,
   .toolbar__group--modes .tool-button,
   .toolbar__group[aria-label="文件操作"] .tool-button,
   .toolbar__group--right .tool-button {

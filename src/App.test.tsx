@@ -10,9 +10,10 @@ describe("FaroPDF app shell", () => {
     expect(
       screen.getByRole("application", { name: "FaroPDF PDF 工作台" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "打开 PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "打开" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "导出" })).toBeInTheDocument();
-    expect(screen.getByRole("complementary", { name: "文档摘要" })).toBeInTheDocument();
+    // ISS-030：侧边栏默认关闭，未打开 PDF 时不显示空侧边栏
+    expect(screen.queryByRole("complementary", { name: "文档摘要" })).not.toBeInTheDocument();
     expect(screen.getByRole("main", { name: "PDF 阅读区" })).toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "任务面板" })).not.toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: "全文搜索" })).toBeInTheDocument();
@@ -20,7 +21,8 @@ describe("FaroPDF app shell", () => {
     expect(screen.getByRole("button", { name: "选择文件" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "图片转成 PDF" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Word 转成 PDF" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "最近文件" })).toBeInTheDocument();
+    // ISS-034：无真实最近文件时"最近"区域不显示
+    expect(screen.queryByRole("region", { name: "最近文件" })).not.toBeInTheDocument();
     expect(screen.getByText("文字层：未知")).toBeInTheDocument();
   });
 

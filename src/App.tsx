@@ -23,7 +23,7 @@ registerReadModeTools();
 function App() {
   const [settings, setSettings] = useState<AppSettings>(() => createDefaultAppSettings());
   const [activeMode, setActiveMode] = useState<AppModeId>("read");
-  const [utilityPanel, setUtilityPanel] = useState<UtilityPanelId>("summary");
+  const [utilityPanel, setUtilityPanel] = useState<UtilityPanelId>("none");
   const [loadedAnnotations, setLoadedAnnotations] = useState<PdfAnnotation[]>([]);
   // 批注 armed 状态（单一真相源），由 ContextToolbar 工具条 + AnnotationOverlay 共享
   const [annotationToolState, setAnnotationToolState] = useState<AnnotationToolState>(() => createInitialAnnotationToolState());

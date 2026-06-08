@@ -9,6 +9,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{AppHandle, Manager, State};
+use tauri::menu::{MenuBuilder, SubmenuBuilder};
 use url::Url;
 
 mod ocr_credentials;
@@ -482,6 +483,42 @@ pub fn run() {
             app.manage(ScanPreprocessJobQueueState(std::sync::Arc::new(Mutex::new(
                 scan_queue,
             ))));
+
+            // ISS-032: macOS 菜单栏中文化
+            let menu = MenuBuilder::new(app)
+                .item(&SubmenuBuilder::new(app, "文件")
+                    .text("new-window", "新建窗口")
+                    .text("open-file", "打开…")
+                    .separator()
+                    .text("close-window", "关闭窗口")
+                    .build()?)
+                .item(&SubmenuBuilder::new(app, "编辑")
+                    .undo()
+                    .redo()
+                    .separator()
+                    .cut()
+                    .copy()
+                    .paste()
+                    .select_all()
+                    .build()?)
+                .item(&SubmenuBuilder::new(app, "视图")
+                    .text("toggle-sidebar", "文档摘要")
+                    .text("page-manager", "页面管理")
+                    .text("view-settings", "视图设置")
+                    .separator()
+                    .text("toggle-fullscreen", "全屏")
+                    .build()?)
+                .item(&SubmenuBuilder::new(app, "窗口")
+                    .minimize()
+                    .separator()
+                    .close_window()
+                    .build()?)
+                .item(&SubmenuBuilder::new(app, "帮助")
+                    .text("about", "关于 FaroPDF")
+                    .build()?)
+                .build()?;
+            app.set_menu(menu)?;
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

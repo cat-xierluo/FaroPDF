@@ -4,40 +4,39 @@
 
 # FaroPDF
 
-面向律师的独立 PDF 阅读器 —— 打开卷宗、证据、判决、合同和扫描材料时能「快读、检索、批注、整理、OCR、表单签署」一条龙。
+一个面向知识工作者的独立 PDF 阅读器 —— 快读、检索、批注、OCR、页面整理、表单签署一条龙。
 
-`Faro` 取灯塔、指引之意。FaroPDF 想在厚重 PDF 材料里为法律工作者照亮重点：打开快、读得清、搜得到、批注能整理、扫描件能识别、页面能重排、交付能另存。
+`Faro` 取灯塔、指引之意。FaroPDF 帮你在厚重 PDF 材料里快速定位、标注、整理和交付：打开快、读得清、搜得到、批注能整理、扫描件能识别、页面能重排、签署能落地。
 
-## 官方仓库
+## 官方网站
 
+- 官网：[https://cat-xierluo.github.io/faropdf/](https://cat-xierluo.github.io/faropdf/)
 - 源码：[https://github.com/cat-xierluo/FaroPDF](https://github.com/cat-xierluo/FaroPDF)
-- Issue / 讨论：见上方 GitHub 仓库的 Issues 区
-- 官网：https://cat-xierluo.github.io/personal-site/faropdf/
 
 ## 下载与安装
 
-**当前状态：待发布**。FaroPDF 仍处于 `0.1.0-alpha` 阶段，全平台打包与自动更新流水线已就位（`docs/RELEASE.md` 记录了发布流程），但**尚未生成任何公开 release**。本节给出 release 上线后的下载入口占位说明，避免在 release 真正发布前误导用户。
+普通用户建议直接从 [GitHub Releases](https://github.com/cat-xierluo/FaroPDF/releases/latest) 下载最新版本。
 
-release 上线后，预期下载入口如下：
+- macOS Apple Silicon：下载带 `aarch64` / `arm64` 字样的 `.dmg`
+- macOS Intel：下载带 `x64` / `x86_64` 字样的 `.dmg`
+- Windows：下载 `.exe` 安装包
 
-- macOS Apple Silicon：`.dmg`（文件名带 `aarch64` / `arm64` 字样）
-- macOS Intel：`.dmg`（文件名带 `x64` / `x86_64` 字样）
-- Windows：`.exe` 或 `.msi` 安装包
+安装后 FaroPDF 会默认检查更新，也可以在"设置 / 关于"中手动检查或关闭自动检查。
 
-### macOS 首次运行（未来指引）
+### macOS 首次运行
 
-由于发布流水线尚未走 Apple Developer 公证，未来首个 release 在 macOS 上首次运行时可能提示「无法验证开发者」或「已损坏」。届时用户可先把 `FaroPDF.app` 拖到「应用程序」，再在终端执行：
+当前版本尚未做 Apple Developer 公证。如果 macOS 提示"无法验证开发者"或"已损坏"，请先把 `FaroPDF.app` 拖到"应用程序"，然后在终端执行一次：
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/FaroPDF.app
 open /Applications/FaroPDF.app
 ```
 
-> 该命令仅在用户确认应用来源可信时执行；具体首次运行步骤以届时 release 的 README 与 `docs/RELEASE.md` 为准。
+如果你把应用放在其他位置，请把命令里的 `/Applications/FaroPDF.app` 换成实际路径。这个命令只应对你信任来源的应用执行。
 
 ## 功能
 
-以下能力基于 0.1.0-alpha.0 至 0.1.0-alpha.11 实际交付范围（详见 `CHANGELOG.md`）：
+以下能力基于 v0.1.1 实际交付范围（详见 `CHANGELOG.md`）：
 
 ### 阅读与检索
 
@@ -126,10 +125,14 @@ open /Applications/FaroPDF.app
 
 **杨卫薪律师** —— 专注于技术类纠纷领域，包括知识产权、数据与 AI 相关争议，同时长期关注 AI 技术在法律实务、知识管理和专业写作中的应用。
 
-FaroPDF 是我在法律文档处理和 AI 协作实践中沉淀出来的桌面工具：解决卷宗 / 证据 / 扫描件 / 表单的快读、批注、OCR、页面整理和签署交付，让律师把更多时间留给案件本身。
+FaroPDF 是我在法律文档处理和 AI 协作实践中沉淀出来的独立 PDF 阅读器：重点解决法律 / 商务 / 学术场景下卷宗、合同、证据、扫描件和报告的快读、批注、OCR、页面整理与签署交付。
 
 - GitHub: [cat-xierluo](https://github.com/cat-xierluo)
 - 微信：`ywxlaw`
+
+<p>
+  <img src="src/assets/wechat-qrcode.png" alt="微信二维码" width="160" height="160">
+</p>
 
 ## 开发环境
 
@@ -179,6 +182,10 @@ npm run tauri build
 构建产物通常位于 `src-tauri/target/release/bundle/`（macOS 产出 `.dmg` / `.app`，Windows 产出 `.exe` / `.msi`，Linux 产出 `.AppImage` / `.deb`）。
 
 发布流程、产物矩阵、`latest.json` schema 与 keypair 管理见 `docs/RELEASE.md`。
+
+## 贡献
+
+欢迎通过 Issue / Pull Request 参与 FaroPDF。贡献流程、规范与 PDF 安全边界见 [`AGENTS.md`](AGENTS.md)。
 
 ## 许可
 

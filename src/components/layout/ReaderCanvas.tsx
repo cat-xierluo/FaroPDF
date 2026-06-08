@@ -34,8 +34,6 @@ const fileInputStyle: CSSProperties = {
   width: 1,
 };
 
-const recentPlaceholders = ["卷宗材料.pdf", "合同附件.pdf", "扫描件.pdf"];
-
 export function ReaderCanvas({ onOpenFile, onPageNavigate, onPageVisible, onRequestOcr, readerState, searchState, renderPageToCanvas }: ReaderCanvasProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const document = readerState.document;
@@ -103,20 +101,6 @@ export function ReaderCanvas({ onOpenFile, onPageNavigate, onPageVisible, onRequ
               选择文件
             </button>
           </section>
-          <section className="recent-start" aria-label="最近文件">
-            <div className="section-heading">
-              <h2>最近</h2>
-              <button type="button">清除最近</button>
-            </div>
-            <ol>
-              {recentPlaceholders.map((name) => (
-                <li key={name}>
-                  <div className="recent-card__thumb" aria-hidden="true" />
-                  <span>{name}</span>
-                </li>
-              ))}
-            </ol>
-          </section>
         </div>
       </main>
     );
@@ -125,6 +109,7 @@ export function ReaderCanvas({ onOpenFile, onPageNavigate, onPageVisible, onRequ
   return (
     <DocumentReader
       document={document}
+      onOpenFile={onOpenFile}
       onPageNavigate={onPageNavigate}
       onPageVisible={onPageVisible}
       onRequestOcr={onRequestOcr}
@@ -142,12 +127,13 @@ interface DocumentReaderProps {
   renderRange: ReaderState["renderRange"];
   searchState?: TextSearchState;
   renderPageToCanvas?: RenderPageToCanvasFn;
+  onOpenFile?: (file: File) => void | Promise<void>;
   onPageVisible?: (pageNumber: number) => void;
   onPageNavigate?: (nextPage: number) => void;
   onRequestOcr?: () => void;
 }
 
-function DocumentReader({ document, pageViewports, renderRange, searchState, renderPageToCanvas, onPageVisible, onPageNavigate, onRequestOcr }: DocumentReaderProps) {
+function DocumentReader({ document, pageViewports, renderRange, searchState, renderPageToCanvas, onOpenFile, onPageVisible, onPageNavigate, onRequestOcr }: DocumentReaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const activeHitPageNumber = searchState?.activeHit?.pageNumber;
@@ -225,8 +211,23 @@ function DocumentReader({ document, pageViewports, renderRange, searchState, ren
     width: pageWidth,
   };
 
+  function handleDrop(event: DragEvent<HTMLElement>) {
+    event.preventDefault();
+    const file = Array.from(event.dataTransfer.files).find(
+      (droppedFile) => droppedFile.type === "application/pdf" || droppedFile.name.toLowerCase().endsWith(".pdf"),
+    );
+    if (file) {
+      void onOpenFile?.(file);
+    }
+  }
+
   return (
-    <main className="reader" aria-label="PDF 阅读区">
+    <main
+      aria-label="PDF 阅读区"
+      className="reader"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDrop}
+    >
       {document.ocrStatus === "needed" ? (
         <div className="reader__status-banner reader__status-banner--ocr-needed" role="status" aria-live="polite">
           <div className="reader__status-banner-body">
@@ -348,8 +349,9 @@ function PdfPage({
           setRenderFailed(false);
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!cancelled) {
+          console.error(`[FaroPDF] 渲染第 ${pageNumber} 页失败:`, error);
           setRenderFailed(true);
         }
       });

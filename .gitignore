@@ -41,6 +41,7 @@ tests/fixtures/ocr/*.tmp
 tests/fixtures/ocr/*.bak
 
 # Claude Code
+.claude/settings.json
 .claude/settings.local.json
 .claude/skills/
 .claude/worktrees/

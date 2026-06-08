@@ -3570,3 +3570,82 @@ v0.1.1 流程：
 - 验证：3 个 bundles（macOS aarch64 + macOS x64 + Windows x64）+ 6 个 .sig 旁车 + latest.json + Gitee 镜像
 - 旧 v0.1.0 客户端通过 updater 拉到 v0.1.1 latest.json（keynum / pubkey 不变，签名链通）
 - 关联：DEC-048 / DEC-065 / DEC-070 / Folia `.github/workflows/release.yml`
+
+## DEC-072 移除 ISS-028 活跃任务卡（已迁移到 personal-site 仓完成）
+
+> 背景：FaroPDF `docs/TASKS.md` 自 2026-06-05 起把 ISS-028「杨卫薪律师个人主页 + 两产品展示」作为活跃任务登记，但 ISS-028 编号本属 personal-site 仓的体系（personal-site git log 可见 `a92dacd feat: 个人主页 v1 scaffold（ISS-028 Phase 1）`），FaroPDF 仓侧不应持有。DEC-054 §「后续路径」已明确"本 DEC 不实现，仅在 `docs/TASKS.md` 登记任务卡"——而 `docs/TASKS.md` § 推进策略 > 跨仓任务边界 进一步规定"杨卫薪律师个人主页 + 两产品展示 → 在 personal-site 仓的 `docs/TASKS.md` 追踪，**FaroPDF 仓不重复登记**"。
+
+### 1. personal-site 仓现状（2026-06-06 验证）
+
+- v0.1.0-alpha.8 已封箱（`personal-site/CHANGELOG.md` 2026-06-06 + latest commit `9897a89`）
+- ISS-001 ~ ISS-012 全部完成（ISS-008 自定义域按用户决策取消）
+- i18n（ISS-006）+ 微信二维码（ISS-007）+ 真实 QR 替换（ISS-010）+ URL 去 subpath（ISS-011）+ Legal Skills 集成（ISS-012）全部落定
+- 部署地址：`https://cat-xierluo.github.io/`
+
+### 2. 决策
+
+本次维护从 FaroPDF `docs/TASKS.md`「活跃任务」段移除 ISS-028 整张任务卡（21 行），迁移到「归档任务索引」段加一行「跨仓交付：personal-site ISS-001~012」交叉引用。FaroPDF 仓侧不再保留 ISS-028 任务卡本身，避免跨仓重复登记带来误导。
+
+### 3. 拒绝的方案
+
+- 在 FaroPDF 仓侧保留 ISS-028 作为「持续跟踪」占位 —— 已被 § 推进策略 > 跨仓任务边界 明文禁止，会导致两边任务卡状态不同步，徒增协调成本。
+- 把 ISS-028 整段迁出 + 留空指针 —— 跨仓状态由 personal-site 仓的 PM 单点维护，FaroPDF 仓侧连一行索引都保留会让两边 README 文档搜索体感割裂。
+
+### 4. 验证
+
+- `git diff docs/TASKS.md` 显示活跃任务段从 21 行减到 0，加 1 行跨仓交付索引
+- `git grep "ISS-028" docs/TASKS.md` 期望 0 命中
+- `git grep "ISS-028" docs/DECISIONS.md` 仍保留 DEC-054 历史引用 2 处（不删历史）
+
+### 5. 已知限制
+
+- personal-site 仓与 FaroPDF 仓的 ISS 编号体系各自独立，本次清理仅对 FaroPDF 仓侧
+- personal-site 仓的 ISS-013（v1.2 候选：博客 / 案例 / 时讯 / RSS / sitemap 等）由 personal-site 仓自己的 PM 推进
+
+### 6. 关联
+
+- DEC-054 §「后续路径」（ISS-028 登记处，保留历史引用）
+- `docs/TASKS.md` § 推进策略 > 跨仓任务边界（「FaroPDF 仓不重复登记」声明位置）
+
+## DEC-073 ISS-030 ~ ISS-038 批量完成（2026-06-07）
+
+- 日期：2026-06-07
+- 状态：已完成
+- 范围：UI 布局、缺陷修复、设计系统、本地化
+
+### 变更摘要
+
+| ISS | 类型 | 核心改动 |
+| --- | --- | --- |
+| ISS-030 | UI 布局 | 工具栏克制化：48px、无品牌区、compact 布局按钮、侧边栏默认关闭 |
+| ISS-031 | 缺陷修复 | DocumentReader DnD handler、PDF.js worker 幂等配置、渲染错误日志 |
+| ISS-032 | 本地化 | macOS 菜单栏中文化（Tauri v2 MenuBuilder/SubmenuBuilder） |
+| ISS-033 | 缺陷修复 | `.reader` 添加 `flex: 1` 修复灰色区域 |
+| ISS-034 | UI 清理 | 移除硬编码占位文件名和最近文件区域 |
+| ISS-035 | UI 视觉 | 设置页 focus-visible 统一 + 遗留 CSS 死代码清理 |
+| ISS-036 | 已知原因 | 私有仓库导致 latest.json 404，仓库公开后自动修复 |
+| ISS-037 | UI 布局 | 工具栏品牌区域去除（与 ISS-030 合并实现） |
+| ISS-038 | 设计系统 | DESIGN.md 重构为 21 节，对齐 Folia/Funes 成熟结构 |
+
+### 关键文件
+
+- `src/components/layout/Toolbar.tsx`（工具栏重写）
+- `src/components/layout/ReaderCanvas.tsx`（DnD + 空态清理）
+- `src/App.tsx`（侧边栏默认关闭）
+- `src/App.test.tsx`（测试适配）
+- `src/modules/settings/SettingsPanel.css`（focus-visible 统一）
+- `src/styles/app.css`（遗留 CSS 清理 + reader flex 修复）
+- `src-tauri/src/lib.rs`（macOS 中文菜单）
+- `docs/DESIGN.md`（21 节重构）
+
+### 决策
+
+1. 工具栏从 6 列（含 156px 品牌区）精简为 5 列，品牌信息只保留在设置页关于 section。
+2. 设置页 focus-visible 统一使用 accent + accent-soft 体系，删除 app.css 中与 SettingsPanel.css 冲突的遗留规则。
+3. macOS 菜单使用 Tauri v2 Rust Menu API 而非 tauri.conf.json 配置，获得更好的类型安全和运行时灵活性。
+4. DESIGN.md 从 8 节扁平文档重构为 21 节成熟结构，新增组件样式、信息密度、交互规则、深度层级、响应式、空态规范、工具栏克制原则、设置页规范、菜单栏规范、禁止事项、设计评审等章节。
+
+### 关联
+
+- `docs/TASKS.md` § 进度日志（2026-06-07 条目）
+- `docs/DESIGN.md` v2.0

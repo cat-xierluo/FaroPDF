@@ -56,18 +56,6 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
   const pageCount = document?.pageCount ?? 0;
   const zoom = document?.zoom ?? reader.state.defaults.zoom;
   const viewMode = document?.viewMode ?? reader.state.defaults.viewMode;
-  const fileSubtitle = (() => {
-    if (reader.state.status === "loading") {
-      return "正在打开";
-    }
-    if (document) {
-      return document.name;
-    }
-    if (reader.state.status === "error" && reader.state.errorMessage) {
-      return `打开失败：${reader.state.errorMessage}`;
-    }
-    return "未打开文档";
-  })();
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -89,55 +77,33 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
 
   return (
     <header className="toolbar">
-      <div className="toolbar__brand">
-        <span className="brand-mark" aria-hidden="true">
-          F
-        </span>
-        <div>
-          <h1>FaroPDF</h1>
-          <p title={fileSubtitle}>{fileSubtitle}</p>
-        </div>
-      </div>
-      <div className="toolbar__group toolbar__group--utility" aria-label="阅读区域">
+      <div className="toolbar__group toolbar__group--layout" aria-label="页面布局">
         <button
           aria-pressed={utilityPanel === "summary" && activeMode !== "pages"}
-          className="tool-button tool-button--icon"
+          className="tool-button tool-button--icon tool-button--compact"
           onClick={() => openUtilityPanel("summary")}
           title="文档摘要"
           type="button"
         >
           <PanelLeft size={16} />
-          <span>文档摘要</span>
         </button>
         <button
           aria-pressed={activeMode === "pages"}
-          className="tool-button tool-button--icon"
+          className="tool-button tool-button--icon tool-button--compact"
           onClick={() => onModeChange(activeMode === "pages" ? "read" : "pages")}
           title="页面管理"
           type="button"
         >
           <LayoutGrid size={16} />
-          <span>页面管理</span>
         </button>
         <button
           aria-pressed={utilityPanel === "view" && activeMode !== "pages"}
-          className="tool-button tool-button--icon"
+          className="tool-button tool-button--icon tool-button--compact"
           onClick={() => openUtilityPanel("view")}
           title="视图设置"
           type="button"
         >
           <PanelTop size={16} />
-          <span>视图设置</span>
-        </button>
-        <button
-          aria-pressed={utilityPanel === "forms" && activeMode !== "pages"}
-          className="tool-button tool-button--icon"
-          onClick={() => openUtilityPanel("forms")}
-          title="填写和签名"
-          type="button"
-        >
-          <FormInput size={16} />
-          <span>填写和签名</span>
         </button>
       </div>
       <div className="toolbar__group" aria-label="文件操作">
@@ -151,7 +117,7 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
         />
         <button className="tool-button tool-button--primary" onClick={() => fileInputRef.current?.click()} type="button">
           <FileUp size={16} />
-          <span>打开 PDF</span>
+          <span>打开</span>
         </button>
         <button className="tool-button" type="button">
           <Download size={16} />
