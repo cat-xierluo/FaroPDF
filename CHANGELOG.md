@@ -1,5 +1,7 @@
-## Unreleased
+## 0.1.2 - 2026-06-14
 
+
+> 0.1.2 封箱（2026-06-14）：3 阶段排查后批量修复 ISS-FIX-1~7 + ROADMAP 状态对齐（ISS-NEW-E）+ ISS-NEW-A 阶段 1 引擎（DEC-097 / PR #62）+ ISS-NEW-A 阶段 2 UI 入口（DEC-098 / PR #64）。typecheck / lint / vitest 884-885 / cargo test ocr_bridge_tests 11/11 / audit-stage-3 13/14 全部 0 回归。
 > ISS-030 ~ ISS-038 批量完成：工具栏克制化、UI 视觉统一、空态清理、菜单中文化、设计系统重构。
 
 UI 改进：
@@ -44,11 +46,11 @@ UI 改进：
 - `package-lock.json` → `pnpm-lock.yaml`
 - `.npmrc` 加 `lockfile=true` 覆盖用户级 npmrc 的 `package-lock=false`
 
-## Unreleased (continued) — ISS-NEW-A PDF 插入 / 合并 / 提取（DEC-097 / PR #62）
+## Unreleased (continued) — 保留为 0.1.2 历史段 — ISS-NEW-A PDF 插入 / 合并 / 提取（DEC-097 / PR #62 / DEC-098 / PR #64）
 
-> 2026-06-14 第 1 阶段排查报告 §3.2 指出 ROADMAP §5 行 66-67 "插入 PDF / 合并 / 提取页码范围" 整组标 [ ] 与 PDF Expert / Folia / Adobe 全员标配能力不符。阶段 1 推进后端能力 + 契约 + 单元测试；UI 入口留 PR #63 阶段 2。
+> 2026-06-14 第 1 阶段排查报告 §3.2 指出 ROADMAP §5 行 66-67 "插入 PDF / 合并 / 提取页码范围" 整组标 [ ] 与 PDF Expert / Folia / Adobe 全员标配能力不符。PR #62 阶段 1 推进后端能力 + 契约 + 单元测试；PR #64 阶段 2 落地 UI 入口。
 
-引擎：
+引擎（PR #62 / DEC-097）：
 
 - `src/shared/pdf/export.ts` 扩 `PdfExportOperation` 联合类型 3 个新值：`insert-pages` / `merge-pdfs` / `extract-pages`。
 - `src/shared/pdf/export.ts` `PdfExportRequest` 加 `additionalSources?: PdfExportSource[]`（仅 `merge-pdfs` 使用，按顺序追加）。
@@ -58,22 +60,11 @@ UI 改进：
 - `src/modules/export/pdfOperationEngine.ts` 加 3 个 handler：`applyInsertPages` / `applyMergePdfs` / `applyExtractPages`；走 pdf-lib `copyPages` + `insertPage` / `addPage` 真实改写 PDF 字节流。3 个新 operation 互斥检测，一次只允许 1 个，多 throw "互斥" 错误；不进入 `outputToolEntries`（其 type 是 6 个原 output tool 联合），写入新加的 `summary.rewritePlan` 字段。
 - `parsePageRangeExpression("2-5, 8, 11-13", max)` 1-based 字符串解析为 0-based 升序去重数组，越界 / 格式错抛明确错误。
 
-测试：
+引擎测试：
 
 - `src/modules/export/pdfOperationEngine.test.ts` 加 7 项单元测试（insert-pages 全部页 / insert-pages pageRange 子集 + 越界 / merge-pdfs 多份追加 / merge-pdfs 缺 additionalSources 报错 / extract-pages 子集 / extract-pages 缺 pageRange 报错 / 3 个 operation 互斥）。**34/34 测试通过**。
 
-文档：
-
-- `docs/ROADMAP.md` §5 行 66-67 状态从 [ ] 改为 "**部分**"，加 PR #62 指针。
-- `docs/DECISIONS.md` DEC-097 记录 ISS-NEW-A 阶段 1 决策 + 验证 + 已知限制。
-- `docs/plans/2026-06-14-iss-new-a-pdf-merge-split-design.md` 详细设计。
-
-UI 入口（PR #63 阶段 2 留待）：
-
-- 工具启动器 `organize` 分组加 3 个命令（`insert-pdf` / `merge-pdfs` / `extract-page-range`），工作台对话框承接源文件选择 + 插入位置 / 提取范围输入 + 默认 `*-inserted.pdf` / `*-merged.pdf` / `*-extracted.pdf` 输出路径。
-- `src/components/layout/PageOrganizerWorkspace.tsx` 加 3 个对话框 form。
-
-UI 入口（PR #63 阶段 2 已落）：
+UI 入口（PR #64 / DEC-098）：
 
 - `src/components/layout/PageOrganizerWorkspace.tsx` 工具条新增 3 个按钮：「插入 PDF」「合并多份 PDF」「提取页码范围」（在已有「撤销」「另存为新 PDF」之间，与原 7 个动作按钮共存）。
 - 3 个原生 `<dialog>` 表单承接输入：插入 PDF 收 PDF 文件 + 1-based 插入位置 + 可选页码范围 + 输出文件名；合并 PDF 收多份 PDF + 输出文件名；提取页码范围收 1-based 字符串 + 输出文件名。
@@ -81,10 +72,26 @@ UI 入口（PR #63 阶段 2 已落）：
 - 默认输出文件名：`<主源 base>-inserted.pdf` / `<主源 base>-merged.pdf` / `<主源 base>-extracted.pdf`（用 `reader.getCurrentFileName` 派生）。
 - `PageOrganizerWorkspace.css` 新增 `.page-organizer__form` / `.page-organizer__form-field` / `.page-organizer__form-error` / `.page-organizer__error` 4 类样式（沿用 DESIGN.md §3 / §10 工具栏克制原则；颜色 token 全部 `var(--*)`，圆角 6px / 间距 4-12px / 按钮 30px）。
 
-测试：
+UI 测试：
 
 - `src/components/layout/PageOrganizerWorkspace.test.tsx` 加 8 项新测试：3 按钮渲染、提取对话框预填、提取确认调 `engine.exportPdf` + `saveUpdatedBytes` + 对话框关闭、提取空范围错误、插入缺文件错误、插入选文件后确认调 `saveUpdatedBytes`、合并 0 文件错误、合并 2 文件后确认调 `saveUpdatedBytes` 且输出名以 `-merged` 结尾。**16/16 通过**。
 - jsdom 不实现 `DataTransfer` — 用 `Object.defineProperty` 数组代理 `FileList` 模拟 `fireEvent.change`。
+
+ISS-NEW-A 文档：
+
+- `docs/ROADMAP.md` §5 行 66-67 状态从 [ ] 改为 "**部分**"（PR #62 + PR #64 双标），加 PR 指针。
+- `docs/DECISIONS.md` DEC-097（阶段 1）+ DEC-098（阶段 2）记录决策 + 验证 + 已知限制。
+- `docs/plans/2026-06-14-iss-new-a-pdf-merge-split-design.md` 详细设计。
+
+ISS-FIX-1 ~ 7（PR #61）：
+
+- 3 阶段排查报告存于 `docs/plans/2026-06-14-faropdf-audit-stage-{1,2,3}-report.md`。
+- 6 个 P1 视觉偏差修复：Toolbar 左区 3 个按钮 `aria-label`（ISS-FIX-1 / DEC-094）/ `commands.ts` 启动器分组 `organize/deliver` 移位（ISS-FIX-2）/ `.reader` 硬编码 `#e4e8eb → var(--bg)` + `.page-organizer` `#dfe4e7 → var(--page-chrome)`（ISS-FIX-3）/ 4 处 `border-radius: 999px → 6px`（ISS-FIX-4）/ 3 处 `padding ... 9px → 8px`（ISS-FIX-5）/ DESIGN.md §1 加 5 个 token 文档 `--warning-bg/-border/-fg` + `--surface-soft` + `--page-chrome`（ISS-FIX-6）。
+- 1 个 P0 文档真相修订：OCR 真实接入实际已就位（ISS-007 E2E 联调 worker 0.1.0-alpha.10 落实），修订 `src/modules/ocr/README.md` / `docs/ARCHITECTURE.md` 移除遗留 "bridge/stub" 描述（ISS-FIX-7 / DEC-095）。
+- 1 个 ROADMAP 状态对齐（ISS-NEW-E / DEC-096）：§5 / §6 / §7 3 处 "**部分**" 标。
+- audit 验证：Playwright 14 场景 `scripts/audit-stage-3.mjs`，13 PASS / 0 FAIL / 1 PARTIAL（3.5 6px 数量偏低，§5 范围内）。
+- `scripts/audit-stage-3.mjs` 14 场景验证脚本 + `scripts/debug-setup-1.mjs` debug 脚本 + `config/eslint.config.js` scripts/**/*.mjs browser globals。
+- 测试：884/885 vitest（1 pre-existing useReaderController.test.tsx zoomIn/zoomOut 失败与本 PR 无关）/ `cargo test ocr_bridge_tests` 11/11 通过 / typecheck 0 / lint 0。
 
 新功能（来自 main，自动随 tag 出来）：
 
