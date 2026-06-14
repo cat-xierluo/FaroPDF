@@ -12,6 +12,8 @@ import {
 import "./SettingsPanel.css";
 
 interface SettingsPanelProps {
+  /** 打开时默认定位到的 section；原生“关于”菜单会直接进入 about。 */
+  initialSection?: SectionId;
   /** 是否打开；为 false 时组件不渲染 portal。 */
   open: boolean;
   /** 关闭回调（Esc / 点遮罩 / 点关闭按钮）。 */
@@ -33,7 +35,7 @@ const NARROW_BREAKPOINT = 768;
  * - 打开时把焦点送到关闭按钮，便于键盘用户；
  * - 窄屏（< NARROW_BREAKPOINT）时左侧导航折叠为顶部 tab。
  */
-export function SettingsPanel({ open, onClose, settings, onSettingsChange }: SettingsPanelProps) {
+export function SettingsPanel({ initialSection = "general", open, onClose, settings, onSettingsChange }: SettingsPanelProps) {
   const [activeSection, setActiveSection] = useState<SectionId>("general");
   const [isNarrow, setIsNarrow] = useState<boolean>(() =>
     typeof window === "undefined" ? false : window.innerWidth < NARROW_BREAKPOINT,
@@ -41,12 +43,18 @@ export function SettingsPanel({ open, onClose, settings, onSettingsChange }: Set
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
-  // 每次打开时重置到第一个 section，并恢复 / 抢占焦点
+  // 每次打开或外部入口变化时，定位到对应 section。
+  useEffect(() => {
+    if (open) {
+      setActiveSection(initialSection);
+    }
+  }, [initialSection, open]);
+
+  // 每次打开时恢复 / 抢占焦点。
   useEffect(() => {
     if (!open) {
       return;
     }
-    setActiveSection("general");
     previousFocusRef.current = (document.activeElement as HTMLElement | null) ?? null;
     // portal 挂载后 useEffect 同步触发，ref 已可用；直接 focus 即可。
     closeButtonRef.current?.focus();

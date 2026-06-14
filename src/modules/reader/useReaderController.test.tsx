@@ -9,10 +9,11 @@ import type { PdfPageText } from "../../shared/pdf/text";
 import type { PdfPageViewport } from "../../shared/pdf/types";
 
 vi.mock("./pdfReaderService", () => ({
+  loadPdfFromBytes: vi.fn(),
   loadPdfFromFile: vi.fn(),
 }));
 
-import { loadPdfFromFile } from "./pdfReaderService";
+import { loadPdfFromBytes, loadPdfFromFile } from "./pdfReaderService";
 
 const loadedMetadata: ReaderLoadedMetadata = {
   fileName: "doc.pdf",
@@ -68,6 +69,7 @@ async function flushEffects() {
 
 describe("useReaderController 阅读深化", () => {
   beforeEach(() => {
+    vi.mocked(loadPdfFromBytes).mockReset();
     vi.mocked(loadPdfFromFile).mockReset();
   });
 
@@ -94,6 +96,34 @@ describe("useReaderController 阅读深化", () => {
     expect(ref.current?.state.document?.rotation).toBe(0);
     act(() => ref.current?.setRotation(180));
     expect(ref.current?.state.document?.rotation).toBe(180);
+  });
+
+  test("openNativeFile 从 Tauri bytes 加载并保留路径", async () => {
+    vi.mocked(loadPdfFromBytes).mockResolvedValue(createLoadedDocument({
+      fileName: "native.pdf",
+      filePath: "/case/native.pdf",
+    }));
+
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} />);
+
+    await act(async () => {
+      await ref.current?.openNativeFile({
+        bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+        name: "native.pdf",
+        path: "/case/native.pdf",
+      });
+    });
+
+    expect(loadPdfFromBytes).toHaveBeenCalledWith({
+      data: expect.any(Uint8Array),
+      fileName: "native.pdf",
+      filePath: "/case/native.pdf",
+    });
+    expect(ref.current?.state.document).toMatchObject({
+      name: "native.pdf",
+      path: "/case/native.pdf",
+    });
   });
 
   test("goToNextPage/goToPreviousPage 触发翻页并夹紧边界", async () => {

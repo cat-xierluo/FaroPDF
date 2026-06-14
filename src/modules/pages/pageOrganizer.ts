@@ -2,6 +2,7 @@ import type {
   PdfExportFileRequest,
   PdfPageOperation,
   PdfPageOperationExportMode,
+  PdfPageOperationsExportOperation,
   PdfPageOrganizerAction,
   PdfPageOrganizerDocument,
   PdfPageOrganizerPage,
@@ -45,6 +46,12 @@ export interface PageOrganizerExportRequestInput {
    * `createPdfExportService` 读取，否则 `pdfExportService.exportToPath` 会因
    * 路径或读不到文件抛出明确错误。
    */
+  mode?: PdfPageOperationExportMode;
+}
+
+export interface PageOrganizerExportOperationInput {
+  exportId?: string;
+  requestedAt?: string;
   mode?: PdfPageOperationExportMode;
 }
 
@@ -223,15 +230,24 @@ export function createPageOrganizerExportRequest(
     inputPath,
     outputPath,
     fingerprint: input.fingerprint ?? state.document.fingerprint,
-    operations: [
-      {
-        id: `${id}-page-operations`,
-        type: "page-operations",
-        mode: input.mode ?? "execute",
-        operations: buildPageOperations(state, id, requestedAt),
-      },
-    ],
+    operations: [createPageOrganizerExportOperation(state, { exportId: id, requestedAt, mode: input.mode })],
     requestedAt,
+  };
+}
+
+export function createPageOrganizerExportOperation(
+  state: PdfPageOrganizerState,
+  input: PageOrganizerExportOperationInput = {},
+): PdfPageOperationsExportOperation {
+  const requestedAt = input.requestedAt ?? new Date().toISOString();
+  const exportId = input.exportId ?? `page-organizer-export-${requestedAt}`;
+  validatePageOrganizerState(state);
+
+  return {
+    id: `${exportId}-page-operations`,
+    type: "page-operations",
+    mode: input.mode ?? "execute",
+    operations: buildPageOperations(state, exportId, requestedAt),
   };
 }
 

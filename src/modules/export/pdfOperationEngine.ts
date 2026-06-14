@@ -88,6 +88,11 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
 
         if (isOutputToolOperation(operation)) {
           const result = await applyOutputToolOperation(workingPdf, operation, inputPageCount);
+          if (result.replacementPdf) {
+            workingPdf = result.replacementPdf;
+            inputPageCount = workingPdf.getPageCount();
+            summary.outputPageCount = inputPageCount;
+          }
           outputToolEntries.push(result.entry);
           warnings.push(...result.warnings);
           continue;
@@ -352,7 +357,7 @@ async function applyOutputToolOperation(
   pdf: PDFDocument,
   operation: PdfWatermarkOperation | PdfPageNumberOperation | PdfBatesNumberOperation | PdfCompressionOperation,
   inputPageCount: number,
-): Promise<{ entry: PdfOutputToolPlanEntry; warnings: string[] }> {
+): Promise<{ entry: PdfOutputToolPlanEntry; replacementPdf?: PDFDocument; warnings: string[] }> {
   const pageIndexes = resolveOutputToolPageIndexes(operation.pageIndexes, inputPageCount);
 
   if (operation.type === "watermark") {
@@ -407,6 +412,7 @@ async function applyOutputToolOperation(
         status: "applied",
         label: compressionResult.label,
       },
+      replacementPdf: compressionResult.pdf,
       warnings: compressionResult.warnings,
     };
   }
@@ -425,6 +431,7 @@ async function applyOutputToolOperation(
 
 interface CompressionApplyResult {
   label: string;
+  pdf: PDFDocument;
   warnings: string[];
 }
 
@@ -441,6 +448,9 @@ async function applyCompression(
     useObjectStreams: true,
     preset: operation.preset,
   });
+  const compressedPdf = await PDFDocument.load(compressionResult.bytes, {
+    updateMetadata: false,
+  });
 
   const ratio = compressionResult.ratio;
   const imageInfo = compressionResult.imageResampling;
@@ -451,6 +461,7 @@ async function applyCompression(
 
   return {
     label,
+    pdf: compressedPdf,
     warnings: [
       ...compressionResult.warnings,
       ...(pageIndexes.length === 0 ? ["PDF 压缩作用于全部页面；当前未指定 pageIndexes 时默认覆盖整份文档。"] : []),

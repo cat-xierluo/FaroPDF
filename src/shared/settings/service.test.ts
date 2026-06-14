@@ -19,6 +19,7 @@ describe("settings service", () => {
     const settings = await service.readSettings();
 
     expect(settings.defaultSavePolicy).toBe("always-export-copy");
+    expect(settings.themePreference).toBe("light");
     expect(settings.defaultOcrProviderId).toBe("local-ocrmypdf");
     expect(settings.requireNetworkOcrConfirmation).toBe(true);
     expect(settings.autoUpdateCheck).toBe(true);
@@ -44,6 +45,15 @@ describe("settings service", () => {
     const settings = await service.readSettings();
 
     expect(settings.autoUpdateCheck).toBe(true);
+  });
+
+  test("preserves persisted dark theme preference across readSettings", async () => {
+    vi.mocked(backend.readSettings).mockResolvedValue({ themePreference: "dark" });
+    const service = createSettingsService(backend);
+
+    const settings = await service.readSettings();
+
+    expect(settings.themePreference).toBe("dark");
   });
 
   test("updates settings through a sanitized storage view", async () => {

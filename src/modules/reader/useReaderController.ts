@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { AppSettings } from "../../shared/settings/types";
 import type { PdfPageText } from "../../shared/pdf/text";
 import type { PageRotation, PdfViewMode, ReaderSession, ZoomPresetId } from "../../shared/pdf/types";
-import { loadPdfFromFile, type LoadedPdfDocument } from "./pdfReaderService";
+import { loadPdfFromBytes, loadPdfFromFile, type LoadedPdfDocument } from "./pdfReaderService";
 import {
   createDefaultReaderSessionStorage,
   type ReaderSessionStorage,
@@ -13,6 +13,12 @@ import { applyZoomPresetId, clampZoom } from "./viewMode";
 interface CachedFile {
   name: string;
   bytesPromise: Promise<Uint8Array>;
+}
+
+interface NativeReaderFile {
+  bytes: Uint8Array;
+  name: string;
+  path: string;
 }
 
 export interface UseReaderControllerOptions {
@@ -49,6 +55,46 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     try {
       await loadedDocumentRef.current?.destroy();
       const loadedDocument = await loadPdfFromFile(file);
+      if (loadRequestIdRef.current !== loadRequestId) {
+        await loadedDocument.destroy();
+        return;
+      }
+
+      loadedDocumentRef.current = loadedDocument;
+      dispatch({
+        type: "reader/loadSucceeded",
+        payload: { documentId: `document-${loadRequestId}`, metadata: loadedDocument.metadata },
+      });
+    } catch (error) {
+      if (loadRequestIdRef.current !== loadRequestId) {
+        return;
+      }
+
+      cachedFileRef.current = null;
+      dispatch({
+        type: "reader/loadFailed",
+        payload: { errorMessage: error instanceof Error ? error.message : "无法打开 PDF" },
+      });
+    }
+  }, []);
+
+  const openNativeFile = useCallback(async (file: NativeReaderFile) => {
+    const loadRequestId = loadRequestIdRef.current + 1;
+    loadRequestIdRef.current = loadRequestId;
+    sessionRestoredRef.current = null;
+    dispatch({ type: "reader/loadStarted", payload: { fileName: file.name } });
+
+    const sourceBytes = new Uint8Array(file.bytes);
+    const bytesPromise = Promise.resolve(sourceBytes);
+    cachedFileRef.current = { name: file.name, bytesPromise };
+
+    try {
+      await loadedDocumentRef.current?.destroy();
+      const loadedDocument = await loadPdfFromBytes({
+        data: new Uint8Array(sourceBytes),
+        fileName: file.name,
+        filePath: file.path,
+      });
       if (loadRequestIdRef.current !== loadRequestId) {
         await loadedDocument.destroy();
         return;
@@ -201,14 +247,19 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
   }, []);
 
   /** 将 PDF 页面渲染到 canvas 元素 */
-  const renderPageToCanvas = useCallback(async (pageIndex: number, canvas: HTMLCanvasElement, zoom: number) => {
+  const renderPageToCanvas = useCallback(async (
+    pageIndex: number,
+    canvas: HTMLCanvasElement,
+    zoom: number,
+    options?: { signal?: AbortSignal },
+  ) => {
     const loadedDocument = loadedDocumentRef.current;
 
     if (!loadedDocument) {
       return;
     }
 
-    return loadedDocument.renderPageToCanvas(pageIndex, canvas, zoom);
+    return loadedDocument.renderPageToCanvas(pageIndex, canvas, zoom, options);
   }, []);
 
   /** 将指定页以缩略图尺寸渲染到 canvas，maxWidth 约束最长边像素。文档未打开时 no-op。 */
@@ -266,6 +317,7 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
   return {
     state,
     openFile,
+    openNativeFile,
     setCurrentPage,
     setZoom,
     zoomIn,

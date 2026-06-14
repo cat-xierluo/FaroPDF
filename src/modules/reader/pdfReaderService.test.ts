@@ -3,7 +3,7 @@ import { loadPdfFromBytes, loadPdfFromFile, type PdfJsReaderAdapter } from "./pd
 
 function createAdapter() {
   const calls: string[] = [];
-  const renderMock = vi.fn(async () => ({ promise: Promise.resolve() }));
+  const renderMock = vi.fn(() => ({ promise: Promise.resolve() }));
   const getPage = vi.fn(async (pageNumber: number) => ({
     rotate: pageNumber === 2 ? 90 : 0,
     getTextContent: vi.fn(async () => ({
@@ -167,6 +167,44 @@ describe("pdfReaderService", () => {
     expect(getPage).toHaveBeenCalledWith(2);
 
     await loaded.destroy();
+  });
+
+  test("renderPageToCanvas aborts the PDF.js render task when the signal is aborted", async () => {
+    const cancel = vi.fn();
+    const renderPromise = new Promise<void>(() => undefined);
+    const page = {
+      rotate: 0,
+      getTextContent: vi.fn(async () => ({ items: [{ str: "page" }] })),
+      getViewport: ({ scale }: { scale: number }) => ({
+        width: 612 * scale,
+        height: 792 * scale,
+        rotation: 0,
+      }),
+      render: vi.fn(() => ({ promise: renderPromise, cancel })),
+    };
+    const document = {
+      numPages: 1,
+      fingerprints: ["fingerprint-abort"],
+      getPage: vi.fn(async () => page),
+    };
+    const adapter: PdfJsReaderAdapter = {
+      configureWorker: vi.fn(() => "/assets/pdf.worker.mjs"),
+      getDocument: vi.fn(() => ({ promise: Promise.resolve(document), destroy: vi.fn(async () => undefined) })),
+    };
+    const loaded = await loadPdfFromBytes({ data: new Uint8Array([1, 2, 3]), fileName: "abort.pdf" }, adapter);
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(() => ({ fillRect: vi.fn() })),
+    } as unknown as HTMLCanvasElement;
+    const controller = new AbortController();
+
+    const render = loaded.renderPageToCanvas(0, canvas, 1, { signal: controller.signal });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    controller.abort();
+
+    await expect(render).rejects.toMatchObject({ name: "AbortError" });
+    expect(cancel).toHaveBeenCalledOnce();
   });
 
   test("renderThumbnail 将页面按 maxWidth 缩放后写入 canvas", async () => {

@@ -10,9 +10,12 @@ import { createMemoryAnnotationStorage } from "./modules/annotation";
 import { AnnotationRepository } from "./modules/annotation";
 import { useReaderController } from "./modules/reader";
 import { registerReadModeTools } from "./modules/reader/readerModeTools";
+import { openNativePdfFileDialog } from "./modules/reader/tauriPdfFileService";
 import { useTextSearchController } from "./modules/search";
 import { useOcrWorkspaceController } from "./modules/ocr";
 import type { PdfAnnotation } from "./shared";
+import type { AppCommandSignal } from "./shared/app/commands";
+import { subscribeNativeMenuCommands } from "./shared/app/nativeMenuBridge";
 import type { AppSettings } from "./shared/settings/types";
 import { createDefaultAppSettings } from "./shared/settings/defaults";
 import "./styles/app.css";
@@ -24,10 +27,13 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(() => createDefaultAppSettings());
   const [activeMode, setActiveMode] = useState<AppModeId>("read");
   const [utilityPanel, setUtilityPanel] = useState<UtilityPanelId>("none");
+  const [commandSignal, setCommandSignal] = useState<AppCommandSignal | null>(null);
   const [loadedAnnotations, setLoadedAnnotations] = useState<PdfAnnotation[]>([]);
+  const commandNonceRef = useRef(0);
   // 批注 armed 状态（单一真相源），由 ContextToolbar 工具条 + AnnotationOverlay 共享
   const [annotationToolState, setAnnotationToolState] = useState<AnnotationToolState>(() => createInitialAnnotationToolState());
   const reader = useReaderController(settings);
+  const readerRef = useRef(reader);
   const search = useTextSearchController({
     document: reader.state.document,
     readPageText: reader.getPageText,
@@ -50,6 +56,13 @@ function App() {
       [ocrDocumentPath, settings.ocrProviders, settings.defaultOcrProviderId, settings.requireNetworkOcrConfirmation],
     ),
   );
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.themePreference;
+    return () => {
+      document.documentElement.removeAttribute("data-theme");
+    };
+  }, [settings.themePreference]);
 
   // 批注服务实例：使用内存存储，后续可替换为文件存储
   const annotationServiceRef = useRef<AnnotationService | null>(null);
@@ -110,6 +123,42 @@ function App() {
     }
   }
 
+  useEffect(() => {
+    readerRef.current = reader;
+  }, [reader]);
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    void subscribeNativeMenuCommands((id) => {
+      if (id === "file-open") {
+        void openNativePdfFileDialog()
+          .then((file) => {
+            if (file) {
+              void readerRef.current.openNativeFile(file);
+            }
+          })
+          .catch(() => undefined);
+        return;
+      }
+
+      commandNonceRef.current += 1;
+      setCommandSignal({ id, nonce: commandNonceRef.current });
+    }).then((nextUnlisten) => {
+      if (disposed) {
+        nextUnlisten();
+      } else {
+        unlisten = nextUnlisten;
+      }
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
   const handleSettingsChange = useCallback((next: AppSettings) => {
     // 设置面板通过 Portal 浮层即时更新 App 状态；后续接入 SettingsService 做
     // 持久化与校验失败回滚时，只需在这里替换 setSettings 为 service.updateSettings。
@@ -159,6 +208,7 @@ function App() {
       activeMode={activeMode}
       annotationArmed={{ state: annotationToolState, onStateChange: setAnnotationToolState }}
       annotations={loadedAnnotations}
+      commandSignal={commandSignal}
       ocr={ocrController}
       onAnnotationDraft={handleAnnotationDraft}
       onModeChange={handleModeChange}

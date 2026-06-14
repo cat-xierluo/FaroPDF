@@ -140,6 +140,30 @@ describe("ReaderCanvas 阅读深化", () => {
     });
   });
 
+  test("重新渲染同一页时中止上一轮 canvas 渲染", async () => {
+    const firstRender = new Promise<void>(() => undefined);
+    const renderPageToCanvas = vi.fn(() => firstRender) as unknown as ReturnType<typeof vi.fn> & RenderPageToCanvasFn;
+    const firstState = makeState({
+      document: { ...baseDocument, viewMode: "single", currentPage: 1, zoom: 1 },
+      renderRange: { endPage: 1, pageNumbers: [1], startPage: 1 },
+    });
+    const nextState = makeState({
+      document: { ...baseDocument, viewMode: "single", currentPage: 1, zoom: 1.25 },
+      renderRange: { endPage: 1, pageNumbers: [1], startPage: 1 },
+    });
+
+    const { rerender } = render(<ReaderCanvas renderPageToCanvas={renderPageToCanvas} readerState={firstState} />);
+    await vi.waitFor(() => expect(renderPageToCanvas).toHaveBeenCalledTimes(1));
+    const firstOptions = renderPageToCanvas.mock.calls[0]?.[3] as { signal?: AbortSignal } | undefined;
+
+    rerender(<ReaderCanvas renderPageToCanvas={renderPageToCanvas} readerState={nextState} />);
+
+    await vi.waitFor(() => expect(renderPageToCanvas).toHaveBeenCalledTimes(2));
+    expect(firstOptions?.signal?.aborted).toBe(true);
+    const secondOptions = renderPageToCanvas.mock.calls[1]?.[3] as { signal?: AbortSignal } | undefined;
+    expect(secondOptions?.signal?.aborted).toBe(false);
+  });
+
   test("ReaderCanvas 暴露 reader-status-footer 区域给状态栏测试", () => {
     const state = makeState();
     render(<ReaderCanvas readerState={state} />);

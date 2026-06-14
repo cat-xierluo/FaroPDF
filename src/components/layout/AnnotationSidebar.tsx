@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useMemo, useState, type ChangeEvent } from "react";
 import type { PdfAnnotation, PdfAnnotationType } from "../../shared/pdf/annotation";
 import {
   ANNOTATION_SIDEBAR_COLOR_CHOICES,
@@ -46,6 +46,19 @@ const ANNOTATION_SIDEBAR_GROUP_BY_ARIA: Record<AnnotationSidebarGroupBy, string>
 
 const NO_LABELS_KEY = "__no_labels__";
 
+export interface AnnotationFlattenResult {
+  annotationCount: number;
+  drawnCount: number;
+  fileName: string;
+  skippedCount: number;
+}
+
+type AnnotationFlattenStatus =
+  | { kind: "idle" }
+  | { kind: "running"; message: string }
+  | { kind: "success"; message: string }
+  | { kind: "error"; message: string };
+
 /**
  * 批注侧边栏：4 维度分组（页码/颜色/类型/标签）+ 搜索/筛选 + 跳转。
  *
@@ -65,6 +78,10 @@ export interface AnnotationSidebarProps {
   activeAnnotationId?: string | null;
   /** 点击批注触发选中回调 */
   onAnnotationClick?: (annotationId: string) => void;
+  /** 将当前批注真实绘制到新 PDF 副本；入口只在有批注且父级接线后显示 */
+  onFlattenAnnotations?: () => Promise<AnnotationFlattenResult>;
+  /** 深层命令可请求侧栏打开指定视图，nonce 变化时重新应用。 */
+  preferredViewSignal?: { view: "list" | "summary"; nonce: number };
 }
 
 export function AnnotationSidebar({
@@ -73,14 +90,23 @@ export function AnnotationSidebar({
   currentPage,
   hasDocument,
   onAnnotationClick,
+  onFlattenAnnotations,
   onSelectPage,
   pageCount,
+  preferredViewSignal,
 }: AnnotationSidebarProps) {
-  const [view, setView] = useState<"list" | "summary">("list");
+  const [view, setView] = useState<"list" | "summary">(preferredViewSignal?.view ?? "list");
   const [groupBy, setGroupBy] = useState<AnnotationSidebarGroupBy>("page");
   const [filters, setFilters] = useState<AnnotationSidebarFilterState>({});
+  const [flattenStatus, setFlattenStatus] = useState<AnnotationFlattenStatus>({ kind: "idle" });
   const groupById = useId();
   const queryId = useId();
+
+  useEffect(() => {
+    if (preferredViewSignal) {
+      setView(preferredViewSignal.view);
+    }
+  }, [preferredViewSignal?.nonce, preferredViewSignal?.view]);
 
   const allLabelChoices = useMemo(() => collectAnnotationLabelChoices(annotations), [annotations]);
 
@@ -136,6 +162,27 @@ export function AnnotationSidebar({
 
   function handleClearFilters() {
     setFilters({});
+  }
+
+  async function handleFlattenAnnotations() {
+    if (!onFlattenAnnotations || flattenStatus.kind === "running") {
+      return;
+    }
+
+    setFlattenStatus({ kind: "running", message: "正在生成批注扁平化副本..." });
+    try {
+      const result = await onFlattenAnnotations();
+      const skippedMessage = result.skippedCount > 0 ? `，跳过 ${result.skippedCount} 个` : "";
+      setFlattenStatus({
+        kind: "success",
+        message: `已导出 ${result.fileName}（绘制 ${result.drawnCount} / ${result.annotationCount} 个批注${skippedMessage}）`,
+      });
+    } catch (error) {
+      setFlattenStatus({
+        kind: "error",
+        message: error instanceof Error ? error.message : "批注扁平化导出失败。",
+      });
+    }
   }
 
   function toggleType(type: PdfAnnotationType) {
@@ -207,6 +254,28 @@ export function AnnotationSidebar({
           </button>
         </div>
         <p className="annotation-sidebar__hint">支持搜索、筛选、跳转与分组</p>
+        {onFlattenAnnotations ? (
+          <div className="annotation-sidebar__actions">
+            <button
+              className="annotation-sidebar__action"
+              disabled={flattenStatus.kind === "running"}
+              onClick={() => {
+                void handleFlattenAnnotations();
+              }}
+              type="button"
+            >
+              {flattenStatus.kind === "running" ? "正在导出..." : "扁平化导出"}
+            </button>
+          </div>
+        ) : null}
+        {flattenStatus.kind !== "idle" ? (
+          <p
+            className={`annotation-sidebar__status annotation-sidebar__status--${flattenStatus.kind}`}
+            role="status"
+          >
+            {flattenStatus.message}
+          </p>
+        ) : null}
       </header>
 
       <div

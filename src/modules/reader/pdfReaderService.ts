@@ -22,6 +22,11 @@ interface PdfJsPageLike {
   getTextContent?: () => Promise<PdfJsTextContentLike>;
 }
 
+interface PdfJsRenderTaskLike {
+  promise: Promise<void>;
+  cancel?: () => void;
+}
+
 interface PdfJsDocumentLike {
   numPages: number;
   fingerprints?: Array<string | null>;
@@ -43,7 +48,12 @@ export interface LoadedPdfDocument {
   getPageViewport: (pageIndex: number, scale?: number) => Promise<PdfPageViewport>;
   getPageText: (pageIndex: number) => Promise<PdfPageText>;
   /** 将指定页渲染到 canvas 上 */
-  renderPageToCanvas: (pageIndex: number, canvas: HTMLCanvasElement, zoom: number) => Promise<void>;
+  renderPageToCanvas: (
+    pageIndex: number,
+    canvas: HTMLCanvasElement,
+    zoom: number,
+    options?: { signal?: AbortSignal },
+  ) => Promise<void>;
   /** 将指定页以缩略图尺寸渲染到 canvas；maxWidth 约束最长边。失败时抛出错误。 */
   renderThumbnail: (pageIndex: number, canvas: HTMLCanvasElement, maxWidth: number) => Promise<void>;
   destroy: () => Promise<void>;
@@ -98,8 +108,11 @@ async function renderPageToCanvas(
   pageIndex: number,
   canvas: HTMLCanvasElement,
   zoom: number,
+  options: { signal?: AbortSignal } = {},
 ): Promise<void> {
+  throwIfAborted(options.signal);
   const page = await document.getPage(pageIndex + 1);
+  throwIfAborted(options.signal);
   const viewport = page.getViewport({ scale: zoom });
   canvas.width = viewport.width;
   canvas.height = viewport.height;
@@ -110,8 +123,8 @@ async function renderPageToCanvas(
   // PDF.js 渲染接口：page.render 接受 canvasContext 和 viewport
   const renderContext = { canvasContext: context, viewport };
   // page.render() 返回包含 promise 属性的对象
-  const renderResult = (page as unknown as { render(ctx: typeof renderContext): { promise: Promise<void> } }).render(renderContext);
-  await renderResult.promise;
+  const renderResult = (page as unknown as { render(ctx: typeof renderContext): PdfJsRenderTaskLike }).render(renderContext);
+  await waitForRenderTask(renderResult, options.signal);
 }
 
 /** 将指定页以缩略图尺寸渲染到 canvas，maxWidth 约束最长边像素。
@@ -227,6 +240,63 @@ function isAsciiWordChar(character: string) {
   return /^[A-Za-z0-9]$/.test(character);
 }
 
+async function waitForRenderTask(renderTask: PdfJsRenderTaskLike, signal?: AbortSignal): Promise<void> {
+  if (!signal) {
+    await renderTask.promise;
+    return;
+  }
+
+  throwIfAborted(signal);
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      signal.removeEventListener("abort", handleAbort);
+    };
+    const settle = (callback: () => void) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      callback();
+    };
+    const handleAbort = () => {
+      renderTask.cancel?.();
+      settle(() => reject(createAbortError()));
+    };
+
+    signal.addEventListener("abort", handleAbort, { once: true });
+    renderTask.promise.then(
+      () => settle(resolve),
+      (error: unknown) => {
+        if (signal.aborted) {
+          settle(() => reject(createAbortError()));
+          return;
+        }
+        settle(() => reject(error));
+      },
+    );
+  });
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw createAbortError();
+  }
+}
+
+function createAbortError(): DOMException {
+  if (typeof DOMException !== "undefined") {
+    return new DOMException("PDF 页面渲染已取消。", "AbortError");
+  }
+
+  const error = new Error("PDF 页面渲染已取消。") as Error & { name: string };
+  error.name = "AbortError";
+
+  return error as unknown as DOMException;
+}
+
 export async function loadPdfFromBytes(
   input: ReaderByteLoadInput,
   adapter: PdfJsReaderAdapter = defaultAdapter,
@@ -256,7 +326,7 @@ export async function loadPdfFromBytes(
     },
     getPageViewport: (pageIndex, scale = 1) => readPageViewport(document, pageIndex, scale),
     getPageText: (pageIndex) => readPageText(document, pageIndex),
-    renderPageToCanvas: (pageIndex, canvas, zoom) => renderPageToCanvas(document, pageIndex, canvas, zoom),
+    renderPageToCanvas: (pageIndex, canvas, zoom, options) => renderPageToCanvas(document, pageIndex, canvas, zoom, options),
     renderThumbnail: (pageIndex, canvas, maxWidth) => renderThumbnail(document, pageIndex, canvas, maxWidth),
     destroy: () => loadingTask.destroy?.() ?? Promise.resolve(),
   };

@@ -50,3 +50,11 @@ tests/fixtures/ocr/*.bak
 # Codex runtime
 .codex/
 .worktree-info/
+
+# 排查临时文件(audit-screenshots / dev-server log 等)
+tmp/audit-screenshots/
+tmp/dev-server.log
+tmp/*.log
+
+# Playwright MCP log 目录
+.playwright-mcp/

@@ -40,12 +40,13 @@ open /Applications/FaroPDF.app
 
 ### 阅读与检索
 
+- 阅读态顶栏保持克制：布局、打开、页码 / 缩放、搜索、工具和设置；批注、导出、填写签名、OCR 从 `工具` 工作流菜单进入
 - 打开本地 PDF（对话框 / 拖拽），PDF.js worker 独立加载，不阻塞主线程
 - 页面虚拟化：只渲染可见页和邻近页，大卷宗打开轻快
 - 4 种视图模式：连续 / 单页 / 双页 / 适合宽度
 - 8 项缩放预设（50/75/100/125/150/200% / 适合宽度 / 适合页面）+ 顺 / 逆时针 90° 旋转
 - 键盘翻页（PageUp / PageDown / 方向键 / Space / Home / End）
-- 左侧文档摘要：真实缩略图、按页码跳转、当前页高亮、批注 / 搜索 / OCR 状态标记
+- 左侧文档摘要：真实缩略图、按页码跳转、当前页高亮、紧凑批注 / 搜索 / OCR 状态标记
 - 阅读位置本地恢复（按 PDF fingerprint 持久化 currentPage / zoom / viewMode / rotation）
 - 全文搜索：按需建立页文本索引、命中列表、上下文片段、当前页轻量高亮、上下一个命中跳转
 - 搜索结果层：索引计数、命中页码 chip、当前命中高亮、自动滚到对应页
@@ -88,7 +89,7 @@ open /Applications/FaroPDF.app
 - 导出引擎（pdf-lib）：复制、删除、重排、旋转真实改写
 - 表单扁平化：`form.flatten()`，单次 `PDFDocument.load` 后批量执行 fill / sign / flatten
 - 批注扁平化：plan-only 与 draw 双策略，draw 走 `writeAnnotationPdf`
-- 文字 / 图片水印、Bates 编号、普通页码写入 PDF
+- 文字 / 图片水印、页眉页脚（全部页面 / 奇数页 / 偶数页，页眉 / 页脚位置）、Bates 编号、普通页码写入 PDF
 - 证据图片 A4 编排：JPEG / PNG 真实拾取、PDF 页面真实嵌入、按 A4 1 / 2 / 3 / 4 张每页自动编排
 - 压缩预设 plan-only（真实图像重编码留 follow-up）
 - 默认输出 `*-delivery.pdf` / `*-organized.pdf` / `*-evidence-pack.pdf` 等新文件
@@ -103,7 +104,8 @@ open /Applications/FaroPDF.app
 
 ### 设置
 
-- 默认保存目录、最近文件、默认缩放和阅读布局
+- 默认保存目录、最近文件、默认缩放、阅读布局和浅色 / 深色外观
+- macOS 中文菜单栏：新建窗口、打开、另存为、视图 / 工具深层入口和帮助关于；系统窗口动作不显示占位提示
 - OCR provider 配置：本地 `ocrmypdf`、PaddleOCR、MinerU
 - 联网 OCR 隐私确认策略（云端 OCR 必须用户主动确认）
 - API Key 脱敏：不写入版本库，不在 UI / 日志 / 错误报告中完整输出

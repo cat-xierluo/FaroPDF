@@ -5,7 +5,13 @@ import { createDefaultAppSettings, exportSafeAppSettings } from "../../shared/se
 import type { AppSettings } from "../../shared/settings/types";
 import { SettingsPanel } from "./SettingsPanel";
 
-function renderPanel(overrides: Partial<{ open: boolean; onClose: () => void; onSettingsChange: (s: AppSettings) => void; settings: AppSettings }> = {}) {
+function renderPanel(overrides: Partial<{
+  initialSection: "general" | "reader" | "ocr" | "shortcuts" | "about";
+  open: boolean;
+  onClose: () => void;
+  onSettingsChange: (s: AppSettings) => void;
+  settings: AppSettings;
+}> = {}) {
   const onClose: Mock<() => void> = (overrides.onClose ? vi.fn(overrides.onClose) : vi.fn()) as Mock<() => void>;
   const onSettingsChange: Mock<(s: AppSettings) => void> = (overrides.onSettingsChange
     ? vi.fn(overrides.onSettingsChange)
@@ -13,6 +19,7 @@ function renderPanel(overrides: Partial<{ open: boolean; onClose: () => void; on
   const settings = overrides.settings ?? createDefaultAppSettings();
   const utils = render(
     <SettingsPanel
+      initialSection={overrides.initialSection}
       onClose={onClose}
       onSettingsChange={onSettingsChange}
       open={overrides.open ?? true}
@@ -53,6 +60,18 @@ describe("SettingsPanel", () => {
     const { unmount } = renderPanel();
     expect(screen.getByRole("tabpanel", { name: "常规" })).toBeInTheDocument();
     expect(screen.getByLabelText("默认保存策略")).toBeInTheDocument();
+    unmount();
+  });
+
+  test("can open directly to the about section", async () => {
+    const { unmount } = renderPanel({ initialSection: "about" });
+    const nav = screen.getByRole("tablist", { name: "设置分类" });
+    expect(within(nav).getByRole("tab", { name: "关于" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: "关于" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "官网" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("github.com"),
+    );
     unmount();
   });
 
@@ -113,7 +132,7 @@ describe("SettingsPanel", () => {
     const safeSettings = exportSafeAppSettings(settings);
     const { unmount } = renderPanel({ settings: safeSettings });
     await user.click(screen.getByRole("tab", { name: "OCR provider" }));
-    expect(screen.getByLabelText("PaddleOCR API Key 引用")).toHaveAttribute("placeholder", "padd...3456");
+    expect(await screen.findByLabelText("PaddleOCR API Key 引用")).toHaveAttribute("placeholder", "padd...3456");
     unmount();
   });
 
@@ -121,7 +140,7 @@ describe("SettingsPanel", () => {
     const user = userEvent.setup();
     const { unmount } = renderPanel();
     await user.click(screen.getByRole("tab", { name: "关于" }));
-    expect(screen.getByRole("link", { name: "官网" })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: "官网" })).toHaveAttribute(
       "href",
       expect.stringContaining("github.com"),
     );
@@ -130,7 +149,7 @@ describe("SettingsPanel", () => {
 
   test("default general section renders without Suspense fallback", () => {
     const { unmount } = renderPanel();
-    expect(screen.queryByText("默认保存策略")).not.toBeInTheDocument();
+    expect(document.body.querySelector(".settings-section-skeleton")).not.toBeInTheDocument();
     expect(screen.getByLabelText("默认保存策略")).toBeInTheDocument();
     unmount();
   });

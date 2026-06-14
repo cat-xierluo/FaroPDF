@@ -58,7 +58,7 @@ interface ToolAvailability {
   pdftotextVersion: string | null;
 }
 
-let tools: ToolAvailability = {
+const tools: ToolAvailability = {
   ocrmypdf: false,
   pdftotext: false,
   ocrmypdfVersion: null,
@@ -67,7 +67,6 @@ let tools: ToolAvailability = {
 
 function requireTools(): boolean {
   if (!tools.ocrmypdf || !tools.pdftotext) {
-    // eslint-disable-next-line no-console
     console.warn(
       `[ocr-e2e] skipping (ocrmypdf=${tools.ocrmypdfVersion ?? "missing"} pdftotext=${tools.pdftotextVersion ?? "missing"})`,
     );
@@ -138,11 +137,6 @@ async function probeTool(command: string, args: string[]): Promise<string> {
       }
     });
   });
-}
-
-interface BackendResult {
-  job: OcrCommandJob;
-  outputPath: string;
 }
 
 function runOcrmypdf(args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
@@ -373,6 +367,7 @@ beforeAll(async () => {
   } catch (error) {
     throw new Error(
       `无法生成 OCR E2E fixture：${error instanceof Error ? error.stack : String(error)}`,
+      { cause: error },
     );
   }
 
@@ -391,7 +386,6 @@ beforeAll(async () => {
     tools.pdftotext = false;
   }
 
-  // eslint-disable-next-line no-console
   console.log(
     `[ocr-e2e] fixture=${fixtureSize}B ocrmypdf=${tools.ocrmypdfVersion ?? "missing"} pdftotext=${tools.pdftotextVersion ?? "missing"}`,
   );

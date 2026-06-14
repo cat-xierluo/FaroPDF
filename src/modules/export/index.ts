@@ -6,6 +6,8 @@ export { createPdfOutputToolsExportRequest, suggestPdfOutputToolsPath } from "./
 export type { CreatePdfOutputToolsExportRequestInput } from "./outputTools";
 export { compressPdf } from "./compressionService";
 export type { CompressionOptions, CompressionResult } from "./compressionService";
+export { ExportDeliveryPanel } from "./ui/ExportDeliveryPanel";
+export type { ExportDeliveryTool } from "./ui/ExportDeliveryPanel";
 export {
   COURT_UPLOAD_PRESETS,
   COURT_UPLOAD_PRESET_TINY,

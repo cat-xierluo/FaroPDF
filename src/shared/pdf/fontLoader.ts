@@ -67,7 +67,7 @@ export async function embedChineseFont(
   return pdfDoc.embedFont(bytes, { subset: true });
 }
 
-const CJK_PATTERN = /[㐀-䶿一-鿿＀-￯　-〿぀-ゟ゠-ヿ]/;
+const CJK_PATTERN = /[\u3400-\u4dbf\u4e00-\u9fff\uff00-\uffef\u3000-\u303f\u3040-\u309f\u30a0-\u30ff]/;
 
 export function containsCjk(text: string): boolean {
   if (text.length === 0) {

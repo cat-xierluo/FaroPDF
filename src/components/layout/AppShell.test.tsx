@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { PDFDocument } from "pdf-lib";
 import { describe, expect, test, vi } from "vitest";
 import type { PdfAnnotation } from "../../shared/pdf/annotation";
 import type { AppSettings } from "../../shared/settings/types";
@@ -11,6 +12,7 @@ import { createInitialAnnotationToolState } from "../../modules/annotation";
 import { AppShell } from "./AppShell";
 import type { AnnotationArmedStateBundle, AppModeId, UtilityPanelId } from "./types";
 import type { OcrWorkspaceController } from "../../modules/ocr";
+import type { AppCommandSignal } from "../../shared/app/commands";
 
 function makeAnnotation(overrides: Partial<PdfAnnotation> & { id: string; pageIndex: number }): PdfAnnotation {
   return {
@@ -53,6 +55,14 @@ function makeSearch(overrides: Partial<TextSearchController> = {}): TextSearchCo
 
 function makeSettings(): AppSettings {
   return createDefaultAppSettings();
+}
+
+async function createBlankPdf(pageCount: number): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+    pdf.addPage([612, 792]);
+  }
+  return pdf.save();
 }
 
 function makeOcrController(overrides: Partial<OcrWorkspaceController> = {}): OcrWorkspaceController {
@@ -109,6 +119,7 @@ interface RenderArgs {
   activeMode?: AppModeId;
   annotations?: PdfAnnotation[];
   annotationArmed?: AnnotationArmedStateBundle;
+  commandSignal?: AppCommandSignal | null;
   onModeChange?: (mode: AppModeId) => void;
   onUtilityPanelChange?: (panel: UtilityPanelId) => void;
   reader?: ReaderController;
@@ -125,6 +136,7 @@ function renderAppShell(args: RenderArgs = {}) {
       activeMode={args.activeMode ?? "read"}
       annotationArmed={args.annotationArmed}
       annotations={args.annotations}
+      commandSignal={args.commandSignal}
       onModeChange={onModeChange}
       onUtilityPanelChange={onUtilityPanelChange}
       reader={args.reader ?? makeReader()}
@@ -156,6 +168,32 @@ function renderShell(
       utilityPanel="summary"
     />,
   );
+}
+
+function makeReadyReader(pageCount = 3): ReaderController {
+  return makeReader({
+    state: {
+      status: "ready",
+      defaults: { viewMode: "continuous", zoom: 1 },
+      document: {
+        documentId: "doc-1",
+        path: "test.pdf",
+        fingerprint: "fp-1",
+        name: "test.pdf",
+        currentPage: 1,
+        pageCount,
+        zoom: 1,
+        viewMode: "continuous",
+        rotation: 0,
+        textLayerStatus: "available",
+        ocrStatus: "not-needed",
+        dirty: false,
+      },
+      pageViewports: [{ pageIndex: 0, width: 612, height: 792, rotation: 0, scale: 1 }],
+      renderRange: { startPage: 1, endPage: pageCount, pageNumbers: Array.from({ length: pageCount }, (_, index) => index + 1) },
+      errorMessage: undefined,
+    },
+  });
 }
 
 describe("AppShell AnnotationSidebar 挂载", () => {
@@ -259,6 +297,283 @@ describe("AppShell AnnotationSidebar 挂载", () => {
 });
 
 describe("AppShell modes 上下文工具条", () => {
+  test("empty read toolbar hides document-only helpers", () => {
+    renderAppShell({ utilityPanel: "none" });
+
+    expect(screen.getByText("- / -")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "逆时针" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "顺时针" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "适合页面" })).not.toBeInTheDocument();
+  });
+
+  test("workflow mode switches live in the tool launcher instead of the top toolbar", async () => {
+    const user = userEvent.setup();
+    const onModeChange = vi.fn();
+    renderAppShell({ onModeChange, utilityPanel: "none" });
+
+    const toolbar = screen.getByRole("banner");
+    expect(within(toolbar).queryByRole("button", { name: "OCR" })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole("button", { name: "批注" })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole("button", { name: "填写和签名" })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole("button", { name: "导出" })).not.toBeInTheDocument();
+
+    await user.click(within(toolbar).getByRole("button", { name: "工具" }));
+    const menu = screen.getByRole("menu", { name: "PDF 工具菜单" });
+    expect(within(menu).getByRole("menuitem", { name: "批注" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "导出" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "填写和签名" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "OCR" })).toBeInTheDocument();
+
+    await user.click(within(menu).getByRole("menuitem", { name: "导出" }));
+    expect(onModeChange).toHaveBeenCalledWith("export");
+  });
+
+  test("read toolbar keeps document tools inside a grouped tool launcher", async () => {
+    const user = userEvent.setup();
+    const onModeChange = vi.fn();
+    renderAppShell({ onModeChange, reader: makeReadyReader(), utilityPanel: "none" });
+
+    expect(screen.queryByRole("button", { name: "Bates 编号" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "添加页码" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "另存为" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "工具" }));
+
+    const menu = screen.getByRole("menu", { name: "PDF 工具菜单" });
+    expect(within(menu).getByRole("group", { name: "组织页面" })).toBeInTheDocument();
+    expect(within(menu).getByRole("group", { name: "交付导出" })).toBeInTheDocument();
+    expect(within(menu).getByRole("group", { name: "标注填写" })).toBeInTheDocument();
+    expect(within(menu).getByRole("group", { name: "扫描 OCR" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /添加页码/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /Bates 编号/ })).toBeInTheDocument();
+
+    await user.click(within(menu).getByRole("menuitem", { name: /Bates 编号/ }));
+    expect(onModeChange).toHaveBeenCalledWith("export");
+  });
+
+  test("native Bates command enters export mode and selects the delivery panel", async () => {
+    const onModeChange = vi.fn();
+    renderAppShell({
+      activeMode: "export",
+      commandSignal: { id: "export-bates", nonce: 1 },
+      onModeChange,
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "证据编号" })).toHaveAttribute("aria-pressed", "true");
+    });
+    expect(onModeChange).toHaveBeenCalledWith("export");
+    expect(screen.getByRole("complementary", { name: "交付设置面板" })).toBeInTheDocument();
+  });
+
+  test("native compress command enters export mode and selects compression settings", async () => {
+    const onModeChange = vi.fn();
+    renderAppShell({
+      activeMode: "export",
+      commandSignal: { id: "export-compress", nonce: 1 },
+      onModeChange,
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "压缩" })).toHaveAttribute("aria-pressed", "true");
+    });
+    expect(onModeChange).toHaveBeenCalledWith("export");
+    expect(screen.getByRole("region", { name: "压缩设置" })).toBeInTheDocument();
+  });
+
+  test("native header/footer command enters export mode and selects header/footer settings", async () => {
+    const onModeChange = vi.fn();
+    renderAppShell({
+      activeMode: "export",
+      commandSignal: { id: "export-header-footer", nonce: 1 },
+      onModeChange,
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "页眉页脚" })).toHaveAttribute("aria-pressed", "true");
+    });
+    expect(onModeChange).toHaveBeenCalledWith("export");
+    expect(screen.getByRole("region", { name: "页眉页脚设置" })).toBeInTheDocument();
+  });
+
+  test("native forms flatten command enters forms mode and requests the forms panel", async () => {
+    const onModeChange = vi.fn();
+    const onUtilityPanelChange = vi.fn();
+    renderAppShell({
+      activeMode: "forms",
+      commandSignal: { id: "forms-flatten", nonce: 1 },
+      onModeChange,
+      onUtilityPanelChange,
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+
+    await waitFor(() => {
+      expect(onUtilityPanelChange).toHaveBeenCalledWith("forms");
+    });
+    expect(onModeChange).toHaveBeenCalledWith("forms");
+    expect(screen.getByText("已进入填写和签名面板，请在面板内读取字段并确认扁平化导出。")).toBeInTheDocument();
+  });
+
+  test("native annotation flatten command enters annotate mode and requests annotation panel", async () => {
+    const onModeChange = vi.fn();
+    const onUtilityPanelChange = vi.fn();
+    renderAppShell({
+      activeMode: "annotate",
+      annotations: [makeAnnotation({ id: "ann-1", pageIndex: 0, type: "highlight" })],
+      commandSignal: { id: "annotations-flatten", nonce: 1 },
+      onModeChange,
+      onUtilityPanelChange,
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+
+    await waitFor(() => {
+      expect(onUtilityPanelChange).toHaveBeenCalledWith("annotation");
+    });
+    expect(onModeChange).toHaveBeenCalledWith("annotate");
+    expect(screen.getByText("已打开批注侧栏，请在侧栏内确认扁平化导出。")).toBeInTheDocument();
+  });
+
+  test("tool launcher Save As writes a real copy instead of showing placeholder feedback", async () => {
+    const user = userEvent.setup();
+    const sourceBytes = new Uint8Array([1, 2, 3, 4]);
+    const saveUpdatedBytes = vi.fn(async (_bytes: Uint8Array, _fileName: string) => undefined);
+    const reader = makeReader({
+      ...makeReadyReader(),
+      getCurrentFileName: vi.fn(() => "test.pdf"),
+      getFileBytes: vi.fn(async () => sourceBytes),
+      saveUpdatedBytes,
+    });
+
+    renderAppShell({ reader, utilityPanel: "none" });
+
+    await user.click(screen.getByRole("button", { name: "工具" }));
+    await user.click(screen.getByRole("menuitem", { name: "另存为" }));
+
+    await waitFor(() => expect(saveUpdatedBytes).toHaveBeenCalledTimes(1));
+    expect(saveUpdatedBytes).toHaveBeenCalledWith(sourceBytes, "test-copy.pdf");
+    expect(screen.getByText("已另存为 test-copy.pdf。")).toBeInTheDocument();
+  });
+
+  test("annotation summary command opens the annotation sidebar summary view", async () => {
+    const onModeChange = vi.fn();
+    const onUtilityPanelChange = vi.fn();
+    renderAppShell({
+      activeMode: "annotate",
+      annotations: [makeAnnotation({ id: "ann-summary-1", pageIndex: 0, type: "highlight", content: "摘要入口" })],
+      commandSignal: { id: "export-annotation-summary", nonce: 1 },
+      onModeChange,
+      onUtilityPanelChange,
+      reader: makeReadyReader(),
+      utilityPanel: "annotation",
+    });
+
+    await waitFor(() => {
+      expect(onUtilityPanelChange).toHaveBeenCalledWith("annotation");
+    });
+    expect(onModeChange).toHaveBeenCalledWith("annotate");
+    expect(screen.getByRole("complementary", { name: "批注摘要" })).toBeInTheDocument();
+    expect(screen.getByText("批注摘要（1）")).toBeInTheDocument();
+  });
+
+  test("native about command opens settings directly on the about section", async () => {
+    const onModeChange = vi.fn();
+    const onUtilityPanelChange = vi.fn();
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "help-about", nonce: 1 },
+      onModeChange,
+      onUtilityPanelChange,
+      utilityPanel: "settings",
+    });
+
+    await waitFor(() => {
+      expect(onUtilityPanelChange).toHaveBeenCalledWith("settings");
+    });
+    expect(onModeChange).toHaveBeenCalledWith("read");
+    expect(screen.getByRole("tabpanel", { name: "关于" })).toBeInTheDocument();
+    expect(screen.queryByText("关于信息位于设置页。")).not.toBeInTheDocument();
+  });
+
+  test("annotation sidebar flatten action saves a new annotations-flattened PDF", async () => {
+    const user = userEvent.setup();
+    const sourceBytes = await createBlankPdf(1);
+    const saveUpdatedBytes = vi.fn(async (_bytes: Uint8Array, _fileName: string) => undefined);
+    const reader = makeReader({
+      getCurrentFileName: vi.fn(() => "case.pdf"),
+      getFileBytes: vi.fn(async () => sourceBytes),
+      saveUpdatedBytes,
+      state: {
+        status: "ready",
+        defaults: { viewMode: "continuous", zoom: 1 },
+        document: {
+          documentId: "doc-annotation-flatten",
+          path: "/case/case.pdf",
+          fingerprint: "fp-annotation-flatten",
+          name: "case.pdf",
+          currentPage: 1,
+          pageCount: 1,
+          zoom: 1,
+          viewMode: "continuous",
+          rotation: 0,
+          textLayerStatus: "available",
+          ocrStatus: "not-needed",
+          dirty: false,
+        },
+        pageViewports: [{ pageIndex: 0, width: 612, height: 792, rotation: 0, scale: 1 }],
+        renderRange: { startPage: 1, endPage: 1, pageNumbers: [1] },
+        errorMessage: undefined,
+      },
+    });
+
+    renderAppShell({
+      activeMode: "annotate",
+      annotations: [makeAnnotation({ id: "ann-1", pageIndex: 0, type: "highlight" })],
+      reader,
+      utilityPanel: "annotation",
+    });
+
+    await user.click(screen.getByRole("button", { name: "扁平化导出" }));
+    await waitFor(() => expect(saveUpdatedBytes).toHaveBeenCalledTimes(1));
+    expect(saveUpdatedBytes.mock.calls[0]).toBeDefined();
+    const [savedBytes, fileName] = saveUpdatedBytes.mock.calls[0]!;
+    expect(fileName).toBe("case-annotations-flattened.pdf");
+    const outputPdf = await PDFDocument.load(savedBytes);
+    expect(outputPdf.getKeywords()).toContain("faropdf:annotation-flattened");
+    expect(await screen.findByText(/已导出 case-annotations-flattened\.pdf/)).toBeInTheDocument();
+  });
+
+  test("forms mode toolbar uses wired form actions instead of placeholder controls", async () => {
+    const user = userEvent.setup();
+    const onUtilityPanelChange = vi.fn();
+    renderAppShell({
+      activeMode: "forms",
+      onUtilityPanelChange,
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+
+    const formsToolbar = screen.getByRole("toolbar", { name: "填写和签名工具条" });
+    expect(within(formsToolbar).getByRole("group", { name: "表单工具" })).toBeInTheDocument();
+    expect(within(formsToolbar).getByRole("button", { name: "读取字段" })).toBeInTheDocument();
+    expect(within(formsToolbar).getByRole("button", { name: "填写" })).toBeInTheDocument();
+    expect(within(formsToolbar).getByRole("button", { name: "签名" })).toBeInTheDocument();
+    expect(within(formsToolbar).getByRole("button", { name: "扁平化导出" })).toBeInTheDocument();
+    expect(within(formsToolbar).queryByRole("button", { name: "日期" })).not.toBeInTheDocument();
+    expect(within(formsToolbar).queryByRole("button", { name: "钩号" })).not.toBeInTheDocument();
+    expect(within(formsToolbar).queryByRole("button", { name: "导出为压平" })).not.toBeInTheDocument();
+
+    await user.click(within(formsToolbar).getByRole("button", { name: "扁平化导出" }));
+    expect(onUtilityPanelChange).toHaveBeenCalledWith("forms");
+  });
+
   test("annotate mode 渲染批注工具条", () => {
     renderAppShell({ activeMode: "annotate" });
     expect(screen.getByRole("toolbar", { name: "批注工具条" })).toBeInTheDocument();
@@ -273,9 +588,30 @@ describe("AppShell modes 上下文工具条", () => {
 
   test("export mode 渲染导出工具条 + 分组", () => {
     renderAppShell({ activeMode: "export" });
-    expect(screen.getByRole("toolbar", { name: "导出工具条" })).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "格式转换" })).toBeInTheDocument();
+    const exportToolbar = screen.getByRole("toolbar", { name: "导出工具条" });
+    expect(exportToolbar).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "交付工具" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "交付设置面板" })).toBeInTheDocument();
+    expect(within(exportToolbar).getByRole("button", { name: "文字水印" })).toBeInTheDocument();
+    expect(within(exportToolbar).getByRole("button", { name: "图片水印" })).toBeInTheDocument();
+    expect(within(exportToolbar).queryByRole("button", { name: "Bates 编号" })).not.toBeInTheDocument();
+    expect(within(exportToolbar).queryByRole("button", { name: "页码" })).not.toBeInTheDocument();
+    expect(within(exportToolbar).queryByRole("button", { name: "压缩" })).not.toBeInTheDocument();
+    expect(within(exportToolbar).queryByRole("button", { name: "页眉页脚" })).not.toBeInTheDocument();
+  });
+
+  test("export toolbar switches the delivery panel between text and image watermark", async () => {
+    const user = userEvent.setup();
+    renderAppShell({ activeMode: "export", reader: makeReadyReader(), utilityPanel: "none" });
+
+    const exportToolbar = screen.getByRole("toolbar", { name: "导出工具条" });
+    expect(screen.getByRole("region", { name: "文字水印设置" })).toBeInTheDocument();
+
+    await user.click(within(exportToolbar).getByRole("button", { name: "图片水印" }));
+    expect(screen.getByRole("region", { name: "图片水印设置" })).toBeInTheDocument();
+
+    await user.click(within(exportToolbar).getByRole("button", { name: "文字水印" }));
+    expect(screen.getByRole("region", { name: "文字水印设置" })).toBeInTheDocument();
   });
 });
 describe("AppShell OCR mode", () => {
@@ -714,4 +1050,3 @@ describe("AppShell AnnotationOverlay ↔ AnnotationSidebar active 联动 (ISS-02
     expect(sidebarAfterReturn.getAttribute("aria-current")).not.toBe("true");
   });
 });
-

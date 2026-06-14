@@ -137,7 +137,6 @@ export function AnnotationToolbar({ state, onStateChange, disabled }: Annotation
                     width="100%"
                     height="32"
                   >
-                    {/* eslint-disable-next-line react/no-danger */}
                     <g dangerouslySetInnerHTML={{ __html: previewInner }} />
                   </svg>
                   <span className="annotation-stamp-button__label">{template.label}</span>

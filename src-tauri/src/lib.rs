@@ -8,8 +8,8 @@ use std::{
     sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Manager, State};
 use tauri::menu::{MenuBuilder, SubmenuBuilder};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use url::Url;
 
 mod ocr_credentials;
@@ -36,6 +36,36 @@ const SETTINGS_FILE_NAME: &str = "settings.json";
 const OCR_JOB_QUEUE_FILE: &str = "ocr-jobs.json";
 const SCAN_PREPROCESS_QUEUE_FILE: &str = "scan-preprocess-jobs.json";
 
+#[derive(Clone, Serialize)]
+struct NativeMenuCommandPayload<'a> {
+    id: &'a str,
+}
+
+#[derive(Serialize)]
+struct NativePdfFileResponse {
+    bytes: Vec<u8>,
+    name: String,
+    path: String,
+}
+
+fn create_faropdf_window(app_handle: &AppHandle) -> tauri::Result<()> {
+    let suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+
+    WebviewWindowBuilder::new(
+        app_handle,
+        format!("faropdf-window-{suffix}"),
+        WebviewUrl::default(),
+    )
+    .title("FaroPDF")
+    .inner_size(1280.0, 820.0)
+    .min_inner_size(960.0, 640.0)
+    .build()
+    .map(|_| ())
+}
+
 #[tauri::command]
 fn read_app_settings(app_handle: AppHandle) -> Result<Option<Value>, String> {
     let settings_path = settings_file_path(&app_handle)?;
@@ -49,6 +79,43 @@ fn read_app_settings(app_handle: AppHandle) -> Result<Option<Value>, String> {
         .map_err(|_| "应用设置文件格式无效。".to_string())?;
 
     Ok(Some(sanitize_settings_value(settings)))
+}
+
+#[tauri::command]
+fn read_pdf_file_from_path(path: String) -> Result<NativePdfFileResponse, String> {
+    let trimmed_path = path.trim();
+    if trimmed_path.is_empty() {
+        return Err("未选择 PDF 文件。".to_string());
+    }
+
+    let input_path = PathBuf::from(trimmed_path);
+    let is_pdf = input_path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.eq_ignore_ascii_case("pdf"))
+        .unwrap_or(false);
+    if !is_pdf {
+        return Err("请选择 PDF 文件。".to_string());
+    }
+
+    let bytes = fs::read(&input_path).map_err(|_| "无法读取所选 PDF 文件。".to_string())?;
+    let name = input_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or("document.pdf")
+        .to_string();
+    let resolved_path = input_path
+        .canonicalize()
+        .unwrap_or(input_path)
+        .to_string_lossy()
+        .to_string();
+
+    Ok(NativePdfFileResponse {
+        bytes,
+        name,
+        path: resolved_path,
+    })
 }
 
 #[tauri::command]
@@ -475,6 +542,7 @@ fn extract_ocr_text(pdf_path: String) -> Result<OcrTextExtractionResponse, Strin
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let ocr_queue = OcrJobQueue::new(ocr_job_queue_path(&app.handle())?);
@@ -484,11 +552,13 @@ pub fn run() {
                 scan_queue,
             ))));
 
-            // ISS-032: macOS 菜单栏中文化
+            // ISS-032 / ISS-039: macOS 菜单栏中文化，并把深层命令桥接到前端 command model。
             let menu = MenuBuilder::new(app)
                 .item(&SubmenuBuilder::new(app, "文件")
-                    .text("new-window", "新建窗口")
-                    .text("open-file", "打开…")
+                    .text("file-new-window", "新建窗口")
+                    .text("file-open", "打开…")
+                    .separator()
+                    .text("file-save-as", "另存为…")
                     .separator()
                     .text("close-window", "关闭窗口")
                     .build()?)
@@ -502,11 +572,23 @@ pub fn run() {
                     .select_all()
                     .build()?)
                 .item(&SubmenuBuilder::new(app, "视图")
-                    .text("toggle-sidebar", "文档摘要")
-                    .text("page-manager", "页面管理")
+                    .text("view-summary", "文档摘要")
+                    .text("view-pages", "页面管理")
                     .text("view-settings", "视图设置")
                     .separator()
-                    .text("toggle-fullscreen", "全屏")
+                    .text("view-fullscreen", "全屏")
+                    .build()?)
+                .item(&SubmenuBuilder::new(app, "工具")
+                    .text("export-page-number", "添加页码…")
+                    .text("export-bates", "Bates 编号…")
+                    .text("export-header-footer", "页眉页脚…")
+                    .separator()
+                    .text("export-watermark-text", "文字水印")
+                    .text("export-watermark-image", "图片水印")
+                    .text("export-compress", "压缩…")
+                    .separator()
+                    .text("annotations-flatten", "批注扁平化")
+                    .text("forms-flatten", "表单扁平化")
                     .build()?)
                 .item(&SubmenuBuilder::new(app, "窗口")
                     .minimize()
@@ -514,16 +596,56 @@ pub fn run() {
                     .close_window()
                     .build()?)
                 .item(&SubmenuBuilder::new(app, "帮助")
-                    .text("about", "关于 FaroPDF")
+                    .text("help-about", "关于 FaroPDF")
                     .build()?)
                 .build()?;
             app.set_menu(menu)?;
+            app.on_menu_event(|app_handle, event| {
+                let command_id = event.id().0.as_str();
+                match command_id {
+                    "close-window" => {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.close();
+                        }
+                    }
+                    "view-fullscreen" => {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            if let Ok(is_fullscreen) = window.is_fullscreen() {
+                                let _ = window.set_fullscreen(!is_fullscreen);
+                            }
+                        }
+                    }
+                    "file-new-window" => {
+                        let _ = create_faropdf_window(app_handle);
+                    }
+                    "file-open"
+                    | "file-save-as"
+                    | "view-summary"
+                    | "view-pages"
+                    | "view-settings"
+                    | "export-page-number"
+                    | "export-bates"
+                    | "export-header-footer"
+                    | "export-watermark-text"
+                    | "export-watermark-image"
+                    | "export-compress"
+                    | "annotations-flatten"
+                    | "forms-flatten"
+                    | "help-about" => {
+                        let _ = app_handle.emit("faropdf://command", NativeMenuCommandPayload {
+                            id: command_id,
+                        });
+                    }
+                    _ => {}
+                }
+            });
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             read_app_settings,
             write_app_settings,
+            read_pdf_file_from_path,
             start_scan_preprocess_job,
             list_scan_preprocess_jobs,
             poll_scan_preprocess_job,
