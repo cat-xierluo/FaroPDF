@@ -87,6 +87,11 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
+    # v0.1.2 暂禁用 publish job: 真实 pubkey 未生成 (DEC-070 续 TODO),
+    # createUpdaterArtifacts: false 后 *.sig 不再生成, latest.json 拼装会失败。
+    # 后续用户本地 `cargo tauri signer generate` + 上传 priv key 到 TAURI_SIGNING_PRIVATE_KEY
+    # + 替换 tauri.conf.json pubkey 字段 → 删 if: false 行。
+    if: false
     steps:
       - uses: actions/checkout@v4
 
