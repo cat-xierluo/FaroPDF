@@ -3689,3 +3689,51 @@ ROADMAP §5 行 66-67 整组标 [ ]，缺位 PDF Expert / Folia / Adobe 全员�
 
 - `docs/TASKS.md` § 进度日志（2026-06-07 条目）
 - `docs/DESIGN.md` v2.0
+
+## DEC-098 ISS-NEW-A 阶段 2 PDF 插入 / 合并 / 提取 UI 入口（2026-06-14）
+
+- 日期：2026-06-14
+- 状态：已完成（PR #63 阶段 2）
+- 关联任务：ISS-NEW-A 阶段 2 / ROADMAP §5 行 66-67
+- 前置：DEC-097（PR #62 阶段 1 引擎 + 契约 + 测试 34/34）
+
+### 背景
+
+DEC-097 阶段 1 落 3 个 PDF 改写能力的引擎 + 共享契约 + 单元测试，但 UI 入口缺位（用户视角"做得动但找不到"）。阶段 2 目标：在 `PageOrganizerWorkspace` 工具条新增 3 个按钮 + 原生 `<dialog>` 表单收参，调阶段 1 引擎走 `reader.saveUpdatedBytes` 触发浏览器下载。
+
+### 决策
+
+1. **UI 入口选 `PageOrganizerWorkspace` 而非工具启动器对话框**：任务描述指向 `commands.ts` 的 `APP_TOOL_LAUNCHER_SECTIONS.organize`，但实际代码库工具启动器由 `src/components/layout/toolbarRegistry.ts` 实现（`getModeTools` / `registerModeTools`），且 `PageOrganizerWorkspace` 是更直观的 PDF 改写入口（用户已经打开 PDF 看到页面网格，下一步自然就是「插入 / 合并 / 提取」）。把 3 个按钮放在 `PageOrganizerWorkspace` 工具条已有「撤销」「另存为新 PDF」之间，与原 7 个动作按钮共存。
+2. **原生 `<dialog>` 不用新依赖**：DESIGN.md §10 工具栏克制原则要求「功能按钮 + 最小浮层」；用 `position: fixed; inset: 0` 遮罩 + 居中卡片（沿用阶段 1 已有的 `.page-organizer__dialog` 体系）。不引入 `react-hook-dialog` / `radix-ui` 等包。
+3. **3 个对话框 form 字段**：
+   - **插入 PDF**：`file`（PDF） + `insertAt`（1-based 数字，默认 `pageCount` 即末尾追加） + `pageRange`（可选 1-based 字符串如 `1-3`） + `outputName`（默认 `<base>-inserted.pdf`）。
+   - **合并 PDF**：`files`（多 PDF） + `outputName`（默认 `<base>-merged.pdf`）。
+   - **提取页码范围**：`pageRange`（必填 1-based 字符串如 `1-3, 5`，默认 `1-1`） + `outputName`（默认 `<base>-extracted.pdf`）。
+4. **统一走 `pdfOperationEngine.exportPdf`**：3 个对话框的确认 handler 都先 `reader.getFileBytes()` 拿主源，再 `engine.exportPdf({ operations: [{ type, ... }] })`，最后 `reader.saveUpdatedBytes(result.bytes, outputName)` 触发浏览器下载（与阶段 1 `useFormController` 同一模式）。
+5. **错误处理双层**：对话框内 `.page-organizer__form-error` 立即显示 + 工具条上方 `.page-organizer__error` 持久显示（仅引擎错误，预校验只显示对话框内错误，不污染工具条）。
+6. **不修改阶段 1 代码**：严格遵守"不动 `pdfOperationEngine.ts` / `src/shared/pdf/export.ts`"的约束；阶段 2 仅新增 UI 入口，阶段 1 的 7 项测试 + 34/34 通过状态保持。
+7. **CSS 增量**：4 个新 class（`.page-organizer__form` / `.page-organizer__form-field` / `.page-organizer__form-error` / `.page-organizer__error`），沿用 DESIGN.md §5 圆角 6/8/10px、间距 4/6/8/12/16/20px、按钮 30/32px；颜色 token 全部 `var(--*)`，不硬编码。
+8. **测试**：`PageOrganizerWorkspace.test.tsx` 加 8 项测试覆盖按钮渲染、对话框预填、引擎 + saveUpdatedBytes 串行调用、错误显示、文件名派生。jsdom 不实现 `DataTransfer`，用 `Object.defineProperty` 数组代理 `FileList` 模拟 `fireEvent.change` 的 `target.files`。
+
+### 验证
+
+- `pnpm typecheck`：**0 错误**。
+- `pnpm vitest run --config config/vitest.config.ts src/components/layout/PageOrganizerWorkspace.test.tsx`：**16 passed / 0 failed**（8 旧 + 8 新）。
+- 不引入新 npm 依赖；不修改阶段 1 已落代码（`pdfOperationEngine.ts` / `shared/pdf/export.ts` / 设计文档）；不修改 `src-tauri/**`；不修改 `package.json`。
+
+### 已知限制
+
+- **空白页插入未落**：任务描述的「插入空白页」仍未实现（`PdfInsertPagesOperation` 只接 `insertSource`，没接 blank-page 工厂）；本期范围只接 3 个已有 operation。后续 ISS-NEW-A 阶段 3 可在引擎加 `add-blank-pages` operation 后接 UI。
+- **输出文件名仅前端默认**：用户可在对话框改，但没接 `settings.saveDirectory` / `outputPath` 模板规则；Tauri 模式下 `reader.saveUpdatedBytes` 走浏览器 `<a download>`，不触发 Tauri dialog（保持与阶段 1 契约一致）。若需原生保存对话框，后续可加 `Tauri save dialog` 路径。
+- **`dataTransfer` 在 jsdom 不可用**：测试用 `Object.defineProperty` 代理 `FileList` 模拟；真实浏览器不受影响。
+- **文档同步节奏**：`ROADMAP.md` §5 行 66-67 状态仍是「部分」（仍标 [ ]，因为空白页插入未落）；完整到 [x] 需等阶段 3 空白页 + 后续页面旋转 / 删除 / 重排真实改写一并接好（PR #21 之前已有部分底座）。
+
+### 关联
+
+- `docs/ROADMAP.md` §5 行 66-67（状态升级到阶段 1+2）
+- `docs/DECISIONS.md` DEC-097（阶段 1 前置）
+- `docs/plans/2026-06-14-iss-new-a-pdf-merge-split-design.md` 阶段 2 实施顺序
+- `CHANGELOG.md` Unreleased (continued) — ISS-NEW-A 阶段 2 段
+- `src/components/layout/PageOrganizerWorkspace.tsx`（3 按钮 + 3 对话框 + 错误处理）
+- `src/components/layout/PageOrganizerWorkspace.css`（4 个新 class）
+- `src/components/layout/PageOrganizerWorkspace.test.tsx`（8 新测试，16/16 通过）

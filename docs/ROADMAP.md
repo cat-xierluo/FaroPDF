@@ -63,8 +63,8 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 ### 5. 页面整理
 
 - [ ] 支持页面旋转、删除、重排和撤销。（已建立可测试状态/撤销/plan-only 导出底座；完整 UI 和真实 PDF 页面改写待接入）
-- [ ] 支持插入 PDF、插入空白页、提取页码范围（**部分**：PR #62 ISS-NEW-A 阶段 1 已落共享契约 + 引擎 + 单元测试 7 项 / 34 通过；insert-pages / merge-pdfs / extract-pages 真实改写走 pdf-lib `copyPages` + `insertPage` / `addPage`，互斥一次只允许 1 个；UI 入口阶段 2 待 PR #63）。
-- [ ] 支持多个 PDF 合并（**部分**：PR #62 ISS-NEW-A 阶段 1 `merge-pdfs` 通过 `additionalSources` 数组按顺序追加多份 PDF 已落；UI 入口阶段 2 待 PR #63）。
+- [ ] 支持插入 PDF、插入空白页、提取页码范围（**部分**：PR #62 ISS-NEW-A 阶段 1 引擎 + 单元测试 7 项 / 34 通过；PR #63 ISS-NEW-A 阶段 2 已落 UI 入口 — `PageOrganizerWorkspace` 工具条新增「插入 PDF / 合并多份 PDF / 提取页码范围」3 个按钮 + 原生 `<dialog>` 表单 + 调 `pdfOperationEngine.exportPdf` 走 `reader.saveUpdatedBytes` 触发浏览器下载；insert-pages / merge-pdfs / extract-pages 真实改写走 pdf-lib `copyPages` + `insertPage` / `addPage`，互斥一次只允许 1 个；空白页插入仍未落）。
+- [ ] 支持多个 PDF 合并（**部分**：PR #62 ISS-NEW-A 阶段 1 `merge-pdfs` 引擎 + 单元测试已落；PR #63 ISS-NEW-A 阶段 2 UI 入口已落 — `PageOrganizerWorkspace` 工具条「合并多份 PDF」按钮 + 原生 `<dialog>` 表单 + `additionalSources` 数组按顺序追加多份 PDF）。
 - [ ] 支持裁剪、拆分双页扫描、添加普通页码和 Bates 编号。
 - [ ] 支持证据图片和 PDF 页面按 A4 多图编排。（已建立 plan-only A4 编排计划器；真实目录拾取和像素渲染待接入）
 - [ ] 支持页级检查索引、文书边界 manifest 和规范命名建议。

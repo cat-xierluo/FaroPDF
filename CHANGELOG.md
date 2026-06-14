@@ -73,6 +73,19 @@ UI 入口（PR #63 阶段 2 留待）：
 - 工具启动器 `organize` 分组加 3 个命令（`insert-pdf` / `merge-pdfs` / `extract-page-range`），工作台对话框承接源文件选择 + 插入位置 / 提取范围输入 + 默认 `*-inserted.pdf` / `*-merged.pdf` / `*-extracted.pdf` 输出路径。
 - `src/components/layout/PageOrganizerWorkspace.tsx` 加 3 个对话框 form。
 
+UI 入口（PR #63 阶段 2 已落）：
+
+- `src/components/layout/PageOrganizerWorkspace.tsx` 工具条新增 3 个按钮：「插入 PDF」「合并多份 PDF」「提取页码范围」（在已有「撤销」「另存为新 PDF」之间，与原 7 个动作按钮共存）。
+- 3 个原生 `<dialog>` 表单承接输入：插入 PDF 收 PDF 文件 + 1-based 插入位置 + 可选页码范围 + 输出文件名；合并 PDF 收多份 PDF + 输出文件名；提取页码范围收 1-based 字符串 + 输出文件名。
+- 提交时统一 `pdfOperationEngine.exportPdf`（阶段 1 引擎，34/34 测试通过）+ `reader.saveUpdatedBytes` 触发浏览器下载；引擎错误回写到对话框内 + 工具条上方错误条。
+- 默认输出文件名：`<主源 base>-inserted.pdf` / `<主源 base>-merged.pdf` / `<主源 base>-extracted.pdf`（用 `reader.getCurrentFileName` 派生）。
+- `PageOrganizerWorkspace.css` 新增 `.page-organizer__form` / `.page-organizer__form-field` / `.page-organizer__form-error` / `.page-organizer__error` 4 类样式（沿用 DESIGN.md §3 / §10 工具栏克制原则；颜色 token 全部 `var(--*)`，圆角 6px / 间距 4-12px / 按钮 30px）。
+
+测试：
+
+- `src/components/layout/PageOrganizerWorkspace.test.tsx` 加 8 项新测试：3 按钮渲染、提取对话框预填、提取确认调 `engine.exportPdf` + `saveUpdatedBytes` + 对话框关闭、提取空范围错误、插入缺文件错误、插入选文件后确认调 `saveUpdatedBytes`、合并 0 文件错误、合并 2 文件后确认调 `saveUpdatedBytes` 且输出名以 `-merged` 结尾。**16/16 通过**。
+- jsdom 不实现 `DataTransfer` — 用 `Object.defineProperty` 数组代理 `FileList` 模拟 `fireEvent.change`。
+
 新功能（来自 main，自动随 tag 出来）：
 
 - DEC-068 批注摘要分组面板 + 案件材料核查清单导出
