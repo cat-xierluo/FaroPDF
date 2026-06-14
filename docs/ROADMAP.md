@@ -67,7 +67,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - [ ] 支持多个 PDF 合并。
 - [x] 支持添加普通页码和 Bates 编号。（ISS-039：三级 `工具` 入口进入导出模式，右侧交付设置面板提供普通编号 / 证据编号设置，并输出新 PDF）
 - [ ] 支持裁剪、拆分双页扫描。
-- [ ] 支持证据图片和 PDF 页面按 A4 多图编排。（已建立 plan-only A4 编排计划器；真实目录拾取和像素渲染待接入）
+- [ ] 支持证据图片和 PDF 页面按 A4 多图编排（**部分**：plan-only 编排计划器已落，ISS-018 / DEC-019，CHANGELOG 0.1.0-alpha.1 + 0.1.0-alpha.6；真实目录拾取和像素渲染待后续 worker 接入）。
 - [ ] 支持页级检查索引、文书边界 manifest 和规范命名建议。
 - [ ] 所有页面整理默认另存为新 PDF，不覆盖原始文件。
 
@@ -82,7 +82,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 ### 6. OCR/扫描
 
 - [x] 检测纯扫描页、低文字量页和疑似 OCR 失败页（`OcrQualityReport` 契约 + `ocrQualityCheckService` 报告服务，DEC-017 / DEC-050）。
-- [ ] 支持扫描件清洁校正：粗方向检测、微倾斜校正、可选裁边和分块处理。（已建立 preprocess-only job/bridge stub，真实处理待接入）
+- [ ] 支持扫描件清洁校正：粗方向检测、微倾斜校正、可选裁边和分块处理（**部分**：preprocess-only job/bridge 真实清洁已落，ISS-016 / DEC-040；粗方向 / 微倾斜 / 拆分双页仍 plan-only，待后续 worker 接入）。
 - [x] 提供 OCR bridge，优先连接本地 Legal Skills / `ocrmypdf`（`start_ocr_job` 按 provider 分发到 `ocrmypdf` 子进程，DEC-030 / PR #18）。
 - [x] PaddleOCR / MinerU 等联网 OCR 需用户明确确认（`ocrPrivacyConsentGuard` notice/consent 双匹配 + 桥接 fingerprint/nonce/有效期，DEC-010 / PR #47）。
 - [x] OCR 任务后台运行，显示进度、后端、输出路径和失败原因（`createTauriOcrJobController` + `OcrJobList`，DEC-042 / PR #29）。
@@ -94,7 +94,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 - [x] 读取 AcroForm 字段并高亮可填写区域（`FormService.readFormFields`）。
 - [x] 支持文本框、复选框、单选框和下拉字段填写（`FormService.fillFormField` + `applyFormOperations` 批量）。
-- [ ] 支持签名图片、手写签名和签名位置调整（**部分**：签名图片限定 PNG/JPG 已落地；手写签名 / 签名位置调整待后续 worker）。
+- [ ] 支持签名图片、手写签名和签名位置调整（**部分**：签名图片限定 PNG/JPG 已落，ISS-008 / DEC-055，CHANGELOG 0.1.0-alpha.5；手写签名 / 签名位置调整待后续 worker）。
 - [x] 支持表单扁平化导出（`FormService.flattenForm`，pdf-lib `form.flatten()`；ISS-043：三级 `表单扁平化` 入口进入填写和签名面板确认导出）。
 
 ### 8. 设置与安全

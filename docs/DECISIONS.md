@@ -4379,3 +4379,40 @@ ISS-FIX-7 按"成本低→高"路径推到 OCR 时，深入查代码发现**OCR 
 - 本次 ISS-FIX-7 不动 PaddleOCR / MinerU 联网 provider 的真实 HTTP 调用代码（这些是另一种 stub：consent guard + keychain 已就位，但真实 HTTP 客户端需独立 worker 接入，且需用户配置 HTTPS endpoint 和 API key 引用）。
 - F-05（另存为走浏览器 `<a download>` 不走 Tauri save dialog）仍 [UNVERIFIED]，vite dev 无 Tauri 运行时；单独起 `pnpm tauri dev` 验证。
 - F-08 图片转 PDF 战略层缺位仍在（不属于 ISS-FIX-1 ~ 7 范围，留作 ISS-NEW-A 另立）。
+
+## DEC-096 ISS-NEW-E ROADMAP 状态对齐（2026-06-14）
+
+- 日期：2026-06-14
+- 状态：已完成
+- 关联任务：ISS-NEW-E / 第 1 阶段 P-01 / P-03 报告纠正
+
+### 背景
+
+第 1 阶段排查报告 §3.2 / §6 P-01 / P-03 指出 ROADMAP 状态与 README / CHANGELOG 矛盾：
+- §5 行 70 "证据图片 A4 多图编排" 标 [ ] vs CHANGELOG 0.1.0-alpha.1 / 0.1.0-alpha.6 ISS-018 真实交付
+- §7 行 97 "签名图片 / 手写签名 / 签名位置调整" 标 [ ] vs README §表单签署 / CHANGELOG 0.1.0-alpha.5 ISS-008 实际交付
+- §6 行 85 "扫描件清洁校正" 标 [ ] vs ISS-016 / DEC-040 preprocess-only job/bridge 真实清洁已落
+
+ISS-NEW-E 同步这三处描述，避免 ROADMAP 与已发布 CHANGELOG 长期矛盾。
+
+### 决策
+
+1. **ROADMAP §5 行 70** 改为"**部分**：[x] plan-only 编排计划器 / [ ] 真实目录拾取和像素渲染"，加 ISS-018 / DEC-019 指针。
+2. **ROADMAP §6 行 85** 改为"**部分**：[x] preprocess-only 真实清洁 / [ ] 粗方向 / 微倾斜 / 拆分双页 plan-only"，加 ISS-016 / DEC-040 指针。
+3. **ROADMAP §7 行 97** 改为"**部分**：[x] 签名图片 PNG/JPG / [ ] 手写签名 / 签名位置调整"，加 ISS-008 / DEC-055 指针。
+4. **ROADMAP §5 行 66-67**（插入 / 合并 / 提取页码范围）保留 [ ] 状态，留作 ISS-NEW-A 另立，不在本期文档同步范围。
+5. **CHANGELOG.md** Unreleased (continued) 段加 "ISS-NEW-E ROADMAP 状态对齐（DEC-096）" 段。
+6. **ROADMAP 状态 / 进度日志 / CHANGELOG 同步更新模式**：今后每次 ISS 卡收口后 PM 同步刷新 ROADMAP 对应 [ ] → [x]，避免状态长期滞后。本次未做"批量全文重读 ROADMAP vs CHANGELOG"自动化扫描，依赖人工 review 触发。
+
+### 验证
+
+- `git diff docs/ROADMAP.md`：3 处描述细化，行 70 / 85 / 97 全部带 ISS / DEC 指针。
+- `git diff CHANGELOG.md`：Unreleased (continued) 段加 ISS-NEW-E 4 行。
+- `git diff docs/DECISIONS.md`：加 DEC-096 段。
+- ROADMAP 行 66-67（ISS-NEW-A 范围）保留 [ ]，不虚假勾选。
+- ROADMAP 行 31-32（§1 脚手架：macOS/Windows 文件关联 / 透明标题栏）保持 [ ]，本期不处理。
+
+### 已知限制
+
+- 本期不做"ROADMAP 全文 vs CHANGELOG / README / src/ 实际状态"自动化扫描脚本（可能留作 `doc-curator` 技能增强，跨多个 ISS 实现）。
+- P-02（§5 行 66-67 插入 / 合并 / 提取整组缺位）不在 ISS-NEW-E 范围，留作 ISS-NEW-A 真实改写 PDF 引擎接入。
