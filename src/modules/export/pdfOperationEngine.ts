@@ -6,7 +6,10 @@ import type {
   PdfExportRequest,
   PdfExportResult,
   PdfExportSummary,
+  PdfExtractPagesOperation,
   PdfFormFlatteningSummary,
+  PdfInsertPagesOperation,
+  PdfMergePdfsOperation,
   PdfOutputPlacement,
   PdfOutputToolPlanEntry,
   PdfOutputToolOperationType,
@@ -111,6 +114,49 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
         summary.outputToolPlan = {
           entries: outputToolEntries,
         };
+      }
+
+      // ISS-NEW-A: insert-pages / merge-pdfs / extract-pages 改写 workingPdf 后继续后续 operation
+      // 互斥: 一次只允许 1 个(取第一个), 多个时报错
+      const rewriteOps = request.operations.filter(
+        (op) => op.type === "insert-pages" || op.type === "merge-pdfs" || op.type === "extract-pages",
+      );
+      if (rewriteOps.length > 1) {
+        throw new Error(
+          `insert-pages / merge-pdfs / extract-pages 互斥, 一次只允许 1 个, 实际 ${rewriteOps.length} 个。`,
+        );
+      }
+      if (rewriteOps.length === 1) {
+        const rewriteOp = rewriteOps[0];
+        const beforeCount = workingPdf.getPageCount();
+        const additionalSources = request.additionalSources ?? [];
+        let label: string;
+        let rewriteType: "insert-pages" | "merge-pdfs" | "extract-pages";
+        if (rewriteOp.type === "insert-pages") {
+          workingPdf = await applyInsertPages(workingPdf, rewriteOp);
+          label = `插入 ${rewriteOp.insertAtIndex} 位置`;
+          summary.insertedPageCount = workingPdf.getPageCount() - beforeCount;
+          rewriteType = "insert-pages";
+        } else if (rewriteOp.type === "merge-pdfs") {
+          workingPdf = await applyMergePdfs(workingPdf, rewriteOp, additionalSources);
+          label = `合并 ${additionalSources.length} 份附加 PDF`;
+          summary.mergedAdditionalSourceCount = additionalSources.length;
+          rewriteType = "merge-pdfs";
+        } else {
+          workingPdf = await applyExtractPages(workingPdf, rewriteOp);
+          label = `提取 ${rewriteOp.pageRange}`;
+          summary.extractedPageCount = workingPdf.getPageCount();
+          rewriteType = "extract-pages";
+        }
+        // 不写入 outputToolEntries(其 type 是 6 个原 output tool operation), 改写入新加的 rewritePlan 段
+        summary.rewritePlan = {
+          operationId: rewriteOp.id,
+          type: rewriteType,
+          pageIndexes: Array.from({ length: workingPdf.getPageCount() }, (_, i) => i),
+          status: "applied",
+          label,
+        };
+        inputPageCount = workingPdf.getPageCount();
       }
 
       if (warnings.length > 0) {
@@ -824,4 +870,124 @@ function applyExportMetadata(pdf: PDFDocument, summary: PdfExportSummary): void 
 
 function copyBytes(bytes: Uint8Array): Uint8Array {
   return new Uint8Array(bytes);
+}
+
+// === ISS-NEW-A: insert-pages / merge-pdfs / extract-pages ===
+
+/**
+ * 解析 1-based 页码范围字符串（如 "2-5" / "2, 4, 6" / "1-3, 5, 8-10"）。
+ * - 输入字符串可含空白（trim 容忍）
+ * - 返回 0-based 升序去重数组
+ * - 任一解析失败或超出 [1, max] 范围抛错
+ */
+function parsePageRangeExpression(range: string, max: number): number[] {
+  if (!range || !range.trim()) {
+    throw new Error("页码范围不能为空。");
+  }
+  if (!Number.isInteger(max) || max < 1) {
+    throw new Error(`页码范围上限无效: max=${max}`);
+  }
+  const tokens = range.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+  const result = new Set<number>();
+  for (const token of tokens) {
+    const m = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(token);
+    if (!m) {
+      throw new Error(`页码范围片段格式无效: '${token}'（期望 N 或 N-M）`);
+    }
+    const start = Number.parseInt(m[1], 10);
+    const end = m[2] ? Number.parseInt(m[2], 10) : start;
+    if (start < 1 || end < 1) {
+      throw new Error(`页码必须 ≥ 1, 实际 start=${start} end=${end}`);
+    }
+    if (start > end) {
+      throw new Error(`页码范围起始 > 结束: ${start} > ${end}`);
+    }
+    if (end > max) {
+      throw new Error(`页码范围超出文档页数: ${end} > ${max}`);
+    }
+    for (let i = start; i <= end; i += 1) {
+      result.add(i - 1);
+    }
+  }
+  return Array.from(result).sort((a, b) => a - b);
+}
+
+async function applyInsertPages(
+  workingPdf: PDFDocument,
+  operation: PdfInsertPagesOperation,
+): Promise<PDFDocument> {
+  if (operation.insertSource.bytes.length === 0) {
+    throw new Error("insert-pages 缺少待插入的 PDF 字节流。");
+  }
+  const totalPages = workingPdf.getPageCount();
+  if (operation.insertAtIndex < 0 || operation.insertAtIndex > totalPages) {
+    throw new Error(
+      `insert-pages 插入位置越界: insertAtIndex=${operation.insertAtIndex}, 总页数=${totalPages}`,
+    );
+  }
+  const insertDoc = await PDFDocument.load(copyBytes(operation.insertSource.bytes), {
+    updateMetadata: false,
+  });
+  const insertPageCount = insertDoc.getPageCount();
+  const indexes0 = operation.pageRange
+    ? parsePageRangeExpression(operation.pageRange, insertPageCount)
+    : Array.from({ length: insertPageCount }, (_, i) => i);
+  if (indexes0.length === 0) {
+    throw new Error("insert-pages 解析后无可插入页。");
+  }
+  const copied = await workingPdf.copyPages(insertDoc, indexes0);
+  // pdf-lib 的 `insertPage(index, page)` 是单页签名, 多页需用 spread 逐个 addPage 或循环
+  // 用 `addPage(page)` 配合 splice 更稳: 在指定 index 处依次插入
+  // 简化: 用 pdf-lib 0-based insertPage(index, page) 循环
+  for (let i = 0; i < copied.length; i += 1) {
+    workingPdf.insertPage(operation.insertAtIndex + i, copied[i]);
+  }
+  return workingPdf;
+}
+
+async function applyMergePdfs(
+  workingPdf: PDFDocument,
+  operation: PdfMergePdfsOperation,
+  additionalSources: NonNullable<PdfExportRequest["additionalSources"]>,
+): Promise<PDFDocument> {
+  if (additionalSources.length === 0) {
+    // 互斥允许 0 个 additionalSources（仅输出主源），但抛错更安全
+    throw new Error("merge-pdfs 缺少 additionalSources（至少 1 份附加 PDF）。");
+  }
+  for (let i = 0; i < additionalSources.length; i += 1) {
+    const src = additionalSources[i];
+    if (src.bytes.length === 0) {
+      throw new Error(`merge-pdfs additionalSources[${i}] 缺少 PDF 字节流。`);
+    }
+    const appendDoc = await PDFDocument.load(copyBytes(src.bytes), { updateMetadata: false });
+    const appendPageCount = appendDoc.getPageCount();
+    const indexes0 = operation.pageRange
+      ? parsePageRangeExpression(operation.pageRange, appendPageCount)
+      : Array.from({ length: appendPageCount }, (_, i) => i);
+    if (indexes0.length === 0) {
+      throw new Error(`merge-pdfs additionalSources[${i}] 解析后无可追加页。`);
+    }
+    const copied = await workingPdf.copyPages(appendDoc, indexes0);
+    copied.forEach((page) => workingPdf.addPage(page));
+  }
+  return workingPdf;
+}
+
+async function applyExtractPages(
+  workingPdf: PDFDocument,
+  operation: PdfExtractPagesOperation,
+): Promise<PDFDocument> {
+  if (!operation.pageRange || !operation.pageRange.trim()) {
+    throw new Error("extract-pages 缺少 pageRange。");
+  }
+  const totalPages = workingPdf.getPageCount();
+  const indexes0 = parsePageRangeExpression(operation.pageRange, totalPages);
+  if (indexes0.length === 0) {
+    throw new Error("extract-pages 解析后无可提取页。");
+  }
+  // pdf-lib 0-based copyPages: src=workingPdf(foreign), dest=新 doc. 新 doc 直接 addPage copied.
+  const newDoc = await PDFDocument.create();
+  const copied = await newDoc.copyPages(workingPdf, indexes0);
+  copied.forEach((page) => newDoc.addPage(page));
+  return newDoc;
 }

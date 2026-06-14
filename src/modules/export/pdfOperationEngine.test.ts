@@ -1171,6 +1171,186 @@ describe("pdf operation engine", () => {
   });
 });
 
+// === ISS-NEW-A: insert-pages / merge-pdfs / extract-pages ===
+
+describe("pdf operation engine — ISS-NEW-A 插入 / 合并 / 提取", () => {
+  test("insert-pages 在指定位置插入另一份 PDF 的全部页", async () => {
+    const main = await createPdfWithBlankPages(3);
+    const insert = await createPdfWithBlankPages(2);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-insert-1",
+      source: { bytes: main },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "op-insert-1",
+          type: "insert-pages",
+          insertSource: { bytes: insert, fileName: "extra.pdf" },
+          insertAtIndex: 1,
+        },
+      ],
+      requestedAt: "2026-06-14T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+    expect(outputPdf.getPageCount()).toBe(5);
+    expect(result.summary.insertedPageCount).toBe(2);
+    expect(result.summary.rewritePlan?.type).toBe("insert-pages");
+    expect(result.summary.rewritePlan?.status).toBe("applied");
+  });
+
+  test("insert-pages 支持 pageRange 1-based 子集 + 越界报错", async () => {
+    const main = await createPdfWithBlankPages(2);
+    const insert = await createPdfWithBlankPages(3);
+    const engine = createPdfOperationEngine();
+
+    // 合法: 取 insert 的 1-2 页
+    const ok = await engine.exportPdf({
+      id: "export-insert-2",
+      source: { bytes: main },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "op-insert-2",
+          type: "insert-pages",
+          insertSource: { bytes: insert },
+          insertAtIndex: 0,
+          pageRange: "1-2",
+        },
+      ],
+      requestedAt: "2026-06-14T00:00:00.000Z",
+    });
+    const okPdf = await PDFDocument.load(ok.bytes);
+    expect(okPdf.getPageCount()).toBe(4); // 2 (main) + 2 (insert 1-2)
+    expect(ok.summary.insertedPageCount).toBe(2);
+
+    // 非法: pageRange 越界
+    await expect(
+      engine.exportPdf({
+        id: "export-insert-3",
+        source: { bytes: main },
+        destination: { type: "bytes" },
+        operations: [
+          {
+            id: "op-insert-3",
+            type: "insert-pages",
+            insertSource: { bytes: insert },
+            insertAtIndex: 0,
+            pageRange: "1-10",
+          },
+        ],
+        requestedAt: "2026-06-14T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("页码范围超出文档页数");
+  });
+
+  test("merge-pdfs 按 additionalSources 顺序追加多份 PDF", async () => {
+    const main = await createPdfWithBlankPages(2);
+    const extra1 = await createPdfWithBlankPages(3);
+    const extra2 = await createPdfWithBlankPages(1);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-merge-1",
+      source: { bytes: main },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "op-merge-1",
+          type: "merge-pdfs",
+        },
+      ],
+      additionalSources: [
+        { bytes: extra1, fileName: "extra1.pdf" },
+        { bytes: extra2, fileName: "extra2.pdf" },
+      ],
+      requestedAt: "2026-06-14T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+    expect(outputPdf.getPageCount()).toBe(6); // 2 + 3 + 1
+    expect(result.summary.mergedAdditionalSourceCount).toBe(2);
+    expect(result.summary.rewritePlan?.type).toBe("merge-pdfs");
+  });
+
+  test("merge-pdfs 缺 additionalSources 报错", async () => {
+    const main = await createPdfWithBlankPages(2);
+    const engine = createPdfOperationEngine();
+
+    await expect(
+      engine.exportPdf({
+        id: "export-merge-2",
+        source: { bytes: main },
+        destination: { type: "bytes" },
+        operations: [{ id: "op-merge-2", type: "merge-pdfs" }],
+        requestedAt: "2026-06-14T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("merge-pdfs 缺少 additionalSources");
+  });
+
+  test("extract-pages 按 1-based pageRange 提取子集到新 PDF", async () => {
+    const main = await createPdfWithBlankPages(5);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-extract-1",
+      source: { bytes: main },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: "op-extract-1",
+          type: "extract-pages",
+          pageRange: "2, 4-5",
+        },
+      ],
+      requestedAt: "2026-06-14T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+    expect(outputPdf.getPageCount()).toBe(3); // 2, 4, 5 → 3 页
+    expect(result.summary.extractedPageCount).toBe(3);
+    expect(result.summary.rewritePlan?.type).toBe("extract-pages");
+  });
+
+  test("extract-pages 缺 pageRange 报错", async () => {
+    const main = await createPdfWithBlankPages(3);
+    const engine = createPdfOperationEngine();
+
+    await expect(
+      engine.exportPdf({
+        id: "export-extract-2",
+        source: { bytes: main },
+        destination: { type: "bytes" },
+        operations: [
+          { id: "op-extract-2", type: "extract-pages", pageRange: "" },
+        ],
+        requestedAt: "2026-06-14T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("extract-pages 缺少 pageRange");
+  });
+
+  test("insert-pages / merge-pdfs / extract-pages 互斥, 多个时报错", async () => {
+    const main = await createPdfWithBlankPages(2);
+    const extra = await createPdfWithBlankPages(1);
+    const engine = createPdfOperationEngine();
+
+    await expect(
+      engine.exportPdf({
+        id: "export-mutex-1",
+        source: { bytes: main },
+        destination: { type: "bytes" },
+        operations: [
+          { id: "op-i", type: "insert-pages", insertSource: { bytes: extra }, insertAtIndex: 0 },
+          { id: "op-e", type: "extract-pages", pageRange: "1" },
+        ],
+        requestedAt: "2026-06-14T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("互斥");
+  });
+});
+
 async function createPdfWithBlankPages(pageCount: number): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
 
