@@ -161,7 +161,6 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
           status: "applied",
           label,
         };
-        inputPageCount = workingPdf.getPageCount();
       }
 
       if (warnings.length > 0) {
