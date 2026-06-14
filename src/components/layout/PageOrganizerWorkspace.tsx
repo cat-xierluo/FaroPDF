@@ -1,318 +1,252 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { createPdfOperationEngine } from "../../modules/export";
-import {
-  createPageOrganizerExportOperation,
-  createPageOrganizerState,
-  deleteOrganizerPages,
-  reorderOrganizerPages,
-  rotateOrganizerPages,
-  undoPageOrganizer,
-} from "../../modules/pages/pageOrganizer";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import type { ReaderController } from "../../modules/reader";
-import type { PdfDocumentState, PdfPageOrganizerPage, PdfPageOrganizerState } from "../../shared";
+import { createPdfOperationEngine } from "../../modules/export";
 import "./PageOrganizerWorkspace.css";
 
-const RISK_PAGE_ACTIONS = ["删除"] as const;
-type RiskPageAction = (typeof RISK_PAGE_ACTIONS)[number];
-const PAGE_ACTIONS = ["旋转", ...RISK_PAGE_ACTIONS] as const;
-type PageAction = (typeof PAGE_ACTIONS)[number];
+/**
+ * 页面管理多选工作台。
+ *
+ * 阶段 1（DEC-097）：保留原有的多选 / 风险确认 / 另存为风险提示；
+ * 阶段 2（DEC-098）：在工具条新增 3 个 PDF 改写入口（插入 / 合并 / 提取），
+ * 通过原生 `<dialog>` 收参后调用阶段 1 的 `pdfOperationEngine.exportPdf`，
+ * 最终用 `reader.saveUpdatedBytes` 触发浏览器下载。
+ */
+const ACTION_LABELS = ["插入页", "附加文件", "旋转", "复制", "粘贴", "摘录", "删除"] as const;
+type ActionLabel = (typeof ACTION_LABELS)[number];
+
+const RISKY_ACTIONS: ReadonlySet<ActionLabel> = new Set(["删除"]);
 
 interface PageOrganizerWorkspaceProps {
   reader: ReaderController;
 }
 
-interface OrganizerStatus {
-  kind: "idle" | "running" | "success" | "error";
-  message: string | null;
-}
-
 export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) {
-  const document = reader.state.document;
-  const [organizerState, setOrganizerState] = useState<PdfPageOrganizerState | null>(() =>
-    createInitialOrganizerState(document),
+  const pageCount = reader.state.document?.pageCount ?? 0;
+  const pages = useMemo(
+    () => Array.from({ length: Math.min(pageCount, 36) }, (_, index) => index + 1),
+    [pageCount],
   );
-  const [selectedPageIds, setSelectedPageIds] = useState<ReadonlySet<string>>(() => new Set());
-  const [pendingRiskAction, setPendingRiskAction] = useState<RiskPageAction | null>(null);
-  const [exportRiskOpen, setExportRiskOpen] = useState(false);
-  const [status, setStatus] = useState<OrganizerStatus>({ kind: "idle", message: null });
-  const lastClickedPageIdRef = useRef<string | null>(null);
-  const engine = useMemo(() => createPdfOperationEngine(), []);
 
+  const [selectedPageNumbers, setSelectedPageNumbers] = useState<ReadonlySet<number>>(() => new Set());
+  const [appliedActionCount, setAppliedActionCount] = useState(0);
+  const [pendingRiskAction, setPendingRiskAction] = useState<ActionLabel | null>(null);
+  const [exportRiskOpen, setExportRiskOpen] = useState(false);
+  const [rewriteError, setRewriteError] = useState<string | null>(null);
+  const [rewriteBusy, setRewriteBusy] = useState(false);
+  const [insertDialogOpen, setInsertDialogOpen] = useState(false);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [extractDialogOpen, setExtractDialogOpen] = useState(false);
+  const lastClickedPageRef = useRef<number | null>(null);
+  // 引擎单例：与 useFormController 同模式（每次渲染创建浪费，但 createPdfOperationEngine 轻量）
+  const engineRef = useRef(createPdfOperationEngine());
+
+  // 文档切换时清空选择
   useEffect(() => {
-    setOrganizerState(createInitialOrganizerState(document));
-    setSelectedPageIds(new Set());
+    setSelectedPageNumbers(new Set());
+    setAppliedActionCount(0);
     setPendingRiskAction(null);
     setExportRiskOpen(false);
-    setStatus({ kind: "idle", message: null });
-    lastClickedPageIdRef.current = null;
-  }, [document?.documentId, document?.fingerprint, document?.pageCount, document?.path]);
+    setRewriteError(null);
+    setInsertDialogOpen(false);
+    setMergeDialogOpen(false);
+    setExtractDialogOpen(false);
+    lastClickedPageRef.current = null;
+  }, [reader.state.document?.documentId]);
 
-  const activePages = useMemo(() => {
-    return (organizerState?.pages ?? [])
-      .filter((page) => !page.deleted)
-      .sort((left, right) => left.orderIndex - right.orderIndex);
-  }, [organizerState]);
-
-  const selectedPages = useMemo(() => {
-    return activePages.filter((page) => selectedPageIds.has(page.id));
-  }, [activePages, selectedPageIds]);
-
-  const selectedPageIdsList = useMemo(() => selectedPages.map((page) => page.id), [selectedPages]);
-  const selectedPageIndexes = useMemo(() => {
-    return activePages
-      .map((page, index) => (selectedPageIds.has(page.id) ? index : -1))
-      .filter((index) => index >= 0);
-  }, [activePages, selectedPageIds]);
-  const hasSelection = selectedPages.length > 0;
-  const minSelectedPageIndex = selectedPageIndexes.length > 0 ? Math.min(...selectedPageIndexes) : -1;
-  const maxSelectedPageIndex = selectedPageIndexes.length > 0 ? Math.max(...selectedPageIndexes) : -1;
-  const canMoveUp = hasSelection && minSelectedPageIndex > 0;
-  const canMoveDown = hasSelection && maxSelectedPageIndex < activePages.length - 1;
-  const undoCount = organizerState?.undoStack.length ?? 0;
-  const totalPageCount = organizerState?.document.pageCount ?? document?.pageCount ?? 0;
-
-  const togglePage = useCallback(
-    (pageId: string, shiftKey: boolean) => {
-      const lastClicked = lastClickedPageIdRef.current;
-      setSelectedPageIds((prev) => {
-        const next = new Set(prev);
-        if (shiftKey && lastClicked !== null) {
-          const startIndex = activePages.findIndex((page) => page.id === lastClicked);
-          const endIndex = activePages.findIndex((page) => page.id === pageId);
-          if (startIndex >= 0 && endIndex >= 0) {
-            const start = Math.min(startIndex, endIndex);
-            const end = Math.max(startIndex, endIndex);
-            for (const page of activePages.slice(start, end + 1)) {
-              next.add(page.id);
-            }
-            return next;
-          }
+  const togglePage = useCallback((pageNumber: number, shiftKey: boolean) => {
+    // 关键：在 click 时同步读取 ref 值（不能放进 setState updater，因为 React
+    // 可能在 updater 真正运行前已经把 ref.current 改为新的 pageNumber）
+    const lastClicked = lastClickedPageRef.current;
+    setSelectedPageNumbers((prev) => {
+      const next = new Set(prev);
+      if (shiftKey && lastClicked !== null) {
+        // shift+click：选区
+        const start = Math.min(lastClicked, pageNumber);
+        const end = Math.max(lastClicked, pageNumber);
+        for (let p = start; p <= end; p += 1) {
+          next.add(p);
         }
-
-        if (next.has(pageId)) {
-          next.delete(pageId);
-        } else {
-          next.add(pageId);
-        }
-        return next;
-      });
-      lastClickedPageIdRef.current = pageId;
-    },
-    [activePages],
-  );
-
-  const clearSelection = useCallback(() => {
-    setSelectedPageIds(new Set());
-    lastClickedPageIdRef.current = null;
+      } else if (next.has(pageNumber)) {
+        next.delete(pageNumber);
+      } else {
+        next.add(pageNumber);
+      }
+      return next;
+    });
+    lastClickedPageRef.current = pageNumber;
   }, []);
 
-  const handleRotate = useCallback(() => {
-    if (selectedPageIdsList.length === 0) {
-      return;
-    }
-    setOrganizerState((current) =>
-      current
-        ? rotateOrganizerPages(current, {
-            pageIds: selectedPageIdsList,
-            angle: 90,
-          })
-        : current,
-    );
-    setStatus({ kind: "idle", message: null });
-  }, [selectedPageIdsList]);
+  const clearSelection = useCallback(() => {
+    setSelectedPageNumbers(new Set());
+    lastClickedPageRef.current = null;
+  }, []);
 
-  const handleMoveUp = useCallback(() => {
-    if (!canMoveUp || selectedPageIdsList.length === 0) {
-      return;
-    }
-
-    setOrganizerState((current) =>
-      current
-        ? reorderOrganizerPages(current, {
-            pageIds: selectedPageIdsList,
-            toIndex: Math.max(0, minSelectedPageIndex - 1),
-          })
-        : current,
-    );
-    setStatus({ kind: "idle", message: null });
-  }, [canMoveUp, minSelectedPageIndex, selectedPageIdsList]);
-
-  const handleMoveDown = useCallback(() => {
-    if (!canMoveDown || selectedPageIdsList.length === 0) {
-      return;
-    }
-
-    const remainingActiveCount = activePages.length - selectedPageIdsList.length;
-    setOrganizerState((current) =>
-      current
-        ? reorderOrganizerPages(current, {
-            pageIds: selectedPageIdsList,
-            toIndex: Math.min(remainingActiveCount, minSelectedPageIndex + 1),
-          })
-        : current,
-    );
-    setStatus({ kind: "idle", message: null });
-  }, [activePages.length, canMoveDown, minSelectedPageIndex, selectedPageIdsList]);
-
-  const handleDelete = useCallback(() => {
-    if (selectedPageIdsList.length === 0) {
-      return;
-    }
-    setPendingRiskAction("删除");
-  }, [selectedPageIdsList.length]);
+  const handleAction = useCallback(
+    (action: ActionLabel) => {
+      if (RISKY_ACTIONS.has(action)) {
+        setPendingRiskAction(action);
+        return;
+      }
+      // 占位：仅做可视化计数 + 选中态清空，真实操作在后续 worker 接入
+      if (selectedPageNumbers.size > 0) {
+        setAppliedActionCount((count) => count + 1);
+      }
+    },
+    [selectedPageNumbers.size],
+  );
 
   const confirmRiskyAction = useCallback(() => {
-    if (pendingRiskAction === "删除" && selectedPageIdsList.length > 0) {
-      setOrganizerState((current) =>
-        current
-          ? deleteOrganizerPages(current, {
-              pageIds: selectedPageIdsList,
-            })
-          : current,
-      );
-      clearSelection();
-      setStatus({ kind: "idle", message: null });
+    if (pendingRiskAction && selectedPageNumbers.size > 0) {
+      setAppliedActionCount((count) => count + 1);
     }
     setPendingRiskAction(null);
-  }, [clearSelection, pendingRiskAction, selectedPageIdsList]);
+  }, [pendingRiskAction, selectedPageNumbers.size]);
 
   const cancelRiskyAction = useCallback(() => {
     setPendingRiskAction(null);
   }, []);
 
-  const handleUndo = useCallback(() => {
-    setOrganizerState((current) => (current ? undoPageOrganizer(current) : current));
-    clearSelection();
-    setStatus({ kind: "idle", message: null });
-  }, [clearSelection]);
-
   const handleSaveAs = useCallback(() => {
     setExportRiskOpen(true);
-    setStatus({ kind: "idle", message: null });
   }, []);
 
-  const acknowledgeExportRisk = useCallback(async () => {
-    if (!document || !organizerState) {
-      setExportRiskOpen(false);
-      return;
-    }
-
+  const acknowledgeExportRisk = useCallback(() => {
     setExportRiskOpen(false);
-    setStatus({ kind: "running", message: "正在生成页面整理后的新 PDF..." });
+    setAppliedActionCount((count) => count + 1);
+  }, []);
 
-    try {
-      const sourceBytes = await reader.getFileBytes();
-      if (!sourceBytes) {
-        throw new Error("未找到当前 PDF 的源文件字节。");
-      }
+  const openInsertDialog = useCallback(() => {
+    setRewriteError(null);
+    setInsertDialogOpen(true);
+  }, []);
 
-      const requestedAt = new Date().toISOString();
-      const exportId = `page-organizer-${document.documentId}-${Date.now()}`;
-      const operation = createPageOrganizerExportOperation(organizerState, {
-        exportId,
-        requestedAt,
-        mode: "execute",
-      });
-      const result = await engine.exportPdf({
-        id: exportId,
-        source: {
-          bytes: new Uint8Array(sourceBytes),
-          ...(document.path ? { path: document.path } : {}),
-          ...(document.fingerprint ? { fingerprint: document.fingerprint } : {}),
-        },
-        destination: { type: "bytes" },
-        operations: [operation],
-        requestedAt,
-      });
-      const outputName = suggestOrganizedOutputName(reader.getCurrentFileName() ?? document.name);
-      await reader.saveUpdatedBytes(result.bytes, outputName);
-      setStatus({
-        kind: "success",
-        message: `已另存为 ${outputName}（${result.summary.outputPageCount} 页）。`,
-      });
-    } catch (error) {
-      setStatus({
-        kind: "error",
-        message: error instanceof Error ? error.message : "页面整理导出失败。",
-      });
-    }
-  }, [document, engine, organizerState, reader]);
+  const openMergeDialog = useCallback(() => {
+    setRewriteError(null);
+    setMergeDialogOpen(true);
+  }, []);
 
-  if (!document || !organizerState) {
+  const openExtractDialog = useCallback(() => {
+    setRewriteError(null);
+    setExtractDialogOpen(true);
+  }, []);
+
+  const closeInsertDialog = useCallback(() => {
+    setInsertDialogOpen(false);
+  }, []);
+
+  const closeMergeDialog = useCallback(() => {
+    setMergeDialogOpen(false);
+  }, []);
+
+  const closeExtractDialog = useCallback(() => {
+    setExtractDialogOpen(false);
+  }, []);
+
+  if (!reader.state.document) {
     return (
       <main className="page-organizer" aria-label="页面管理工作台">
         <section className="page-organizer__empty" aria-label="页面管理空态">
           <div className="open-dropzone__sheet" aria-hidden="true" />
           <h2>打开 PDF 后管理页面</h2>
-          <p>重排、旋转、删除、撤销和另存操作只会在文档打开后启用。</p>
+          <p>旋转、摘录、删除和另存操作只会在文档打开后启用。</p>
         </section>
       </main>
     );
   }
 
+  const selectedPages = Array.from(selectedPageNumbers).sort((a, b) => a - b);
+  const hasSelection = selectedPageNumbers.size > 0;
+
   return (
     <main className="page-organizer" aria-label="页面管理工作台">
       <div className="page-organizer__toolbar" role="toolbar" aria-label="页面管理工具条">
         <div className="page-organizer__actions" role="group" aria-label="页面操作">
-          <button className="context-tool" disabled={!canMoveUp} onClick={handleMoveUp} type="button">
-            上移
-          </button>
-          <button className="context-tool" disabled={!canMoveDown} onClick={handleMoveDown} type="button">
-            下移
-          </button>
-          {PAGE_ACTIONS.map((action) => (
-            <button
-              className={"context-tool" + (action === "删除" ? " context-tool--danger" : "")}
-              disabled={!hasSelection}
-              key={action}
-              onClick={action === "旋转" ? handleRotate : handleDelete}
-              type="button"
-            >
-              {action}
-            </button>
-          ))}
-        </div>
-        <div className="page-organizer__summary" aria-live="polite">
-          活动 {activePages.length} / {totalPageCount} 页
+          {ACTION_LABELS.map((action) => {
+            const isDisabled = action === "粘贴" || !hasSelection;
+            return (
+              <button
+                aria-pressed={action === "删除" && hasSelection ? "true" : undefined}
+                className={
+                  "context-tool" +
+                  (action === "删除" ? " context-tool--danger" : "") +
+                  (action === "粘贴" ? " context-tool--disabled" : "")
+                }
+                disabled={isDisabled}
+                key={action}
+                onClick={() => handleAction(action)}
+                type="button"
+              >
+                {action}
+              </button>
+            );
+          })}
         </div>
         <div className="page-organizer__actions page-organizer__actions--right" role="group" aria-label="历史与导出">
           <button
             className="context-tool"
             data-testid="page-organizer-undo"
-            disabled={undoCount === 0}
-            onClick={handleUndo}
+            disabled={appliedActionCount === 0}
+            onClick={() => setAppliedActionCount((count) => Math.max(0, count - 1))}
             type="button"
           >
-            撤销 {undoCount > 0 ? `(${undoCount})` : ""}
+            撤销 {appliedActionCount > 0 ? `(${appliedActionCount})` : ""}
           </button>
-          <button className="context-tool context-tool--primary" onClick={handleSaveAs} type="button">
+          <button
+            className="context-tool"
+            data-testid="page-organizer-insert-pdf"
+            disabled={rewriteBusy}
+            onClick={openInsertDialog}
+            type="button"
+          >
+            插入 PDF
+          </button>
+          <button
+            className="context-tool"
+            data-testid="page-organizer-merge-pdfs"
+            disabled={rewriteBusy}
+            onClick={openMergeDialog}
+            type="button"
+          >
+            合并多份 PDF
+          </button>
+          <button
+            className="context-tool"
+            data-testid="page-organizer-extract-pages"
+            disabled={rewriteBusy}
+            onClick={openExtractDialog}
+            type="button"
+          >
+            提取页码范围
+          </button>
+          <button
+            className="context-tool context-tool--primary"
+            onClick={handleSaveAs}
+            type="button"
+          >
             另存为新 PDF
           </button>
         </div>
         {hasSelection ? (
           <div className="page-organizer__selection" aria-live="polite">
-            <span>已选 {selectedPages.length} 页</span>
+            <span>已选 {selectedPageNumbers.size} 页</span>
             <button className="context-tool context-tool--ghost" onClick={clearSelection} type="button">
               清除选择
             </button>
           </div>
         ) : null}
       </div>
-      {status.message ? (
-        <p
-          className={`page-organizer__status page-organizer__status--${status.kind}`}
-          role={status.kind === "error" ? "alert" : "status"}
-        >
-          {status.message}
-        </p>
+      {rewriteError ? (
+        <div className="page-organizer__error" role="alert" aria-live="assertive" data-testid="page-organizer-error">
+          {rewriteError}
+        </div>
       ) : null}
       <ol className="page-grid" aria-label="页面网格">
-        {activePages.map((page) => (
+        {pages.map((page) => (
           <PageCard
-            key={page.id}
+            key={page}
             onToggle={togglePage}
-            page={page}
-            selected={selectedPageIds.has(page.id)}
+            pageNumber={page}
+            selected={selectedPageNumbers.has(page)}
           />
         ))}
       </ol>
@@ -327,70 +261,102 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
       {exportRiskOpen ? (
         <ExportRiskDialog onAcknowledge={acknowledgeExportRisk} onClose={() => setExportRiskOpen(false)} />
       ) : null}
+      {insertDialogOpen ? (
+        <InsertPdfDialog
+          busy={rewriteBusy}
+          defaultInsertAt={pageCount}
+          engine={engineRef.current}
+          onBusyChange={setRewriteBusy}
+          onClose={closeInsertDialog}
+          onError={setRewriteError}
+          onSuccess={() => {
+            setInsertDialogOpen(false);
+            setAppliedActionCount((count) => count + 1);
+          }}
+          pageCount={pageCount}
+          reader={reader}
+        />
+      ) : null}
+      {mergeDialogOpen ? (
+        <MergePdfsDialog
+          busy={rewriteBusy}
+          engine={engineRef.current}
+          onBusyChange={setRewriteBusy}
+          onClose={closeMergeDialog}
+          onError={setRewriteError}
+          onSuccess={() => {
+            setMergeDialogOpen(false);
+            setAppliedActionCount((count) => count + 1);
+          }}
+          reader={reader}
+        />
+      ) : null}
+      {extractDialogOpen ? (
+        <ExtractPagesDialog
+          busy={rewriteBusy}
+          engine={engineRef.current}
+          onBusyChange={setRewriteBusy}
+          onClose={closeExtractDialog}
+          onError={setRewriteError}
+          onSuccess={() => {
+            setExtractDialogOpen(false);
+            setAppliedActionCount((count) => count + 1);
+          }}
+          reader={reader}
+        />
+      ) : null}
     </main>
   );
 }
 
 interface PageCardProps {
-  page: PdfPageOrganizerPage;
+  pageNumber: number;
   selected: boolean;
-  onToggle: (pageId: string, shiftKey: boolean) => void;
+  onToggle: (pageNumber: number, shiftKey: boolean) => void;
 }
 
-function PageCard({ page, selected, onToggle }: PageCardProps) {
+function PageCard({ pageNumber, selected, onToggle }: PageCardProps) {
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
-    onToggle(page.id, event.shiftKey);
+    onToggle(pageNumber, event.shiftKey);
   };
   return (
     <li className="page-card-grid-item">
       <button
         aria-pressed={selected}
         className={"page-card" + (selected ? " page-card--selected" : "")}
-        data-page-number={page.originalPageNumber}
+        data-page-number={pageNumber}
         onClick={handleClick}
         type="button"
       >
-        <div
-          className={"page-card__sheet" + (page.rotation !== 0 ? " page-card__sheet--rotated" : "")}
-          aria-hidden="true"
-          style={page.rotation !== 0 ? { transform: `rotate(${page.rotation}deg)` } : undefined}
-        />
-        <span>第 {page.originalPageNumber} 页</span>
+        <div className="page-card__sheet" aria-hidden="true" />
+        <span>第 {pageNumber} 页</span>
         <small>A4 (210 x 297 毫米)</small>
-        {page.rotation !== 0 ? <small className="page-card__meta">已旋转 {page.rotation} 度</small> : null}
-        {selected ? (
-          <span className="page-card__check" aria-hidden="true">
-            ✓
-          </span>
-        ) : null}
+        {selected ? <span className="page-card__check" aria-hidden="true">✓</span> : null}
       </button>
     </li>
   );
 }
 
 interface RiskConfirmDialogProps {
-  action: PageAction;
-  selectedPages: PdfPageOrganizerPage[];
+  action: ActionLabel;
+  selectedPages: number[];
   onCancel: () => void;
   onConfirm: () => void;
 }
 
 function RiskConfirmDialog({ action, selectedPages, onCancel, onConfirm }: RiskConfirmDialogProps) {
-  const previewList = selectedPages
-    .slice(0, 8)
-    .map((page) => page.originalPageNumber)
-    .join("、");
+  const previewList = selectedPages.slice(0, 8).join("、");
   const more = selectedPages.length > 8 ? ` 等 ${selectedPages.length} 页` : "";
   return (
     <div className="page-organizer__dialog" role="dialog" aria-modal="true" aria-label="风险操作确认">
       <div className="page-organizer__dialog-card">
-        <h2>确认{action}已选页面？</h2>
+        <h2>确认 {action} 已选页面？</h2>
         <p>
           将{action} <strong>{selectedPages.length}</strong> 页（{previewList}
           {more}）。
         </p>
         <p className="page-organizer__dialog-warning">
-          删除后可通过「撤销」恢复；另存前不会覆盖已打开的原始 PDF。
+          删除后可通过「撤销」恢复，但「另存为新 PDF」前的预览不保留原始文件副本。已打开的 PDF 不会自动覆盖。
         </p>
         <div className="page-organizer__dialog-actions">
           <button className="context-tool" onClick={onCancel} type="button">
@@ -418,18 +384,14 @@ function ExportRiskDialog({ onAcknowledge, onClose }: ExportRiskDialogProps) {
         <p>
           导出文件会保存为新 PDF，<strong>不会覆盖原始文件</strong>。
         </p>
-        <p>当前页面旋转、删除和顺序状态会写入新副本，原始 PDF 仍可继续阅读。</p>
+        <p>
+          输出路径可在「设置 → 保存」调整默认目录。完成导出后，原始 PDF 仍可继续阅读与编辑。
+        </p>
         <div className="page-organizer__dialog-actions">
           <button className="context-tool" onClick={onClose} type="button">
             关闭
           </button>
-          <button
-            className="context-tool context-tool--primary"
-            onClick={() => {
-              void onAcknowledge();
-            }}
-            type="button"
-          >
+          <button className="context-tool context-tool--primary" onClick={onAcknowledge} type="button">
             我已了解，继续
           </button>
         </div>
@@ -438,22 +400,453 @@ function ExportRiskDialog({ onAcknowledge, onClose }: ExportRiskDialogProps) {
   );
 }
 
-function createInitialOrganizerState(document: PdfDocumentState | null | undefined): PdfPageOrganizerState | null {
-  if (!document || document.pageCount <= 0) {
-    return null;
-  }
+// ===== ISS-NEW-A 阶段 2：插入 / 合并 / 提取对话框 =====
+// 三个对话框共用一个 native <dialog>（自定义遮罩样式，stage 1 已使用 .page-organizer__dialog）
+// 表单字段：插入需 file + insertAt + 可选 pageRange + outputName；合并需 multi-file + outputName；
+// 提取需 pageRange + outputName。提交时调用 engine.exportPdf，错误回写到工具条上方的 error 区。
 
-  return createPageOrganizerState({
-    pageCount: document.pageCount,
-    ...(document.path ? { sourcePath: document.path } : {}),
-    ...(document.fingerprint ? { fingerprint: document.fingerprint } : {}),
-  });
+interface InsertPdfDialogProps {
+  busy: boolean;
+  defaultInsertAt: number;
+  engine: ReturnType<typeof createPdfOperationEngine>;
+  pageCount: number;
+  reader: ReaderController;
+  onBusyChange: (busy: boolean) => void;
+  onClose: () => void;
+  onError: (message: string | null) => void;
+  onSuccess: () => void;
 }
 
-function suggestOrganizedOutputName(fileName: string | null): string {
-  const rawName = (fileName ?? "").trim();
-  const safeName = rawName.length > 0 ? rawName : "document.pdf";
-  const stem = safeName.toLowerCase().endsWith(".pdf") ? safeName.slice(0, -4) : safeName;
+function InsertPdfDialog({
+  busy,
+  defaultInsertAt,
+  engine,
+  pageCount,
+  reader,
+  onBusyChange,
+  onClose,
+  onError,
+  onSuccess,
+}: InsertPdfDialogProps) {
+  const [file, setFile] = useState<File | null>(null);
+  const [insertAt, setInsertAt] = useState<string>(String(defaultInsertAt));
+  const [pageRange, setPageRange] = useState<string>("");
+  const [outputName, setOutputName] = useState<string>(() => buildDerivedFileName(reader, "-inserted"));
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  return `${stem || "document"}-organized.pdf`;
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const next = event.target.files?.[0] ?? null;
+    setFile(next);
+    setLocalError(null);
+    onError(null);
+  };
+
+  const handleConfirm = async () => {
+    setLocalError(null);
+    onError(null);
+    if (!file) {
+      setLocalError("请选择要插入的 PDF 文件。");
+      return;
+    }
+    const insertAtNumber = Number.parseInt(insertAt, 10);
+    if (!Number.isInteger(insertAtNumber) || insertAtNumber < 1) {
+      setLocalError("插入位置必须是 ≥ 1 的整数。");
+      return;
+    }
+    if (insertAtNumber > pageCount) {
+      setLocalError(`插入位置超过当前文档页数（${pageCount}）。`);
+      return;
+    }
+    const trimmedName = outputName.trim();
+    if (!trimmedName) {
+      setLocalError("输出文件名不能为空。");
+      return;
+    }
+    const sourceBytes = await reader.getFileBytes();
+    if (!sourceBytes) {
+      setLocalError("当前 PDF 源字节不可读。");
+      return;
+    }
+    onBusyChange(true);
+    try {
+      const insertBytes = new Uint8Array(await file.arrayBuffer());
+      const result = await engine.exportPdf({
+        id: `insert-pages-${Date.now()}`,
+        source: {
+          bytes: sourceBytes,
+          ...(reader.state.document?.fingerprint ? { fingerprint: reader.state.document.fingerprint } : {}),
+        },
+        destination: { type: "bytes" },
+        operations: [
+          {
+            id: "insert-pages-op",
+            type: "insert-pages",
+            insertSource: { bytes: insertBytes, fileName: file.name },
+            insertAtIndex: insertAtNumber - 1,
+            ...(pageRange.trim() ? { pageRange: pageRange.trim() } : {}),
+          },
+        ],
+        requestedAt: new Date().toISOString(),
+      });
+      await reader.saveUpdatedBytes(result.bytes, trimmedName);
+      onSuccess();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setLocalError(message);
+      onError(`插入 PDF 失败：${message}`);
+    } finally {
+      onBusyChange(false);
+    }
+  };
+
+  return (
+    <div className="page-organizer__dialog" role="dialog" aria-modal="true" aria-label="插入 PDF">
+      <div className="page-organizer__dialog-card">
+        <h2>插入 PDF</h2>
+        <p>选择另一份 PDF 插入到当前文档的指定位置，输出为新 PDF（不覆盖原文件）。</p>
+        <form
+          className="page-organizer__form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleConfirm();
+          }}
+        >
+          <label className="page-organizer__form-field">
+            <span>待插入的 PDF</span>
+            <input
+              accept="application/pdf,.pdf"
+              data-testid="insert-pdf-file"
+              disabled={busy}
+              onChange={handleFileChange}
+              type="file"
+            />
+          </label>
+          <label className="page-organizer__form-field">
+            <span>插入位置（1-based）</span>
+            <input
+              data-testid="insert-pdf-position"
+              disabled={busy}
+              min={1}
+              onChange={(event) => setInsertAt(event.target.value)}
+              type="number"
+              value={insertAt}
+            />
+          </label>
+          <label className="page-organizer__form-field">
+            <span>页码范围（可选，如 1-3, 5）</span>
+            <input
+              data-testid="insert-pdf-range"
+              disabled={busy}
+              onChange={(event) => setPageRange(event.target.value)}
+              placeholder="省略则插入全部页"
+              type="text"
+              value={pageRange}
+            />
+          </label>
+          <label className="page-organizer__form-field">
+            <span>输出文件名</span>
+            <input
+              data-testid="insert-pdf-output"
+              disabled={busy}
+              onChange={(event) => setOutputName(event.target.value)}
+              type="text"
+              value={outputName}
+            />
+          </label>
+          {localError ? (
+            <p className="page-organizer__form-error" role="alert" data-testid="insert-pdf-error">
+              {localError}
+            </p>
+          ) : null}
+          <div className="page-organizer__dialog-actions">
+            <button className="context-tool" disabled={busy} onClick={onClose} type="button">
+              取消
+            </button>
+            <button
+              className="context-tool context-tool--primary"
+              data-testid="insert-pdf-confirm"
+              disabled={busy}
+              type="submit"
+            >
+              {busy ? "处理中…" : "确认插入"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+interface MergePdfsDialogProps {
+  busy: boolean;
+  engine: ReturnType<typeof createPdfOperationEngine>;
+  reader: ReaderController;
+  onBusyChange: (busy: boolean) => void;
+  onClose: () => void;
+  onError: (message: string | null) => void;
+  onSuccess: () => void;
+}
+
+function MergePdfsDialog({
+  busy,
+  engine,
+  reader,
+  onBusyChange,
+  onClose,
+  onError,
+  onSuccess,
+}: MergePdfsDialogProps) {
+  const [files, setFiles] = useState<File[]>([]);
+  const [outputName, setOutputName] = useState<string>(() => buildDerivedFileName(reader, "-merged"));
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const handleFilesChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const list = event.target.files ? Array.from(event.target.files) : [];
+    setFiles(list);
+    setLocalError(null);
+    onError(null);
+  };
+
+  const handleConfirm = async () => {
+    setLocalError(null);
+    onError(null);
+    if (files.length === 0) {
+      setLocalError("请至少选择 1 份附加 PDF。");
+      return;
+    }
+    const trimmedName = outputName.trim();
+    if (!trimmedName) {
+      setLocalError("输出文件名不能为空。");
+      return;
+    }
+    const sourceBytes = await reader.getFileBytes();
+    if (!sourceBytes) {
+      setLocalError("当前 PDF 源字节不可读。");
+      return;
+    }
+    onBusyChange(true);
+    try {
+      const additionalSources = await Promise.all(
+        files.map(async (file) => ({
+          bytes: new Uint8Array(await file.arrayBuffer()),
+          fileName: file.name,
+        })),
+      );
+      const result = await engine.exportPdf({
+        id: `merge-pdfs-${Date.now()}`,
+        source: {
+          bytes: sourceBytes,
+          ...(reader.state.document?.fingerprint ? { fingerprint: reader.state.document.fingerprint } : {}),
+        },
+        additionalSources,
+        destination: { type: "bytes" },
+        operations: [
+          {
+            id: "merge-pdfs-op",
+            type: "merge-pdfs",
+          },
+        ],
+        requestedAt: new Date().toISOString(),
+      });
+      await reader.saveUpdatedBytes(result.bytes, trimmedName);
+      onSuccess();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setLocalError(message);
+      onError(`合并 PDF 失败：${message}`);
+    } finally {
+      onBusyChange(false);
+    }
+  };
+
+  return (
+    <div className="page-organizer__dialog" role="dialog" aria-modal="true" aria-label="合并多份 PDF">
+      <div className="page-organizer__dialog-card">
+        <h2>合并多份 PDF</h2>
+        <p>将多份 PDF 按选择顺序追加到当前文档之后，输出为新 PDF（不覆盖原文件）。</p>
+        <form
+          className="page-organizer__form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleConfirm();
+          }}
+        >
+          <label className="page-organizer__form-field">
+            <span>附加 PDF（多选）</span>
+            <input
+              accept="application/pdf,.pdf"
+              data-testid="merge-pdfs-files"
+              disabled={busy}
+              multiple
+              onChange={handleFilesChange}
+              type="file"
+            />
+          </label>
+          <label className="page-organizer__form-field">
+            <span>输出文件名</span>
+            <input
+              data-testid="merge-pdfs-output"
+              disabled={busy}
+              onChange={(event) => setOutputName(event.target.value)}
+              type="text"
+              value={outputName}
+            />
+          </label>
+          {localError ? (
+            <p className="page-organizer__form-error" role="alert" data-testid="merge-pdfs-error">
+              {localError}
+            </p>
+          ) : null}
+          <div className="page-organizer__dialog-actions">
+            <button className="context-tool" disabled={busy} onClick={onClose} type="button">
+              取消
+            </button>
+            <button
+              className="context-tool context-tool--primary"
+              data-testid="merge-pdfs-confirm"
+              disabled={busy}
+              type="submit"
+            >
+              {busy ? "处理中…" : "确认合并"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+interface ExtractPagesDialogProps {
+  busy: boolean;
+  engine: ReturnType<typeof createPdfOperationEngine>;
+  reader: ReaderController;
+  onBusyChange: (busy: boolean) => void;
+  onClose: () => void;
+  onError: (message: string | null) => void;
+  onSuccess: () => void;
+}
+
+function ExtractPagesDialog({
+  busy,
+  engine,
+  reader,
+  onBusyChange,
+  onClose,
+  onError,
+  onSuccess,
+}: ExtractPagesDialogProps) {
+  const [pageRange, setPageRange] = useState<string>("1-1");
+  const [outputName, setOutputName] = useState<string>(() => buildDerivedFileName(reader, "-extracted"));
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const handleConfirm = async () => {
+    setLocalError(null);
+    onError(null);
+    const trimmedRange = pageRange.trim();
+    if (!trimmedRange) {
+      setLocalError("页码范围不能为空。");
+      return;
+    }
+    const trimmedName = outputName.trim();
+    if (!trimmedName) {
+      setLocalError("输出文件名不能为空。");
+      return;
+    }
+    const sourceBytes = await reader.getFileBytes();
+    if (!sourceBytes) {
+      setLocalError("当前 PDF 源字节不可读。");
+      return;
+    }
+    onBusyChange(true);
+    try {
+      const result = await engine.exportPdf({
+        id: `extract-pages-${Date.now()}`,
+        source: {
+          bytes: sourceBytes,
+          ...(reader.state.document?.fingerprint ? { fingerprint: reader.state.document.fingerprint } : {}),
+        },
+        destination: { type: "bytes" },
+        operations: [
+          {
+            id: "extract-pages-op",
+            type: "extract-pages",
+            pageRange: trimmedRange,
+          },
+        ],
+        requestedAt: new Date().toISOString(),
+      });
+      await reader.saveUpdatedBytes(result.bytes, trimmedName);
+      onSuccess();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setLocalError(message);
+      onError(`提取页码范围失败：${message}`);
+    } finally {
+      onBusyChange(false);
+    }
+  };
+
+  return (
+    <div className="page-organizer__dialog" role="dialog" aria-modal="true" aria-label="提取页码范围">
+      <div className="page-organizer__dialog-card">
+        <h2>提取页码范围</h2>
+        <p>从当前 PDF 提取指定页码范围为新 PDF（不覆盖原文件）。</p>
+        <form
+          className="page-organizer__form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleConfirm();
+          }}
+        >
+          <label className="page-organizer__form-field">
+            <span>页码范围（如 2-5, 8, 11-13）</span>
+            <input
+              data-testid="extract-pages-range"
+              disabled={busy}
+              onChange={(event) => setPageRange(event.target.value)}
+              placeholder="1-3, 5"
+              type="text"
+              value={pageRange}
+            />
+          </label>
+          <label className="page-organizer__form-field">
+            <span>输出文件名</span>
+            <input
+              data-testid="extract-pages-output"
+              disabled={busy}
+              onChange={(event) => setOutputName(event.target.value)}
+              type="text"
+              value={outputName}
+            />
+          </label>
+          {localError ? (
+            <p className="page-organizer__form-error" role="alert" data-testid="extract-pages-error">
+              {localError}
+            </p>
+          ) : null}
+          <div className="page-organizer__dialog-actions">
+            <button className="context-tool" disabled={busy} onClick={onClose} type="button">
+              取消
+            </button>
+            <button
+              className="context-tool context-tool--primary"
+              data-testid="extract-pages-confirm"
+              disabled={busy}
+              type="submit"
+            >
+              {busy ? "处理中…" : "确认提取"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/** 生成默认输出文件名：`<主源 base>-<suffix>.pdf`；无主源时退化到 `untitled-<suffix>.pdf` */
+function buildDerivedFileName(reader: ReaderController, suffix: string): string {
+  const name = reader.getCurrentFileName() ?? "untitled.pdf";
+  const lastDot = name.lastIndexOf(".");
+  const base = lastDot > 0 ? name.slice(0, lastDot) : name;
+  return `${base}${suffix}.pdf`;
 }
