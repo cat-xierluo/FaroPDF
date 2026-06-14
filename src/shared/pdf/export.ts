@@ -21,6 +21,7 @@ export type PdfOutputPlacement =
 export interface PdfExportSource {
   bytes: Uint8Array;
   path?: string;
+  fileName?: string;
   fingerprint?: string;
 }
 
@@ -40,7 +41,10 @@ export type PdfExportOperation =
   | PdfWatermarkOperation
   | PdfPageNumberOperation
   | PdfBatesNumberOperation
-  | PdfCompressionOperation;
+  | PdfCompressionOperation
+  | PdfInsertPagesOperation
+  | PdfMergePdfsOperation
+  | PdfExtractPagesOperation;
 
 export interface PdfFlattenAnnotationsOperation {
   id: string;
@@ -144,11 +148,45 @@ export interface PdfCompressionOperation {
   mode?: PdfCompressionMode;
 }
 
+export interface PdfInsertPagesOperation {
+  id: string;
+  type: "insert-pages";
+  /** 待插入的另一份 PDF 字节流（0-based `insertAtIndex` 之后插入到主源）。 */
+  insertSource: PdfExportSource;
+  insertAtIndex: number;
+  /** 可选：1-based 页码范围（如 "1-3"）只取该范围；省略则取全部页。 */
+  pageRange?: string;
+}
+
+export interface PdfMergePdfsOperation {
+  id: string;
+  type: "merge-pdfs";
+  /**
+   * 多源 PDF 字节流。从 `PdfExportRequest.additionalSources` 顺序读取，
+   * 与主源 `source` 按顺序拼接（主源在前，additionalSources 顺次追加）。
+   * 省略则仅输出主源（不报错，warning 状态）。
+   */
+  /** 选填：从主源 + additionalSources 中各取哪些页，1-based 字符串（如 "1-3, 5"）。省略则全取。 */
+  pageRange?: string;
+}
+
+export interface PdfExtractPagesOperation {
+  id: string;
+  type: "extract-pages";
+  /** 1-based 页码范围字符串（如 "2-5" / "2, 4, 6" / "1-3, 5"）。必填。 */
+  pageRange: string;
+}
+
 export interface PdfExportRequest {
   id: string;
   source: PdfExportSource;
   destination: PdfExportDestination;
   operations: PdfExportOperation[];
+  /**
+   * 合并多源 PDF 时的额外源（仅 `merge-pdfs` 使用）。数组顺序决定合并顺序。
+   * `merge-pdfs` 输出 = `source` + `additionalSources[0]` + `additionalSources[1]` + ...
+   */
+  additionalSources?: PdfExportSource[];
   requestedAt: string;
 }
 
@@ -223,7 +261,23 @@ export interface PdfExportSummary {
   formFlattening?: PdfFormFlatteningSummary;
   pageOperationPlan?: PdfPageOperationPlan;
   outputToolPlan?: PdfOutputToolPlan;
+  /** ISS-NEW-A: insert-pages / merge-pdfs / extract-pages 互斥改写方案 */
+  rewritePlan?: PdfRewritePlan;
+  /** ISS-NEW-A: insert-pages 实际插入的页数 */
+  insertedPageCount?: number;
+  /** ISS-NEW-A: merge-pdfs 实际追加的 additionalSources 数量 */
+  mergedAdditionalSourceCount?: number;
+  /** ISS-NEW-A: extract-pages 提取后输出页数（= 解析后的页码范围长度） */
+  extractedPageCount?: number;
   warnings?: string[];
+}
+
+export interface PdfRewritePlan {
+  operationId: string;
+  type: "insert-pages" | "merge-pdfs" | "extract-pages";
+  pageIndexes: number[];
+  status: PdfOutputToolStatus;
+  label: string;
 }
 
 export interface PdfExportResult {
