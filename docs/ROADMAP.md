@@ -1,6 +1,6 @@
 # FaroPDF 路线图
 
-> Last updated: 2026-06-06（v0.1.0 + v0.1.1 发布后逐节审计）
+> Last updated: 2026-06-09（ISS-055 顶栏任务模式入口收口后更新）
 
 ## 项目愿景
 
@@ -63,8 +63,8 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 ### 5. 页面整理
 
 - [ ] 支持页面旋转、删除、重排和撤销。（已建立可测试状态/撤销/plan-only 导出底座；完整 UI 和真实 PDF 页面改写待接入）
-- [ ] 支持插入 PDF、插入空白页、提取页码范围（**部分**：PR #62 ISS-NEW-A 阶段 1 已落共享契约 + 引擎 + 单元测试 7 项 / 34 通过；insert-pages / merge-pdfs / extract-pages 真实改写走 pdf-lib `copyPages` + `insertPage` / `addPage`，互斥一次只允许 1 个；UI 入口阶段 2 待 PR #63）。
-- [ ] 支持多个 PDF 合并（**部分**：PR #62 ISS-NEW-A 阶段 1 `merge-pdfs` 通过 `additionalSources` 数组按顺序追加多份 PDF 已落；UI 入口阶段 2 待 PR #63）。
+- [ ] 支持插入 PDF、插入空白页、提取页码范围（**部分**：PR #62 ISS-NEW-A 阶段 1 已落共享契约 + 引擎 + 单元测试 7 项 / 34 通过；PR #63 阶段 2 UI 入口已落；insert-pages / merge-pdfs / extract-pages 真实改写走 pdf-lib `copyPages` + `insertPage` / `addPage`，互斥一次只允许 1 个）。
+- [ ] 支持多个 PDF 合并（**部分**：PR #62 ISS-NEW-A 阶段 1 `merge-pdfs` 通过 `additionalSources` 数组按顺序追加多份 PDF 已落；PR #63 阶段 2 UI 入口已落）。
 - [ ] 支持裁剪、拆分双页扫描、添加普通页码和 Bates 编号。
 - [ ] 支持证据图片和 PDF 页面按 A4 多图编排。（已建立 plan-only A4 编排计划器；真实目录拾取和像素渲染待接入）
 - [ ] 支持页级检查索引、文书边界 manifest 和规范命名建议。
@@ -72,15 +72,16 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 ### 5.1 常用导出工具
 
-- [ ] 支持文字水印和图片水印。（已建立导出 operation 和 pdf-lib 写入底座；中文字体和完整 UI 预览待接入）
-- [ ] 支持 Bates 编号的起始号、前后缀和位置选择。（已建立导出 operation 和 pdf-lib 写入底座；完整 UI 预览待接入）
-- [ ] 支持常用压缩预设，并明确压缩影响和输出路径。（已建立 plan-only 压缩预设和警告；真实图像重编码/降采样待接入）
-- [ ] 支持批注、表单和页面操作扁平化导出。（已建立导出引擎底座和表单 flatten；批注真实绘制、页面操作改写和 UI 接入待完成）
+- [x] 支持文字水印和图片水印。（ISS-040：导出二级工具条切换右侧交付设置面板，支持文字水印参数和 PNG/JPG 图片水印，默认输出新副本）
+- [x] 支持页眉页脚固定说明。（ISS-042：三级 `工具` 入口进入导出模式右侧页眉页脚设置，默认输出 `*-header-footer.pdf` 新副本）
+- [x] 支持 Bates 编号的起始号、前后缀和位置选择。（ISS-039：导出模式右侧交付设置面板已接入预览和 bytes 下载）
+- [x] 支持常用压缩预设，并明确压缩影响和输出路径。（ISS-041：三级 `工具` 入口进入导出模式右侧压缩设置，默认输出 `*-compressed.pdf` 新副本；DPI 降采样仍保留后续深化）
+- [x] 支持批注、表单和页面操作扁平化导出。（ISS-043 / ISS-044 / ISS-045：表单扁平化、页面操作真实另存和批注扁平化入口均已接入对应深层面板，默认输出新副本）
 
 ### 6. OCR/扫描
 
 - [x] 检测纯扫描页、低文字量页和疑似 OCR 失败页（`OcrQualityReport` 契约 + `ocrQualityCheckService` 报告服务，DEC-017 / DEC-050）。
-- [ ] 支持扫描件清洁校正：粗方向检测、微倾斜校正、可选裁边和分块处理。（已建立 preprocess-only job/bridge stub，真实处理待接入）
+- [ ] 支持扫描件清洁校正：粗方向检测、微倾斜校正、可选裁边和分块处理（**部分**：preprocess-only job/bridge 真实清洁已落，ISS-016 / DEC-040；粗方向 / 微倾斜 / 拆分双页仍 plan-only，待后续 worker 接入）。
 - [x] 提供 OCR bridge，优先连接本地 Legal Skills / `ocrmypdf`（`start_ocr_job` 按 provider 分发到 `ocrmypdf` 子进程，DEC-030 / PR #18）。
 - [x] PaddleOCR / MinerU 等联网 OCR 需用户明确确认（`ocrPrivacyConsentGuard` notice/consent 双匹配 + 桥接 fingerprint/nonce/有效期，DEC-010 / PR #47）。
 - [x] OCR 任务后台运行，显示进度、后端、输出路径和失败原因（`createTauriOcrJobController` + `OcrJobList`，DEC-042 / PR #29）。
@@ -92,12 +93,12 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 - [x] 读取 AcroForm 字段并高亮可填写区域（`FormService.readFormFields`）。
 - [x] 支持文本框、复选框、单选框和下拉字段填写（`FormService.fillFormField` + `applyFormOperations` 批量）。
-- [ ] 支持签名图片、手写签名和签名位置调整（**部分**：签名图片限定 PNG/JPG 已落地；手写签名 / 签名位置调整待后续 worker）。
-- [x] 支持表单扁平化导出（`FormService.flattenForm`，pdf-lib `form.flatten()`）。
+- [ ] 支持签名图片、手写签名和签名位置调整（**部分**：签名图片限定 PNG/JPG 已落，ISS-008 / DEC-055，CHANGELOG 0.1.0-alpha.5；手写签名 / 签名位置调整待后续 worker）。
+- [x] 支持表单扁平化导出（`FormService.flattenForm`，pdf-lib `form.flatten()`；ISS-043：三级 `表单扁平化` 入口进入填写和签名面板确认导出）。
 
 ### 8. 设置与安全
 
-- [x] 支持最近文件、默认缩放、阅读布局、默认保存目录和 OCR 后端设置。
+- [x] 支持最近文件、默认缩放、阅读布局、默认保存目录、浅色 / 深色外观和 OCR 后端设置。
 - [x] 支持 PaddleOCR / MinerU API 配置，不在 UI、日志和仓库中暴露完整密钥。
 - [x] 联网 OCR 必须要求用户主动确认。
 - [x] 所有改变 PDF 的操作默认另存为新 PDF（`pdfOperationEngine` 路径型新文件 + `outputToolPlan` 计划摘要 + `writeNewFile` 仅新建语义）。
@@ -136,6 +137,14 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - 2026-06-02：完成 `ISS-006` 页面整理第一版底座：页面整理状态、旋转/删除/重排/恢复/撤销、默认 `*-organized.pdf` 输出路径和 plan-only 导出请求已落地；真实页面改写、完整页面网格 UI 和高级页面整理能力继续后续接入。
 - 2026-06-02：完成 `ISS-010` 法律材料隐私与联网 OCR 提示第一版：notice/consent/audit 模型、脱敏路径摘要、API key 引用脱敏、云端 consent guard 和 bridge 审计衔接已落地；旧布尔确认标记不能单独放行云端 OCR，完整 UI 弹窗和真实云端 OCR 调用后续接入。
 - 2026-06-02：完成 `ISS-013` PDF 交付工具底座第一版：文字/图片水印、页码和 Bates 编号导出 operation 与 pdf-lib 写入已落地，默认 `*-delivery.pdf` 新输出路径和压缩 plan-only 摘要已建立；真实压缩和中文字体接入继续后续深化。
+- 2026-06-08：完成 ISS-039 工具启动器与导出编号面板：右侧 `工具` 菜单按 `组织页面 / 交付导出 / 标注填写 / 扫描 OCR` 分组；页码 / Bates 继续留在三级入口和导出模式右侧面板，二级导出工具条只保留 `文字水印 / 图片水印`。
+- 2026-06-08：补齐 ISS-032 原生菜单桥接：macOS `工具` 菜单项通过 `faropdf://command` 进入前端 command model；`文件 > 打开…` 经 Tauri dialog + 专用 PDF bytes 读取 command 打开文档。
+- 2026-06-08：完成 ISS-050 原生菜单系统动作收口：`文件 > 新建窗口` 由 Tauri 直接创建新窗口，`帮助 > 关于 FaroPDF` 打开设置页关于 section；新建窗口 / 全屏 / 关闭窗口不再进入前端 PDF 业务 command catalog。
+- 2026-06-08：完成 ISS-041 压缩交付面板：`压缩` 保持三级工具入口并进入导出模式右侧 `压缩设置`，支持法院上传 5MB/10MB/20MB/50MB 等预设，默认输出 `*-compressed.pdf` 新副本；压缩 apply 模式使用压缩服务输出替换导出工作 PDF。
+- 2026-06-08：完成 ISS-042 页眉页脚交付面板：`页眉页脚` 保持三级工具入口并进入导出模式右侧 `页眉页脚设置`，支持页眉、页脚、字号和透明度，默认输出 `*-header-footer.pdf` 新副本。
+- 2026-06-08：完成 ISS-043 表单扁平化入口收口：`表单扁平化` 保持三级工具 / 原生菜单入口并进入填写和签名面板；填写签名二级工具条只展示 `读取字段 / 填写 / 签名 / 扁平化导出` 四个已接通动作。
+- 2026-06-08：完成 ISS-044 页面管理工作台真实状态：页面管理继续留在左上角独立工作台；旋转 / 删除 / 撤销接入 `pageOrganizer` 状态机，另存通过 `pdfOperationEngine` 的 `page-operations execute` 输出 `*-organized.pdf` 新副本。
+- 2026-06-08：完成 ISS-046 页面管理重排 UI：页面管理工作台新增 `上移 / 下移`，使用 `reorderOrganizerPages` 更新页面顺序，撤销可恢复，另存继续输出 `*-organized.pdf` 新副本；重排不进入阅读态顶栏或导出二级工具条。
 - 2026-06-04：ISS-013 第二阶段（真实压缩 + 中文字体）worker 启动后即触发 scope-fontkit 物理冲突（pdf-lib 嵌入自定义字体需 `@pdf-lib/fontkit`，与 worker prompt 的"不修改 package.json / 不引入 npm 字体包"约束冲突），按 DEC-036 延期到下一波；当前 wave 3 收口 2 个 PR（PR #22 阅读模式深化 / PR #23 表单填写与签署），整体推进度足够。重启条件：重写 worker prompt 明确"@pdf-lib/fontkit 是 pdf-lib 官方 devDep，可装"+ 选开源协议中文字体（OFL / Apache 2.0 / MIT）。
 - 2026-06-03：合并 `ISS-017` OCR 质量检查第一版（可检索页比例、关键词命中、CER、体积比、耗时和问题页）和 `ISS-018` 证据图片 A4 编排计划器第一版（auto 布局、方向检测、边距校验、安全输出路径）。
 - 2026-06-05：跨仓 cleanup（personal-site `ISS-005` 联动 / DEC-058）：官网 / 文档站入口由 `cat-xierluo/personal-site` 仓统一维护；FaroPDF 仓 README / ROADMAP 同步指向 `https://cat-xierluo.github.io/personal-site/faropdf/`，不引入 `website/` 子目录或独立的 GitHub Pages workflow。

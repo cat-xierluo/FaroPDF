@@ -252,6 +252,7 @@ describe("shared contracts", () => {
       defaultZoom: 1,
       defaultViewMode: "continuous",
       defaultSavePolicy: "always-export-copy",
+      themePreference: "light",
       recentFiles: [],
       ocrProviders: [provider],
       requireNetworkOcrConfirmation: true,

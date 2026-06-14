@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
-import type { PdfAnnotation } from "../../shared";
+import { useCallback, useEffect, useState } from "react";
+import type { AnnotationSidecar, PdfAnnotation } from "../../shared";
 import type { ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
 import type { AppSettings } from "../../shared";
+import { getCommandById, type AppCommandId, type AppCommandSignal } from "../../shared/app/commands";
 import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
 import {
@@ -14,16 +15,18 @@ import { createInitialAnnotationToolState } from "../../modules/annotation";
 import type { AnnotationToolState } from "../../modules/annotation";
 import { useFormController } from "../../modules/forms/useFormController";
 import { setActiveFormController } from "../../modules/forms/activeFormController";
-import { registerFormsToolbarTools } from "../../modules/forms/registerFormsToolbarTools";
 import { FormsPanel } from "../../modules/forms/ui/FormsPanel";
+import { createPdfOperationEngine } from "../../modules/export";
+import { ExportDeliveryPanel, type ExportDeliveryTool } from "../../modules/export/ui/ExportDeliveryPanel";
 import { ReaderCanvas } from "./ReaderCanvas";
 import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
-import { AnnotationSidebar } from "./AnnotationSidebar";
+import { AnnotationSidebar, type AnnotationFlattenResult } from "./AnnotationSidebar";
 import { AnnotationToolbar } from "./AnnotationToolbar";
 import { PageOrganizerWorkspace } from "./PageOrganizerWorkspace";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 import { SettingsPanel } from "../../modules/settings/SettingsPanel";
+import type { SectionId } from "../../modules/settings/sections";
 import { AnnotationOverlay, type AnnotationDraftInput, type AnnotationOverlayViewport } from "./AnnotationOverlay";
 import type {
   AnnotationArmedStateBundle,
@@ -38,6 +41,7 @@ interface AppShellProps {
   onModeChange: (mode: AppModeId) => void;
   onSettingsChange?: (settings: AppSettings) => void;
   onUtilityPanelChange: (panel: UtilityPanelId) => void;
+  commandSignal?: AppCommandSignal | null;
   reader: ReaderController;
   search: TextSearchController;
   settings: AppSettings;
@@ -64,21 +68,15 @@ interface AppShellProps {
   onRequestOcr?: () => void;
 }
 
-const contextualTools: Partial<Record<Exclude<AppModeId, "read" | "pages" | "ocr">, string[]>> = {
-  annotate: ["高亮", "下划线", "删除线", "笔", "橡皮擦", "文本", "形状", "笔记", "图章", "签名", "内容选定", "裁剪"],
-  forms: ["文本", "签名", "日期", "钩号", "叉号", "图章", "图像", "导出为压平"],
-};
-
 const exportToolGroups = [
   {
-    label: "格式转换",
-    tools: ["转成 Word", "转成 Excel", "转成 PowerPoint", "转成文本", "转成图片"],
-  },
-  {
     label: "交付工具",
-    tools: ["文字水印", "图片水印", "页码", "Bates 编号", "压缩", "批注摘要"],
+    tools: [
+      { commandId: "export-watermark-text", label: "文字水印" },
+      { commandId: "export-watermark-image", label: "图片水印" },
+    ],
   },
-];
+] satisfies Array<{ label: string; tools: Array<{ commandId: AppCommandId; label: string }> }>;
 
 const contextualToolbarLabels: Record<Exclude<AppModeId, "read" | "pages">, string> = {
   annotate: "批注工具条",
@@ -91,6 +89,7 @@ export function AppShell({
   activeMode,
   annotations,
   annotationArmed,
+  commandSignal,
   onAnnotationClick,
   onAnnotationDraft,
   onModeChange,
@@ -114,6 +113,13 @@ export function AppShell({
   // 状态由 AppShell 持有——Overlay 点击 → setActiveAnnotationId → Sidebar 高亮；Sidebar 点击 → setActiveAnnotationId → Overlay 高亮。
   // 离开 annotate 模式时自动清空，避免切换到 read / pages 等模式后保留 stale 选中态。
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+  const [activeExportTool, setActiveExportTool] = useState<ExportDeliveryTool>("text-watermark");
+  const [annotationViewSignal, setAnnotationViewSignal] = useState<{ view: "list" | "summary"; nonce: number }>({
+    view: "list",
+    nonce: 0,
+  });
+  const [settingsInitialSection, setSettingsInitialSection] = useState<SectionId>("general");
+  const [commandFeedback, setCommandFeedback] = useState<string | null>(null);
   useEffect(() => {
     if (activeMode !== "annotate") {
       setActiveAnnotationId(null);
@@ -125,13 +131,13 @@ export function AppShell({
     setActiveFormController(formController);
     return () => setActiveFormController(null);
   }, [formController]);
-  useEffect(() => {
-    if (activeMode === "forms") {
-      registerFormsToolbarTools();
-    }
-  }, [activeMode]);
   const document = reader.state.document;
   const hasDocument = document !== null;
+  useEffect(() => {
+    if (hasDocument && commandFeedback === "请先打开 PDF 文档。") {
+      setCommandFeedback(null);
+    }
+  }, [commandFeedback, hasDocument]);
   // 当前页 PDF viewport（pt），用于 overlay 真实坐标
   const currentPageNumber = document?.currentPage ?? 1;
   const currentPageViewport = reader.state.pageViewports.find((viewport) => viewport.pageIndex + 1 === currentPageNumber);
@@ -145,10 +151,144 @@ export function AppShell({
   // 当前页的批注子集
   const currentPageAnnotations = (annotations ?? []).filter((annotation) => annotation.pageIndex === currentPageNumber - 1);
 
+  const handleFlattenAnnotations = useCallback(async (): Promise<AnnotationFlattenResult> => {
+    if (!document) {
+      throw new Error("请先打开 PDF 文档。");
+    }
+
+    const sourceBytes = await reader.getFileBytes();
+    if (!sourceBytes) {
+      throw new Error("未找到当前 PDF 的源文件字节。");
+    }
+
+    const requestedAt = new Date().toISOString();
+    const sidecar: AnnotationSidecar = {
+      schemaVersion: 1,
+      document: {
+        ...(document.fingerprint ? { fingerprint: document.fingerprint } : {}),
+        pageCount: document.pageCount,
+      },
+      annotations: [...(annotations ?? [])],
+      createdAt: requestedAt,
+      updatedAt: requestedAt,
+    };
+    const engine = createPdfOperationEngine();
+    const result = await engine.exportPdf({
+      id: `annotation-flatten-${document.documentId}-${Date.now()}`,
+      source: {
+        bytes: new Uint8Array(sourceBytes),
+        ...(document.path ? { path: document.path } : {}),
+        ...(document.fingerprint ? { fingerprint: document.fingerprint } : {}),
+      },
+      destination: { type: "bytes" },
+      operations: [
+        {
+          id: `flatten-annotations-${document.documentId}`,
+          type: "flatten-annotations",
+          sidecar,
+          strategy: "draw",
+        },
+      ],
+      requestedAt,
+    });
+    const fileName = suggestAnnotationFlattenOutputName(reader.getCurrentFileName() ?? document.name);
+    await reader.saveUpdatedBytes(result.bytes, fileName);
+    const plan = result.summary.annotationPlan;
+
+    return {
+      annotationCount: plan?.annotationCount ?? sidecar.annotations.length,
+      drawnCount: plan?.drawnCount ?? sidecar.annotations.length,
+      fileName,
+      skippedCount: plan?.skippedCount ?? 0,
+    };
+  }, [annotations, document, reader]);
+
+  const executeCommand = useCallback(async (commandId: AppCommandId) => {
+    const command = getCommandById(commandId);
+    if (!command) {
+      return;
+    }
+
+    if (command.requiresDocument && !hasDocument) {
+      setCommandFeedback("请先打开 PDF 文档。");
+      return;
+    }
+
+    if (command.id === "file-save-as") {
+      try {
+        setCommandFeedback("正在另存副本...");
+        const sourceBytes = await reader.getFileBytes();
+        if (!sourceBytes) {
+          throw new Error("未找到当前 PDF 的源文件字节。");
+        }
+        const outputName = suggestSaveAsOutputName(reader.getCurrentFileName() ?? document?.name ?? null);
+        await reader.saveUpdatedBytes(sourceBytes, outputName);
+        setCommandFeedback(`已另存为 ${outputName}。`);
+      } catch (error) {
+        setCommandFeedback(error instanceof Error ? error.message : "另存失败。");
+      }
+      return;
+    }
+
+    if (command.id === "view-pages") {
+      onModeChange(activeMode === "pages" ? "read" : "pages");
+      onUtilityPanelChange("none");
+      return;
+    }
+
+    if (command.id === "export-watermark-text") {
+      setActiveExportTool("text-watermark");
+    } else if (command.id === "export-watermark-image") {
+      setActiveExportTool("image-watermark");
+    } else if (command.id === "export-header-footer") {
+      setActiveExportTool("header-footer");
+    } else if (command.id === "export-page-number") {
+      setActiveExportTool("page-number");
+    } else if (command.id === "export-bates") {
+      setActiveExportTool("bates");
+    } else if (command.id === "export-compress") {
+      setActiveExportTool("compress");
+    }
+
+    if (command.id === "export-annotation-summary") {
+      setAnnotationViewSignal((prev) => ({ view: "summary", nonce: prev.nonce + 1 }));
+    } else if (command.id === "annotations-flatten") {
+      setAnnotationViewSignal((prev) => ({ view: "list", nonce: prev.nonce + 1 }));
+    }
+
+    if (command.id === "help-about") {
+      setSettingsInitialSection("about");
+    } else if (command.id === "settings-open") {
+      setSettingsInitialSection("general");
+    }
+
+    if (command.targetMode) {
+      onModeChange(command.targetMode as AppModeId);
+    }
+
+    if (command.targetUtilityPanel) {
+      onUtilityPanelChange(command.targetUtilityPanel as UtilityPanelId);
+    } else if (command.group === "export" || command.group === "forms" || (command.group === "mode" && command.targetMode !== "annotate")) {
+      onUtilityPanelChange("none");
+    }
+
+    if (command.feedback) {
+      setCommandFeedback(command.feedback);
+    }
+  }, [activeMode, document?.name, hasDocument, onModeChange, onUtilityPanelChange, reader]);
+
+  useEffect(() => {
+    if (!commandSignal || commandSignal.id === "file-open") {
+      return;
+    }
+    void executeCommand(commandSignal.id);
+  }, [commandSignal?.nonce, executeCommand]);
+
   return (
     <div className="app-shell" role="application" aria-label="FaroPDF PDF 工作台">
       <Toolbar
         activeMode={activeMode}
+        onCommand={executeCommand}
         onModeChange={onModeChange}
         onUtilityPanelChange={onUtilityPanelChange}
         reader={reader}
@@ -159,9 +299,13 @@ export function AppShell({
         <ContextToolbar
           annotationDisabled={!hasDocument}
           annotationState={annotationState}
+          hasDocument={hasDocument}
           mode={activeMode}
           ocr={ocr}
+          onCommand={executeCommand}
           onAnnotationStateChange={annotationArmed?.onStateChange ?? (() => undefined)}
+          onUtilityPanelChange={onUtilityPanelChange}
+          formController={formController}
         />
       ) : null}
       <div className={showUtilityPanel ? "workspace" : "workspace workspace--full"}>
@@ -171,6 +315,8 @@ export function AppShell({
             annotations={annotations}
             formController={formController}
             onAnnotationClick={setActiveAnnotationId}
+            annotationViewSignal={annotationViewSignal}
+            onFlattenAnnotations={handleFlattenAnnotations}
             panel={utilityPanel}
             reader={reader}
             search={search}
@@ -201,6 +347,13 @@ export function AppShell({
               searchState={search.state}
             />
           )}
+          {activeMode === "export" ? (
+            <ExportDeliveryPanel
+              onSelectedToolChange={setActiveExportTool}
+              reader={reader}
+              selectedTool={activeExportTool}
+            />
+          ) : null}
           {isAnnotateMode && hasDocument && overlayViewport ? (
             <AnnotationOverlay
               activeAnnotationId={activeAnnotationId}
@@ -226,8 +379,25 @@ export function AppShell({
         </div>
       </div>
       <StatusBar readerState={reader.state} />
+      {commandFeedback ? (
+        <div className="command-feedback" role="status" aria-live="polite">
+          <span>{commandFeedback}</span>
+          <button
+            aria-label="关闭命令提示"
+            className="compact-button"
+            onClick={() => setCommandFeedback(null)}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
       <SettingsPanel
-        onClose={() => onUtilityPanelChange(utilityPanel === "settings" ? "none" : "none")}
+        initialSection={settingsInitialSection}
+        onClose={() => {
+          setSettingsInitialSection("general");
+          onUtilityPanelChange("none");
+        }}
         onSettingsChange={onSettingsChange}
         open={utilityPanel === "settings"}
         settings={settings}
@@ -251,13 +421,17 @@ function UtilityPanel({
   activeAnnotationId,
   annotations,
   formController,
+  annotationViewSignal,
   onAnnotationClick,
+  onFlattenAnnotations,
   panel,
   reader,
   search,
 }: {
   activeAnnotationId: string | null;
+  annotationViewSignal: { view: "list" | "summary"; nonce: number };
   onAnnotationClick: (annotationId: string) => void;
+  onFlattenAnnotations: () => Promise<AnnotationFlattenResult>;
   panel: Exclude<UtilityPanelId, "none">;
   reader: ReaderController;
   search: TextSearchController;
@@ -302,8 +476,10 @@ function UtilityPanel({
         currentPage={reader.state.document?.currentPage}
         hasDocument={reader.state.document !== null}
         onAnnotationClick={onAnnotationClick}
+        onFlattenAnnotations={(annotations ?? []).length > 0 ? onFlattenAnnotations : undefined}
         onSelectPage={reader.setCurrentPage}
         pageCount={reader.state.document?.pageCount}
+        preferredViewSignal={annotationViewSignal}
       />
     );
   }
@@ -346,18 +522,44 @@ function matchZoomPreset(zoom: number): ZoomPresetId | undefined {
   return undefined;
 }
 
+function suggestAnnotationFlattenOutputName(fileName: string | null): string {
+  const fallback = "document.pdf";
+  const name = (fileName?.trim() || fallback).replace(/[\\/]/g, "-");
+  if (name.toLowerCase().endsWith(".pdf")) {
+    return `${name.slice(0, -4)}-annotations-flattened.pdf`;
+  }
+  return `${name}-annotations-flattened.pdf`;
+}
+
+function suggestSaveAsOutputName(fileName: string | null): string {
+  const fallback = "document.pdf";
+  const name = (fileName?.trim() || fallback).replace(/[\\/]/g, "-");
+  if (name.toLowerCase().endsWith(".pdf")) {
+    return `${name.slice(0, -4)}-copy.pdf`;
+  }
+  return `${name}-copy.pdf`;
+}
+
 function ContextToolbar({
   annotationDisabled,
   annotationState,
+  formController,
+  hasDocument,
   mode,
   ocr,
+  onCommand,
   onAnnotationStateChange,
+  onUtilityPanelChange,
 }: {
   annotationDisabled: boolean;
   annotationState: AnnotationToolState;
+  formController: import("../../modules/forms/useFormController").FormController;
+  hasDocument: boolean;
   mode: Exclude<AppModeId, "read" | "pages">;
   ocr?: OcrWorkspaceController;
+  onCommand: (commandId: AppCommandId) => void;
   onAnnotationStateChange: (next: AnnotationToolState) => void;
+  onUtilityPanelChange: (panel: UtilityPanelId) => void;
 }) {
   if (mode === "annotate") {
     // stage 4 milestone 2：annotate 模式用真正的 AnnotationToolbar（受控），
@@ -408,8 +610,14 @@ function ContextToolbar({
           <div className="context-tool-group" role="group" aria-label={group.label} key={group.label}>
             <span>{group.label}</span>
             {group.tools.map((tool) => (
-              <button className="context-tool" key={tool} type="button">
-                {tool}
+              <button
+                className="context-tool"
+                disabled={!hasDocument}
+                key={tool.commandId}
+                onClick={() => onCommand(tool.commandId)}
+                type="button"
+              >
+                {tool.label}
               </button>
             ))}
           </div>
@@ -418,14 +626,57 @@ function ContextToolbar({
     );
   }
 
-  return (
-    <div className="context-toolbar" role="toolbar" aria-label={contextualToolbarLabels[mode]}>
-      {contextualTools[mode]?.map((tool) => (
-        <button className="context-tool" key={tool} type="button">
-          {tool}
-        </button>
-      ))}
-    </div>
-  );
-}
+  if (mode === "forms") {
+    const disabled = !hasDocument || formController.loading;
+    return (
+      <div className="context-toolbar context-toolbar--grouped" role="toolbar" aria-label={contextualToolbarLabels[mode]}>
+        <div className="context-tool-group" role="group" aria-label="表单工具">
+          <span>表单工具</span>
+          <button
+            className="context-tool context-tool--primary"
+            disabled={disabled}
+            onClick={() => {
+              onUtilityPanelChange("forms");
+              void formController.refreshFormState();
+            }}
+            type="button"
+          >
+            {formController.loading ? "处理中..." : "读取字段"}
+          </button>
+          <button
+            className="context-tool"
+            disabled={disabled}
+            onClick={() => {
+              onUtilityPanelChange("forms");
+              formController.openPanel("fill");
+            }}
+            type="button"
+          >
+            填写
+          </button>
+          <button
+            className="context-tool"
+            disabled={disabled}
+            onClick={() => {
+              onUtilityPanelChange("forms");
+              formController.openPanel("sign");
+            }}
+            type="button"
+          >
+            签名
+          </button>
+          <button
+            className="context-tool"
+            disabled={!hasDocument}
+            onClick={() => onCommand("forms-flatten")}
+            type="button"
+          >
+            扁平化导出
+          </button>
+        </div>
+      </div>
+    );
+  }
 
+  return null;
+}

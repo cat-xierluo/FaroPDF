@@ -11,6 +11,7 @@ export type RenderPageToCanvasFn = (
   pageIndex: number,
   canvas: HTMLCanvasElement,
   zoom: number,
+  options?: { signal?: AbortSignal },
 ) => Promise<void>;
 
 interface ReaderCanvasProps {
@@ -70,16 +71,6 @@ export function ReaderCanvas({ onOpenFile, onPageNavigate, onPageVisible, onRequ
     return (
       <main className="reader" aria-label="PDF 阅读区">
         <div className="reader__start">
-          <section className="start-conversions" aria-label="转换入口">
-            <button className="conversion-button" type="button">
-              <span className="conversion-button__icon" aria-hidden="true">IMG</span>
-              图片转成 PDF
-            </button>
-            <button className="conversion-button" type="button">
-              <span className="conversion-button__icon" aria-hidden="true">DOC</span>
-              Word 转成 PDF
-            </button>
-          </section>
           <section
             className="open-dropzone"
             aria-label="打开 PDF 文档"
@@ -342,21 +333,24 @@ function PdfPage({
       return;
     }
     const pageIndex = pageNumber - 1; // PDF.js 页码为 1-based
-    let cancelled = false;
-    renderPageToCanvas(pageIndex, canvas, zoom)
+    const abortController = new AbortController();
+    renderPageToCanvas(pageIndex, canvas, zoom, { signal: abortController.signal })
       .then(() => {
-        if (!cancelled) {
+        if (!abortController.signal.aborted) {
           setRenderFailed(false);
         }
       })
       .catch((error: unknown) => {
-        if (!cancelled) {
+        if (isAbortError(error)) {
+          return;
+        }
+        if (!abortController.signal.aborted) {
           console.error(`[FaroPDF] 渲染第 ${pageNumber} 页失败:`, error);
           setRenderFailed(true);
         }
       });
     return () => {
-      cancelled = true;
+      abortController.abort();
     };
   }, [pageNumber, zoom, rotation, renderPageToCanvas]);
 
@@ -462,4 +456,10 @@ function PdfPage({
       </div>
     </section>
   );
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === "AbortError"
+    : error instanceof Error && error.name === "AbortError";
 }

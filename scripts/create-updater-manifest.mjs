@@ -30,11 +30,11 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join, basename } from "node:path";
 
-const UPDATER_PLATFORM_KEYS = {
-  "darwin-aarch64": "darwin-aarch64",
-  "darwin-x86_64": "darwin-x86_64",
-  "windows-x86_64": "windows-x86_64",
-};
+const UPDATER_PLATFORM_KEYS = new Set([
+  "darwin-aarch64",
+  "darwin-x86_64",
+  "windows-x86_64",
+]);
 
 // sig 文件名格式：<bundle-name>.sig，比如
 //   FaroPDF_aarch64.app.tar.gz.sig
@@ -70,7 +70,7 @@ function printHelp() {
 Optional env:
   FAROPDF_UPDATE_NOTES          Short release notes line (embedded in latest.json? no, dropped).
   FAROPDF_UPDATE_GITEE_REPO     Gitee repo URL (overrides GitHub for asset URLs in latest-gitee.json).
-  FAROPDF_GITEE MANIFEST_OUTPUT Output file path for the Gitee-specific latest.json
+  FAROPDF_GITEE_MANIFEST_OUTPUT Output file path for the Gitee-specific latest.json
                                 (typically latest-gitee.json).`);
 }
 
@@ -79,6 +79,14 @@ function parseRequiredPlatforms(raw) {
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean);
+}
+
+function validateRequiredPlatforms(platforms) {
+  const unknown = platforms.filter((platform) => !UPDATER_PLATFORM_KEYS.has(platform));
+  if (unknown.length > 0) {
+    console.error(`[updater:manifest] unsupported platform keys: ${unknown.join(", ")}`);
+    process.exit(1);
+  }
 }
 
 function matchSigToPlatform(filename) {
@@ -118,7 +126,7 @@ async function main() {
   const version = readEnv("FAROPDF_UPDATE_VERSION");
   const tag = readEnv("FAROPDF_UPDATE_TAG");
   const repo = readEnv("FAROPDF_UPDATE_REPO");
-  const outputPath = readEnv("FAROPDF MANIFEST_OUTPUT");
+  const outputPath = readEnv("FAROPDF_MANIFEST_OUTPUT");
   const requiredPlatforms = parseRequiredPlatforms(
     readEnv("FAROPDF_REQUIRE_PLATFORMS"),
   );
@@ -128,9 +136,10 @@ async function main() {
     );
     process.exit(1);
   }
+  validateRequiredPlatforms(requiredPlatforms);
 
   const giteeRepo = process.env["FAROPDF_UPDATE_GITEE_REPO"] || null;
-  const giteeOutputPath = process.env["FAROPDF_GITEE MANIFEST_OUTPUT"] || null;
+  const giteeOutputPath = process.env["FAROPDF_GITEE_MANIFEST_OUTPUT"] || null;
 
   // 1. 扫 sigs/ 目录，匹配 platform
   const { readdir } = await import("node:fs/promises");

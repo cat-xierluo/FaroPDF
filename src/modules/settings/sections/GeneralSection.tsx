@@ -1,6 +1,11 @@
 import { useState } from "react";
-import type { AppSettings, DefaultSavePolicy } from "../../../shared/settings/types";
+import type { AppSettings, AppThemePreference, DefaultSavePolicy } from "../../../shared/settings/types";
 import type { SectionProps } from "./types";
+
+const themePreferenceLabels: Record<AppThemePreference, string> = {
+  light: "浅色",
+  dark: "深色",
+};
 
 const savePolicyLabels: Record<DefaultSavePolicy, string> = {
   "always-export-copy": "始终另存副本",
@@ -24,6 +29,10 @@ export function GeneralSection({ settings, onChange }: GeneralSectionProps) {
     onChange({ ...settings, defaultSavePolicy: policy });
   }
 
+  function updateThemePreference(themePreference: AppThemePreference) {
+    onChange({ ...settings, themePreference });
+  }
+
   function commitSaveDirectory() {
     const trimmed = pendingSaveDir.trim();
     onChange({
@@ -35,7 +44,22 @@ export function GeneralSection({ settings, onChange }: GeneralSectionProps) {
   return (
     <section className="settings-section" aria-label="常规">
       <h2 className="settings-section__title">常规</h2>
-      <p className="settings-section__hint">默认保存行为、最近打开过的文件。</p>
+      <p className="settings-section__hint">外观、默认保存行为、最近打开过的文件。</p>
+
+      <label className="settings-field" htmlFor="theme-preference">
+        <span>外观</span>
+        <select
+          id="theme-preference"
+          onChange={(event) => updateThemePreference(event.currentTarget.value as AppThemePreference)}
+          value={settings.themePreference}
+        >
+          {(Object.keys(themePreferenceLabels) as AppThemePreference[]).map((themePreference) => (
+            <option key={themePreference} value={themePreference}>
+              {themePreferenceLabels[themePreference]}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <label className="settings-field" htmlFor="default-save-policy">
         <span>默认保存策略</span>

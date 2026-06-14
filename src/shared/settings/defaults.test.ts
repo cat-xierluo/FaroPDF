@@ -3,6 +3,7 @@ import {
   createDefaultAppSettings,
   exportSafeAppSettings,
   maskSecret,
+  normalizeAppSettings,
   sanitizeAppSettingsForStorage,
   validateAppSettings,
 } from "./defaults";
@@ -16,6 +17,7 @@ describe("default app settings", () => {
     expect(settings.defaultZoom).toBe(1);
     expect(settings.defaultViewMode).toBe("continuous");
     expect(settings.defaultSavePolicy).toBe("always-export-copy");
+    expect(settings.themePreference).toBe("light");
     expect(settings.requireNetworkOcrConfirmation).toBe(true);
     expect(settings.autoUpdateCheck).toBe(true);
     expect(settings.recentFiles).toEqual([]);
@@ -78,6 +80,19 @@ describe("default app settings", () => {
 
     expect(JSON.stringify(stored)).not.toContain(rawKey);
     expect(stored.ocrProviders.find((provider) => provider.id === "mineru")?.apiKeyRef).toBe("mine...cdef");
+  });
+
+  test("normalizes theme preference and keeps legacy payloads light", () => {
+    expect(normalizeAppSettings({}).themePreference).toBe("light");
+    expect(normalizeAppSettings({ themePreference: "dark" }).themePreference).toBe("dark");
+    expect(normalizeAppSettings({ themePreference: "sepia" }).themePreference).toBe("light");
+  });
+
+  test("rejects invalid theme preference during validation", () => {
+    const settings = createDefaultAppSettings();
+    settings.themePreference = "sepia" as never;
+
+    expect(validateAppSettings(settings).errors).toContain("外观偏好无效。");
   });
 
   test("validates provider configuration without leaking key material", () => {

@@ -212,7 +212,7 @@ async function loadPdfSafely(bytes: Uint8Array, itemId: string): Promise<PDFDocu
     return await PDFDocument.load(bytes, { updateMetadata: false });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`PDF 页面条目 ${itemId} 解析失败：${message}`);
+    throw new Error(`PDF 页面条目 ${itemId} 解析失败：${message}`, { cause: error });
   }
 }
 

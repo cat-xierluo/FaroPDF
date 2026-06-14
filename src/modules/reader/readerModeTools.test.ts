@@ -45,6 +45,15 @@ describe("registerReadModeTools", () => {
     );
   });
 
+  test("重复注册 read mode 工具时保持幂等", () => {
+    registerReadModeTools();
+    registerReadModeTools();
+
+    const tools = getModeTools("read");
+    expect(tools).toHaveLength(3);
+    expect(new Set(tools.map((tool) => tool.id)).size).toBe(3);
+  });
+
   test("无文档时所有工具处于 disabled 状态", () => {
     registerReadModeTools();
     const tools = getModeTools("read");

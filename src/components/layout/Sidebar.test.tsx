@@ -217,7 +217,7 @@ describe("DocumentSummaryPanel 缩略图", () => {
     expect(screen.getByTestId("thumbnail-canvas-3")).toBeInTheDocument();
   });
 
-  test("pagesWithHits 中的页码显示命中标记", () => {
+  test("pagesWithHits 中的页码显示可访问的紧凑命中标记", () => {
     render(
       <DocumentSummaryPanel
         currentPage={1}
@@ -232,12 +232,13 @@ describe("DocumentSummaryPanel 缩略图", () => {
     const page4 = screen.getByTestId("thumbnail-list").querySelector('[data-page-number="4"]') as HTMLElement;
     const page1 = screen.getByTestId("thumbnail-list").querySelector('[data-page-number="1"]') as HTMLElement;
 
-    expect(within(page2).getByText("命中")).toBeInTheDocument();
-    expect(within(page4).getByText("命中")).toBeInTheDocument();
-    expect(within(page1).queryByText("命中")).not.toBeInTheDocument();
+    expect(within(page2).getByLabelText("本页有搜索命中")).toHaveClass("thumbnail-status-marker--search");
+    expect(within(page4).getByLabelText("本页有搜索命中")).toHaveClass("thumbnail-status-marker--search");
+    expect(within(page2).queryByText("命中")).not.toBeInTheDocument();
+    expect(within(page1).queryByLabelText("本页有搜索命中")).not.toBeInTheDocument();
   });
 
-  test("有批注的页码显示批注标记", () => {
+  test("有批注的页码显示可访问的紧凑批注标记", () => {
     const annotations: PdfAnnotation[] = [
       createTestAnnotation({ id: "ann-1", pageIndex: 0, type: "highlight" }),
       createTestAnnotation({ id: "ann-2", pageIndex: 1, type: "note" }),
@@ -256,12 +257,13 @@ describe("DocumentSummaryPanel 缩略图", () => {
     const page2 = screen.getByTestId("thumbnail-list").querySelector('[data-page-number="2"]') as HTMLElement;
     const page3 = screen.getByTestId("thumbnail-list").querySelector('[data-page-number="3"]') as HTMLElement;
 
-    expect(within(page1).getByText("批注")).toBeInTheDocument();
-    expect(within(page2).getByText("批注")).toBeInTheDocument();
-    expect(within(page3).queryByText("批注")).not.toBeInTheDocument();
+    expect(within(page1).getByLabelText("本页有批注")).toHaveClass("thumbnail-status-marker--annotation");
+    expect(within(page2).getByLabelText("本页有批注")).toHaveClass("thumbnail-status-marker--annotation");
+    expect(within(page1).queryByText("批注")).not.toBeInTheDocument();
+    expect(within(page3).queryByLabelText("本页有批注")).not.toBeInTheDocument();
   });
 
-  test("ocrNeeded=true 时所有页码显示 OCR 标记", () => {
+  test("ocrNeeded=true 时所有页码显示可访问的紧凑 OCR 标记", () => {
     render(
       <DocumentSummaryPanel
         currentPage={1}
@@ -271,8 +273,10 @@ describe("DocumentSummaryPanel 缩略图", () => {
       />,
     );
 
-    const ocrMarkers = screen.getAllByText("OCR");
+    const ocrMarkers = screen.getAllByLabelText("本页需要 OCR");
     expect(ocrMarkers).toHaveLength(3);
+    expect(ocrMarkers[0]).toHaveClass("thumbnail-status-marker--ocr");
+    expect(screen.queryByText("OCR")).not.toBeInTheDocument();
   });
 
   test("ocrNeeded=false 时不显示 OCR 标记", () => {
@@ -285,6 +289,35 @@ describe("DocumentSummaryPanel 缩略图", () => {
       />,
     );
 
-    expect(screen.queryByText("OCR")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("本页需要 OCR")).not.toBeInTheDocument();
+  });
+
+  test("同一页多个状态标记并排显示，点击仍跳转到页码", async () => {
+    const user = userEvent.setup();
+    const onSelectPage = vi.fn();
+    const annotations: PdfAnnotation[] = [
+      createTestAnnotation({ id: "ann-1", pageIndex: 0, type: "highlight" }),
+    ];
+
+    render(
+      <DocumentSummaryPanel
+        annotations={annotations}
+        currentPage={1}
+        hasDocument={true}
+        ocrNeeded={true}
+        onSelectPage={onSelectPage}
+        pageCount={2}
+        pagesWithHits={new Set([1])}
+      />,
+    );
+
+    const page1 = screen.getByTestId("thumbnail-list").querySelector('[data-page-number="1"]') as HTMLElement;
+    expect(within(page1).getByLabelText("本页有批注")).toBeInTheDocument();
+    expect(within(page1).getByLabelText("本页有搜索命中")).toBeInTheDocument();
+    expect(within(page1).getByLabelText("本页需要 OCR")).toBeInTheDocument();
+    expect(within(page1).queryByText(/批注|命中|OCR/)).not.toBeInTheDocument();
+
+    await user.click(within(page1).getByRole("button", { name: "第 1 页（当前页）" }));
+    expect(onSelectPage).toHaveBeenCalledWith(0);
   });
 });

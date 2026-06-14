@@ -48,6 +48,12 @@ const ANNOTATION_TYPE_ICONS: Record<PdfAnnotationType, string> = {
   stamp: "YPD",
 };
 
+const THUMBNAIL_STATUS_MARKERS = [
+  { className: "thumbnail-status-marker--annotation", label: "本页有批注", shortLabel: "A" },
+  { className: "thumbnail-status-marker--search", label: "本页有搜索命中", shortLabel: "S" },
+  { className: "thumbnail-status-marker--ocr", label: "本页需要 OCR", shortLabel: "O" },
+] as const;
+
 interface DocumentSummaryPanelProps {
   /** 当前打开的文档是否有批注数据可用 */
   hasDocument: boolean;
@@ -300,26 +306,49 @@ function ThumbnailItem({
         </div>
         <div className="thumbnail-meta">
           <span>第 {pageNumber} 页</span>
-          <div className="thumbnail-markers" aria-label="页标记">
-            {showAnnotationMarker ? (
-              <span className="thumbnail-marker thumbnail-marker--annotation" title="本页有批注">
-                批注
-              </span>
-            ) : null}
-            {showSearchMarker ? (
-              <span className="thumbnail-marker thumbnail-marker--search" title="本页有搜索命中">
-                命中
-              </span>
-            ) : null}
-            {ocrNeeded ? (
-              <span className="thumbnail-marker thumbnail-marker--ocr" title="本页需要 OCR">
-                OCR
-              </span>
-            ) : null}
-          </div>
+          <ThumbnailStatusMarkers
+            showAnnotationMarker={showAnnotationMarker}
+            showSearchMarker={showSearchMarker}
+            ocrNeeded={ocrNeeded}
+          />
         </div>
       </button>
     </li>
+  );
+}
+
+function ThumbnailStatusMarkers({
+  ocrNeeded,
+  showAnnotationMarker,
+  showSearchMarker,
+}: {
+  ocrNeeded: boolean;
+  showAnnotationMarker: boolean;
+  showSearchMarker: boolean;
+}) {
+  const markers = [
+    showAnnotationMarker ? THUMBNAIL_STATUS_MARKERS[0] : null,
+    showSearchMarker ? THUMBNAIL_STATUS_MARKERS[1] : null,
+    ocrNeeded ? THUMBNAIL_STATUS_MARKERS[2] : null,
+  ].filter((marker): marker is (typeof THUMBNAIL_STATUS_MARKERS)[number] => marker !== null);
+
+  if (markers.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="thumbnail-status-markers" aria-label="页状态标记">
+      {markers.map((marker) => (
+        <span
+          aria-label={marker.label}
+          className={`thumbnail-status-marker ${marker.className}`}
+          key={marker.label}
+          title={marker.label}
+        >
+          <span aria-hidden="true">{marker.shortLabel}</span>
+        </span>
+      ))}
+    </div>
   );
 }
 

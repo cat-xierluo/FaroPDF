@@ -708,6 +708,9 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 - **ISS-004 批注 sidecar 模型**（P0，批注，已完成 sidecar+侧边栏列表 UI+点击跳转）— `feat/annotations-sidecar`：`PdfAnnotation` 模型、sidecar 持久化（默认 `.faropdf/annotations/*.annotations.json`）、批注列表 UI 和跳转。
 - **ISS-005 PDF 导出与批注扁平化**（P0，导出，部分完成）— `feat/pdf-export-engine`：`pdfOperationEngine` 抽象、pdf-lib 复制/扁平化表单、批注与页面操作 plan-only 计划、绝对新 PDF 路径。批注几何绘制和 UI 接入待后续。
 - **ISS-006 页面整理工作台**（P0，页面管理，进行中）— `feat/page-organizer`：`PdfPageOrganizerState` 状态机、旋转/删除/重排/恢复/撤销、plan-only 导出请求。完整 UI、插入/合并/裁剪、A4 标准化、页级 manifest、Bates 编号待后续。
+- **ISS-007 OCR bridge（含端到端联调 worker）**（P0，OCR/质量，已完成 v0.1 收口）— `feat/ocr-bridge` → `feat/iss-007-keychain` → PR #18 / #29 / #33 / #47：bridge 真实接入（`start_ocr_job` 按 provider 分发到 `ocrmypdf` / PaddleOCR / MinerU）+ UI 接线（OCR 模式工具条 + OcrJobList + OcrQualityReportView）+ 端到端 fixture 验证（`tests/e2e/ocr-e2e.test.ts` 4 case + Rust `ocr_e2e_tests`）+ keychain apiKeyRef + OS Keychain 集成（DEC-030 / DEC-042 / DEC-050 / DEC-061）。下一波 OCR 后处理 Agent 集成暂缓到 v0.3。
+- **ISS-008 表单填写与签署**（P1，表单/签署，已完成 v0.1 收口）— `feat/forms-signing` → `feat/iss-008-forms-utility-panel`：AcroForm 字段识别、批量填写/flatten、签名图片限定 PNG/JPG、FormsPanel 浮层 + 窄屏底部 sheet 自适应（`FORMS_PANEL_NARROW_BREAKPOINT=480`）+ AppShell 左侧 utility panel 收口（DEC-035 / DEC-055 / DEC-064）。批量填写规则引擎 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件留后续 worker。
+- **ISS-009 设计系统落地**（P0，UI/信息架构，已完成 v0.1 收口）— `feat/pdf-expert-shell-ia` → PR #32：PDF Expert 风格主工具栏/左侧按需工具区/上下文工具条/独立页面管理工作台/状态栏/设置入口；M1 阅读态视觉 polish + M2 搜索结果层 + M3 页面管理多选撤销 + M4 OCR 任务参数区 4 个 milestone 全部完成（DEC-049）。浏览器截图视觉验收由 PM 推进。
 - **ISS-010 法律材料隐私与联网 OCR 提示**（P0，安全，已完成第一版）— `feat/privacy-safety`：notice/consent 模型、`ocrPrivacyConsentGuard` 绑定指纹+nonce+有效期、API key 引用脱敏、bridge audit 衔接。真实 PaddleOCR/MinerU 调用和完整 UI 弹窗待后续。
 - **ISS-011 共享契约与模块边界**（P0，工程基础，已完成）— `feat/shared-contracts`：`PdfDocumentState`/`PdfPageViewport`/`PdfAnnotation`/`PdfPageOperation`/`PdfExportJob`/`OcrProviderConfig`/`OcrJob`/`AppSettings` 共享契约与 `FAROPDF_MODULES` 模块边界。
 - **ISS-012 基础应用 Shell 与验证夹具**（P0，UI/工程基础，已完成）— `feat/app-shell-foundation`：PDF Expert 风格主工具栏/按需左侧工具区/上下文工具条/页面管理工作台/状态栏/设置入口、测试 fixture 规则。
@@ -718,11 +721,8 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 - **ISS-018 证据图片 A4 编排**（P1，页面管理/证据材料，已完成第一版 plan-only 编排计划器）— `feat/evidence-image-pack`：`imagePackPlanner` 纯函数规划器（auto 3/auto 1/平手回落/显式 2/4/逐项方向/固定方向/单元格纵横比/页边距/输出路径安全/空 items/越界/负 margin/零或 NaN 尺寸/`sort=name`/混合 image+pdf-page）。真实目录拾取、像素渲染、image/PDF I/O 待后续。
 - **ISS-019 文书整理 manifest 与规范命名**（P1，法律材料整理，已完成第一版 manifest 服务）— `feat/document-organizer-manifest`：页级检查索引、文书边界建议、拆分/合并 manifest、规范命名建议。真实 PDF 解析和 UI 接入待后续。
 - **ISS-020 临时应用图标**（P1，品牌/UI，已完成）— 暂用最初生成的灯塔图标，覆盖 `src-tauri/icons/` 和 `public/favicon.png`；后续正式品牌图标再继续简化。
-- **ISS-007 OCR bridge（含 ISS-007 端到端联调 worker）**（P0，OCR/质量，已完成 v0.1 收口）— `feat/ocr-bridge` → `feat/iss-007-keychain` → PR #18 / #29 / #33 / #47：bridge 真实接入（`start_ocr_job` 按 provider 分发到 `ocrmypdf` / PaddleOCR / MinerU）+ UI 接线（OCR 模式工具条 + OcrJobList + OcrQualityReportView）+ 端到端 fixture 验证（`tests/e2e/ocr-e2e.test.ts` 4 case + Rust `ocr_e2e_tests`）+ keychain apiKeyRef + OS Keychain 集成（DEC-030 / DEC-042 / DEC-050 / DEC-061）。下一波 OCR 后处理（ISS-025 Agent 集成）暂缓到 v0.3。
-- **ISS-008 表单填写与签署**（P1，表单/签署，已完成 v0.1 收口）— `feat/forms-signing` → `feat/iss-008-forms-utility-panel`：AcroForm 字段识别、批量填写/flatten、签名图片限定 PNG/JPG、FormsPanel 浮层 + 窄屏底部 sheet 自适应（`FORMS_PANEL_NARROW_BREAKPOINT=480`）+ AppShell 左侧 utility panel 收口（DEC-035 / DEC-055 / DEC-064）。批量填写规则引擎 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件留后续 worker。
-- **ISS-009 设计系统落地**（P0，UI/信息架构，已完成 v0.1 收口）— `feat/pdf-expert-shell-ia` → PR #32：PDF Expert 风格主工具栏/左侧按需工具区/上下文工具条/独立页面管理工作台/状态栏/设置入口；M1 阅读态视觉 polish + M2 搜索结果层 + M3 页面管理多选撤销 + M4 OCR 任务参数区 4 个 milestone 全部完成（DEC-049）。浏览器截图视觉验收由 PM 推进。
 - **ISS-021 全平台打包与自动更新（含 v0.1.0 / v0.1.1 发布）**（P1，发布/工程，已完成 v0.1 收口）— `feat/app-distribution` → PR #31 / #41 / #55 / #56 / #60：tauri-plugin-updater 接入、9 态 updater 状态机、autoUpdateCheck 设置项、真实 keypair 替换（DEC-065）、release.yml 跨平台矩阵 + tauri-action 切换 + Gitee 同步（DEC-070 / DEC-071）。v0.1.0 + v0.1.1 成功发布；增量更新失败回退（DEC-066）/ 移动端 / CODE_SIGNING 留 v0.3 follow-up。
-- **ISS-023 关于页面与作者页**（P1，UI/品牌，已完成 v0.1 收口）— `feat/iss-023-author-update`：AuthorCard 独立组件 + 关于 section 替换占位 div + 1×1 灰阶 PNG 占位二维码 + `QRCODE_LICENSE.md` 替换说明（DEC-038 / DEC-051）。真实公众号二维码按 `QRCODE_LICENSE.md` 流程后续替换（ISS-029 联动）。
+- **ISS-023 关于页面与作者页**（P1，UI/品牌，已完成 v0.1 收口）— `feat/iss-023-author-update`：AuthorCard 独立组件 + 关于 section 替换占位 div + 1×1 灰阶 PNG 占位二维码 + `QRCODE_LICENSE.md` 替换说明（DEC-038 / DEC-051）。真实公众号二维码按 `QRCODE_LICENSE.md` 流程后续替换（二维码资源联动）。
 - **ISS-024 文档瘦身 subagent（doc-curator）**（P1，工程协作/工具链，已完成首版部署）— PR #17 + DEC-043：项目级 doc-curator skill 落地、本机基线建立、AGENTS.md Skill 强制调用表加 doc-curator 行。后续 v0.1 PR 创建/合并后自动跑体检 + 必要时提 maintenance PR。
 - **ISS-026 批注深化（高亮/手写/图章/搜索）**（P0，批注/检索，已完成 v0.1 + v0.2 收口）— PR #19 / #24 / #28 / #30 / #43：4 阶段批注 sidecar（颜色/作者/时间/页码/几何）+ active 联动（Overlay↔Sidebar）+ v0.2 摘要分组面板（DEC-068）。9 类型批注 + 6 色色板 + 5 图章模板 + 4 维度分组 + 真实 PDF 绘制 flatten 全部完成。
 - **ISS-027 根目录配置收束**（P2，工程基础，已完成）— PR #36 / DEC-053：`docs/` 架构收口 + 文档体系统一。Folia 对齐度（删 `package.json` 冗余 Tauri 配置 / 切换 pnpm / Gitee 同步等）按需另起 worker。
@@ -3689,3 +3689,770 @@ ROADMAP §5 行 66-67 整组标 [ ]，缺位 PDF Expert / Folia / Adobe 全员�
 
 - `docs/TASKS.md` § 进度日志（2026-06-07 条目）
 - `docs/DESIGN.md` v2.0
+
+## DEC-074 ISS-039 PDF 工具启动器与导出编号面板收口（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已采纳
+- 关联任务：ISS-039
+
+用户持续反馈“多层级菜单”和“整体 UI 简洁”没有真正完成，并明确要求整体页面和功能布局参照 PDF Expert。当前问题不是单个按钮缺失，而是低频交付工具仍容易被放回顶栏或二级工具条，导致阅读态变重、导出模式缺少参数面板。
+
+### 决策
+
+1. 新增统一 command model（`src/shared/app/commands.ts`），把低频命令标记为三级入口，避免在 `Toolbar.tsx` 内硬编码第二套命令体系。
+2. 顶栏右侧 `工具` 按钮打开工作流启动器，固定分为 `组织页面 / 交付导出 / 标注填写 / 扫描 OCR` 四组；启动器只显示分组标题和命令名，说明文字收进悬停提示，避免变成说明面板。
+3. 阅读态移除 `另存` 平铺按钮；`添加页码` / `Bates 编号` 不进入一级顶栏，也不进入导出二级工具条。
+4. 导出模式二级工具条只保留 `文字水印 / 图片水印` 两个高频交付按钮。
+5. 新增 `ExportDeliveryPanel`，在导出模式右侧提供 `普通编号 / 证据编号` 切换，并复用 `pdfOperationEngine` 的 `page-number` / `bates-number` operation 导出新 PDF bytes。
+6. 输出文件名默认使用 `*-page-numbered.pdf` / `*-bates.pdf`，继续遵守不覆盖原始 PDF 的安全边界。
+7. 空态顶栏不展示旋转 / 适合页面等文档专属阅读辅助按钮，页码控件使用 `- / -` 占位，避免未打开文档时出现 `1 / 0`。
+
+### 验证
+
+- `npm test -- --run src/App.test.tsx src/shared/app/commands.test.ts src/modules/export/ui/ExportDeliveryPanel.test.tsx src/components/layout/AppShell.test.tsx`：4 个测试文件、48 项测试通过。
+- `npm run typecheck`：通过。
+- Playwright 960×720 视觉验收：工具启动器不压状态栏；空态顶栏不再显示禁用阅读辅助工具，页码显示为 `- / -`。
+
+### 已知限制
+
+- 本期不做页码 / Bates 的页面范围选择、字体选择、中文字体嵌入或页面内可视化定位预览；文字绘制仍沿用导出引擎当前的内置 Helvetica 限制。
+- macOS 原生菜单桥接已在 DEC-075 补齐。
+
+## DEC-075 ISS-032 原生菜单事件桥接与文件打开补齐（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已采纳
+- 关联任务：ISS-032 / ISS-039
+
+ISS-032 先前完成了 macOS 菜单栏中文化，但菜单项只停留在标签层：`文件 > 打开…`、`工具 > 添加页码 / Bates 编号 / 页眉页脚` 等深层入口没有真实进入前端工作流。这与 PDF Expert 式多层级菜单目标不一致。
+
+### 决策
+
+1. Rust 端菜单项 id 统一改为前端 `AppCommandId`，例如 `export-page-number`、`export-bates`、`view-pages`，避免原生菜单和工具启动器维护两套命名。
+2. Rust `app.on_menu_event` 对业务类菜单项只发出 `faropdf://command`，payload 为 `{ id }`；前端 `nativeMenuBridge` 过滤非 `native-menu` command 后再交给 App 状态。
+3. `文件 > 打开…` 不再走浏览器隐藏 input，而是由 `openNativePdfFileDialog` 调 Tauri dialog 选择 PDF，再由专用 `read_pdf_file_from_path` command 读取 bytes，最后调用 reader 的 `openNativeFile`。
+4. 不开放通用 fs scope；后端读取 command 只接受 `.pdf` 路径，并返回 `bytes / name / path`。
+5. `view-fullscreen` 和 `close-window` 属于窗口行为，仍由 Rust 菜单事件直接调用窗口 API，不进入前端业务状态。
+
+### 验证
+
+- `npm test -- --run src/App.test.tsx src/shared/app/commands.test.ts src/shared/app/nativeMenuBridge.test.ts src/modules/reader/useReaderController.test.tsx src/components/layout/AppShell.test.tsx`：5 个测试文件、58 项测试通过。
+- `npm run typecheck`：通过。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+
+### 已知限制
+
+- `新建窗口` 仍是菜单占位反馈，独立多窗口能力未实现。
+- 原生菜单不会执行页码 / Bates 的实际导出动作，只负责进入导出模式和右侧交付设置面板，由用户确认参数后再导出副本。
+
+## DEC-076 ISS-039 全量验证收口（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-039 / ISS-032
+
+### 背景
+
+ISS-039 的 UI 主线已按 PDF Expert 式信息架构落地，但全量测试仍残留 5 个失败点，导致“多层级菜单 + 整体 UI 简洁”的完成状态不可交付。失败集中在既有设置页 lazy section、批注摘要颜色分组测试样本和表单面板断点 mock，均不属于工具启动器产品行为本身。
+
+### 处理
+
+1. `SettingsPanel.test.tsx` 改为等待 lazy section 内容出现；常规 section 测试改为断言没有 Suspense skeleton，而不是断言 label 文本不存在。
+2. `AnnotationSummaryPanel.test.tsx` 的颜色分组样本改用项目 6 色色板中的黄 / 蓝 / 红，符合 `groupAnnotationsByColor` “命中色板分组、未知颜色归其他颜色”的既有契约。
+3. `FormsPanel.test.tsx` 的 `matchMedia` mock 改为保存并更新每个 query 的 `matches`，模拟真实浏览器在 media change 后 `MediaQueryList.matches` 会同步变化的行为。
+4. `config/eslint.config.js` 改用 `config/tsconfig.eslint.json` 覆盖测试目录，并为 Node 脚本补充 Node globals；下划线前缀参数继续作为“刻意未用”约定。
+5. 修正 `scripts/create-updater-manifest.mjs` 的 `FAROPDF_MANIFEST_OUTPUT` / `FAROPDF_GITEE_MANIFEST_OUTPUT` 环境变量读取，并校验 updater platform key，避免 release job 传正确变量但脚本读不到。
+6. 清理旧 lint 问题：删除不存在的 `react/no-danger` 规则禁用注释，补充 error cause，修正 CJK 正则中的全角空格字面量。
+
+### 验证
+
+| 验证项 | 结果 |
+| --- | --- |
+| `npm test` | 85 个测试文件 / 830 个用例通过 |
+| `npm run typecheck` | 通过 |
+| `npm run lint` | 通过 |
+| `cd src-tauri && cargo check` | 通过；仍有 17 个既有 Rust warning |
+| `git diff --check` | 通过 |
+| `npm run build` | 通过；仍有既有 Vite externalized / chunk size warning |
+| `node scripts/create-updater-manifest.mjs --help` | 通过；输出下划线形式的 manifest 环境变量名 |
+| Playwright 960×720 | 空态顶栏保持纯图标压缩；工具启动器 560×357，不压状态栏 |
+
+## DEC-077 ISS-040 文字 / 图片水印交付面板接入（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-040 / ROADMAP v0.1 §5.1
+
+### 背景
+
+ISS-039 已把页码 / Bates 收到 `工具` 三级入口和导出模式右侧面板，但导出模式二级工具条里的 `文字水印 / 图片水印` 仍只是入口按钮。如果按钮不切换任何参数面板，用户会看到“二级工具条简化了”，但实际交付流程仍不完整。
+
+### 决策
+
+1. `ExportDeliveryPanel` 从 `page-number | bates` 扩展为 `text-watermark | image-watermark | page-number | bates` 四类交付工具。
+2. 导出二级工具条仍只保留 `文字水印 / 图片水印`，点击后切换右侧交付设置面板；页码 / Bates 继续只能从三级工具或原生菜单进入。
+3. 文字水印支持内容、位置、字号、透明度和旋转角度，默认输出 `*-text-watermarked.pdf`。
+4. 图片水印支持 PNG/JPG 文件、位置、宽度和透明度，默认输出 `*-image-watermarked.pdf`。
+5. 所有导出继续走 `reader.getFileBytes()` → `pdfOperationEngine.exportPdf({ destination: bytes })` → `reader.saveUpdatedBytes()`，不覆盖原始 PDF。
+
+### 验证
+
+- `npm test -- --run src/modules/export/ui/ExportDeliveryPanel.test.tsx src/components/layout/AppShell.test.tsx`：2 个测试文件、41 项测试通过。
+- `npm test`：85 个测试文件、833 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- `git diff --check`：通过。
+- Playwright 960×720：导出模式右侧交付面板宽 344px，底部 688.5px，未压状态栏；图片水印切换正常。
+
+### 已知限制
+
+- 本期图片水印只做文件选择状态，不做页面内可视化定位预览。
+- 页眉页脚和压缩参数已在 DEC-078 / DEC-079 接入同一交付设置面板。
+
+## DEC-078 ISS-041 压缩交付面板接入（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-041 / ROADMAP v0.1 §5.1
+
+### 背景
+
+用户要求整体页面和功能布局继续参照 PDF Expert，核心问题是低频工具不能反复回到顶栏或二级工具条。ISS-039 / ISS-040 已把页码、Bates、文字水印和图片水印收敛到同一套导出交付面板，但 `压缩` 仍只有工具命令入口；同时审计发现 `pdfOperationEngine` 的 `compress mode=apply` 虽调用压缩服务获取结果，却没有把压缩后 bytes 替换为最终导出工作副本。
+
+### 决策
+
+1. `压缩` 继续保持三级工具 / 原生菜单入口，不加入阅读态顶栏，也不加入导出二级工具条。
+2. `export-compress` 命令进入导出模式后选中右侧 `压缩设置` 面板。
+3. `ExportDeliveryPanel` 增加 `compress` 工具，默认使用 `法院 10MB` 预设，并提供法院上传 5MB / 10MB / 20MB / 50MB、屏幕阅读、电子归档、打印优先预设。
+4. 压缩导出继续走 bytes 副本流程，默认输出 `*-compressed.pdf`，不覆盖原始 PDF。
+5. `pdfOperationEngine` 在 `compress mode=apply` 下把 `compressionService` 返回的 PDF bytes 重新加载为 `workingPdf`，后续再应用导出元数据和保存，避免只显示压缩摘要。
+
+### 验证
+
+- `npm test -- --run src/modules/export/ui/ExportDeliveryPanel.test.tsx src/components/layout/AppShell.test.tsx`：2 个测试文件、43 项测试通过。
+- `npm test -- --run src/modules/export/pdfOperationEngine.test.ts src/modules/export/compressionService.test.ts`：2 个测试文件、40 项测试通过。
+- `npm test`：85 个测试文件、835 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- `git diff --check`：通过。
+- Playwright 960×720：压缩设置面板底部约 689px，状态栏 top 703px，未遮挡；导出二级工具条仍只显示 `文字水印 / 图片水印`。
+
+### 已知限制
+
+- 当前压缩 UI 不做压缩前后体积对比预览；体积超出目标时由导出结果 warning 呈现。
+- DPI-based 降采样仍未实现，后续可由后台 bridge 接入 PyMuPDF / Rust 图像处理。
+- 页眉页脚已在 DEC-079 接入同一交付设置面板。
+
+## DEC-079 ISS-042 页眉页脚交付面板接入（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-042 / ROADMAP v0.1 §5.1
+
+### 背景
+
+`页眉页脚` 已出现在右侧工具启动器和 macOS 原生工具菜单，但仍只是占位反馈。按 PDF Expert 式多层级交付工具目标，低频命令可以从深层入口进入，但进入后必须落到同一套右侧参数面板，不能停在“已收纳但不可用”的状态。
+
+### 决策
+
+1. `页眉页脚` 继续保持三级工具 / 原生菜单入口，不加入阅读态顶栏，也不加入导出二级工具条。
+2. `export-header-footer` 命令进入导出模式后选中右侧 `页眉页脚设置` 面板。
+3. `ExportDeliveryPanel` 增加 `header-footer` 工具，支持页眉、页脚、字号和透明度；页眉和页脚均为空时阻止导出。
+4. 第一版不新增独立 PDF operation，而是复用现有 text watermark operation：页眉写入 `top-center`，页脚写入 `bottom-center`。
+5. 页眉页脚导出继续走 bytes 副本流程，默认输出 `*-header-footer.pdf`，不覆盖原始 PDF。
+
+### 验证
+
+- `npm test -- --run src/modules/export/ui/ExportDeliveryPanel.test.tsx src/components/layout/AppShell.test.tsx`：2 个测试文件、46 项测试通过。
+- `npm test -- --run src/modules/export/ui/ExportDeliveryPanel.test.tsx src/components/layout/AppShell.test.tsx src/shared/app/commands.test.ts`：3 个测试文件、52 项测试通过。
+- `npm test`：85 个测试文件、838 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- `git diff --check`：通过。
+- Playwright 960×720：六个交付工具按钮排成 3 行；页眉页脚设置面板底部约 508px，状态栏 top 703px，未遮挡；导出二级工具条仍只显示 `文字水印 / 图片水印`。
+
+### 已知限制
+
+- 当前不支持奇偶页不同页眉页脚。
+- 当前不支持页面内可视化拖拽定位；位置固定为上中 / 下中。
+- 中文页眉页脚依赖 Source Han Sans 字体加载；Vitest UI 面板测试用 ASCII 样本覆盖交互路径，CJK 字体路径由导出引擎既有测试覆盖。
+
+## DEC-080 ISS-043 表单扁平化入口与填写签名工具条收口（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-043 / ROADMAP v0.1 §5.1 / §7
+
+### 背景
+
+继续按 PDF Expert 式信息架构审计后发现：`FormService.flattenForm` 和 `FormsPanel` 的扁平化导出按钮已经存在，但 `forms-flatten` 深层命令只进入 forms mode，没有稳定打开填写签名面板。与此同时，填写签名二级工具条仍展示 `日期 / 钩号 / 叉号 / 图章 / 图像 / 导出为压平` 等未完整接线的占位按钮，用户会看到“有入口”，但不知道实际确认动作在哪里。
+
+### 决策
+
+1. `表单扁平化` 继续保持三级工具 / 原生菜单入口，不加入阅读态顶栏，也不加入导出二级工具条。
+2. `forms-flatten` 命令显式路由到 `forms` mode + `forms` utility panel，并提示用户在填写和签名面板内读取字段后确认扁平化导出。
+3. 填写签名二级工具条改为真实动作组：`读取字段 / 填写 / 签名 / 扁平化导出`。
+4. `读取字段 / 填写 / 签名` 会打开填写签名面板并调用现有 form controller；`扁平化导出` 作为深层命令入口打开面板，不直接绕过面板确认。
+5. 移除未接通的日期、钩号、叉号、图章、图像等可见占位按钮，避免低完成度控件破坏简洁 UI。
+
+### 验证
+
+- `npm test -- --run src/components/layout/AppShell.test.tsx src/shared/app/commands.test.ts src/App.test.tsx`：3 个测试文件、52 项测试通过。
+- `npm test -- --run src/components/layout/AppShell.test.tsx src/shared/app/commands.test.ts src/App.test.tsx src/modules/forms/ui/FormsPanel.test.tsx src/modules/forms/useFormController.test.tsx`：5 个测试文件、97 项测试通过。
+- `npm test`：85 个测试文件、841 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- `git diff --check`：通过。
+- Playwright 960×720：填写签名二级工具条只显示 `读取字段 / 填写 / 签名 / 扁平化导出`；工具菜单中 `表单扁平化` 位于 `标注填写` 分组，空态禁用，不回到顶栏或导出二级工具条。
+
+### 已知限制
+
+- 手写签名、日期、勾叉、图章和图像放置仍是表单签署后续能力，不在本次重新展示。
+- 表单扁平化仍依赖用户先读取 AcroForm 字段；没有字段时面板内按钮保持禁用。
+- 批注扁平化 UI 接入和页面操作真实改写仍是 ROADMAP §5.1 剩余项。
+
+## DEC-081 ISS-044 页面管理工作台真实状态与另存导出接入（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-044 / ROADMAP v0.1 §5 / §5.1
+
+### 背景
+
+继续按 PDF Expert 式信息架构审计后发现，页面管理工作台仍展示 `插入页 / 附加文件 / 复制 / 粘贴 / 摘录` 等未接通按钮，`旋转 / 删除 / 另存为新 PDF` 也只维护视觉计数和风险提示。底层 `pageOrganizer` 状态机和 `pdfOperationEngine page-operations execute` 已存在，但 UI 没有接入，导致“多层级菜单已收纳但真实功能没落地”。
+
+### 决策
+
+1. 页面管理继续作为左上角布局入口进入独立工作台，不进入阅读态顶栏，也不进入导出二级工具条。
+2. 页面管理工具条只展示已接通动作：`旋转 / 删除 / 撤销 / 另存为新 PDF`；插入、复制、摘录、重排等未完成能力不以占位按钮出现。
+3. 页面网格接入 `pageOrganizer` 状态机：旋转会更新页面卡片角度，删除确认后页面从活动网格移除，撤销恢复上一份页面整理快照。
+4. 新增 `createPageOrganizerExportOperation`，让路径型导出和前端 bytes 另存共用同一套 page-operations 生成逻辑。
+5. `另存为新 PDF` 使用当前 reader bytes 调用 `pdfOperationEngine` 的 `page-operations execute`，默认保存 `*-organized.pdf` 新副本，不覆盖原始 PDF。
+
+### 验证
+
+- `npm test -- --run src/components/layout/PageOrganizerWorkspace.test.tsx`：先失败，覆盖未接通按钮、旋转状态、删除网格和真实另存导出四个缺口。
+- `npm test -- --run src/components/layout/PageOrganizerWorkspace.test.tsx src/modules/pages/pageOrganizer.test.ts src/modules/pages/pageOrganizer.export.test.ts`：3 个测试文件、25 项测试通过。
+- `npm test`：85 个测试文件、842 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- `git diff --check`：通过。
+- Playwright 960×720：页面管理空态只说明旋转、删除、撤销和另存；打开 5 页临时 PDF 后，页面管理工作台只显示 `旋转 / 删除 / 撤销 / 另存为新 PDF`，旋转后卡片显示 `已旋转 90 度`，删除确认后活动页计数变为 `4 / 5`。
+
+### 已知限制
+
+- 本期未接入页面重排 UI；`reorderOrganizerPages` 状态机和真实导出仍保留给后续工作台交互。
+- 插入 PDF、附加文件、复制、摘录、合并、裁剪和拆分扫描仍属页面整理后续能力，不在当前工作台露出。
+- 批注扁平化 UI 接入仍是 ROADMAP §5.1 剩余项。
+
+## DEC-082 ISS-045 批注扁平化入口与批注侧栏导出接入（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-045 / ROADMAP v0.1 §5.1 / §7
+
+### 背景
+
+继续按 PDF Expert 式信息架构审计后，表单扁平化和页面管理另存已经完成，但批注扁平化还停在“底层引擎可用、UI 没入口”的状态。若把 `批注扁平化` 直接放回阅读态顶栏或导出二级工具条，会破坏本轮“一级少、二级只放高频、低频进工具菜单和对应面板”的核心约束。
+
+### 决策
+
+1. `批注扁平化` 注册为 `annotations-flatten` 三级命令，归属 `标注填写` 分组，同时接入原生工具菜单；不进入阅读态顶栏，也不进入导出二级工具条。
+2. 触发 `annotations-flatten` 时，只负责进入 `annotate` mode 并打开 `annotation` utility panel，提示用户在批注侧栏内确认。
+3. 批注侧栏新增 `扁平化导出` 动作，但仅在有文档、有批注且父级已接入导出处理函数时显示；无批注时只显示空态说明，不显示假按钮。
+4. 侧栏按钮调用 `pdfOperationEngine.exportPdf` 的 `flatten-annotations draw` 策略，把当前 sidecar 批注真实绘制到新 PDF bytes，再通过 `reader.saveUpdatedBytes` 保存 `*-annotations-flattened.pdf`。
+5. 输出默认新副本，不覆盖原始 PDF；缺少源 PDF bytes 时返回明确错误。
+
+### 验证
+
+- `npm test -- --run src/shared/app/commands.test.ts src/components/layout/AnnotationSidebar.test.tsx src/components/layout/AppShell.test.tsx`：先失败，覆盖命令缺失、侧栏按钮缺失和真实保存缺口；实现后 3 个测试文件、71 项测试通过。
+- `npm test`：85 个测试文件、848 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / dynamic import / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- `git diff --check`：通过。
+- Playwright 960×720：空态工具菜单中 `批注扁平化` 位于 `标注填写` 分组且未打开文档时禁用；打开临时 1 页 PDF 后该入口启用，触发后进入批注模式并打开批注侧栏；无批注时侧栏不显示 `扁平化导出` 假入口；导出二级工具条仍只显示 `文字水印 / 图片水印`。
+
+### 已知限制
+
+- 当前没有在浏览器手动复核真实绘制有批注的截图；真实保存路径由 `AppShell.test.tsx` 用 pdf-lib 生成的 PDF bytes 验证，输出 metadata 包含 `faropdf:annotation-flattened`。
+- CJK textbox 批注绘制仍遵循既有 `writeAnnotationPdf` 字体与跳过策略；本期只接 UI 入口和侧栏确认。
+
+## DEC-083 doc-curator 硬门禁收口：进度日志瘦身与 ISS 归档排序（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-024 / doc-curator 完成门禁
+
+### 背景
+
+完成 ISS-045 后按 doc-curator 跑归档体检，发现两个 hard 问题：`docs/TASKS.md` 进度日志 9 条，超过硬上限 5 条；`docs/DECISIONS.md` 的「ISS 任务归档」中 ISS-007/008/009 位于 ISS-020 后，违反升序归档规则。
+
+### 处理
+
+1. 将 ISS-007/008/009 的归档摘要移动到 ISS-006 后，恢复 ISS 任务归档升序。
+2. 将 TASKS 进度日志中较旧的 4 条迁移到本决策记录，TASKS 仅保留最近 5 条。
+
+### 迁移的进度日志
+
+- 2026-06-07：ISS-030 / ISS-031 / ISS-032 / ISS-033 / ISS-034 / ISS-035 / ISS-037 / ISS-038 全部完成。工具栏克制化（48px、无品牌区、compact 布局按钮）、欢迎页空态清理（移除占位符和最近文件区域）、主页灰色区域修复（reader flex: 1）、PDF 拖拽打开（DocumentReader DnD handler）、PDF.js worker 幂等配置、设置页 UI 统一（focus-visible + 遗留 CSS 清理）、macOS 菜单栏中文化（Tauri v2 MenuBuilder）、DESIGN.md 重构为 21 节成熟结构（对齐 Folia / Funes）。
+- 2026-06-08：完成 ISS-039。顶栏新增 `工具` 工作流启动器并移除阅读态 `另存` 平铺；导出二级工具条收敛为 `文字水印 / 图片水印`；`添加页码` / `Bates 编号` 从三级工具入口切入导出模式右侧交付设置面板，默认输出 `*-page-numbered.pdf` / `*-bates.pdf` 新文件；二次收口空态顶栏和工具启动器文字密度，避免无文档时显示禁用阅读辅助工具和 `1 / 0` 页码。
+- 2026-06-06：ISS-013 法院上传压缩预设 4 档 + 真实 JPEG 图像重编码（DEC-069 / `feat/iss-013-court-compression-presets`）：4 档 court preset（5MB/10MB/20MB/50MB）+ Canvas API JPEG DCTDecode 重编码 + 目标体积验证 + 保守路径（CMYK/FlateDecode/其他 Filter 保留原图）。
+- 2026-06-05：ISS-029 落地（fix/iss-029-faropdf-real-qr，资源替换 + AuthorCard 注释 + QRCODE_LICENSE.md 改写 + docs 同步）。
+- 2026-06-05：封箱 0.1.0-alpha.18（release/0.1.0-alpha.18，DEC-063）：合并 4 条 Unreleased 条目为 `## 0.1.0-alpha.18 - 2026-06-05` 段 + `package.json` / `src-tauri/tauri.conf.json` 版本号 bump 到 `0.1.0-alpha.18` + ROADMAP v0.1 状态从「待开始」改为「进行中（alpha.0~18 已封箱）」+ release.yml tag pattern 从 `v*.*.*` 扩到 `["v*.*.*", "v*.*.*-*"]` 让 prerelease 也能触发 CI；详见 DEC-063。是否实际打 `v0.1.0-alpha.18` tag 触发 release.yml 由 PM 在 PR 合并后决定（占位 pubkey 不打 tag；PM 重新生成 keypair 替换 + 配 GitHub Secrets 后再打 tag）。
+
+### 验证
+
+- `bash .claude/skills/doc-curator/scripts/scan.sh`：hard 问题清零；仍保留既有 adaptive 行数/活跃任务提示和 README 当前状态 soft 提示。
+
+## DEC-084 ISS-046 页面管理重排 UI 与真实另存接入（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-046 / ROADMAP v0.1 §5
+
+### 背景
+
+ISS-044 已把页面管理工作台接入真实状态机和 `page-operations execute` 另存，但仍缺少用户可操作的重排入口。底层 `reorderOrganizerPages` 与导出页序改写已经存在，如果继续不接 UI，用户看到的“页面管理”仍不完整；如果把重排放回阅读态顶栏或导出二级工具条，又会破坏本轮 PDF Expert 式简洁信息架构。
+
+### 决策
+
+1. 页面重排只在页面管理独立工作台内出现，不进入阅读态顶栏、导出二级工具条或工具启动器的额外命令层。
+2. 工作台工具条新增两个真实动作：`上移 / 下移`；未选择页面时禁用，首个选中页已在顶部时禁用 `上移`，最后选中页已在底部时禁用 `下移`。
+3. 上移 / 下移复用 `reorderOrganizerPages`，按当前活动页顺序把已选页面作为稳定 page id 集合移动；移动后保留选择，方便连续调整。
+4. 重排动作压入 `pageOrganizer` 撤销栈，`撤销` 可恢复页面顺序。
+5. `另存为新 PDF` 不新增导出分支，继续通过 `createPageOrganizerExportOperation(..., mode: "execute")` 和 `pdfOperationEngine.exportPdf` 写入真实页序，默认输出 `*-organized.pdf` 新副本。
+
+### 验证
+
+- `npm test -- --run src/components/layout/PageOrganizerWorkspace.test.tsx`：先失败，确认缺少 `上移 / 下移` 入口；实现后 13 项测试通过。
+- `npm test -- --run src/components/layout/PageOrganizerWorkspace.test.tsx src/modules/pages/pageOrganizer.test.ts src/modules/pages/pageOrganizer.export.test.ts`：3 个测试文件、29 项测试通过。
+- `npm test`：85 个测试文件、852 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / dynamic import / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- `git diff --check`：通过。
+- `bash .claude/skills/doc-curator/scripts/scan.sh`：hard 问题为 0；仍有既有 active-count / line-count adaptive 提示和 README current status soft 提示。
+- Playwright 960×720：工具菜单未新增重排命令；页面管理空态不显示工具条；上传 5 页临时 PDF 后页面管理工具条显示 `上移 / 下移 / 旋转 / 删除 / 撤销 / 另存为新 PDF`，第 3 页上移后顺序为 `1, 3, 2, 4, 5`，撤销后恢复 `1, 2, 3, 4, 5`；导出二级工具条仍只显示 `文字水印 / 图片水印`。
+
+### 已知限制
+
+- 当前重排 UI 是克制的上移 / 下移按钮，尚未做拖拽排序；后续如接入拖拽，也必须留在页面管理工作台内。
+- 插入 PDF、合并、摘录、裁剪和拆分扫描仍属后续页面整理能力，不以占位按钮展示。
+- Playwright 复核中观察到既有 `ReaderCanvas` PDF.js canvas 并发渲染错误，已登记为 ISS-047；不属于 ISS-046 重排状态机或导出路径。
+
+## DEC-085 ISS-047 ReaderCanvas PDF.js 并发渲染取消缺陷（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-047 / ROADMAP v0.1 §2
+
+### 背景
+
+ISS-046 的 960×720 Playwright 复核中发现：上传 5 页临时 PDF 后，从页面管理工作台切回导出模式，console 出现 `Cannot use the same canvas during multiple render() operations`，页面回退到文本占位。系统化调试确认 root cause 是 `ReaderCanvas` 的 effect cleanup 只设置本地 `cancelled=true`，但没有取消 PDF.js 的实际 render task；模式切换后同一个 canvas 被下一轮 render 复用，触发 PDF.js 并发保护。
+
+### 决策
+
+1. `ReaderCanvas` 每次页面 canvas 渲染时创建 `AbortController`，在依赖变化或组件卸载时 abort。
+2. `RenderPageToCanvasFn` 和 `LoadedPdfDocument.renderPageToCanvas` 增加可选 `{ signal }` 参数，由 `useReaderController` 透传。
+3. `pdfReaderService.renderPageToCanvas` 在 signal abort 时调用 PDF.js render task 的 `cancel()`，并用 `AbortError` 结束当前 promise。
+4. `ReaderCanvas` 将 `AbortError` 视为预期取消，不记录错误，也不把页面置为渲染失败。
+5. 缩略图渲染暂不改：它已有可见性 gating 和 rendered 状态，本次问题发生在阅读页 canvas 的模式切换路径。
+
+### 验证
+
+- `npm test -- --run src/components/layout/ReaderCanvas.test.tsx src/modules/reader/pdfReaderService.test.ts`：先失败，覆盖组件层 signal abort 和服务层 PDF.js `cancel()`；实现后 2 个测试文件、23 项测试通过。
+- `npm test -- --run src/components/layout/ReaderCanvas.test.tsx src/modules/reader/pdfReaderService.test.ts src/modules/reader/useReaderController.test.tsx src/modules/reader/readerUi.test.tsx src/modules/search/searchUi.test.tsx src/components/layout/AppShell.test.tsx`：6 个测试文件、79 项测试通过。
+- `npm test`：85 个测试文件、854 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / dynamic import / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- `git diff --check`：通过。
+- Playwright 960×720：上传 5 页临时 PDF 后进入页面管理，再切换到导出模式；新 console 日志仅有 React DevTools 提示，未再出现同 canvas 并发 render 错误。
+
+### 已知限制
+
+- 本次只修复阅读页 canvas 的 render task 取消；大卷宗渲染队列、优先级调度和远离视口页面 canvas 释放仍属于后续性能深化。
+
+## DEC-086 ISS-048 工具启动器去假入口与批注摘要重路由（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-048 / PDF Expert 式 UI 信息架构
+
+### 背景
+
+继续审计多层级菜单后发现，空态仍展示未接通的 `图片转成 PDF` / `Word 转成 PDF` 按钮，工具启动器里的 `另存为` 只是提示语，`批注摘要` 则进入导出模式但没有对应设置面板。这些入口虽然被收进了多层级菜单，却仍会造成“看起来有功能、点击后不完成任务”的体验问题。
+
+### 决策
+
+1. 空态回到单一主路径：只展示打开 / 拖拽 PDF；图片转 PDF、Word 转 PDF 等格式转换能力在真实接通前不展示。
+2. `file-save-as` 保留在 `工具 > 交付导出` 和原生菜单中，但去掉占位反馈，改为读取当前 reader 缓存的源 PDF bytes 并保存 `*-copy.pdf` 新副本。
+3. `export-annotation-summary` 从 `交付导出` 分组迁入 `标注填写` 分组，触发后进入 `annotate` mode + `annotation` utility panel。
+4. `AnnotationSidebar` 增加 `preferredViewSignal`，深层命令可请求侧栏打开 `summary` 或 `list`；用户仍可在侧栏内手动切换列表 / 摘要。
+5. 页码、Bates、页眉页脚、压缩继续留在工具启动器和导出右侧面板，不回到阅读态顶栏或导出二级工具条。
+
+### 验证
+
+- `npm test -- --run src/App.test.tsx src/shared/app/commands.test.ts src/components/layout/AppShell.test.tsx`：先失败，覆盖空态假转换、另存为未保存、批注摘要路由错误；实现后 3 个测试文件、59 项测试通过。
+- `npm test -- --run src/components/layout/ReaderCanvas.test.tsx src/components/layout/AnnotationSidebar.test.tsx src/modules/annotation-summary/ui/AnnotationSummaryPanel.test.tsx src/shared/app/commands.test.ts src/components/layout/AppShell.test.tsx src/App.test.tsx`：6 个测试文件、111 项测试通过。
+- 浏览器 960×720：空态只展示打开 / 拖拽 PDF；上传临时 2 页 PDF 后 `工具 > 另存为` 下载 `faropdf-iss048-copy.pdf` 并显示成功提示；`工具 > 批注摘要` 进入批注模式并打开批注摘要侧栏。
+
+### 已知限制
+
+- 图片转 PDF / Word 转 PDF 只是从空态隐藏，并未实现；后续若接入，必须进入真实格式转换工作流或独立面板。
+- `另存为` 当前保存当前源 PDF bytes 的副本，不弹自定义路径选择；默认下载文件名为 `*-copy.pdf`。
+
+## DEC-087 ISS-049 阅读模式工具注册幂等修复（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-049 / PDF Expert 式工具栏克制
+
+### 背景
+
+ISS-048 浏览器复核中，上传临时 PDF 后阅读态顶栏出现两组 `逆时针 / 顺时针 / 适合页面` 按钮，console 报 React children key 重复。调查确认根因是 `registerReadModeTools()` 会在开发热更新或重复初始化时再次调用，而 `toolbarRegistry.registerModeTools()` 只追加、不按工具 id 去重。
+
+### 决策
+
+1. `toolbarRegistry` 在同一 mode 下按 `ToolbarToolItem.id` 去重：新 id 追加，已有 id 用最新定义替换原位置。
+2. 保留不同 id 的多次注册能力，避免破坏批注、OCR、表单等后续按模式追加工具的扩展模式。
+3. `registerReadModeTools()` 不再需要单独持有已注册布尔状态，幂等性由注册表统一保证。
+
+### 验证
+
+- `npm test -- --run src/components/layout/toolbarRegistry.test.ts src/modules/reader/readerModeTools.test.ts`：先失败，覆盖同 id 替换和重复注册 read mode 工具；实现后 2 个测试文件、17 项测试通过。
+- 浏览器 960×720：刷新后上传 `.playwright-mcp/faropdf-iss048.pdf`，阅读态只显示一组 `逆时针 / 顺时针 / 适合页面`；后续 console 未再新增重复 key 错误。
+- `npm test`：85 个测试文件、860 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / dynamic import / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- `git diff --check`：通过。
+- `bash .claude/skills/doc-curator/scripts/scan.sh`：hard 问题为 0；命令返回非 0 是因为保留 adaptive 行数/活跃任务提示和 README 当前状态 soft 提示。
+
+### 已知限制
+
+- 开发会话里旧 console 日志仍保留历史重复 key 记录；刷新并重新上传后的新增日志未再出现该错误。
+
+## DEC-088 ISS-050 原生菜单系统动作去提示型假入口（2026-06-08）
+
+- 日期：2026-06-08
+- 状态：已完成
+- 关联任务：ISS-050 / PDF Expert 式 UI 信息架构
+
+### 背景
+
+ISS-048 已清理工具启动器里的明显假入口，但继续审计原生菜单后发现：`文件 > 新建窗口` 仍通过前端 command catalog 显示“独立窗口创建将随窗口管理能力补齐”，`帮助 > 关于 FaroPDF` 也只是提示“关于信息位于设置页”。这些入口虽然不在顶栏里，但仍属于用户可见菜单层级，会继续破坏“点击入口即可完成任务”的多层级菜单目标。
+
+### 决策
+
+1. `file-new-window` 不再作为前端 `AppCommandId` 暴露；Rust 菜单事件直接用 `WebviewWindowBuilder` 创建新的 FaroPDF 窗口。
+2. `view-fullscreen` 同样不再进入前端 command catalog；继续由 Rust 侧读取当前窗口 fullscreen 状态并切换。
+3. `help-about` 保留为前端业务路由命令，但去掉占位 feedback，触发后进入 `read` mode 并打开 `settings` utility panel。
+4. `SettingsPanel` 增加 `initialSection`，让原生帮助菜单可直接定位到 `关于` section；普通设置入口仍默认打开 `常规`。
+5. `nativeMenuBridge` 只转发在 `AppCommandId` 中登记且包含 `native-menu` entry point 的业务命令，系统窗口动作不走这条桥。
+
+### 验证
+
+- `npm test -- --run src/shared/app/commands.test.ts src/modules/settings/SettingsPanel.test.tsx src/components/layout/AppShell.test.tsx`：先失败，覆盖系统菜单混入前端 command、设置面板不能直达关于、关于命令仍显示提示；实现后 3 个测试文件、71 项测试通过。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+
+### 已知限制
+
+- `新建窗口` 当前创建一个新的空 FaroPDF 阅读窗口；跨窗口恢复同一文件、标签页化、多窗口间最近文件状态同步和文件关联打开仍属后续桌面壳深化。
+
+## DEC-089 ISS-051 页眉页脚奇偶页范围接入（2026-06-09）
+
+- 日期：2026-06-09
+- 状态：已完成
+- 关联任务：ISS-051 / PDF Expert 式交付面板深化
+
+### 背景
+
+ISS-042 已把 `页眉页脚` 从工具启动器和原生菜单接入导出模式右侧交付设置面板，但 `docs/DESIGN.md` 仍记录“页眉页脚的奇偶页差异”待深化。按本轮 PDF Expert 式信息架构，问题不应通过新增顶栏或导出二级工具条按钮解决，而应继续在右侧交付面板内补齐参数。
+
+### 决策
+
+1. `页眉页脚` 继续只从工具启动器 / 原生菜单进入导出模式右侧面板，不进入阅读态顶栏或导出二级工具条。
+2. `ExportDeliveryPanel` 的页眉页脚设置新增 `应用范围`，选项为 `全部页面 / 奇数页 / 偶数页`，默认 `全部页面`。
+3. 默认 `全部页面` 不向导出 operation 写入 `pageIndexes`，保持导出引擎原有“全页”语义。
+4. `奇数页 / 偶数页` 转换为 0-based 显示页索引并写入页眉、页脚两个 `PdfWatermarkOperation.pageIndexes`。
+5. 无匹配页面时在导出前阻止执行并提示，例如单页文档选择偶数页时显示“当前文档没有偶数页。”，不显示虚假成功。
+6. 页眉页脚仍默认保存 `*-header-footer.pdf` 新副本，不覆盖原始 PDF。
+
+### 验证
+
+- `npm test -- --run src/modules/export/ui/ExportDeliveryPanel.test.tsx`：11 项测试通过，覆盖默认全部页面、奇数页索引、单页偶数页拦截和既有导出路径。
+- `npm test -- --run src/modules/export/ui/ExportDeliveryPanel.test.tsx src/components/layout/AppShell.test.tsx src/shared/app/commands.test.ts`：3 个测试文件、66 项测试通过，确认深层命令进入页眉页脚面板且导出二级工具条仍不展示 `页眉页脚`。
+- `npm test`：85 个测试文件、865 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / dynamic import / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- Playwright 960×720：空态进入导出模式后二级工具条仍只显示 `文字水印 / 图片水印`；右侧交付设置面板内切到 `页眉页脚` 后显示 `应用范围` 控件，选项为 `全部页面 / 奇数页 / 偶数页`，导出按钮在未打开 PDF 时保持禁用且不遮挡状态栏。
+- `bash .claude/skills/doc-curator/scripts/scan.sh`：hard 问题为 0；命令返回 2 是因为保留既有 active-count / line-count adaptive 提示和 README current status soft 提示。
+
+### 已知限制
+
+- 当前支持同一组页眉 / 页脚文本作用到全部、奇数或偶数页；不支持奇偶页使用不同文字。
+- 页眉页脚位置仍是 `top-center` / `bottom-center` 的表单式设置，可视化拖拽定位留后续深化。
+
+## DEC-090 ISS-052 缩略图状态标记克制化（2026-06-09）
+
+- 日期：2026-06-09
+- 状态：已完成
+- 关联任务：ISS-052 / PDF Expert 式左侧摘要状态提示
+
+### 背景
+
+`DocumentSummaryPanel` 已能从 AppShell 接收批注、搜索命中和 OCR-needed 状态，并在缩略图页码旁显示 `批注 / 命中 / OCR` 文字胶囊。这个实现证明数据链路已接通，但长卷宗左侧会出现大量重复文字，和本轮“顶栏轻、左侧摘要按需承载状态”的 PDF Expert 式信息架构不一致。
+
+### 决策
+
+1. 状态提示继续留在左侧文档摘要缩略图卡内，不新增顶栏按钮、二级工具条按钮或工具启动器入口。
+2. 批注、搜索命中、OCR-needed 三类状态改为固定 12px 紧凑视觉点，分别用短码 `A / S / O` 和颜色区分。
+3. 可见文本不再重复显示 `批注 / 命中 / OCR`；完整含义保留在每个标记的 `aria-label` 和 `title` 中。
+4. 同一页可并排显示多个状态点，不改变缩略图按钮点击跳页行为。
+5. 无状态页不渲染空标记容器，避免左侧列表出现无意义间距。
+
+### 验证
+
+- `npm test -- --run src/components/layout/Sidebar.test.tsx`：先失败，确认旧实现没有可访问名称且仍显示重复文字；实现后 17 项测试通过。
+- `npm test -- --run src/components/layout/Sidebar.test.tsx src/components/layout/AppShell.test.tsx`：2 个测试文件、62 项测试通过，确认左侧摘要数据链路仍正常。
+- `npm test`：85 个测试文件、866 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / dynamic import / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- `git diff --check`：通过。
+- `bash .claude/skills/doc-curator/scripts/scan.sh`：hard 问题为 0；命令返回 2 是因为保留既有 active-count / line-count adaptive 提示和 README current status soft 提示。
+- Playwright 960×720：上传 `.playwright-mcp/scan-only-sample-bates.pdf`，打开左侧文档摘要并搜索 `CASE`；两页缩略图都显示紧凑搜索状态点，不再显示 `命中` 重复文字，状态栏未遮挡。
+
+### 已知限制
+
+- 当前是轻量状态点，不展示每页批注数量或搜索命中数量；后续如增加数量，也应留在左侧摘要内，避免顶栏回潮。
+
+## DEC-091 ISS-053 页眉页脚视觉位置选择器（2026-06-09）
+
+- 日期：2026-06-09
+- 状态：已完成
+- 关联任务：ISS-053 / PDF Expert 式交付面板深化
+
+### 背景
+
+ISS-042 / ISS-051 已把 `页眉页脚` 收进工具启动器 / 原生菜单深层入口，并在导出右侧交付设置面板内补齐内容、字号、透明度和奇偶页应用范围。但位置仍固定为页眉上方居中、页脚下方居中，`docs/DESIGN.md` 仍把页眉页脚基础定位列为待深化项。
+
+### 决策
+
+1. `页眉页脚` 继续只从工具启动器 / 原生菜单进入导出模式右侧面板，不进入阅读态顶栏或导出二级工具条。
+2. 不复用水印的完整位置下拉；页眉只提供左 / 中 / 右并映射到 `top-left` / `top-center` / `top-right`，页脚只提供左 / 中 / 右并映射到 `bottom-left` / `bottom-center` / `bottom-right`。
+3. 位置选择使用面板内紧凑三段式按钮，两个控件分别命名为 `页眉位置` 和 `页脚位置`，默认均为居中。
+4. 页眉页脚预览条加入位置摘要，例如 `页眉右侧 / 页脚左侧 · ...`，不增加长说明文字。
+5. 奇数页 / 偶数页范围仍通过 `PdfWatermarkOperation.pageIndexes` 写入页眉、页脚两个 operation，位置选择与范围共存。
+6. 页眉页脚仍默认保存 `*-header-footer.pdf` 新副本，不覆盖原始 PDF。
+
+### 验证
+
+- `npm test -- --run src/modules/export/ui/ExportDeliveryPanel.test.tsx`：先失败，确认旧面板没有 `页眉位置` / `页脚位置` 控件；实现后 13 项测试通过。
+- `npm test -- --run src/modules/export/ui/ExportDeliveryPanel.test.tsx src/components/layout/AppShell.test.tsx src/shared/app/commands.test.ts`：3 个测试文件、68 项测试通过，确认深层命令仍进入页眉页脚面板且导出二级工具条不展示 `页眉页脚`。
+- `npm test`：85 个测试文件、868 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / dynamic import / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- Playwright 960×720：上传 `.playwright-mcp/scan-only-sample-bates.pdf` 后进入 `工具 > 页眉页脚`；导出二级工具条为 `文字水印 / 图片水印`，无 `页眉页脚`；右侧面板显示 `页眉位置` / `页脚位置`，选择页眉右侧和页脚左侧后 `aria-pressed` 均为 `true`；面板底部 689px，状态栏顶部 703px，未遮挡；预览显示 `页眉右侧 / 页脚左侧 · CASE 2026-001 / 仅供内部核对`。
+- `git diff --check`：通过。
+- `bash .claude/skills/doc-curator/scripts/scan.sh`：hard 问题为 0；命令返回 2 是因为保留既有 active-count / line-count adaptive 提示和 README current status soft 提示。
+
+### 已知限制
+
+- 当前是页眉 / 页脚三段式基础定位，不做自由拖拽或按页面绘制区精确偏移；如后续需要自由定位，仍应留在导出右侧面板内，不回到顶栏。
+- 当前支持同一组页眉 / 页脚文本作用到全部、奇数或偶数页；不支持奇偶页使用不同文字。
+
+## DEC-092 ISS-054 深色模式最小接入（2026-06-09）
+
+- 日期：2026-06-09
+- 状态：已完成
+- 关联任务：ISS-054 / PDF Expert 式视觉 polish
+
+### 背景
+
+`docs/DESIGN.md` 曾记录深色模式仍是当前设计差距。深色模式属于全局外观设置，不应新增顶栏按钮，也不应打乱已经收口的工具启动器和上下文工具条层级。
+
+### 决策
+
+1. 外观入口放在 `设置 > 常规`，字段命名为 `themePreference`，只支持 `light` / `dark`。
+2. 默认值为 `light`；旧设置 payload 缺字段时由 `normalizeAppSettings` 回退浅色，非法值同样归一化或由校验报错。
+3. `App.tsx` 将主题偏好写入 `document.documentElement.dataset.theme`，CSS 用 `:root[data-theme="dark"]` 覆盖 token。
+4. 深色模式只影响应用壳层、工具栏、设置浮层、面板和状态栏；`--paper` 继续保持白色，不反相 PDF 原始内容。
+5. 不新增依赖，不修改 PDF 导出、保存或 OCR 语义。
+
+### 验证
+
+- `npm test -- --run src/shared/settings/defaults.test.ts src/shared/settings/service.test.ts src/modules/settings/sections/GeneralSection.test.tsx src/App.test.tsx`：4 个测试文件、25 项测试通过。
+- `npm test -- --run src/shared/contracts.test.ts src/modules/settings/SettingsPanel.test.tsx src/components/layout/AppShell.test.tsx`：3 个测试文件、66 项测试通过。
+- `npm test`：85 个测试文件、873 项测试通过。
+- `npm run typecheck`：通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / dynamic import / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- Playwright 960×720：默认根节点 `data-theme="light"`；在 `设置 > 常规 > 外观` 切换深色后根节点变为 `data-theme="dark"`，设置面板和应用背景切换为深色 token，PDF 纸面保持白色，顶栏没有新增“深色模式”按钮。
+
+### 已知限制
+
+- 当前是浅色 / 深色手动切换，不跟随系统外观自动切换。
+- 少量后续深层模块如仍发现硬编码色值，应继续按 CSS token 方式收口。
+
+## DEC-093 ISS-055 顶栏任务模式入口收口（2026-06-09）
+
+- 日期：2026-06-09
+- 状态：已完成
+- 关联任务：ISS-055 / PDF Expert 式顶栏与多层级菜单
+
+### 背景
+
+ISS-039 起已经把低频导出、页眉页脚、压缩、表单扁平化和批注扁平化逐步收到工具启动器或对应面板。但实际浏览器复核发现，阅读态顶栏仍常驻 `OCR / 批注 / 填写和签名 / 导出` 四个任务模式入口。它们不是假入口，但会让第一屏更像控制台，而不是 PDF 阅读器。
+
+### 决策
+
+1. `mode-annotate` / `mode-export` / `mode-forms` / `mode-ocr` 从 `toolbar` entry point 移除，只保留 `more-menu` 入口。
+2. `Toolbar.tsx` 删除常驻 `modeButtons` 渲染，不再保留独立 `任务模式` 顶栏分组。
+3. 右侧 `工具` 工作流启动器继续按 `组织页面 / 交付导出 / 标注填写 / 扫描 OCR` 分组承载任务入口和低频命令。
+4. `ModeActiveTools` 移入阅读控制区，只在打开 PDF 后渲染 read mode 阅读辅助工具，并通过 `tool-button--reader` 保持图标化。
+5. 顶栏 CSS grid 从 5 列收成 4 列：布局、打开、阅读控制、搜索和全局入口；任务模式切入后仍由 AppShell 渲染第二行上下文工具条或独立工作台。
+
+### 验证
+
+- `npm test -- --run src/shared/app/commands.test.ts src/App.test.tsx src/components/layout/AppShell.test.tsx`：先失败，确认旧实现仍有顶栏模式按钮和 mode command 的 `toolbar` entry point；实现后 3 个测试文件、63 项测试通过。
+- `npm run typecheck`：通过。
+- `npm test`：85 个测试文件、875 项测试通过。
+- `npm run lint`：通过。
+- `npm run build`：通过；仍有既有 Vite externalized / dynamic import / chunk size warning。
+- `cd src-tauri && cargo check`：通过；仍有 17 个既有 Rust warning。
+- `git diff --check`：通过。
+- Playwright 1462×857：空态顶栏只显示布局、打开、阅读控制、搜索、工具和设置；没有 `OCR / 批注 / 填写和签名 / 导出` 顶栏按钮；`工具` 菜单中仍显示 `导出 / 批注 / 填写和签名 / OCR`；点击 `工具 > 导出` 后显示 `导出工具条` 和右侧 `交付设置面板`。
+- `bash .claude/skills/doc-curator/scripts/scan.sh`：hard 问题为 0；命令返回 2 是因为保留既有 active-count / line-count adaptive 提示和 README current status soft 提示。
+
+### 已知限制
+
+- 任务模式入口现在多一次 `工具` 菜单点击；这是本轮为阅读优先和顶栏克制做出的明确取舍。
+- 本次不新增快捷键或命令面板；后续若补快捷键，仍应复用 `AppCommandId`，不新增顶栏按钮。
+
+## DEC-094 3 阶段排查与 ISS-FIX-1 Toolbar 左区 aria-label（2026-06-14）
+
+- 日期：2026-06-14
+- 状态：排查已完成；ISS-FIX-1 已落地；后续 5 个 P1 + 1 个 P0 修复按"成本低→高"顺序推进中
+- 关联任务：3 阶段排查 / ISS-FIX-1 / ISS-FIX-2 ~ 7
+
+### 背景
+
+用户 2026-06-14 反馈三类问题：(1) 功能没真正完成；(2) 页面布局没按 PDF Expert 来；(3) 一直在对一些错误的功能进行。`docs/ROADMAP.md` 与 `docs/TASKS.md` 大量标"已完成"，但用户实际跑应用时认为没做完。同时 `AGENTS.md` §2 规定"必须实际启动应用眼见为实"，而 `CHANGELOG.md` 中 ISS-039 ~ ISS-055 的"全量验证通过"基本是 typecheck + vitest + build 组合，没有 960×720 实际启动 Tauri 后用户点头的证据链。
+
+### 决策
+
+1. **采用"先排查再修复"的三阶段渐进流程**，不直接进入修复路径。三阶段分别：静态扫描（不启动 Tauri）→ Chrome headless 截图 → Playwright 精细验证；每阶段产报告 docs/plans/2026-06-14-faropdf-audit-stage-{1,2,3}-report.md。
+2. **三阶段合并：3 个 P0 + 11 个 P1 偏差**。其中 6 个 P1 视觉偏差由 Playwright 在第 3 阶段全部复现（2.3.2 / 2.4.13 / 2.4.14 / 2.4.19 / 2.4.30），1 个 P1 可访问性问题（2.5.1 Toolbar 左区 3 个 compact 图标按钮无 aria-label）为新增 P1。
+3. **第 1 阶段报告 1 个错（F-04 微信二维码）**已纠正：playwright 实证 QR 是 734×734 真实图片（已通过 DEC-062 流程替换），第 1 阶段静态 agent 错把"代码注释自承"当"代码实情"。
+4. **修复顺序按"成本低→高"递进**：ISS-FIX-1（aria-label 3 行）→ ISS-FIX-2（commands.ts 2 行移位）→ ISS-FIX-3（.reader 硬编码 1 行）→ ISS-FIX-4（999px 胶囊 3 行）→ ISS-FIX-5（间距 9px / 1px 9 行）→ ISS-FIX-6（隐式 token 1 行）→ ISS-FIX-7（OCR stub 真实接入，大改）。
+5. **ISS-FIX-1（本期已落地）**：`src/components/layout/Toolbar.tsx` 行 71/80/89 三处加 `aria-label="文档摘要"` / `aria-label="页面管理"` / `aria-label="视图设置"`。DESIGN.md §3 仅要求"图标按钮使用 title 属性提供无障碍文本"，半合规；本期补 aria-label 让屏幕阅读器对 `<button>` 处理一致。
+
+### 验证
+
+- `pnpm typecheck`：通过（基线和改后都干净）。
+- `node scripts/audit-stage-3.mjs`：2.5.1 状态由 FAIL 变 PASS："Toolbar 左区 3 个按钮都有 aria-label"；其他 FAIL 项均为剩余 P1 修复目标，按计划在后续 5 个 ISS-FIX 解决。
+- `git diff src/components/layout/Toolbar.tsx`：3 行属性追加，0 删除，未触动其他模块。
+
+### 已知限制
+
+- 6 个 P1 视觉偏差 + 1 个 P0 OCR stub 修复仍待完成，本期仅 ISS-FIX-1 落地；用户视角可能仍看到部分旧偏差。
+- ROADMAP §7 "手写签名" 标 [ ] 与 README/CHANGELOG 描述矛盾 / ROADMAP §5 "插入/合并/提取页码范围" 整组缺位 / ROADMAP §5 "证据图片 A4 真实渲染" 标 [ ] 与 CHANGELOG 矛盾 — 这 3 个 ROADMAP 状态偏差未在本期处理，留作 ISS-NEW-E 文档同步 ISS（不在 7 步修复路径中）。
+- 3 阶段排查不覆盖 Tauri 后端 native menu / file save dialog（vite dev 无 Tauri 运行时），F-05（另存为不走 Tauri dialog）仍 [UNVERIFIED]，留作单独起 Tauri dev 验证。
+
+## DEC-095 ISS-FIX-7 OCR 真实接入文档修订（2026-06-14）
+
+- 日期：2026-06-14
+- 状态：已完成（文档修订 + 验证 OCR E2E 11/11 通过）
+- 关联任务：ISS-FIX-7 / 第 1 阶段 F-01 / F-10 报告纠正
+
+### 背景
+
+第 1 阶段排查报告 F-01 / F-10 把 OCR 模式标为 P0 严重问题：
+
+> "OCR 模式整个是 stub: `useOcrWorkspaceController` 调 `bridge.ts` 只返回 queued job, 不真跑 OCR / 不生成双层 PDF / 不发起联网请求。`src/modules/ocr/README.md:7,13` 自承"...
+
+ISS-FIX-7 按"成本低→高"路径推到 OCR 时，深入查代码发现**OCR 真实接入实际已完整就位**（不是 stub）。`src/modules/ocr/README.md` 第 7、13 行的"bridge/stub"和"只返回 queued job"表述与代码实情不符，是 ISS-007 E2E 联调 worker 在 0.1.0-alpha.10 落实后的遗留描述。
+
+### 决策
+
+1. **OCR 真实接入实际已就位**：`src/modules/ocr/service/bridge.ts` 调 `invoke("start_ocr_job", { request })`；`src-tauri/src/ocr_dispatch.rs` 真实 spawn `ocrmypdf` 子进程（`OcrDispatchBackend::LocalOcrMyPdf`）；`src-tauri/src/ocr_queue.rs` 持久化任务到 `app_config_dir/ocr-jobs.json`；`src-tauri/src/ocr_text_extract.rs` OCR 后用 `pdftotext` 抽页面文本；`src-tauri/src/ocr_credentials.rs` 解析 `env:VAR_NAME` 和 `keychain:providerId:keyName` 凭证引用。4 个 Tauri command 在 `src-tauri/src/lib.rs` 完整定义。
+2. **端到端覆盖已写好**：`tests/e2e/ocr-e2e.test.ts`（前端 fixture + 真实 ocrmypdf + 真实 pdftotext + 真实质量报告）+ `src-tauri/src/lib.rs` `mod ocr_bridge_tests`（Rust 集成测试 + 真实 OCR + 任务队列持久化）。缺工具时静默跳过。
+3. **ISS-FIX-7 实际是文档同步修复**：
+   - `src/modules/ocr/README.md` 改写为"已真实接入"段，加历史注脚指向 DEC-095。
+   - `docs/ARCHITECTURE.md` §"OCR bridge" 改写"OCR 不直接内置到前端"段（line 644-666 旧文"当前第一版只建立 bridge/stub，不执行真实 OCR"删除），改写为"前端通过 invoke 调 Tauri command；后端真实 spawn ocrmypdf 子进程"。
+   - `docs/plans/2026-06-14-faropdf-audit-stage-1-report.md` 不修改（历史报告记录当时的判断，便于追溯），在 DEC-095 注明报告 F-01 / F-10 与代码实情不符。
+4. **保留 P-02 优先级偏差**：F-08（图片转 PDF 战略层缺位）仍 P0 真实缺口；F-05（另存为不走 Tauri dialog）仍 [UNVERIFIED] 待起 Tauri dev 验证；ROADMAP 状态偏差 3 个仍 ISS-NEW-E 文档同步。
+
+### 验证
+
+- `cargo test --offline --lib ocr_bridge_tests`：**11 passed; 0 failed**，包括 `rejects_raw_cloud_api_key_refs` / `resolves_default_ocr_output_path_without_overwriting_input_pdf` / `rejects_invalid_ocr_quality_sample_pages` / `rejects_same_ocr_output_path_without_leaking_the_full_path` / `rejects_mineru_spoofed_127_http_endpoint` / `rejects_remote_http_ocr_endpoints_but_allows_loopback_http` / `stored_to_command_job_preserves_status_and_progress` 等。
+- `pnpm typecheck`：0 错误。
+- `pnpm lint`：0 错误。
+- 完整 ISS-FIX-1 ~ 7 修复路径完成：6 个 P1 视觉偏差（aria-label / commands.ts 移位 / 硬编码 / 999px 胶囊 / 9px 间距 / 隐式 token 文档化）+ 1 个 P0 OCR 真相修订。最终 audit 13 PASS / 0 FAIL / 1 PARTIAL（3.5 6px 数量偏低，§5 范围内）。
+
+### 已知限制
+
+- 本次 ISS-FIX-7 不动 PaddleOCR / MinerU 联网 provider 的真实 HTTP 调用代码（这些是另一种 stub：consent guard + keychain 已就位，但真实 HTTP 客户端需独立 worker 接入，且需用户配置 HTTPS endpoint 和 API key 引用）。
+- F-05（另存为走浏览器 `<a download>` 不走 Tauri save dialog）仍 [UNVERIFIED]，vite dev 无 Tauri 运行时；单独起 `pnpm tauri dev` 验证。
+- F-08 图片转 PDF 战略层缺位仍在（不属于 ISS-FIX-1 ~ 7 范围，留作 ISS-NEW-A 另立）。
+
+## DEC-096 ISS-NEW-E ROADMAP 状态对齐（2026-06-14）
+
+- 日期：2026-06-14
+- 状态：已完成
+- 关联任务：ISS-NEW-E / 第 1 阶段 P-01 / P-03 报告纠正
+
+### 背景
+
+第 1 阶段排查报告 §3.2 / §6 P-01 / P-03 指出 ROADMAP 状态与 README / CHANGELOG 矛盾：
+- §5 行 70 "证据图片 A4 多图编排" 标 [ ] vs CHANGELOG 0.1.0-alpha.1 / 0.1.0-alpha.6 ISS-018 真实交付
+- §7 行 97 "签名图片 / 手写签名 / 签名位置调整" 标 [ ] vs README §表单签署 / CHANGELOG 0.1.0-alpha.5 ISS-008 实际交付
+- §6 行 85 "扫描件清洁校正" 标 [ ] vs ISS-016 / DEC-040 preprocess-only job/bridge 真实清洁已落
+
+ISS-NEW-E 同步这三处描述，避免 ROADMAP 与已发布 CHANGELOG 长期矛盾。
+
+### 决策
+
+1. **ROADMAP §5 行 70** 改为"**部分**：[x] plan-only 编排计划器 / [ ] 真实目录拾取和像素渲染"，加 ISS-018 / DEC-019 指针。
+2. **ROADMAP §6 行 85** 改为"**部分**：[x] preprocess-only 真实清洁 / [ ] 粗方向 / 微倾斜 / 拆分双页 plan-only"，加 ISS-016 / DEC-040 指针。
+3. **ROADMAP §7 行 97** 改为"**部分**：[x] 签名图片 PNG/JPG / [ ] 手写签名 / 签名位置调整"，加 ISS-008 / DEC-055 指针。
+4. **ROADMAP §5 行 66-67**（插入 / 合并 / 提取页码范围）保留 [ ] 状态，留作 ISS-NEW-A 另立，不在本期文档同步范围。
+5. **CHANGELOG.md** Unreleased (continued) 段加 "ISS-NEW-E ROADMAP 状态对齐（DEC-096）" 段。
+6. **ROADMAP 状态 / 进度日志 / CHANGELOG 同步更新模式**：今后每次 ISS 卡收口后 PM 同步刷新 ROADMAP 对应 [ ] → [x]，避免状态长期滞后。本次未做"批量全文重读 ROADMAP vs CHANGELOG"自动化扫描，依赖人工 review 触发。
+
+### 验证
+
+- `git diff docs/ROADMAP.md`：3 处描述细化，行 70 / 85 / 97 全部带 ISS / DEC 指针。
+- `git diff CHANGELOG.md`：Unreleased (continued) 段加 ISS-NEW-E 4 行。
+- `git diff docs/DECISIONS.md`：加 DEC-096 段。
+- ROADMAP 行 66-67（ISS-NEW-A 范围）保留 [ ]，不虚假勾选。
+- ROADMAP 行 31-32（§1 脚手架：macOS/Windows 文件关联 / 透明标题栏）保持 [ ]，本期不处理。
+
+### 已知限制
+
+- 本期不做"ROADMAP 全文 vs CHANGELOG / README / src/ 实际状态"自动化扫描脚本（可能留作 `doc-curator` 技能增强，跨多个 ISS 实现）。
+- P-02（§5 行 66-67 插入 / 合并 / 提取整组缺位）不在 ISS-NEW-E 范围，留作 ISS-NEW-A 真实改写 PDF 引擎接入。

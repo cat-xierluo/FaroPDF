@@ -9,6 +9,7 @@ import { ControlledHarness } from "./testUtils";
 describe("GeneralSection", () => {
   test("renders default save policy and recent files placeholder", () => {
     render(<GeneralSection settings={createDefaultAppSettings()} onChange={() => undefined} />);
+    expect(screen.getByLabelText("外观")).toHaveValue("light");
     expect(screen.getByLabelText("默认保存策略")).toBeInTheDocument();
     expect(screen.getByText("暂无最近文件")).toBeInTheDocument();
   });
@@ -35,6 +36,31 @@ describe("GeneralSection", () => {
     const lastCall = onChange.mock.calls.at(-1)?.[0];
     expect(lastCall?.defaultSavePolicy).toBe("ask-each-time");
   });
+
+  test("emits theme preference change without leaving the general section", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn<(next: AppSettings) => void>();
+    render(
+      <ControlledHarness initial={createDefaultAppSettings()}>
+        {(settings, setSettings) => (
+          <GeneralSection
+            settings={settings}
+            onChange={(next) => {
+              onChange(next);
+              setSettings(next);
+            }}
+          />
+        )}
+      </ControlledHarness>,
+    );
+
+    await user.selectOptions(screen.getByLabelText("外观"), "dark");
+
+    const lastCall = onChange.mock.calls.at(-1)?.[0];
+    expect(lastCall?.themePreference).toBe("dark");
+    expect(screen.getByRole("region", { name: "最近文件" })).toBeInTheDocument();
+  });
+
 
   test("commits default save directory on blur and clears on empty", async () => {
     const user = userEvent.setup();

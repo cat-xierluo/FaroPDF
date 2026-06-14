@@ -21,31 +21,40 @@ import {
  */
 function createMatchMediaMock(initialMatches: boolean) {
   const listeners = new Set<(event: { matches: boolean; media: string }) => void>();
-  const media = formsPanelNarrowMediaQuery();
-  const matchMedia = vi.fn((query: string) => ({
-    matches: initialMatches,
-    media: query,
-    onchange: null,
-    addEventListener: (_: string, listener: (event: { matches: boolean; media: string }) => void) => {
-      listeners.add(listener);
-    },
-    removeEventListener: (_: string, listener: (event: { matches: boolean; media: string }) => void) => {
-      listeners.delete(listener);
-    },
-    addListener: (listener: (event: { matches: boolean; media: string }) => void) => {
-      listeners.add(listener);
-    },
-    removeListener: (listener: (event: { matches: boolean; media: string }) => void) => {
-      listeners.delete(listener);
-    },
-    dispatchEvent: () => false,
-  }));
+  const entries = new Map<string, { matches: boolean; media: string }>();
+  const matchMedia = vi.fn((query: string) => {
+    const entry = entries.get(query) ?? { matches: initialMatches, media: query };
+    entries.set(query, entry);
+    return {
+      get matches() {
+        return entry.matches;
+      },
+      media: query,
+      onchange: null,
+      addEventListener: (_: string, listener: (event: { matches: boolean; media: string }) => void) => {
+        listeners.add(listener);
+      },
+      removeEventListener: (_: string, listener: (event: { matches: boolean; media: string }) => void) => {
+        listeners.delete(listener);
+      },
+      addListener: (listener: (event: { matches: boolean; media: string }) => void) => {
+        listeners.add(listener);
+      },
+      removeListener: (listener: (event: { matches: boolean; media: string }) => void) => {
+        listeners.delete(listener);
+      },
+      dispatchEvent: () => false,
+    };
+  });
   return {
     matchMedia,
-    media,
+    media: formsPanelNarrowMediaQuery(),
     setMatches(next: boolean) {
+      for (const entry of entries.values()) {
+        entry.matches = next;
+      }
       for (const listener of listeners) {
-        listener({ matches: next, media });
+        listener({ matches: next, media: formsPanelNarrowMediaQuery() });
       }
     },
   };

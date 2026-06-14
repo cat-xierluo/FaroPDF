@@ -2,6 +2,7 @@ import type { OcrProviderConfig } from "../ocr/types";
 import type { PdfViewMode } from "../pdf/types";
 
 export type DefaultSavePolicy = "always-export-copy" | "ask-each-time" | "allow-overwrite-with-confirmation";
+export type AppThemePreference = "light" | "dark";
 
 export interface RecentPdfFile {
   path: string;
@@ -16,6 +17,7 @@ export interface AppSettings {
   defaultZoom: number;
   defaultViewMode: PdfViewMode;
   defaultSavePolicy: DefaultSavePolicy;
+  themePreference: AppThemePreference;
   recentFiles: RecentPdfFile[];
   defaultOcrProviderId?: string;
   ocrProviders: OcrProviderConfig[];

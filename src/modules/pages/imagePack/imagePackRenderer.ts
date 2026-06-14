@@ -128,7 +128,7 @@ async function readBytesSafely(reader: ImagePackFileReader, path: string, itemId
     return await reader.readFile(path);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`证据图片条目 ${itemId} 读取 ${path} 失败：${message}`);
+    throw new Error(`证据图片条目 ${itemId} 读取 ${path} 失败：${message}`, { cause: error });
   }
 }
 
@@ -137,6 +137,6 @@ async function loadPdfSafely(bytes: Uint8Array, itemId: string, path: string): P
     return await PDFDocument.load(bytes, { updateMetadata: false });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`证据图片条目 ${itemId} 解析 PDF ${path} 失败：${message}`);
+    throw new Error(`证据图片条目 ${itemId} 解析 PDF ${path} 失败：${message}`, { cause: error });
   }
 }

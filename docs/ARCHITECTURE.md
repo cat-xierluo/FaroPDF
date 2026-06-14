@@ -1,19 +1,19 @@
 # FaroPDF 架构文档
 
-> Last updated: 2026-06-03
+> Last updated: 2026-06-09
 
 ## 技术栈
 
 | 层 | 技术 | 职责 |
 | --- | --- | --- |
-| 桌面壳 | Tauri v2 | 文件打开、保存、系统窗口、文件关联、后台命令 bridge |
+| 桌面壳 | Tauri v2 | 文件打开、保存、系统窗口、原生菜单、文件关联、后台命令 bridge |
 | 前端 | React + TypeScript + Vite | 应用界面、状态管理、渲染调度 |
 | PDF 渲染 | PDF.js | 页面渲染、文本层、目录、缩略图、搜索基础 |
 | PDF 操作 | pdf-lib | 页面复制、删除、重排、表单、元数据、导出保存 |
-| PDF 操作引擎 | `pdfOperationEngine` 抽象 + pdf-lib 起步 | 表单扁平化、批注/页面操作导出计划，后续承载水印、页码、Bates 和压缩 |
+| PDF 操作引擎 | `pdfOperationEngine` 抽象 + pdf-lib 起步 | 表单扁平化、批注导出计划、页面操作真实改写、水印、页眉页脚、页码、Bates 和压缩副本 |
 | OCR bridge | 本地命令 / Legal Skills / OCR API | 双层 PDF、扫描件预处理、质量检查 |
 | 扫描预处理 | OpenCV / PyMuPDF / OCR bridge | 清洁校正、方向检测、倾斜校正、裁边、预处理输出 |
-| 设置与凭证 | Tauri command + 本地持久化 / 系统凭证预留 | 最近文件、默认保存策略、OCR provider 配置 |
+| 设置与凭证 | Tauri command + 本地持久化 / 系统凭证预留 | 最近文件、默认保存策略、外观偏好、OCR provider 配置 |
 
 ## 系统架构
 
@@ -24,16 +24,16 @@
 │ │ React App                               │ │
 │ │ ┌──────────────────────────────────────┐ │ │
 │ │ │ Main Toolbar                         │ │ │
-│ │ │ Summary / Page / View / Mode / Search│ │ │
+│ │ │ Summary / Page / View / Open / Tools │ │ │
 │ │ └──────────────────────────────────────┘ │ │
 │ │ ┌──────────────┬──────────────────────┐ │ │
 │ │ │ Utility Pane │ PDF Reader Canvas    │ │ │
-│ │ │ Summary/View │ or Task Workspace    │ │ │
+│ │ │ Summary/View/Forms │ or Task Workspace│ │ │
 │ │ │ Settings     │ Page grid / PDF.js   │ │ │
 │ │ └──────────────┴──────────────────────┘ │ │
-│ │ Context Toolbar for annotate/OCR/export  │ │
+│ │ Context Toolbar after workflow selection │ │
 │ └─────────────────────────────────────────┘ │
-│ Tauri commands: fs / dialog / OCR bridge    │
+│ Tauri commands/events: menu / dialog / OCR  │
 └─────────────────────────────────────────────┘
 ```
 
@@ -42,7 +42,9 @@
 ```text
 打开 PDF
   ↓
-Tauri fs 读取二进制
+浏览器 File 或 Tauri dialog 选择路径
+  ↓
+浏览器 File.arrayBuffer 或 Tauri read_pdf_file_from_path 读取二进制
   ↓
 PdfDocumentState 写入前端状态
   ↓
@@ -62,6 +64,34 @@ search state / sidecar / page operation queue / export job queue / OCR job queue
   ↓
 导出时由 pdfOperationEngine 读取 PDF bytes，用 pdf-lib 生成新 PDF bytes；路径型导出再写入新输出路径
 ```
+
+### 原生菜单桥接
+
+macOS 原生菜单由 `src-tauri/src/lib.rs` 使用 Tauri v2 `MenuBuilder` / `SubmenuBuilder` 创建。需要进入 PDF 业务工作流的自定义菜单项 id 与 `src/shared/app/commands.ts` 的 `AppCommandId` 保持一致；系统窗口动作留在 Rust 侧直接处理：
+
+- `file-new-window`：Rust 菜单事件直接用 `WebviewWindowBuilder` 创建新的 FaroPDF 窗口，不进入前端 command catalog。
+- `file-open`：Rust 菜单事件发出 `faropdf://command`，前端 `nativeMenuBridge` 转给 `App.tsx`，再通过 Tauri dialog 选择 PDF，并调用 `read_pdf_file_from_path` 专用 command 读取 bytes。
+- `file-save-as`：前端复用当前 reader 缓存的源 PDF bytes，通过 `reader.saveUpdatedBytes` 保存 `*-copy.pdf` 新副本，不覆盖原始 PDF。
+- `export-page-number` / `export-bates` / `export-header-footer` / 水印 / 压缩：Rust 只发 `{ id }` 事件，前端复用同一 command model 进入导出模式和 `ExportDeliveryPanel`。
+- `export-annotation-summary`：工具启动器复用同一 command model 进入批注模式和 `AnnotationSidebar` 摘要视图，不进入导出面板。
+- `forms-flatten`：Rust 只发 `{ id }` 事件，前端复用同一 command model 进入填写和签名模式并打开 `FormsPanel`，由面板承载字段读取和扁平化导出确认。
+- `help-about`：Rust 发出 `faropdf://command`，前端打开设置浮层并定位到 `关于` section，不显示占位 feedback。
+- `view-fullscreen` / `close-window`：由 Rust 直接调用窗口 API 处理，不进入前端业务状态。
+
+该桥接避免在 Rust 菜单、右侧工具启动器和 AppShell 之间维护三套命令分支。
+
+### 工具启动器与上下文工具条
+
+前端业务命令统一由 `src/shared/app/commands.ts` 描述。阅读态顶栏只保留布局、打开、阅读控制、全文搜索、`工具` 和设置入口；`mode-annotate` / `mode-export` / `mode-forms` / `mode-ocr` 不再作为顶栏 entry point 暴露，而是通过 `工具` 工作流启动器进入。
+
+进入任务模式后，`AppShell` 按 `activeMode` 渲染第二行上下文工具条或独立工作台：
+
+- `annotate`：显示批注上下文工具条和批注 overlay。
+- `export`：显示导出上下文工具条，并挂右侧 `ExportDeliveryPanel`。
+- `forms`：显示填写和签名上下文工具条，扁平化等低频动作进入 FormsPanel。
+- `ocr`：独占主工作区，显示 OCR 工具条和 OCR 任务 / 质量报告工作台。
+
+阅读辅助工具仍通过 `toolbarRegistry` 注册到 `read` mode，但只在已打开 PDF 时以图标按钮追加到阅读控制区，避免空态或阅读态顶栏重新堆叠任务模式文字。
 
 ## 核心接口
 
@@ -255,11 +285,11 @@ export interface PdfPageOrganizerState {
 }
 ```
 
-当前导出入口只生成 `PdfPageOperationsExportOperation` 和 `PdfExportFileRequest`：
+当前导出入口生成 `PdfPageOperationsExportOperation`、`PdfExportFileRequest`，页面管理工作台也可直接复用 operation 进行 bytes 另存：
 
 - 默认输出路径为 `*-organized.pdf`。
 - 输出路径必须不同于原始 PDF，`../` 等等价路径会被归一化后拒绝。
-- 页面操作以 `plan-only` 提交给导出引擎，当前不声称已经完成真实页面重排、删除或旋转。
+- `execute` 模式通过 `pdfOperationEngine` 真实改写页面顺序、旋转和删除；`plan-only` 仅作为显式兼容模式保留。
 
 ### PdfExportJob
 
@@ -298,13 +328,13 @@ export type PdfExportDestination =
   | { type: 'file'; outputPath: string };
 
 export type PdfExportOperation =
-  | { id: string; type: 'flatten-annotations'; sidecar: AnnotationSidecar; strategy?: 'plan-only' }
+  | { id: string; type: 'flatten-annotations'; sidecar: AnnotationSidecar; strategy?: 'plan-only' | 'draw' }
   | { id: string; type: 'flatten-form' }
-  | { id: string; type: 'page-operations'; operations: PdfPageOperation[]; mode?: 'plan-only' }
+  | { id: string; type: 'page-operations'; operations: PdfPageOperation[]; mode?: 'plan-only' | 'execute' }
   | { id: string; type: 'watermark'; pageIndexes?: number[]; watermark: TextOrImageWatermark }
   | { id: string; type: 'page-number'; pageIndexes?: number[]; format?: string; startNumber?: number }
   | { id: string; type: 'bates-number'; pageIndexes?: number[]; prefix?: string; suffix?: string; startNumber: number; digits?: number }
-  | { id: string; type: 'compress'; pageIndexes?: number[]; preset: 'screen' | 'ebook' | 'print' | 'court-upload'; mode?: 'plan-only' };
+  | { id: string; type: 'compress'; pageIndexes?: number[]; preset: 'screen' | 'ebook' | 'print' | 'court-upload' | 'court-5mb' | 'court-10mb' | 'court-20mb' | 'court-50mb'; mode?: 'plan-only' | 'apply' };
 
 export interface PdfExportRequest {
   id: string;
@@ -330,11 +360,12 @@ export interface PdfExportResult {
 导出引擎第一版边界：
 
 - `pdfOperationEngine` 不写文件，只返回新 PDF bytes；`pdfExportService` 在路径型导出时拒绝 `outputPath === inputPath`。
-- `flatten-form` 使用 pdf-lib `form.flatten()`，可生成不可编辑表单提交版 bytes。
-- `flatten-annotations` 当前只把 sidecar 批注转换为 `plan-only` 摘要并写入 PDF 元数据，不绘制真实高亮、形状、墨迹、图章或备注外观。
-- `page-operations` 当前只接收页面整理生成的 `plan-only` 入口，真实旋转、删除、重排、裁剪和插入仍待后续导出深化接入。
-- `watermark`、`page-number`、`bates-number` 使用 pdf-lib 写入新 PDF bytes；文字绘制第一版使用内置 Helvetica，只支持 Latin-1 文本，中文水印/页码待后续字体接入。
-- `compress` 当前只生成 `plan-only` 摘要和警告，不执行 PyMuPDF 式图像重编码、降采样或对象流优化。
+- `flatten-form` 使用 pdf-lib `form.flatten()`，可生成不可编辑表单提交版 bytes；UI 入口归属填写和签名面板，不进入导出二级工具条。
+- `flatten-annotations` 支持 `plan-only` 摘要模式和 `draw` 真实绘制模式；批注侧栏的 `扁平化导出` 走 `draw`，默认保存 `*-annotations-flattened.pdf` 新副本，不覆盖原始 PDF。
+- `page-operations` 支持 `execute` 真实改写页面顺序、旋转和删除；裁剪、插入和合并仍待后续导出深化接入。
+- `watermark`、`page-number`、`bates-number` 使用 pdf-lib 写入新 PDF bytes；CJK 文本通过 Source Han Sans 字体路径嵌入。页眉页脚复用两个 text watermark operation，页眉映射到 `top-left` / `top-center` / `top-right`，页脚映射到 `bottom-left` / `bottom-center` / `bottom-right`，应用范围通过 `PdfWatermarkOperation.pageIndexes` 支持全部页面 / 奇数页 / 偶数页。
+- 导出模式 UI 通过 `ExportDeliveryPanel` 复用 `reader.getFileBytes()` 和 `reader.saveUpdatedBytes()` 调用 `watermark` / `page-number` / `bates-number` / `compress` operation，默认下载 `*-text-watermarked.pdf` / `*-image-watermarked.pdf` / `*-header-footer.pdf` / `*-page-numbered.pdf` / `*-bates.pdf` / `*-compressed.pdf`，不覆盖原始 PDF。
+- `compress mode=apply` 调用 `compressionService` 生成压缩后 PDF，并把返回 bytes 重新加载为后续导出工作副本；当前支持对象流保存、JPEG DCTDecode 图像重编码和目标体积检查，DPI 降采样仍留给后续后台 bridge。
 
 ### OcrJob
 
@@ -487,8 +518,9 @@ export interface OcrProviderConfig {
 export interface AppSettings {
   defaultSaveDirectory?: string;
   defaultZoom: number;
-  defaultViewMode: 'continuous' | 'single' | 'double';
+  defaultViewMode: 'continuous' | 'single' | 'double' | 'fit-width';
   defaultSavePolicy: 'always-export-copy' | 'ask-each-time' | 'allow-overwrite-with-confirmation';
+  themePreference: 'light' | 'dark';
   recentFiles: Array<{ path: string; name: string; lastOpenedAt: string }>;
   defaultOcrProviderId?: string;
   ocrProviders: OcrProviderConfig[];
@@ -520,21 +552,22 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 `src/modules/reader/` 已建立 PDF.js 阅读底座：
 
 - `pdfReaderService`：懒加载 `pdfjs-dist`，配置独立 PDF.js worker，读取 PDF 页数、指纹、首页尺寸和文字层初始状态。
+- `renderPageToCanvas`：接收可选 `AbortSignal`，在页面重新渲染、模式切换或卸载时取消 PDF.js render task，避免同一 canvas 并发渲染。
 - `readerState`：维护打开状态、页码、缩放、视图模式、文字层状态和错误信息。
 - `virtualization`：按当前页、总页数、视图模式和 overscan 计算应渲染页范围。
 - `useReaderController`：连接文件输入、PDF 加载和阅读状态。
 
-当前 UI 使用阅读占位页展示虚拟化范围；真实 canvas 渲染、滚动驱动当前页和页级尺寸缓存继续由后续阅读深化任务完成。
+当前 UI 已使用 PDF.js canvas 渲染阅读页；滚动驱动当前页和页级尺寸缓存已在阅读深化中接入，后续重点是大卷宗渲染调度和页级资源释放。
 
 ### Settings
 
 `src/shared/settings/` 与 `src/modules/settings/` 已建立设置和 OCR provider 配置底座：
 
-- `createDefaultAppSettings`：提供默认保存策略、默认缩放、默认视图、最近文件数组、本地 OCR provider、PaddleOCR 和 MinerU provider。
-- `validateAppSettings`：校验缩放范围、默认 OCR provider、联网 provider endpoint、apiKeyRef 和联网确认策略。
+- `createDefaultAppSettings`：提供默认保存策略、默认缩放、默认视图、浅色外观偏好、最近文件数组、本地 OCR provider、PaddleOCR 和 MinerU provider。
+- `validateAppSettings`：校验缩放范围、外观偏好、默认 OCR provider、联网 provider endpoint、apiKeyRef 和联网确认策略。
 - `sanitizeAppSettingsForStorage` / `exportSafeAppSettings`：保存和展示前对 API Key 引用脱敏。
 - `createSettingsService`：通过 Tauri command 读取、校验和写入设置。
-- `SettingsPanel`：支持默认保存策略、默认缩放、阅读模式、OCR provider、联网 OCR 确认和外部 provider endpoint/apiKeyRef 编辑。
+- `SettingsPanel`：支持外观偏好、默认保存策略、默认缩放、阅读模式、OCR provider、联网 OCR 确认和外部 provider endpoint/apiKeyRef 编辑。
 
 `src-tauri/src/lib.rs` 已提供 `read_app_settings` 与 `write_app_settings`，将设置写入应用配置目录下的 `settings.json`，不触碰用户 PDF 文件。
 
@@ -550,14 +583,15 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 
 ### Pages
 
-`src/shared/pdf/pageOrganizer.ts` 与 `src/modules/pages/` 已建立页面整理第一版状态底座：
+`src/shared/pdf/pageOrganizer.ts` 与 `src/modules/pages/` 已建立页面整理状态底座：
 
 - `createPageOrganizerState`：按 PDF 页数创建页面项，记录原始页码、当前顺序、旋转角和删除状态。
 - `rotateOrganizerPages` / `deleteOrganizerPages` / `reorderOrganizerPages` / `restoreOrganizerPages`：以稳定 page id 更新页面状态，并为每次高风险操作压入撤销栈。
 - `undoPageOrganizer`：恢复上一个页面整理快照，确保旋转、删除和重排都可回退。
-- `createPageOrganizerExportRequest`：生成 `page-operations` 的 `plan-only` 导出请求，默认 `*-organized.pdf` 新输出路径，并拒绝等价覆盖原始 PDF 的路径。
+- `createPageOrganizerExportOperation`：生成可供前端 bytes 另存复用的 `page-operations execute` operation。
+- `createPageOrganizerExportRequest`：生成路径型页面整理导出请求，默认 `*-organized.pdf` 新输出路径，并拒绝等价覆盖原始 PDF 的路径。
 
-当前不执行真实 PDF 页序、删除或旋转改写；页面网格 UI、多选预览、插入/合并/裁剪、A4 标准化和页级 manifest 后续接入。
+页面管理工作台已接入状态机：上移 / 下移重排、旋转、删除和撤销会更新页面网格，另存时调用 `pdfOperationEngine` 输出新 PDF bytes。插入/合并/裁剪、A4 标准化和页级 manifest 后续接入。
 
 ### 证据图片 A4 编排（imagePack）
 
@@ -579,9 +613,10 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 | `annotationService` | sidecar 批注模型、编辑、导出摘要 |
 | `pdfExportService` | 路径型导出安全校验、仅新建写入、批注/页面操作计划和表单导出 |
 | `pdfOperationEngine` | 抽象 PDF 写入能力，第一版用 pdf-lib 起步复制 PDF、扁平化表单、写入水印/页码/Bates 并生成导出计划，预留更强引擎替换空间 |
+| `formService` | AcroForm 字段读取、填写、签名图片写入、表单扁平化和批量表单操作 |
 | `pageOrganizerService` | 页面整理状态、旋转、删除、重排、恢复、撤销和 plan-only 导出请求 |
 | `scanPreprocessService` | 扫描件清洁、90 度方向检测、微倾斜校正、裁边和预处理输出 |
-| `compressionService` | PDF 图像资源重编码、降采样、压缩档位和压缩统计；当前只有导出计划，真实处理待后台 bridge |
+| `compressionService` | PDF 图像资源重编码、法院上传压缩档位、目标体积检查和压缩统计；由 `compress mode=apply` 在导出引擎内调用 |
 | `ocrBridgeService` | 调用本地或云端 OCR 后端，管理任务状态 |
 | `ocrPrivacyConsentGuard` | 校验联网 OCR 本次 consent，生成脱敏隐私审计记录 |
 | `ocrQualityCheckService` | OCR 可检索页比例、关键词命中、体积比、耗时、CER、阈值结果和问题页报告 |
@@ -608,14 +643,16 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 
 ## OCR bridge
 
-OCR 不直接内置到前端。当前第一版只建立 bridge/stub，不执行真实 OCR、不生成双层 PDF、不发起 PaddleOCR/MinerU 联网请求。已落地边界：
+OCR 不直接内置到前端。前端 `src/modules/ocr/service/bridge.ts` 通过 `createTauriOcrBridgeBackend()` 调 `invoke("start_ocr_job", { request })`；后端 `src-tauri/src/ocr_dispatch.rs` 真实 spawn `ocrmypdf` 子进程（`OcrDispatchBackend::LocalOcrMyPdf`）并按 provider 分发到 PaddleOCR / MinerU HTTPS endpoint（DEC-095 / 修订自 DEC-050 之前的 bridge/stub 描述）。已落地边界：
 
 - `src/shared/ocr/` 定义 `OcrRequest`、页码范围、`new-layered-pdf` 输出策略、任务进度和质量抽查入口；`text-sidecar`、`quality-check-only` 仅作为后续策略类型，第一版校验会拒绝执行。
 - `src/shared/security/` 定义联网 OCR notice、consent decision、脱敏路径摘要和 `OcrPrivacyAuditRecord`；提示可展示 provider、页码范围、输出路径、是否联网、不会覆盖原 PDF 和 API key 引用，audit/consent 不保留完整本地 PDF 路径或真实密钥。notice 带一次性 nonce、签发时间和有效期，consent 绑定输入文件指纹、输出路径指纹、provider、页码范围、输出策略和 API key 引用。
 - `src/modules/ocr/privacy/consentGuard.ts` 负责校验云端 OCR 的本次 notice/consent 是否与当前输入文件、provider、页码范围、输出路径、输出策略和有效期匹配；本地 provider 不要求联网 consent，旧布尔 consent 标记不能绕过 guard。
-- `src/modules/ocr/service/bridge.ts` 负责准备请求、校验输入/输出 PDF、拒绝覆盖原始 PDF、查找 provider，并通过 adapter 边界区分本地命令和云端 API。
+- `src/modules/ocr/service/bridge.ts` 负责准备请求、校验输入/输出 PDF、拒绝覆盖原始 PDF、查找 provider，并通过 adapter 边界区分本地命令和云端 API；`createTauriOcrBridgeBackend` 调 `invoke("start_ocr_job")`。
 - `src/modules/ocr/quality/qualityCheckService.ts` 负责把 OCR 后页面文本和统计数据转换为质量报告，覆盖可检索页比例、关键词命中率、文件体积比、耗时和可选 CER；输入为空或页数无效时直接拒绝，避免把空结果误判为通过。
-- Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有用户本次明确 consent、安全 apiKeyRef 和 HTTPS endpoint，本机调试仅允许 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback HTTP；真实密钥串、远端明文 HTTP、伪装成 `127.*` 的域名和非法 endpoint 不会调用 Tauri command。bridge 请求会携带脱敏 `privacyAuditRecord`，但不声称已经执行真实 OCR。
+- Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有用户本次明确 consent、安全 apiKeyRef 和 HTTPS endpoint，本机调试仅允许 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback HTTP；真实密钥串、远端明文 HTTP、伪装成 `127.*` 的域名和非法 endpoint 不会调用 Tauri command。bridge 请求会携带脱敏 `privacyAuditRecord`。
+- 端到端覆盖：`tests/e2e/ocr-e2e.test.ts`（前端 fixture + 真实 ocrmypdf + 真实 pdftotext + 真实质量报告）+ `src-tauri/src/lib.rs` `mod ocr_bridge_tests`（Rust 集成测试 + 真实 OCR + 任务队列持久化）。缺工具时静默跳过。
+- 历史（不再适用）：`docs/ARCHITECTURE.md` 之前表述 "当前第一版只建立 bridge/stub，不执行真实 OCR"，与代码实情不符（ISS-007 E2E 联调 worker 已在 0.1.0-alpha.10 落实真实接入，DEC-050 / PR #27）。DEC-095 修订此处。
 - `src-tauri/src/lib.rs` 提供 `start_ocr_job` command stub，Rust 侧重复校验 provider、页码范围、输出策略、默认 `*-ocr.pdf` 新输出路径和云端 OCR 的 `privacyAuditRecord.consentStatus=granted`，返回 queued job。
 - 错误信息不包含完整敏感 PDF 路径，带逗号或中文标点的 PDF 路径也会在展示前脱敏；API Key 只使用引用或脱敏占位，不写入日志或错误报告。
 

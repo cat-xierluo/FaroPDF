@@ -24,7 +24,16 @@ const registry = new Map<AppModeId, ToolbarToolItem[]>();
 
 export function registerModeTools(modeId: AppModeId, items: ToolbarToolItem[]): void {
   const existing = registry.get(modeId) ?? [];
-  registry.set(modeId, [...existing, ...items]);
+  const next = [...existing];
+  for (const item of items) {
+    const existingIndex = next.findIndex((registered) => registered.id === item.id);
+    if (existingIndex >= 0) {
+      next[existingIndex] = item;
+    } else {
+      next.push(item);
+    }
+  }
+  registry.set(modeId, next);
 }
 
 export function getModeTools(modeId: AppModeId): ToolbarToolItem[] {

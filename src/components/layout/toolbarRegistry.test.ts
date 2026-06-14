@@ -54,6 +54,16 @@ describe("toolbarRegistry", () => {
     expect(getModeTools("annotate")).toEqual([a, b]);
   });
 
+  test("registerModeTools replaces existing items with the same id", () => {
+    const initial = makeItem({ id: "same", label: "旧工具", order: 1 });
+    const replacement = makeItem({ id: "same", label: "新工具", order: 2 });
+
+    registerModeTools("annotate", [initial]);
+    registerModeTools("annotate", [replacement]);
+
+    expect(getModeTools("annotate")).toEqual([replacement]);
+  });
+
   test("registerModeTools keeps registrations across distinct modes isolated", () => {
     const annotateItem = makeItem({ id: "annotate-item", modeId: "annotate" });
     const ocrItem = makeItem({ id: "ocr-item", modeId: "ocr" });

@@ -435,7 +435,7 @@ async function drawStamp(
     opacity: 0,
   });
 
-  let font: PDFFont | null = null;
+  let font: PDFFont | null;
   try {
     font = await resolveStampFont(workingPdf, label);
   } catch {

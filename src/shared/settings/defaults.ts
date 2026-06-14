@@ -1,7 +1,7 @@
 import type { OcrProviderConfig, OcrProviderType } from "../ocr/types";
 import { isAllowedOcrEndpoint, isCredentialReference, isMaskedSecret, isSafeApiKeyRef } from "../ocr/providerSecurity";
 import type { PdfViewMode } from "../pdf/types";
-import type { AppSettings, DefaultSavePolicy, RecentPdfFile } from "./types";
+import type { AppSettings, AppThemePreference, DefaultSavePolicy, RecentPdfFile } from "./types";
 
 const DEFAULT_RECENT_FILE_LIMIT = 20;
 const allowedViewModes = new Set<PdfViewMode>(["continuous", "single", "double", "fit-width"]);
@@ -10,6 +10,7 @@ const allowedSavePolicies = new Set<DefaultSavePolicy>([
   "ask-each-time",
   "allow-overwrite-with-confirmation",
 ]);
+const allowedThemePreferences = new Set<AppThemePreference>(["light", "dark"]);
 const networkProviderTypes = new Set<OcrProviderType>(["paddleocr", "mineru"]);
 const localProviderTypes = new Set<OcrProviderType>(["local-ocrmypdf", "legal-skills"]);
 
@@ -60,6 +61,7 @@ export function createDefaultAppSettings(): AppSettings {
     defaultZoom: 1,
     defaultViewMode: "continuous",
     defaultSavePolicy: "always-export-copy",
+    themePreference: "light",
     recentFiles: [],
     defaultOcrProviderId: "local-ocrmypdf",
     requireNetworkOcrConfirmation: true,
@@ -134,6 +136,9 @@ export function normalizeAppSettings(input: unknown): AppSettings {
     defaultSavePolicy: isDefaultSavePolicy(input.defaultSavePolicy)
       ? input.defaultSavePolicy
       : defaults.defaultSavePolicy,
+    themePreference: isAppThemePreference(input.themePreference)
+      ? input.themePreference
+      : defaults.themePreference,
     recentFiles: normalizeRecentFiles(input.recentFiles),
     defaultOcrProviderId:
       typeof input.defaultOcrProviderId === "string" ? input.defaultOcrProviderId : defaults.defaultOcrProviderId,
@@ -160,6 +165,10 @@ export function validateAppSettings(settings: AppSettings): SettingsValidationRe
 
   if (!allowedSavePolicies.has(settings.defaultSavePolicy)) {
     errors.push("默认保存策略无效。");
+  }
+
+  if (!allowedThemePreferences.has(settings.themePreference)) {
+    errors.push("外观偏好无效。");
   }
 
   const providerIds = new Set(settings.ocrProviders.map((provider) => provider.id));
@@ -271,6 +280,10 @@ function isPdfViewMode(value: unknown): value is PdfViewMode {
 
 function isDefaultSavePolicy(value: unknown): value is DefaultSavePolicy {
   return typeof value === "string" && allowedSavePolicies.has(value as DefaultSavePolicy);
+}
+
+function isAppThemePreference(value: unknown): value is AppThemePreference {
+  return typeof value === "string" && allowedThemePreferences.has(value as AppThemePreference);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

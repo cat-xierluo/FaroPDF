@@ -42,6 +42,419 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 活跃任务
 
+### ISS-039 PDF 工具启动器与导出编号面板收口
+
+- 优先级：P0
+- 类型：UI 信息架构 / 导出 / 多层级菜单
+- 状态：已完成（2026-06-08，全量验证通过）
+- 来源：用户持续反馈“多层级菜单”和“整体 UI 简洁”未完成，并要求整体页面和功能布局参照 PDF Expert。
+- 目标：
+  1. 阅读态顶栏只保留常用入口，`另存为`、页码、Bates、压缩等低频交付命令不再平铺。
+  2. 右侧 `工具` 按钮打开 PDF Expert 式工作流启动器，按 `组织页面 / 交付导出 / 标注填写 / 扫描 OCR` 分组。
+  3. `添加页码` / `Bates 编号` 从三级工具入口进入导出模式，导出模式右侧设置面板承载编号参数。
+  4. 导出二级工具条只保留 `文字水印 / 图片水印`，不把页码 / Bates 重新塞回二级按钮。
+  5. 页码 / Bates 导出默认生成新 PDF，不覆盖原始 PDF。
+- 关键文件：
+  - `src/shared/app/commands.ts`
+  - `src/components/layout/Toolbar.tsx`
+  - `src/components/layout/AppShell.tsx`
+  - `src/modules/export/ui/ExportDeliveryPanel.tsx`
+  - `src/styles/app.css`
+- 验收：
+  - [x] `工具` 菜单按四组展示，并复用统一 command model。
+  - [x] `添加页码` / `Bates 编号` 不出现在一级顶栏或导出二级工具条。
+  - [x] 导出模式显示 `交付设置面板`，可在 `普通编号 / 证据编号` 间切换。
+  - [x] 普通页码可按样式、位置和起始号导出 `*-page-numbered.pdf`。
+  - [x] Bates 可按前缀、后缀、位数、位置和起始号导出 `*-bates.pdf`。
+  - [x] 空态不展示旋转 / 适合页面等文档专属辅助按钮，页码控件不显示 `1 / 0`。
+  - [x] 工具启动器只展示分组标题和命令名，命令说明收进悬停提示，降低菜单文字密度。
+  - [x] 全量测试、类型检查、Rust 检查、生产构建和 960×720 视觉复核通过。
+
+### ISS-040 文字 / 图片水印交付面板接入
+
+- 优先级：P1
+- 类型：导出 UI / 多层级菜单 / PDF Expert 式交付工具
+- 状态：已完成（2026-06-08）
+- 来源：ISS-039 后续审计：导出引擎已有文字/图片水印 operation，但 UI 只有二级工具条按钮，缺少同一套右侧交付设置面板。
+- 目标：
+  1. 导出二级工具条的 `文字水印 / 图片水印` 只负责切换右侧面板，不直接弹散乱入口。
+  2. `ExportDeliveryPanel` 支持 `文字水印 / 图片水印 / 普通编号 / 证据编号` 四类交付工具。
+  3. 文字水印支持内容、位置、字号、透明度和旋转角度，并默认导出 `*-text-watermarked.pdf` 新副本。
+  4. 图片水印支持选择 PNG/JPG、位置、宽度和透明度，并默认导出 `*-image-watermarked.pdf` 新副本。
+  5. 继续不覆盖原始 PDF。
+- 关键文件：
+  - `src/modules/export/ui/ExportDeliveryPanel.tsx`
+  - `src/components/layout/AppShell.tsx`
+  - `src/modules/export/ui/ExportDeliveryPanel.test.tsx`
+  - `src/components/layout/AppShell.test.tsx`
+- 验收：
+  - [x] 导出工具条点击 `文字水印 / 图片水印` 会切换右侧交付设置面板。
+  - [x] 文字水印可导出新 PDF 副本。
+  - [x] 图片水印选择 PNG/JPG 后可导出新 PDF 副本。
+  - [x] 页码 / Bates 仍留在深层工具入口和交付面板，不回到二级工具条。
+  - [x] 全量测试、类型检查、lint、构建、Rust 检查和 960×720 视觉复核通过。
+
+### ISS-041 压缩交付面板接入
+
+- 优先级：P1
+- 类型：导出 UI / 多层级菜单 / 压缩
+- 状态：已完成（2026-06-08）
+- 来源：用户要求整体页面和功能布局继续参照 PDF Expert，低频交付能力不能重新平铺到顶栏或二级工具条；ISS-040 后压缩仍停留在工具命令入口，缺少右侧交付设置面板。
+- 目标：
+  1. `压缩` 继续作为三级工具 / 原生菜单入口，不进入阅读态顶栏或导出二级工具条。
+  2. `export-compress` 进入导出模式后选中右侧 `压缩设置`。
+  3. `ExportDeliveryPanel` 增加压缩预设选择，默认 `法院 10MB`，并输出 `*-compressed.pdf` 新副本。
+  4. `pdfOperationEngine` 的 `compress mode=apply` 使用压缩服务返回的 PDF 作为后续导出工作副本，避免只生成摘要、不改变输出 bytes。
+  5. 继续不覆盖原始 PDF。
+- 关键文件：
+  - `src/modules/export/ui/ExportDeliveryPanel.tsx`
+  - `src/modules/export/pdfOperationEngine.ts`
+  - `src/components/layout/AppShell.tsx`
+  - `src/modules/export/ui/ExportDeliveryPanel.test.tsx`
+  - `src/components/layout/AppShell.test.tsx`
+- 验收：
+  - [x] 压缩工具只从 `工具` 菜单 / 原生菜单进入导出模式右侧面板。
+  - [x] 右侧面板支持法院上传 5MB / 10MB / 20MB / 50MB 以及屏幕阅读 / 电子归档 / 打印优先预设。
+  - [x] 压缩导出默认生成 `*-compressed.pdf` 新副本。
+  - [x] 压缩 apply 模式使用压缩服务输出替换工作 PDF，不再只是计划摘要。
+  - [x] 全量测试、类型检查、lint、构建、Rust 检查、git diff 空白检查和 960×720 视觉复核通过。
+
+### ISS-042 页眉页脚交付面板接入
+
+- 优先级：P1
+- 类型：导出 UI / 多层级菜单 / 页眉页脚
+- 状态：已完成（2026-06-08）
+- 来源：ISS-041 后续审计：`页眉页脚` 已在工具启动器和原生菜单中作为深层命令暴露，但仍只是占位反馈，没有进入右侧交付设置面板。
+- 目标：
+  1. `页眉页脚` 继续作为三级工具 / 原生菜单入口，不进入阅读态顶栏或导出二级工具条。
+  2. `export-header-footer` 进入导出模式后选中右侧 `页眉页脚设置`。
+  3. `ExportDeliveryPanel` 支持页眉、页脚、字号和透明度设置，并默认输出 `*-header-footer.pdf` 新副本。
+  4. 导出实现复用现有文字 watermark operation，在页面上方 / 下方写入固定说明，不新增独立分叉引擎。
+  5. 继续不覆盖原始 PDF。
+- 关键文件：
+  - `src/modules/export/ui/ExportDeliveryPanel.tsx`
+  - `src/components/layout/AppShell.tsx`
+  - `src/shared/app/commands.ts`
+  - `src/modules/export/ui/ExportDeliveryPanel.test.tsx`
+  - `src/components/layout/AppShell.test.tsx`
+- 验收：
+  - [x] 页眉页脚工具只从 `工具` 菜单 / 原生菜单进入导出模式右侧面板。
+  - [x] 右侧面板支持页眉、页脚、字号和透明度设置。
+  - [x] 页眉页脚导出默认生成 `*-header-footer.pdf` 新副本。
+  - [x] 页眉和页脚均为空时阻止导出并提示。
+  - [x] 全量测试、类型检查、lint、构建、Rust 检查、git diff 空白检查和 960×720 视觉复核通过。
+
+### ISS-043 表单扁平化入口与填写签名工具条收口
+
+- 优先级：P1
+- 类型：UI 信息架构 / 表单 / 多层级菜单
+- 状态：已完成（2026-06-08）
+- 来源：继续推进 PDF Expert 式页面和功能布局；审计发现 `表单扁平化` 已有输出能力，但深层工具命令只切到 forms mode，没有稳定打开填写签名面板；填写签名二级工具条仍保留日期、钩号等未接通占位按钮。
+- 目标：
+  1. `表单扁平化` 继续作为三级工具 / 原生菜单入口，不进入阅读态顶栏或导出二级工具条。
+  2. `forms-flatten` 进入填写和签名模式后打开左侧 `填写和签名面板`，由面板承载读取字段和扁平化导出确认。
+  3. 填写和签名二级工具条只展示已接通动作：`读取字段 / 填写 / 签名 / 扁平化导出`。
+  4. 移除日期、钩号、叉号、图章、图像等未接通占位按钮，避免 UI 看似丰富但不可用。
+  5. 表单扁平化继续默认输出 `*-flattened.pdf` 新副本，不覆盖原始 PDF。
+- 关键文件：
+  - `src/shared/app/commands.ts`
+  - `src/components/layout/AppShell.tsx`
+  - `src/components/layout/AppShell.test.tsx`
+  - `src/shared/app/commands.test.ts`
+  - `src/App.test.tsx`
+- 验收：
+  - [x] `forms-flatten` 标记为三级命令，并路由到 `forms` mode + `forms` utility panel。
+  - [x] 工具启动器 / 原生菜单触发 `表单扁平化` 后，前端命令模型请求打开填写签名面板。
+  - [x] 填写签名二级工具条只保留真实接线动作，不展示日期 / 钩号 / 导出为压平等旧占位。
+  - [x] 全量测试、类型检查、lint、构建、Rust 检查、git diff 空白检查和 960×720 视觉复核通过。
+
+### ISS-044 页面管理工作台真实状态与另存导出接入
+
+- 优先级：P0
+- 类型：页面整理 / UI 信息架构 / 多层级菜单
+- 状态：已完成（2026-06-08）
+- 来源：继续推进 PDF Expert 式页面和功能布局；审计发现页面管理工作台仍停留在视觉计数和风险提示，未接入 `pageOrganizer` 状态机和真实 PDF 页面改写导出。
+- 目标：
+  1. 页面管理继续作为左上角布局入口 / 独立工作台，不回到阅读态顶栏或导出二级工具条。
+  2. 页面网格接入 `pageOrganizer` 状态机，旋转、删除和撤销要真实更新工作台状态。
+  3. 删除必须先确认，确认后页面从活动网格移除；撤销可恢复删除和旋转。
+  4. `另存为新 PDF` 使用当前 PDF bytes 和 `pdfOperationEngine` 的 `page-operations execute` 导出新副本。
+  5. 默认文件名为 `*-organized.pdf`，不覆盖原始 PDF。
+- 关键文件：
+  - `src/components/layout/PageOrganizerWorkspace.tsx`
+  - `src/components/layout/PageOrganizerWorkspace.test.tsx`
+  - `src/modules/pages/pageOrganizer.ts`
+  - `src/modules/export/pdfOperationEngine.ts`
+- 验收：
+  - [x] 旋转已选页面后，页面卡片显示旋转状态且撤销可恢复。
+  - [x] 删除确认后，页面从活动网格移除且撤销可恢复。
+  - [x] 另存导出调用真实页面操作导出并保存 `*-organized.pdf` 新副本。
+  - [x] 页面管理相关低频动作不进入阅读态顶栏或导出二级工具条。
+
+### ISS-045 批注扁平化入口与批注侧栏导出接入
+
+- 优先级：P0
+- 类型：批注 / UI 信息架构 / 多层级菜单
+- 状态：已完成（2026-06-08）
+- 来源：继续推进 PDF Expert 式页面和功能布局；ROADMAP §5.1 剩余项显示表单 flatten 与页面操作真实改写已完成，但批注扁平化 UI 仍未接入。底层 `pdfOperationEngine` 已支持 `flatten-annotations` 的 `draw` 策略，缺少深层入口和面板确认。
+- 目标：
+  1. `批注扁平化` 作为三级工具 / 原生菜单入口，归属 `标注填写` 分组，不进入阅读态顶栏或导出二级工具条。
+  2. `annotations-flatten` 进入批注模式后打开左侧 `批注侧边栏`，由侧栏承载扁平化导出确认。
+  3. 批注侧栏在有批注时展示 `扁平化导出` 动作，调用 `pdfOperationEngine` 的 `flatten-annotations draw` 真实绘制批注。
+  4. 默认输出 `*-annotations-flattened.pdf` 新副本，不覆盖原始 PDF。
+  5. 无文档、无批注或缺少源 PDF bytes 时给出明确状态，不显示虚假成功。
+- 关键文件：
+  - `src/shared/app/commands.ts`
+  - `src/components/layout/AppShell.tsx`
+  - `src/components/layout/AnnotationSidebar.tsx`
+  - `src/components/layout/AnnotationSidebar.test.tsx`
+  - `src/components/layout/AppShell.test.tsx`
+- 验收：
+  - [x] `annotations-flatten` 标记为三级命令，并路由到 `annotate` mode + `annotation` utility panel。
+  - [x] 工具启动器 / 原生菜单触发 `批注扁平化` 后打开批注侧栏，不进入导出工具条。
+  - [x] 批注侧栏 `扁平化导出` 调用真实 `flatten-annotations draw` 并保存 `*-annotations-flattened.pdf`。
+  - [x] 无批注时不显示可点击的扁平化导出假入口。
+
+### ISS-046 页面管理重排 UI 与真实另存接入
+
+- 优先级：P0
+- 类型：页面整理 / UI 信息架构 / PDF Expert 式工作台
+- 状态：已完成（2026-06-08，全量验证通过）
+- 来源：继续推进未完成任务；ROADMAP §5 显示页面旋转 / 删除 / 撤销已完成，但 `重排 UI 待完成`。底层 `pageOrganizer` 已有 reorder 状态机，`pdfOperationEngine page-operations execute` 已能真实改写页序，缺少工作台内可操作入口。
+- 目标：
+  1. 页面重排只在页面管理工作台内完成，不进入阅读态顶栏或导出二级工具条。
+  2. 页面卡片提供克制的上移 / 下移动作，支持多次移动、撤销和状态提示。
+  3. 重排后的页面顺序参与 `另存为新 PDF`，输出 `*-organized.pdf` 新副本，不覆盖原始 PDF。
+  4. 未选择页面或边界页时禁用无效移动，不展示未接通的插入 / 合并 / 摘录占位按钮。
+- 关键文件：
+  - `src/components/layout/PageOrganizerWorkspace.tsx`
+  - `src/components/layout/PageOrganizerWorkspace.test.tsx`
+  - `src/components/layout/PageOrganizerWorkspace.css`
+  - `src/modules/pages/pageOrganizer.ts`
+- 验收：
+  - [x] 页面管理工作台可对选中页面执行上移 / 下移，页面网格立即反映新顺序。
+  - [x] 重排动作可撤销。
+  - [x] 重排后的另存导出调用真实 `page-operations execute` 并保存新副本。
+  - [x] 重排入口不进入阅读态顶栏或导出二级工具条。
+
+### ISS-047 ReaderCanvas PDF.js 并发渲染取消缺陷
+
+- 优先级：P1
+- 类型：阅读渲染 / 缺陷修复
+- 状态：已完成（2026-06-08，全量验证通过）
+- 来源：ISS-046 Playwright 960×720 复核时，上传 5 页临时 PDF 后从页面管理切到导出模式，console 出现 `Cannot use the same canvas during multiple render() operations`。
+- 目标：
+  1. `ReaderCanvas` 在页面重新渲染、模式切换或组件卸载时取消上一轮 PDF.js render task。
+  2. 避免同一 canvas 被重复 render 导致页面回退到渲染失败占位。
+  3. 增加回归测试覆盖快速模式切换 / 重新渲染场景。
+- 关键文件：
+  - `src/components/layout/ReaderCanvas.tsx`
+  - `src/components/layout/ReaderCanvas.test.tsx`
+  - `src/modules/reader/pdfReaderService.ts`
+  - `src/modules/reader/useReaderController.ts`
+- 验收：
+  - [x] 快速上传 PDF 后切换页面管理 / 导出 / 阅读模式，不再出现同 canvas 并发 render 错误。
+  - [x] PDF 页面保持 canvas 渲染，不落入文本占位回退。
+  - [x] 相关单测和 Playwright 复核通过。
+
+### ISS-048 工具启动器去假入口与批注摘要重路由
+
+- 优先级：P0
+- 类型：UI 信息架构 / 多层级菜单 / PDF Expert 式收口
+- 状态：已完成（2026-06-08，核心验证通过）
+- 来源：用户继续反馈“多层级菜单、整体 UI 简洁”仍未完成，并要求整体页面和功能布局参照 PDF Expert。
+- 目标：
+  1. 空态不展示未接通的图片转 PDF / Word 转 PDF 假入口，保持打开 PDF 的主动作清晰。
+  2. 工具启动器中的 `另存为` 必须执行真实副本导出，默认不覆盖原始 PDF。
+  3. `批注摘要` 从工具启动器进入批注侧栏的摘要视图，避免切到没有对应设置项的导出面板。
+  4. 工具启动器继续按工作流分组展示，低频命令不回到阅读态顶栏或导出二级工具条。
+- 关键文件：
+  - `src/components/layout/ReaderCanvas.tsx`
+  - `src/components/layout/AppShell.tsx`
+  - `src/components/layout/AnnotationSidebar.tsx`
+  - `src/shared/app/commands.ts`
+  - `src/App.test.tsx`
+  - `src/components/layout/AppShell.test.tsx`
+  - `src/shared/app/commands.test.ts`
+- 验收：
+  - [x] 未打开 PDF 时只展示打开 / 拖拽 PDF 主入口，不展示未接通转换按钮。
+  - [x] `工具 > 另存为` 真实保存 `*-copy.pdf` 新副本，缺少源 bytes 时给出明确错误。
+  - [x] `工具 > 批注摘要` 打开批注侧栏摘要视图，可继续导出 Markdown / HTML。
+  - [x] 页码 / Bates / 压缩等低频命令仍只在工具启动器或对应工作台中出现。
+
+### ISS-049 阅读模式工具注册幂等修复
+
+- 优先级：P0
+- 类型：UI 信息架构 / 缺陷修复
+- 状态：已完成（2026-06-08，浏览器复核通过）
+- 来源：ISS-048 960×720 浏览器复核：打开 PDF 后阅读辅助按钮 `逆时针 / 顺时针 / 适合页面` 重复出现，console 提示 React children key 重复。
+- 目标：
+  1. `registerReadModeTools()` 在开发热更新或重复初始化时保持幂等，不重复追加同一批工具。
+  2. `toolbarRegistry` 按 mode + tool id 去重，避免相同按钮在顶栏重复显示。
+  3. 阅读态仍只在有文档时显示阅读辅助按钮，未打开 PDF 时保持空态顶栏克制。
+- 关键文件：
+  - `src/components/layout/toolbarRegistry.ts`
+  - `src/components/layout/toolbarRegistry.test.ts`
+  - `src/modules/reader/readerModeTools.test.ts`
+- 验收：
+  - [x] 重复调用 `registerReadModeTools()` 后 read mode 仍只有 3 个阅读工具。
+  - [x] 重复注册同 id 工具时，注册表保留最新项且不产生重复 key。
+  - [x] 浏览器复核打开 PDF 后不再出现重复阅读按钮或重复 key console 错误。
+
+### ISS-050 原生菜单系统动作去提示型假入口
+
+- 优先级：P0
+- 类型：UI 信息架构 / 原生菜单 / PDF Expert 式收口
+- 状态：已完成（2026-06-08，核心验证通过）
+- 来源：继续推进用户反馈的“多层级菜单、整体 UI 简洁”问题；ISS-048 后审计发现 `新建窗口` 和 `关于 FaroPDF` 仍是提示型入口，系统级窗口动作也混在前端业务 command catalog 中。
+- 目标：
+  1. `文件 > 新建窗口` 必须执行真实桌面壳层动作，不再发前端占位提示。
+  2. `帮助 > 关于 FaroPDF` 必须直接打开设置页的 `关于` section，不再只显示“关于信息位于设置页”提示。
+  3. `新建窗口 / 全屏 / 关闭窗口` 等系统动作由 Rust 菜单事件处理，不进入前端 PDF 业务 command catalog。
+  4. 前端 `nativeMenuBridge` 只接收需要业务路由的菜单命令，继续复用统一 command model。
+- 关键文件：
+  - `src-tauri/src/lib.rs`
+  - `src/shared/app/commands.ts`
+  - `src/modules/settings/SettingsPanel.tsx`
+  - `src/components/layout/AppShell.tsx`
+  - `src/shared/app/commands.test.ts`
+  - `src/modules/settings/SettingsPanel.test.tsx`
+  - `src/components/layout/AppShell.test.tsx`
+- 验收：
+  - [x] `file-new-window` / `view-fullscreen` 不再作为前端 `native-menu` command 暴露。
+  - [x] Rust 菜单事件中 `file-new-window` 直接创建新的 FaroPDF 窗口。
+  - [x] `help-about` 无占位 feedback，触发后打开设置对话框并定位到 `关于` section。
+  - [x] 相关前端回归测试和 `cargo check` 通过。
+
+### ISS-051 页眉页脚奇偶页范围接入
+
+- 优先级：P1
+- 类型：导出 UI / 多层级菜单 / 页眉页脚深化
+- 状态：已完成（2026-06-09，全量验证通过）
+- 来源：`docs/DESIGN.md` §19 当前设计差距仍记录“页眉页脚的奇偶页差异”待后续深化；该能力属于导出模式右侧交付设置，不应增加顶栏或二级工具条噪音。
+- 目标：
+  1. `页眉页脚` 继续只从工具启动器 / 原生菜单进入导出右侧面板，不进入阅读态顶栏或导出二级工具条。
+  2. `ExportDeliveryPanel` 的页眉页脚设置增加 `全部页面 / 奇数页 / 偶数页` 应用范围。
+  3. 奇数页 / 偶数页范围通过 `PdfWatermarkOperation.pageIndexes` 精确传给导出引擎。
+  4. 无匹配页面时阻止导出并提示，不显示虚假成功。
+  5. 默认仍输出 `*-header-footer.pdf` 新副本，不覆盖原始 PDF。
+- 关键文件：
+  - `src/modules/export/ui/ExportDeliveryPanel.tsx`
+  - `src/modules/export/ui/ExportDeliveryPanel.test.tsx`
+  - `docs/DESIGN.md`
+  - `docs/DECISIONS.md`
+  - `CHANGELOG.md`
+- 验收：
+  - [x] 页眉页脚面板有 `应用范围` 控件，默认 `全部页面`。
+  - [x] 选择 `奇数页` 时，页眉和页脚 operation 都只携带 0-based 奇数显示页索引，例如 3 页文档为 `[0, 2]`。
+  - [x] 选择 `偶数页` 时，单页文档阻止导出并提示“当前文档没有偶数页。”。
+  - [x] 导出模式二级工具条仍不展示 `页眉页脚` 按钮。
+
+### ISS-052 缩略图状态标记克制化
+
+- 优先级：P1
+- 类型：UI 信息架构 / 左侧摘要 / PDF Expert 式状态提示
+- 状态：已完成（2026-06-09，核心验证通过）
+- 来源：`docs/DESIGN.md` §19 仍记录“左侧缩略图接批注 / 搜索 / OCR 标记的视觉化”；当前代码已经能接收批注、搜索命中和 OCR 状态，但缩略图卡片使用 `批注 / 命中 / OCR` 文字胶囊，长卷宗左侧容易形成重复文字噪音。
+- 目标：
+  1. 状态提示继续只放在左侧文档摘要缩略图卡内，不增加阅读态顶栏、二级工具条或工具启动器入口。
+  2. 批注、搜索命中和 OCR 状态改为紧凑视觉标记，降低重复文字密度。
+  3. 保留 `title` / `aria-label` 等辅助说明，让屏幕阅读器和鼠标悬停仍能知道标记含义。
+  4. 支持同一页同时出现多个状态标记，且不改变缩略图尺寸或点击跳页行为。
+  5. 无状态页不显示空的标记容器。
+- 关键文件：
+  - `src/components/layout/Sidebar.tsx`
+  - `src/components/layout/Sidebar.test.tsx`
+  - `src/styles/app.css`
+  - `docs/DESIGN.md`
+  - `docs/DECISIONS.md`
+  - `CHANGELOG.md`
+- 验收：
+  - [x] 有批注 / 搜索命中 / OCR 状态的页码显示紧凑状态标记，不再显示重复的 `批注 / 命中 / OCR` 可见文字。
+  - [x] 每个标记保留可访问名称和悬停说明。
+  - [x] 同一页多个状态标记可以并排显示，缩略图按钮点击仍按 0-based pageIndex 跳页。
+  - [x] 左侧摘要状态标记不进入顶栏、二级工具条或工具启动器。
+
+### ISS-053 页眉页脚视觉位置选择器
+
+- 优先级：P1
+- 类型：导出 UI / 多层级菜单 / 页眉页脚深化
+- 状态：已完成（2026-06-09，全量验证通过）
+- 来源：继续推进用户反馈的“多层级菜单、整体 UI 简洁”和“整体页面和功能布局参照 PDF Expert”；`docs/DESIGN.md` §19 仍记录“页眉页脚可视化拖拽定位”待深化。
+- 目标：
+  1. `页眉页脚` 继续只从工具启动器 / 原生菜单进入导出右侧面板，不进入阅读态顶栏或导出二级工具条。
+  2. 页眉和页脚各自支持左 / 中 / 右位置选择，默认页眉上方居中、页脚下方居中。
+  3. 位置选择使用面板内的紧凑视觉选择器表达，不新增大面积说明或复杂拖拽组件。
+  4. 导出时页眉位置传给上方 watermark placement，页脚位置传给下方 watermark placement，并继续复用奇偶页 `pageIndexes` 范围。
+  5. 默认仍输出 `*-header-footer.pdf` 新副本，不覆盖原始 PDF。
+- 关键文件：
+  - `src/modules/export/ui/ExportDeliveryPanel.tsx`
+  - `src/modules/export/ui/ExportDeliveryPanel.css`
+  - `src/modules/export/ui/ExportDeliveryPanel.test.tsx`
+  - `docs/DESIGN.md`
+  - `docs/DECISIONS.md`
+  - `CHANGELOG.md`
+- 验收：
+  - [x] 页眉位置选择默认 `top-center`，可切换到 `top-left` / `top-right`。
+  - [x] 页脚位置选择默认 `bottom-center`，可切换到 `bottom-left` / `bottom-right`。
+  - [x] 选择奇数页 / 偶数页时，位置和 `pageIndexes` 同时正确传给导出引擎。
+  - [x] 导出模式二级工具条仍不展示 `页眉页脚` 按钮。
+  - [x] 相关测试、类型检查、lint、构建、Rust 检查、空白检查和 960×720 视觉复核通过。
+
+### ISS-054 深色模式最小接入
+
+- 优先级：P1
+- 类型：UI 视觉 / 设置 / PDF Expert 式界面 polish
+- 状态：已完成（2026-06-09，核心验证通过）
+- 来源：`docs/DESIGN.md` §19 当前设计差距仍记录“深色模式（当前仅亮色）”。该能力属于整体视觉系统和设置项，不应新增顶栏按钮，也不应改变已收口的工具层级。
+- 目标：
+  1. 外观选择放在 `设置 > 常规`，不进入阅读态顶栏、二级工具条或工具启动器。
+  2. `AppSettings` 新增外观偏好，默认 `浅色`；旧持久化数据缺字段时自动回退浅色。
+  3. 切换 `深色` 后通过根节点 `data-theme="dark"` 应用深色 token，让设置浮层、工具启动器、阅读区和状态栏共享同一主题。
+  4. PDF 页面纸张仍保持可读的纸面语义，不把原始 PDF 内容反相。
+  5. 不引入新依赖，不改动 PDF 导出或文件保存语义。
+- 关键文件：
+  - `src/shared/settings/types.ts`
+  - `src/shared/settings/defaults.ts`
+  - `src/modules/settings/sections/GeneralSection.tsx`
+  - `src/App.tsx`
+  - `src/styles/app.css`
+  - `src/modules/settings/sections/GeneralSection.test.tsx`
+  - `src/shared/settings/defaults.test.ts`
+  - `src/App.test.tsx`
+- 验收：
+  - [x] 默认设置为浅色，根节点为 `data-theme="light"`。
+  - [x] 旧设置数据没有外观字段时回退浅色，非法字段被校验拦截或归一化。
+  - [x] 在常规设置中选择深色后，根节点切换为 `data-theme="dark"`。
+  - [x] 深色模式不新增顶栏 / 二级工具条入口，既有工具层级保持不变。
+  - [x] 相关测试、类型检查、lint、构建、空白检查和 960×720 视觉复核通过。
+
+### ISS-055 顶栏任务模式入口收口
+
+- 优先级：P0
+- 类型：UI 信息架构 / 多层级菜单 / PDF Expert 式顶栏
+- 状态：已完成（2026-06-09，全量验证通过）
+- 来源：用户继续反馈“多层级菜单、整体 UI 简洁”仍未达到预期，并明确要求整体页面和功能布局参照 PDF Expert。
+- 目标：
+  1. 阅读态顶栏不再直接平铺 `OCR / 批注 / 填写和签名 / 导出` 四个任务模式按钮。
+  2. 任务模式入口统一进入右侧 `工具` 工作流启动器，由 `交付导出 / 标注填写 / 扫描 OCR` 等分组承载。
+  3. 切入某个任务模式后，仍只显示该模式对应的第二行上下文工具条或工作台。
+  4. 阅读辅助按钮继续只在打开 PDF 后出现，并保持图标化，不把文字标签重新堆回顶栏。
+  5. 不改变导出、批注、表单、OCR 的业务命令语义和默认另存安全策略。
+- 关键文件：
+  - `src/components/layout/Toolbar.tsx`
+  - `src/shared/app/commands.ts`
+  - `src/styles/app.css`
+  - `src/App.test.tsx`
+  - `src/components/layout/AppShell.test.tsx`
+  - `src/shared/app/commands.test.ts`
+- 验收：
+  - [x] 顶栏关闭状态下没有 `OCR / 批注 / 填写和签名 / 导出` 四个任务模式按钮。
+  - [x] `工具` 菜单中仍可进入 `导出 / 批注 / 填写和签名 / OCR`。
+  - [x] 进入导出 / 批注 / 填写 / OCR 后，对应上下文工具条和工作台行为保持不变。
+  - [x] 打开 PDF 后阅读辅助工具保持图标化，不增加顶栏文字噪音。
+  - [x] 相关测试、类型检查、lint、构建、空白检查和浏览器视觉复核通过。
+
 ### ISS-030 工具栏布局克制化（一级/二级分层 + 侧边栏默认关闭 + 页面布局收左上角）
 
 - 优先级：P1
@@ -85,7 +498,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P2
 - 类型：UI / 本地化
-- 状态：已完成（2026-06-07）
+- 状态：已完成（2026-06-08，原生菜单桥接补齐）
 - 来源：用户实际使用反馈
 - 目标：
   1. macOS 原生菜单栏从默认英文（File / Edit / View / Window / Help）改为中文。
@@ -95,7 +508,11 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - 中文菜单标签：文件（新建窗口 / 打开 / 保存 / 另存为 / 关闭）、编辑（撤销 / 重做 / 剪切 / 复制 / 粘贴）、视图（文档摘要 / 页面管理 / 视图设置 / 全屏）、窗口、帮助。
   - 深层功能入口：可在"文件"或"工具"菜单下添加"添加页眉页脚""添加页码""Bates 编号"等菜单项，点击后进入对应的工具模式或打开设置面板。
   - 关键文件：`src-tauri/tauri.conf.json`（菜单配置）、可能需要 `src-tauri/src/lib.rs` 添加菜单事件处理。
-- 验收：macOS 菜单栏显示中文标签；低频功能可通过菜单栏访问。
+- 验收：
+  - [x] macOS 菜单栏显示中文标签。
+  - [x] `文件 > 打开…` 通过 Tauri dialog 选择 PDF，并经专用 Rust command 读取 bytes 后进入 reader。
+  - [x] `工具 > 添加页码 / Bates 编号 / 页眉页脚 / 水印 / 压缩 / 表单扁平化` 通过 `faropdf://command` 事件进入前端 command model。
+  - [x] 原生菜单命令 id 与 `src/shared/app/commands.ts` 保持一致，避免菜单、工具启动器和 AppShell 分叉。
 
 ### ISS-033 主页下半部分灰色渲染异常
 
@@ -215,6 +632,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - **发布 / 工程**：ISS-021、ISS-027
 - **法律材料整理**：ISS-019
 - **品牌 / UI**：ISS-020、ISS-029
+- **UI 信息架构 / 导出面板**：ISS-039、ISS-040、ISS-041、ISS-042
 - **跨仓协调**：personal-site `ISS-005`（Folio 仓 PR-A / FaroPDF 仓 PR-B 联动，FaroPDF 仓侧见 DEC-058 docs-only 同步）
 - **跨仓交付**：personal-site `ISS-001~012`（仓 `cat-xierluo/cat-xierluo.github.io`，v0.1.0-alpha.8 + i18n + 微信二维码真实化 + URL 去 subpath + Legal Skills 集成已落定；FaroPDF 仓侧不重复登记，详见 `docs/TASKS.md` § 推进策略 > 跨仓任务边界 + DEC-072）
 
@@ -222,15 +640,10 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
-- 2026-06-07：ISS-030 / ISS-031 / ISS-032 / ISS-033 / ISS-034 / ISS-035 / ISS-037 / ISS-038 全部完成。工具栏克制化（48px、无品牌区、compact 布局按钮）、欢迎页空态清理（移除占位符和最近文件区域）、主页灰色区域修复（reader flex: 1）、PDF 拖拽打开（DocumentReader DnD handler）、PDF.js worker 幂等配置、设置页 UI 统一（focus-visible + 遗留 CSS 清理）、macOS 菜单栏中文化（Tauri v2 MenuBuilder）、DESIGN.md 重构为 21 节成熟结构（对齐 Folia / Funes）。
-- 2026-06-06：ISS-013 法院上传压缩预设 4 档 + 真实 JPEG 图像重编码（DEC-069 / `feat/iss-013-court-compression-presets`）：4 档 court preset（5MB/10MB/20MB/50MB）+ Canvas API JPEG DCTDecode 重编码 + 目标体积验证 + 保守路径（CMYK/FlateDecode/其他 Filter 保留原图）。
-- 2026-06-05：ISS-029 落地（fix/iss-029-faropdf-real-qr，资源替换 + AuthorCard 注释 + QRCODE_LICENSE.md 改写 + docs 同步）。
-- 2026-06-05：封箱 0.1.0-alpha.18（release/0.1.0-alpha.18，DEC-063）：合并 4 条 Unreleased 条目为 `## 0.1.0-alpha.18 - 2026-06-05` 段 + `package.json` / `src-tauri/tauri.conf.json` 版本号 bump 到 `0.1.0-alpha.18` + ROADMAP v0.1 状态从「待开始」改为「进行中（alpha.0~18 已封箱）」+ release.yml tag pattern 从 `v*.*.*` 扩到 `["v*.*.*", "v*.*.*-*"]` 让 prerelease 也能触发 CI；详见 DEC-063。是否实际打 `v0.1.0-alpha.18` tag 触发 release.yml 由 PM 在 PR 合并后决定（占位 pubkey 不打 tag；PM 重新生成 keypair 替换 + 配 GitHub Secrets 后再打 tag）。
+- 2026-06-09：完成 ISS-055。针对用户继续反馈的多层级菜单与整体简洁问题，收口顶栏任务模式入口：`OCR / 批注 / 填写和签名 / 导出` 统一进入 `工具` 工作流启动器，顶栏只保留阅读和全局入口；切入后继续显示对应上下文工具条或工作台。
+- 2026-06-09：完成 ISS-054。深色模式作为 `设置 > 常规` 的外观偏好接入，默认浅色、旧设置缺字段回退浅色；切换深色后根节点写入 `data-theme="dark"` 并套用深色 token，不新增顶栏、二级工具条或工具启动器入口，PDF 纸面内容保持不反相。
+- 2026-06-09：完成 ISS-053。页眉页脚继续保持工具启动器 / 原生菜单深层入口，不进入导出二级工具条；右侧交付设置面板新增页眉 / 页脚各自的左 / 中 / 右视觉位置选择器，导出时映射到上方 / 下方 watermark placement，并继续与奇偶页范围共存。
+- 2026-06-09：完成 ISS-052。左侧文档摘要缩略图的批注 / 搜索命中 / OCR 状态改为紧凑视觉标记，保留 `aria-label` 和 `title` 辅助说明；状态提示继续停留在左侧摘要，不进入顶栏、二级工具条或工具启动器。
+- 2026-06-09：完成 ISS-051。`页眉页脚` 继续保持工具启动器 / 原生菜单深层入口，不进入导出二级工具条；右侧交付设置面板新增 `全部页面 / 奇数页 / 偶数页` 应用范围，奇偶页通过 `PdfWatermarkOperation.pageIndexes` 传给导出引擎，无匹配页面时阻止导出并提示。
 
-
-
-
-
-
-
-
+较早进度日志已迁移到 `docs/DECISIONS.md` 的 DEC-083。

@@ -596,7 +596,6 @@ function StampGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyp
       <svg
         preserveAspectRatio="xMidYMid meet"
         viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
-        // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: inner }}
         width="100%"
         height="100%"

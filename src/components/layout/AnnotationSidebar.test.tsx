@@ -34,6 +34,40 @@ describe("AnnotationSidebar 基础态", () => {
     render(<AnnotationSidebar annotations={annotations} hasDocument={true} />);
     expect(screen.getByText("批注（2 / 2）")).toBeInTheDocument();
   });
+
+  test("有批注时显示扁平化导出动作", () => {
+    const annotations = [makeAnnotation({ id: "a", pageIndex: 0, type: "highlight", content: "重要段落" })];
+    render(<AnnotationSidebar annotations={annotations} hasDocument={true} onFlattenAnnotations={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "扁平化导出" })).toBeInTheDocument();
+  });
+
+  test("无批注时不显示可点击的扁平化导出假入口", () => {
+    render(<AnnotationSidebar annotations={[]} hasDocument={true} onFlattenAnnotations={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "扁平化导出" })).not.toBeInTheDocument();
+  });
+
+  test("点击扁平化导出后显示成功状态", async () => {
+    const user = userEvent.setup();
+    const annotations = [makeAnnotation({ id: "a", pageIndex: 0, type: "highlight", content: "重要段落" })];
+    const onFlattenAnnotations = vi.fn(async () => ({
+      annotationCount: 1,
+      drawnCount: 1,
+      fileName: "case-annotations-flattened.pdf",
+      skippedCount: 0,
+    }));
+
+    render(
+      <AnnotationSidebar
+        annotations={annotations}
+        hasDocument={true}
+        onFlattenAnnotations={onFlattenAnnotations}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "扁平化导出" }));
+    expect(onFlattenAnnotations).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(/已导出 case-annotations-flattened\.pdf/)).toBeInTheDocument();
+  });
 });
 
 describe("AnnotationSidebar 4 维度分组", () => {

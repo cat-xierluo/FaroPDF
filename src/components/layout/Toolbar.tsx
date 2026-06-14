@@ -1,46 +1,34 @@
 import {
   ChevronLeft,
   ChevronRight,
-  Download,
   FileUp,
-  FormInput,
-  Highlighter,
   LayoutGrid,
   Minus,
   PanelLeft,
   PanelTop,
   Plus,
-  ScanText,
   Search,
   Settings,
+  Wrench,
 } from "lucide-react";
-import { useRef, type ChangeEvent, type ComponentType, type CSSProperties } from "react";
+import { useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
 import { formatZoom, viewModeLabels } from "../../modules/reader/readerLabels";
 import type { PdfViewMode } from "../../shared/pdf/types";
+import { getToolLauncherSections, type AppCommandId } from "../../shared/app/commands";
 import { getModeTools, type ToolbarState } from "./toolbarRegistry";
 import type { AppModeId, UtilityPanelId } from "./types";
 
 interface ToolbarProps {
   activeMode: AppModeId;
+  onCommand: (commandId: AppCommandId) => void;
   onModeChange: (mode: AppModeId) => void;
   onUtilityPanelChange: (panel: UtilityPanelId) => void;
   reader: ReaderController;
   search: TextSearchController;
   utilityPanel: UtilityPanelId;
 }
-
-const modeButtons: Array<{
-  id: Exclude<AppModeId, "read" | "pages">;
-  label: string;
-  icon: ComponentType<{ size?: number; strokeWidth?: number }>;
-}> = [
-  { id: "annotate", label: "批注", icon: Highlighter },
-  { id: "export", label: "导出", icon: Download },
-  { id: "forms", label: "填写和签名", icon: FormInput },
-  { id: "ocr", label: "OCR", icon: ScanText },
-];
 
 const fileInputStyle: CSSProperties = {
   position: "absolute",
@@ -49,13 +37,15 @@ const fileInputStyle: CSSProperties = {
   opacity: 0,
 };
 
-export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader, search, utilityPanel }: ToolbarProps) {
+export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelChange, reader, search, utilityPanel }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
   const document = reader.state.document;
   const currentPage = document?.currentPage ?? 1;
   const pageCount = document?.pageCount ?? 0;
   const zoom = document?.zoom ?? reader.state.defaults.zoom;
   const viewMode = document?.viewMode ?? reader.state.defaults.viewMode;
+  const pageControlLabel = document ? `${currentPage} / ${pageCount}` : "- / -";
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -79,6 +69,7 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
     <header className="toolbar">
       <div className="toolbar__group toolbar__group--layout" aria-label="页面布局">
         <button
+          aria-label="文档摘要"
           aria-pressed={utilityPanel === "summary" && activeMode !== "pages"}
           className="tool-button tool-button--icon tool-button--compact"
           onClick={() => openUtilityPanel("summary")}
@@ -88,6 +79,7 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
           <PanelLeft size={16} />
         </button>
         <button
+          aria-label="页面管理"
           aria-pressed={activeMode === "pages"}
           className="tool-button tool-button--icon tool-button--compact"
           onClick={() => onModeChange(activeMode === "pages" ? "read" : "pages")}
@@ -97,6 +89,7 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
           <LayoutGrid size={16} />
         </button>
         <button
+          aria-label="视图设置"
           aria-pressed={utilityPanel === "view" && activeMode !== "pages"}
           className="tool-button tool-button--icon tool-button--compact"
           onClick={() => openUtilityPanel("view")}
@@ -119,10 +112,6 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
           <FileUp size={16} />
           <span>打开</span>
         </button>
-        <button className="tool-button" type="button">
-          <Download size={16} />
-          <span>另存</span>
-        </button>
       </div>
       <div className="toolbar__pager" aria-label="阅读控制">
         <button
@@ -134,7 +123,7 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
         >
           <ChevronLeft size={16} />
         </button>
-        <span className="page-control">{currentPage} / {pageCount}</span>
+        <span className="page-control">{pageControlLabel}</span>
         <button
           aria-label="下一页"
           className="compact-button"
@@ -176,21 +165,6 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
             </option>
           ))}
         </select>
-      </div>
-      <div className="toolbar__group toolbar__group--modes" aria-label="任务模式">
-        {modeButtons.map(({ id, label, icon: Icon }) => (
-          <button
-            aria-pressed={activeMode === id}
-            className="tool-button tool-button--icon"
-            key={id}
-            onClick={() => onModeChange(activeMode === id ? "read" : id)}
-            title={label}
-            type="button"
-          >
-            <Icon size={16} />
-            <span>{label}</span>
-          </button>
-        ))}
         <ModeActiveTools
           activeMode={activeMode}
           reader={reader}
@@ -212,6 +186,28 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
           </label>
           <SearchResultsPopover search={search} />
         </div>
+        <div className="tool-launcher-wrap">
+          <button
+            aria-expanded={toolsMenuOpen}
+            aria-haspopup="menu"
+            className="tool-button tool-button--icon"
+            onClick={() => setToolsMenuOpen((open) => !open)}
+            title="工具"
+            type="button"
+          >
+            <Wrench size={16} />
+            <span>工具</span>
+          </button>
+          {toolsMenuOpen ? (
+            <ToolLauncherMenu
+              hasDocument={document !== null}
+              onCommand={(commandId) => {
+                onCommand(commandId);
+                setToolsMenuOpen(false);
+              }}
+            />
+          ) : null}
+        </div>
         <button
           aria-pressed={utilityPanel === "settings"}
           className="tool-button tool-button--icon"
@@ -227,6 +223,49 @@ export function Toolbar({ activeMode, onModeChange, onUtilityPanelChange, reader
   );
 }
 
+function ToolLauncherMenu({
+  hasDocument,
+  onCommand,
+}: {
+  hasDocument: boolean;
+  onCommand: (commandId: AppCommandId) => void;
+}) {
+  return (
+    <div className="tool-launcher-menu" role="menu" aria-label="PDF 工具菜单">
+      <div className="tool-launcher-menu__header">
+        <strong>PDF 工具</strong>
+      </div>
+      <div className="tool-launcher-menu__grid">
+        {getToolLauncherSections().map((section) => (
+          <section className="tool-launcher-section" role="group" aria-label={section.label} key={section.id}>
+            <header title={section.summary}>
+              <strong>{section.label}</strong>
+            </header>
+            <div className="tool-launcher-section__commands">
+              {section.commands.map((command) => {
+                const disabled = command.requiresDocument && !hasDocument;
+                return (
+                  <button
+                    className="tool-launcher-command"
+                    disabled={disabled}
+                    key={command.id}
+                    onClick={() => onCommand(command.id)}
+                    role="menuitem"
+                    title={command.description}
+                    type="button"
+                  >
+                    <span>{command.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ModeActiveTools({
   activeMode,
   reader,
@@ -237,7 +276,9 @@ function ModeActiveTools({
   search: TextSearchController;
 }) {
   const state: ToolbarState = { activeMode, reader, search };
+  const hasDocument = reader.state.document !== null;
   const items = getModeTools(activeMode)
+    .filter(() => activeMode !== "read" || hasDocument)
     .slice()
     .sort((a, b) => a.order - b.order);
 
@@ -246,7 +287,7 @@ function ModeActiveTools({
       {items.map((item) => (
         <button
           aria-pressed={item.isActive(state)}
-          className="tool-button tool-button--icon"
+          className="tool-button tool-button--icon tool-button--reader"
           disabled={item.isDisabled?.(state) ?? false}
           key={item.id}
           onClick={() => item.onClick(state)}
