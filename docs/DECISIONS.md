@@ -3645,6 +3645,46 @@ v0.1.1 流程：
 3. macOS 菜单使用 Tauri v2 Rust Menu API 而非 tauri.conf.json 配置，获得更好的类型安全和运行时灵活性。
 4. DESIGN.md 从 8 节扁平文档重构为 21 节成熟结构，新增组件样式、信息密度、交互规则、深度层级、响应式、空态规范、工具栏克制原则、设置页规范、菜单栏规范、禁止事项、设计评审等章节。
 
+## DEC-097 ISS-NEW-A 阶段 1 PDF 插入 / 合并 / 提取能力（2026-06-14）
+
+- 日期：2026-06-14
+- 状态：已完成（PR #62 阶段 1）
+- 关联任务：ISS-NEW-A 阶段 1 / ROADMAP §5 行 66-67
+
+### 背景
+
+ROADMAP §5 行 66-67 整组标 [ ]，缺位 PDF Expert / Folia / Adobe 全员标配能力（插入 PDF / 合并 / 提取页码范围）。ISS-NEW-A 用户视角"一直在做错误的功能"对应的高频缺位。阶段 1 目标：把 3 个能力从契约到引擎到测试全部接好，UI 入口阶段 2 推。
+
+### 决策
+
+1. **`src/shared/pdf/export.ts` 扩契约**：
+   - `PdfExportOperation` 联合类型加 3 个值：`insert-pages` / `merge-pdfs` / `extract-pages`。
+   - `PdfExportRequest` 加 `additionalSources?: PdfExportSource[]`（仅 `merge-pdfs` 使用，按顺序追加）。
+   - `PdfExportSource` 加 `fileName?: string` 字段（多源合并时记录原文件元数据）。
+   - `PdfExportSummary` 加 4 字段：`rewritePlan?: PdfRewritePlan` / `insertedPageCount?` / `mergedAdditionalSourceCount?` / `extractedPageCount?`。
+   - 新加 `PdfRewritePlan` 接口（与 `PdfOutputToolPlanEntry` 类似但 type 字段是 3 个新值）。
+2. **`src/modules/export/pdfOperationEngine.ts` 加 3 个 handler**：
+   - `applyInsertPages(workingPdf, op)`: load insertSource + `copyPages` + 在 `insertAtIndex` 循环 `insertPage`（pdf-lib 单页 insertPage，多页需循环）。
+   - `applyMergePdfs(workingPdf, op, additionalSources)`: load 主源 + 每个 additionalSources `copyPages` + `addPage` 追加。
+   - `applyExtractPages(workingPdf, op)`: `PDFDocument.create()` 新建 doc + `newDoc.copyPages(workingPdf, indexes0)` + `addPage`（新 doc 拷外源 + 拷回的页归新 doc，避免 foreign PDF 错误）。
+   - 加 `parsePageRangeExpression(range, max)` helper：1-based 字符串（"2-5, 8, 11-13"）解析为 0-based 升序去重数组，越界 / 格式错抛明确错误。
+3. **互斥语义**：3 个新 operation 一次只允许 1 个（多 throw "互斥" 错误）。简化 dispatch 逻辑，避免多 operation 链式改写 workingPdf 时的状态管理复杂度。
+4. **不进入 `outputToolEntries`**：3 个新 operation type 不在 `PdfOutputToolOperationType` 联合内（仅 6 个原 output tool），写入新加的 `summary.rewritePlan` 字段。
+5. **测试**：`src/modules/export/pdfOperationEngine.test.ts` 加 7 项单元测试覆盖正路径 + 错误路径。**34/34 测试通过**。
+
+### 验证
+
+- `pnpm vitest run src/modules/export/pdfOperationEngine.test.ts`：**34 passed / 0 failed**。
+- `pnpm typecheck`：0 错误。
+- `git diff src/shared/pdf/export.ts src/modules/export/pdfOperationEngine.ts src/modules/export/pdfOperationEngine.test.ts`：契约 + 引擎 + 测试 ~480 行新增。
+
+### 已知限制
+
+- UI 入口（工具启动器对话框 / 工作台按钮）留 PR #63 阶段 2 推进，本阶段不涉及。
+- 大 PDF（1000+ 页）一次性 load 可能 OOM（pdf-lib 不流式），本期不优化。
+- `merge-pdfs` 一次只允许 1 个 operation，不支持"先合并再 extract-pages"链式。后续若需可加 multi-pass。
+- `additionalSources` 的 `path` / `fingerprint` 字段本期不强制做路径安全校验（同主源校验），UI 阶段 2 接入时统一处理。
+
 ### 关联
 
 - `docs/TASKS.md` § 进度日志（2026-06-07 条目）
