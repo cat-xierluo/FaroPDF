@@ -16,7 +16,6 @@
   "engines": {
     "pnpm": ">=10"
   },
-  "packageManager": "pnpm@10.24.0",
   "scripts": {
     "dev": "vite --config config/vite.config.ts",
     "build": "tsc --noEmit --project config/tsconfig.json && vite build --config config/vite.config.ts",
