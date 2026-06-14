@@ -44,6 +44,35 @@ UI 改进：
 - `package-lock.json` → `pnpm-lock.yaml`
 - `.npmrc` 加 `lockfile=true` 覆盖用户级 npmrc 的 `package-lock=false`
 
+## Unreleased (continued) — ISS-NEW-A PDF 插入 / 合并 / 提取（DEC-097 / PR #62）
+
+> 2026-06-14 第 1 阶段排查报告 §3.2 指出 ROADMAP §5 行 66-67 "插入 PDF / 合并 / 提取页码范围" 整组标 [ ] 与 PDF Expert / Folia / Adobe 全员标配能力不符。阶段 1 推进后端能力 + 契约 + 单元测试；UI 入口留 PR #63 阶段 2。
+
+引擎：
+
+- `src/shared/pdf/export.ts` 扩 `PdfExportOperation` 联合类型 3 个新值：`insert-pages` / `merge-pdfs` / `extract-pages`。
+- `src/shared/pdf/export.ts` `PdfExportRequest` 加 `additionalSources?: PdfExportSource[]`（仅 `merge-pdfs` 使用，按顺序追加）。
+- `src/shared/pdf/export.ts` `PdfExportSource` 加 `fileName?: string` 字段（多源合并时记录原文件名）。
+- `src/shared/pdf/export.ts` `PdfExportSummary` 加 4 字段：`rewritePlan?` / `insertedPageCount?` / `mergedAdditionalSourceCount?` / `extractedPageCount?`。
+- `src/shared/pdf/export.ts` 新加 `PdfRewritePlan` 接口（与 `PdfOutputToolPlanEntry` 类似，type 字段是 3 个新值）。
+- `src/modules/export/pdfOperationEngine.ts` 加 3 个 handler：`applyInsertPages` / `applyMergePdfs` / `applyExtractPages`；走 pdf-lib `copyPages` + `insertPage` / `addPage` 真实改写 PDF 字节流。3 个新 operation 互斥检测，一次只允许 1 个，多 throw "互斥" 错误；不进入 `outputToolEntries`（其 type 是 6 个原 output tool 联合），写入新加的 `summary.rewritePlan` 字段。
+- `parsePageRangeExpression("2-5, 8, 11-13", max)` 1-based 字符串解析为 0-based 升序去重数组，越界 / 格式错抛明确错误。
+
+测试：
+
+- `src/modules/export/pdfOperationEngine.test.ts` 加 7 项单元测试（insert-pages 全部页 / insert-pages pageRange 子集 + 越界 / merge-pdfs 多份追加 / merge-pdfs 缺 additionalSources 报错 / extract-pages 子集 / extract-pages 缺 pageRange 报错 / 3 个 operation 互斥）。**34/34 测试通过**。
+
+文档：
+
+- `docs/ROADMAP.md` §5 行 66-67 状态从 [ ] 改为 "**部分**"，加 PR #62 指针。
+- `docs/DECISIONS.md` DEC-097 记录 ISS-NEW-A 阶段 1 决策 + 验证 + 已知限制。
+- `docs/plans/2026-06-14-iss-new-a-pdf-merge-split-design.md` 详细设计。
+
+UI 入口（PR #63 阶段 2 留待）：
+
+- 工具启动器 `organize` 分组加 3 个命令（`insert-pdf` / `merge-pdfs` / `extract-page-range`），工作台对话框承接源文件选择 + 插入位置 / 提取范围输入 + 默认 `*-inserted.pdf` / `*-merged.pdf` / `*-extracted.pdf` 输出路径。
+- `src/components/layout/PageOrganizerWorkspace.tsx` 加 3 个对话框 form。
+
 新功能（来自 main，自动随 tag 出来）：
 
 - DEC-068 批注摘要分组面板 + 案件材料核查清单导出
