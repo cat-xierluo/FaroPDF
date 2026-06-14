@@ -122,12 +122,12 @@ describe("app command catalog", () => {
 
     expect(commandIdsBySection.get("organize")).toEqual(expect.arrayContaining<AppCommandId>([
       "view-pages",
-      "export-page-number",
-      "export-bates",
     ]));
     expect(commandIdsBySection.get("deliver")).toEqual(expect.arrayContaining<AppCommandId>([
       "mode-export",
       "file-save-as",
+      "export-page-number",
+      "export-bates",
       "export-compress",
     ]));
     expect(commandIdsBySection.get("markup")).toEqual(expect.arrayContaining<AppCommandId>([
