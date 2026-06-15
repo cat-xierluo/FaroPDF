@@ -959,6 +959,109 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [ ] 输出 `*-metadata.pdf` 新副本验证 metadata 已更新
   - [ ] Producer 字段默认写"FaroPDF"，不写底层库名（避免实现细节泄露）
 
+### ISS-073 v0.2 阶段 2 "PDF Expert 页面布局"完整对齐路线图（差距追踪）
+
+- 优先级：P0（v0.2 顶层目标，wrap ISS-059/060 阶段 2 + ISS-065 持续）
+- 类型：UI 信息架构 / 整体 polish / 路线图
+- 状态：路线图（不直接交付，作为差距追踪 + 阶段 2 ISS 入口）
+- 来源：2026-06-15 PDF Expert audit 揭露剩余差距 + DEC-103 PDF-Guru 调研 + DEC-105 ISS-071 阶段 1 落地后的下一波
+
+### 当前 "页面布局" 完成度（vs PDF Expert）
+
+| PDF Expert 分节 | 完成度 | 缺什么 |
+|---|---|---|
+| §18.1 总体结构 6 区 | 85% | 右栏 skeleton（真实内容缺） |
+| §18.2 工具栏 5 区 | 100% | — |
+| §18.3 右侧模式驱动栏 | 40% | 真图章网格 / 真签名列表 / 真导出预览 / 真 OCR 队列 |
+| §18.4 浮动文本工具条 | 70% | 选区→直接 draft（不再 armed mode）/ 翻译 / 朗读 |
+| §18.5 图章 | 60% | 自定义上传 tab + 缩略图 |
+| §18.6 签名面板 | 0% | 手写板（v0.1 仅 PNG/JPG 静态） |
+| §18.7 对话框：合并 100% / 密码 50% / 拆分 0% / 属性 0% | 35% | 拆分 + 属性 + set 密码真实加密 |
+| §18.8 搜索 | 100% | — |
+| §18.9 多 Tab + 拖离剥离 | 0% | 整个 multi-tab + window 体系（v0.1 一窗一 PDF） |
+| §18.10 视觉细节 | 95% | — |
+
+整体加权：**~70%** 视觉信息架构对齐；**~75%** "页面布局"；**~50%** PDF 处理能力（vs PDF-Guru 全集）。
+
+### 差距分桶（优先级 + 工作量 + 关联 ISS）
+
+#### 桶 1：P0 / "页面布局"最显眼缺口
+
+| 项 | 工作量 | ISS |
+|---|---|---|
+| 多 Tab + inline rename + 拖离剥离窗口 | **high**（需 Pinia 类状态管理 + Tauri 多窗口 IPC） | **ISS-059** |
+| 右栏真实内容 stage 2（图章网格 / 签名列表 / OCR 队列 / 导出预览 4 个） | medium-high | **ISS-060 阶段 2** |
+
+#### 桶 2：P0 / 律师场景刚需（PDF 处理）
+
+| 项 | 工作量 | ISS |
+|---|---|---|
+| 矩形遮罩涂黑 + 去页眉页脚 | low-medium（pdf-lib drawRectangle） | **ISS-067** |
+| 去水印（按索引 / 按文本） | medium（lopdf 内容流编辑） | **ISS-068** |
+| OCR 自动出目录（PaddleOCR + 字号聚类） | high（独立算法重写） | **ISS-069** |
+| `set_pdfpassword` 真实加密（v0.2 阶段 2） | medium（lopdf 升级 0.34 或 qpdf） | **ISS-064 阶段 2** |
+
+#### 桶 3：P1 / 表单 + 扫描 + 视觉补全
+
+| 项 | 工作量 | ISS |
+|---|---|---|
+| 浮动工具条选区直接转 draft + 翻译 / 朗读 | medium | **ISS-061 阶段 2** |
+| 自定义图章上传 tab + 缩略图 | low-medium | **ISS-062 阶段 2** |
+| 手写签名板 | low（react-signature-canvas） | **ISS-070** |
+| 扫描拆双页 / 网格切 / 自定义断点切 | medium | **ISS-066** |
+| 左右栏宽度持久化 | low | **ISS-065 polish** |
+
+#### 桶 4：P1 / 工程基础设施 stage 2
+
+| 项 | 工作量 | ISS |
+|---|---|---|
+| OCR pageRange / SecurityPanel error / 导出 units / lib.rs Result<T,String> → AppError 全面迁移 | medium | **ISS-071 阶段 2** |
+
+#### 桶 5：P2 / 元数据 + 文档属性
+
+| 项 | 工作量 | ISS |
+|---|---|---|
+| 文档属性对话框（只读） | low | **ISS-063** |
+| 文档属性写回（编辑 + `*-metadata.pdf`） | low | **ISS-072** |
+
+### 推进策略（按依赖 + 风险排序）
+
+**Wave A**（互不冲突 + 文件范围窄 + 适合 multi-agent）：
+- ISS-067 阶段 1（redaction 模块新建：`src/modules/redaction/` + RedactionEngine + 测试，不接 AppShell）
+- ISS-070 阶段 1（SignaturePad 组件：`src/modules/forms/ui/SignaturePad.tsx` + 测试，PM 先 commit react-signature-canvas dep）
+- ISS-062 阶段 2（自定义图章上传 tab：`src/modules/annotation/ui/CustomStampTab.tsx` + 测试）
+- ISS-066 阶段 1（拆双页算法：`src/modules/pages/scanSplit.ts` + 测试，不接 UI）
+- ISS-072 阶段 1（properties.ts 读取层 + 测试，不接 UI）
+
+5 个候选都是**纯新建模块 + 测试**，不动 shared / commands / AppShell / package.json（ISS-070 例外），适合并行。
+
+**Wave B**（需 PM 收口 + 集成）：
+- 各 Wave A 模块接 AppShell / commands.ts 入口
+- ISS-071 阶段 2 全面迁移
+- ISS-060 阶段 2 右栏真实内容（依赖图章 / OCR / 导出模块）
+
+**Wave C**（高风险 / 大依赖）：
+- ISS-059 多 Tab（架构级，Pinia/Zustand 状态管理 + Tauri 多窗口 IPC）
+- ISS-064 阶段 2 set_pdfpassword（需 lopdf 升级或 qpdf 引入）
+- ISS-068 去水印（需 lopdf 内容流编辑）
+- ISS-069 OCR 自动出目录（高 high 工作量 + 算法独立实现）
+
+### 阶段成功标准
+
+- Wave A 全部 ship → 整体 "页面布局" 70% → **80%**
+- Wave B ship → 90%
+- Wave C ship → 95% → v0.2 收尾
+
+### 关联
+
+- DEC-101（v0.2 第一波 ISS-060/061/064 阶段 1 集成）
+- DEC-102（v0.2 第一波 code review 修复）
+- DEC-103（PDF-Guru 调研引出 ISS-066~072）
+- DEC-104（Wave 1 multi-agent 失败教训 + 单 session 替代路径）
+- DEC-105（ISS-071 阶段 1 工程基础设施落地）
+- skill 侧 v1.16.2（multi-agent 启动注意事项警示）
+
+
 
 ## 归档任务索引
 
@@ -987,6 +1090,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
+- 2026-06-15：登记 ISS-073 v0.2 阶段 2 "PDF Expert 页面布局"完整对齐路线图。整理 PDF Expert audit 揭露的剩余差距按 5 桶分类：桶 1（P0 页面布局：多 Tab + 右栏真实内容）；桶 2（P0 律师场景：遮罩 / 去水印 / OCR 出目录 / 真实加密）；桶 3（P1 表单+扫描+视觉）；桶 4（P1 ISS-071 阶段 2 迁移）；桶 5（P2 元数据）。推进策略 Wave A/B/C 按依赖 + 风险排序。Wave A 5 个 ISS 阶段 1（ISS-067/070/062/066/072）是窄 scope + 互不冲突 + 适合 multi-agent。
 - 2026-06-15：完成 ISS-071 阶段 1（4 个工程基础设施抽象，DEC-105）。**m1 pageRange DSL** `parsePageRange(input, totalPages) → number[]` 支持 all/even/odd/N/范围/反向/混合 + 12 测试；**m2 units** `convertLength(value, from, to)` pt/cm/mm/in 互转 TS + Rust 双侧 + 12 TS + 12 Rust 测试；**m3 naming** `suggestOutputName(name, suffix)` 18 个 OutputSuffix 枚举 TS + Rust 双侧 + 12 TS + 8 Rust 测试；**m4 error schema** `AppError { code, message, context }` + 9 个 ErrCode + serde::Serialize TS + Rust 双侧 + 8 TS + 8 Rust 测试。lib.rs 加 `mod util; mod error;`。AppShell.tsx 迁移示范：两个本地命名 helper 改用 `suggestOutputName`。全量 948 通过（+51 新测试）+ cargo 26 测试 + typecheck/lint 全绿。
 - 2026-06-15：Wave 1 multi-agent spawn ISS-071 worker 实战失败（详见 DEC-104）。3 个 bug 阻塞：①`.git/main` 孤儿文件导致 `main` ref ambiguous；②`spawn-worker.sh` `<` shell redirect 不被 tmux 展开（需 `bash -lc` 包）；③claude `-p` batch 模式 + 7KB prompt + FaroPDF 大上下文 → autocompact thrash 3 次自动终止。**决策**：取消 Wave 1，ISS-066~072 改 PM 单 session 顺序推进。未来 multi-agent 启用条件提高（小 prompt + 交互式 claude + 窄 scope）。
 - 2026-06-15：归档 PDF-Guru 参考项目调研（DEC-103）。新立 ISS-066~072 律师场景刚需 + 工程基础设施任务卡。**P0 候选**：ISS-067（证据遮蔽 + 去页眉页脚）、ISS-068（去水印）、ISS-069（OCR 自动出目录）。**P1**：ISS-066（扫描清洁校正）、ISS-070（签名手写板）、ISS-071（页码 DSL / 单元转换 / 文件命名 / 错误 schema 抽象）。明确不引入 PyMuPDF（AGPL-3.0 传染风险），所有实现 Rust / TypeScript 独立重写。
