@@ -1,0 +1,149 @@
+/* ISS-064 文档安全面板（v0.1 skeleton）。
+ * 样式与 FormsPanel 保持一致：48px header + 12px 间距 + 6px 圆角。
+ */
+
+.security_panel {
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.security_panel[data-layout="bottom-sheet"] {
+  border-left: none;
+  border-top: 1px solid var(--border);
+}
+
+.security_panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.security_panel__header h2 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: 0.5px;
+}
+
+.security_panel__header p {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.security_panel__error,
+.security_panel__success {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 6px 10px;
+  line-height: 1.4;
+}
+
+.security_panel__error {
+  color: var(--danger);
+  background: var(--warning-bg);
+  border-bottom: 1px solid var(--warning-border);
+}
+
+.security_panel__success {
+  color: var(--fg);
+  background: var(--accent-soft, #d9eef0);
+  border-bottom: 1px solid var(--accent, #276f76);
+}
+
+.security_panel__empty {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 16px;
+  line-height: 1.6;
+}
+
+.security_panel__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.security_panel__mode {
+  display: flex;
+  gap: 4px;
+  background: var(--surface-soft, #f6f8f9);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.security_panel__mode-button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.security_panel__mode-button--active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.security_panel__form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.security_panel__input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.security_panel__input-row input {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--paper, #fff);
+  color: var(--fg);
+}
+
+.security_panel__input-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.security_panel__hint {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.security_panel__hint code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10.5px;
+  background: var(--surface-soft, #f6f8f9);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.security_panel__reset {
+  align-self: flex-end;
+}

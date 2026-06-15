@@ -14,7 +14,14 @@ export type AppCommandGroup =
 
 export type AppCommandTargetMode = "read" | "annotate" | "export" | "forms" | "ocr" | "pages";
 
-export type AppCommandTargetUtilityPanel = "summary" | "view" | "settings" | "annotation" | "forms" | "none";
+export type AppCommandTargetUtilityPanel =
+  | "summary"
+  | "view"
+  | "settings"
+  | "annotation"
+  | "forms"
+  | "security"
+  | "none";
 
 export type AppCommandId =
   | "file-open"
@@ -33,6 +40,8 @@ export type AppCommandId =
   | "export-bates"
   | "export-header-footer"
   | "export-compress"
+  | "export-set-password"
+  | "export-remove-password"
   | "export-annotation-summary"
   | "annotations-flatten"
   | "forms-flatten"
@@ -234,6 +243,30 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     targetMode: "export",
   },
   {
+    id: "export-set-password",
+    label: "设置密码",
+    description: "为当前 PDF 副本设置用户/拥有者密码，另存 -secured.pdf。",
+    layer: "tertiary",
+    group: "export",
+    entryPoints: ["more-menu", "native-menu"],
+    requiresDocument: true,
+    targetMode: "export",
+    targetUtilityPanel: "security",
+    feedback: "已打开文档安全面板，请输入拥有者密码并确认。",
+  },
+  {
+    id: "export-remove-password",
+    label: "移除密码",
+    description: "用原密码解密当前 PDF，另存 -unsecured.pdf。",
+    layer: "tertiary",
+    group: "export",
+    entryPoints: ["more-menu", "native-menu"],
+    requiresDocument: true,
+    targetMode: "export",
+    targetUtilityPanel: "security",
+    feedback: "已打开文档安全面板，请输入原密码并确认。",
+  },
+  {
     id: "export-annotation-summary",
     label: "批注摘要",
     description: "导出批注核查清单。",
@@ -291,7 +324,7 @@ export const APP_TOOL_LAUNCHER_SECTIONS: AppToolLauncherSectionDefinition[] = [
   {
     id: "deliver",
     label: "交付导出",
-    summary: "另存副本、水印、页眉页脚、页码、证据编号和压缩。",
+    summary: "另存副本、水印、页眉页脚、页码、证据编号、压缩和密码保护。",
     commandIds: [
       "mode-export",
       "file-save-as",
@@ -301,6 +334,8 @@ export const APP_TOOL_LAUNCHER_SECTIONS: AppToolLauncherSectionDefinition[] = [
       "export-page-number",
       "export-bates",
       "export-compress",
+      "export-set-password",
+      "export-remove-password",
     ],
   },
   {

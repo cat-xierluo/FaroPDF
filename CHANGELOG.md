@@ -1,14 +1,24 @@
 ## Unreleased
 
-> v0.2 起步：PDF Expert 视觉与功能对照（ISS-059..065 立项）+ ISS-062 阶段 1 图章扩展。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100。
+> v0.2 起步：PDF Expert 视觉与功能对照（ISS-059..065 立项）+ ISS-060/061/062/064 阶段 1 集成。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100 / DEC-101。
+
+UI 信息架构：
+
+- ISS-060 阶段 1：引入右栏 `RightPanel`（v0.1 skeleton），按 `activeMode` 推导：annotate→图章 / ocr→OCR 队列 / export→导出预览；阅读和页面管理模式自动折叠。
+- ISS-061 阶段 1：浮动文本工具条 `TextSelectionToolbar` 接入选区 `usePdfTextSelection` hook，PDF 文本选中后浮出 5 启用动作（高亮 / 下划线 / 删除线 / 便签 / 复制）+ 2 disabled 占位（翻译 / 朗读，v0.2 候选）。Esc 关闭，选区消失自动隐藏。
 
 批注：
 
 - ISS-062 阶段 1：标准图章模板从 5 个扩到 9 个（新增 `FOR REVIEW` / `NOT FOR DISTRIBUTION` / `INTERNAL ONLY` / `PROPRIETARY`），新增 `diagonal` 对角斜条带形态用于带状对角印章；`PdfAnnotationStamp.image` 字段为阶段 2 自定义上传预留。
 
+安全 / 导出：
+
+- ISS-064 阶段 1：`工具 > 交付导出` 分组新增 `设置密码 / 移除密码` 命令，进入导出模式后打开右侧 `SecurityPanel` 文档安全面板；Rust 后端 `set_pdfpassword / remove_pdfpassword` 命令已注册到 `invoke_handler!`。`remove_pdfpassword` 已能用原密码解密生成 `<原名>-unsecured.pdf` 新副本（lopdf）；`set_pdfpassword` UI 已就绪，真实加密待 lopdf 升级到 0.34 或引入 qpdf。
+
 工程：
 
 - 同步 `src-tauri/Cargo.lock` 中 faropdf 包版本 `0.1.1 → 0.1.2`，与 `Cargo.toml` 对齐（DEC-100 修正 DEC-099 的 Cargo.lock 撤回条款）。
+- TextSelectionToolbar hook 加 `getBoundingClientRect` jsdom 防御，避免 vitest 环境下 22 个 selectionchange error。
 
 ---
 

@@ -1,6 +1,20 @@
 export type AppModeId = "read" | "annotate" | "export" | "forms" | "ocr" | "pages";
 
-export type UtilityPanelId = "summary" | "view" | "settings" | "annotation" | "forms" | "none";
+export type UtilityPanelId =
+  | "summary"
+  | "view"
+  | "settings"
+  | "annotation"
+  | "forms"
+  /** ISS-064：文档安全面板（设置 / 移除密码），从导出工具启动器入口进入 */
+  | "security"
+  | "none";
+
+/** 右侧模式驱动栏 id（v0.2 候选）。
+ *  - 由 AppShell 通过 activeMode 推导 + 显式 rightPanel 覆盖
+ *  - 「none」= 右栏折叠
+ */
+export type RightPanelId = "stamps" | "signatures" | "export-preview" | "ocr-queue" | "none";
 
 /** 批注 overlay 停靠位置。
  *  当前 stage 4 只实现 "workspace-main"（覆盖 ReaderCanvas 的主区域）；

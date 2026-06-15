@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AnnotationSidecar, PdfAnnotation } from "../../shared";
 import type { ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
@@ -23,6 +23,9 @@ import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
 import { AnnotationSidebar, type AnnotationFlattenResult } from "./AnnotationSidebar";
 import { AnnotationToolbar } from "./AnnotationToolbar";
 import { PageOrganizerWorkspace } from "./PageOrganizerWorkspace";
+import { RightPanel } from "./RightPanel";
+import { SecurityPanel } from "./SecurityPanel";
+import { TextSelectionToolbar, usePdfTextSelection } from "./TextSelectionToolbar";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 import { SettingsPanel } from "../../modules/settings/SettingsPanel";
@@ -32,6 +35,7 @@ import type {
   AnnotationArmedStateBundle,
   AnnotationDraftSubmission,
   AppModeId,
+  RightPanelId,
   UtilityPanelId,
 } from "./types";
 
@@ -119,7 +123,66 @@ export function AppShell({
     nonce: 0,
   });
   const [settingsInitialSection, setSettingsInitialSection] = useState<SectionId>("general");
+  // ISS-060：右栏驱动（activeMode 决定内容）。v0.1 暂不在 Toolbar 加按钮，AppShell 顶层保留。
+  // useState with 1-tuple destructure keeps the type checker aware of "read" without
+  // producing a "declared but never read" diagnostic.
+  const [rightPanel] = useState<RightPanelId>(() => {
+    if (activeMode === "annotate") return "stamps";
+    if (activeMode === "ocr") return "ocr-queue";
+    if (activeMode === "export") return "export-preview";
+    return "none";
+  });
   const [commandFeedback, setCommandFeedback] = useState<string | null>(null);
+  // ISS-061 阶段 2：真接选区——usePdfTextSelection 监听 workspace__main 内的文本选择。
+  // 用户主动点 onClose 或选中某个动作后用 toolbarHidden 强制隐藏；bounds 变 null（选区消失）时
+  // 自动重置 toolbarHidden，让下一次选区可以重新触发。
+  const workspaceMainRef = useRef<HTMLDivElement>(null);
+  const selectionBounds = usePdfTextSelection(workspaceMainRef);
+  const [toolbarHidden, setToolbarHidden] = useState(false);
+  useEffect(() => {
+    if (!selectionBounds) {
+      setToolbarHidden(false);
+    }
+  }, [selectionBounds]);
+  const handleSelectionAction = useCallback(
+    (action: import("./TextSelectionToolbar").AnnotationAction | import("./TextSelectionToolbar").CopyAction) => {
+      if (action === "copy") {
+        const selectedText = window.getSelection?.()?.toString() ?? "";
+        if (selectedText && typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+          void navigator.clipboard.writeText(selectedText).catch(() => undefined);
+          setCommandFeedback("已复制选中文本到剪贴板。");
+        }
+      }
+      setToolbarHidden(true);
+    },
+    [],
+  );
+  const handleSelectionClose = useCallback(() => setToolbarHidden(true), []);
+  // ISS-061：浮动文本工具条 - 监听 toolbar 通过自定义事件上传的工具激活请求
+  useEffect(() => {
+    function handleFloatingTool(event: Event) {
+      const detail = (event as CustomEvent<{ toolType: string }>).detail;
+      if (!annotationArmed) {
+        setCommandFeedback("请先打开 PDF 文档并 arm 批注。");
+        return;
+      }
+      // 把 toolbar action 翻译成批注工具类型，回灌到 armed state。
+      // 当前实现为 v0.1 的「armed 模式」：用户点 toolbar 后需在画布拖拽以应用。
+      // v0.2 计划：直接拿选区 boundingClientRect 创建 draft，跳过 user 二次拖拽。
+      if (detail.toolType === "annotate-highlight") {
+        annotationArmed.onStateChange({ ...annotationArmed.state, activeToolType: "highlight" });
+      } else if (detail.toolType === "annotate-underline") {
+        annotationArmed.onStateChange({ ...annotationArmed.state, activeToolType: "underline" });
+      } else if (detail.toolType === "annotate-strikeout") {
+        annotationArmed.onStateChange({ ...annotationArmed.state, activeToolType: "strikeout" });
+      } else if (detail.toolType === "annotate-note") {
+        annotationArmed.onStateChange({ ...annotationArmed.state, activeToolType: "note" });
+      }
+      // Copy 已经在 TextSelectionToolbar 内处理，这里不再管
+    }
+    window.addEventListener("floating-annotation-tool", handleFloatingTool);
+    return () => window.removeEventListener("floating-annotation-tool", handleFloatingTool);
+  }, [annotationArmed]);
   useEffect(() => {
     if (activeMode !== "annotate") {
       setActiveAnnotationId(null);
@@ -313,16 +376,23 @@ export function AppShell({
           <UtilityPanel
             activeAnnotationId={activeAnnotationId}
             annotations={annotations}
+            currentPdfPath={document?.path ?? null}
             formController={formController}
             onAnnotationClick={setActiveAnnotationId}
             annotationViewSignal={annotationViewSignal}
             onFlattenAnnotations={handleFlattenAnnotations}
+            onSecurityClose={() => onUtilityPanelChange("none")}
+            onSecurityFeedback={(message) => setCommandFeedback(message)}
             panel={utilityPanel}
             reader={reader}
             search={search}
           />
         ) : null}
-        <div className="workspace__main" style={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, position: "relative" }}>
+        <RightPanel
+          activeMode={activeMode}
+          rightPanel={rightPanel}
+        />
+        <div ref={workspaceMainRef} className="workspace__main" style={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, position: "relative" }}>
           {activeMode === "pages" ? (
             <PageOrganizerWorkspace reader={reader} />
           ) : isOcrMode ? (
@@ -378,6 +448,11 @@ export function AppShell({
           ) : null}
         </div>
       </div>
+      <TextSelectionToolbar
+        bounds={toolbarHidden ? null : selectionBounds}
+        onAction={handleSelectionAction}
+        onClose={handleSelectionClose}
+      />
       <StatusBar readerState={reader.state} />
       {commandFeedback ? (
         <div className="command-feedback" role="status" aria-live="polite">
@@ -420,18 +495,24 @@ function OcrWorkspaceUnavailable() {
 function UtilityPanel({
   activeAnnotationId,
   annotations,
+  currentPdfPath,
   formController,
   annotationViewSignal,
   onAnnotationClick,
   onFlattenAnnotations,
+  onSecurityClose,
+  onSecurityFeedback,
   panel,
   reader,
   search,
 }: {
   activeAnnotationId: string | null;
   annotationViewSignal: { view: "list" | "summary"; nonce: number };
+  currentPdfPath: string | null;
   onAnnotationClick: (annotationId: string) => void;
   onFlattenAnnotations: () => Promise<AnnotationFlattenResult>;
+  onSecurityClose: () => void;
+  onSecurityFeedback: (message: string | null) => void;
   panel: Exclude<UtilityPanelId, "none">;
   reader: ReaderController;
   search: TextSearchController;
@@ -486,6 +567,16 @@ function UtilityPanel({
 
   if (panel === "forms") {
     return <FormsPanel controller={formController} layoutMode="utility-panel" />;
+  }
+
+  if (panel === "security") {
+    return (
+      <SecurityPanel
+        currentPdfPath={currentPdfPath}
+        onClose={onSecurityClose}
+        onFeedback={(message) => onSecurityFeedback(message)}
+      />
+    );
   }
 
   return (

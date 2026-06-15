@@ -498,6 +498,134 @@ select.zoom-control {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* ISS-060：右栏（v0.2 骨架）。activeMode 决定是否渲染，宽 320px。 */
+.workspace--with-right-pane,
+.workspace--with-both {
+  grid-template-columns: 290px minmax(420px, 1fr) 320px;
+}
+
+.right-pane {
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.right-pane__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.right-pane__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: 0.5px;
+}
+
+.right-pane__mode-pill {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--accent-soft, #d9eef0);
+  color: var(--accent, #276f76);
+  text-transform: uppercase;
+}
+
+.right-pane__body {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.right-pane__hint,
+.right-pane__placeholder {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.right-pane__placeholder {
+  margin-top: 8px;
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* ISS-061：浮动文本工具条 — PDF Expert 风格选区微缩工具。
+ * fixed 定位，紧贴选区上方 / 下方；选区消失 / 用户主动关闭后隐藏。
+ * 7 个动作（5 启用 + 2 disabled 占位）水平排列，紧凑像素密度。 */
+.text-selection-toolbar {
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 0;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.text-selection-toolbar__spacer {
+  height: 0;
+}
+
+.text-selection-toolbar__actions {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  padding: 4px;
+}
+
+.text-selection-toolbar__action {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 44px;
+  padding: 4px 6px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 10px;
+}
+
+.text-selection-toolbar__action:hover {
+  background: var(--surface-soft, #f6f8f9);
+}
+
+.text-selection-toolbar__action--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.text-selection-toolbar__action--disabled:hover {
+  background: transparent;
+}
+
+.text-selection-toolbar__icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.text-selection-toolbar__label {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.text-selection-toolbar--bottom {
+  /* placeholder for placement-specific tweaks (arrow direction etc.) */
+}
+
 .utility-panel {
   min-height: 0;
   border-right: 1px solid var(--border);

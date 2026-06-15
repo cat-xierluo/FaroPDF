@@ -83,6 +83,24 @@ describe("app command catalog", () => {
     expect(command?.feedback).toBeUndefined();
   });
 
+  test("ISS-064: 设置 / 移除密码命令进入导出模式 + security 面板", () => {
+    const setCommand = getCommandById("export-set-password");
+    expect(setCommand?.group).toBe("export");
+    expect(setCommand?.layer).toBe("tertiary");
+    expect(setCommand?.targetMode).toBe("export");
+    expect(setCommand?.targetUtilityPanel).toBe("security");
+    expect(setCommand?.requiresDocument).toBe(true);
+    expect(setCommand?.entryPoints).toEqual(expect.arrayContaining(["more-menu", "native-menu"]));
+
+    const removeCommand = getCommandById("export-remove-password");
+    expect(removeCommand?.group).toBe("export");
+    expect(removeCommand?.layer).toBe("tertiary");
+    expect(removeCommand?.targetMode).toBe("export");
+    expect(removeCommand?.targetUtilityPanel).toBe("security");
+    expect(removeCommand?.requiresDocument).toBe(true);
+    expect(removeCommand?.entryPoints).toEqual(expect.arrayContaining(["more-menu", "native-menu"]));
+  });
+
   test("native menu entries are backed by the same command definitions", () => {
     const nativeIds = getNativeMenuCommands().map((command) => command.id);
     expect(nativeIds).toEqual(expect.arrayContaining<AppCommandId>([
@@ -97,6 +115,8 @@ describe("app command catalog", () => {
       "export-bates",
       "export-header-footer",
       "export-compress",
+      "export-set-password",
+      "export-remove-password",
       "annotations-flatten",
       "forms-flatten",
       "help-about",
@@ -129,6 +149,8 @@ describe("app command catalog", () => {
       "export-page-number",
       "export-bates",
       "export-compress",
+      "export-set-password",
+      "export-remove-password",
     ]));
     expect(commandIdsBySection.get("markup")).toEqual(expect.arrayContaining<AppCommandId>([
       "mode-annotate",

@@ -441,6 +441,46 @@ describe("AppShell modes 上下文工具条", () => {
     expect(screen.getByText("已打开批注侧栏，请在侧栏内确认扁平化导出。")).toBeInTheDocument();
   });
 
+  test("ISS-064: set-password command enters export mode and opens security panel", async () => {
+    const onModeChange = vi.fn();
+    const onUtilityPanelChange = vi.fn();
+    renderAppShell({
+      activeMode: "export",
+      commandSignal: { id: "export-set-password", nonce: 1 },
+      onModeChange,
+      onUtilityPanelChange,
+      reader: makeReadyReader(),
+      utilityPanel: "security",
+    });
+
+    await waitFor(() => {
+      expect(onUtilityPanelChange).toHaveBeenCalledWith("security");
+    });
+    expect(onModeChange).toHaveBeenCalledWith("export");
+    expect(screen.getByTestId("security-panel")).toBeInTheDocument();
+    expect(screen.getByText("已打开文档安全面板，请输入拥有者密码并确认。")).toBeInTheDocument();
+  });
+
+  test("ISS-064: remove-password command enters export mode and opens security panel", async () => {
+    const onModeChange = vi.fn();
+    const onUtilityPanelChange = vi.fn();
+    renderAppShell({
+      activeMode: "export",
+      commandSignal: { id: "export-remove-password", nonce: 1 },
+      onModeChange,
+      onUtilityPanelChange,
+      reader: makeReadyReader(),
+      utilityPanel: "security",
+    });
+
+    await waitFor(() => {
+      expect(onUtilityPanelChange).toHaveBeenCalledWith("security");
+    });
+    expect(onModeChange).toHaveBeenCalledWith("export");
+    expect(screen.getByTestId("security-panel")).toBeInTheDocument();
+    expect(screen.getByText("已打开文档安全面板，请输入原密码并确认。")).toBeInTheDocument();
+  });
+
   test("tool launcher Save As writes a real copy instead of showing placeholder feedback", async () => {
     const user = userEvent.setup();
     const sourceBytes = new Uint8Array([1, 2, 3, 4]);

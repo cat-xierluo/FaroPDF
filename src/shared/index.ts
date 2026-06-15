@@ -222,3 +222,20 @@ export {
   validateManifestInput,
   type ManifestValidationResult,
 } from "./organizer/defaults";
+
+
+/** ISS-064 文档密码保护：复用现有 PdfBytes Source + 输出新副本 */
+export interface PasswordChangeRequest {
+  input_path: string;
+  /** 用户密码：留空 = 沿用旧用户密码（只设置 owner 时） */
+  user_password?: string | null;
+  /** 拥有者密码：移除时必传；设置时建议与 user 不同 */
+  owner_password?: string | null;
+}
+
+export interface NativePasswordChangeResult {
+  /** 输出 PDF 路径：通常是 "<原名>-secured.pdf" 或 "<原名>-unsecured.pdf" */
+  path: string;
+  /** 输出文件字节数（用于 UI 显示） */
+  size_bytes: number;
+}

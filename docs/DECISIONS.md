@@ -3832,3 +3832,71 @@ DEC-099 §决策段中"撤回 Cargo.lock"的部分**作废**，仅保留以下�
 - ISS-036（仓库私有导致 updater endpoint 404）
 - DEC-097 / DEC-098（v0.1.2 PR #62 + #64 累计）
 
+## DEC-101 ISS-060 / ISS-061 / ISS-064 阶段 1 集成 AppShell
+
+- 日期：2026-06-15
+- 状态：已完成
+- 关联：ISS-060 / ISS-061 / ISS-064 / ISS-065（v0.2 起步）/ DEC-097 / DEC-098（前序）
+
+### 背景
+
+`docs/TASKS.md` ISS-059..065 立项后，working tree 内已有 4 个 ISS 的孤儿组件（RightPanel.tsx + 测试、TextSelectionToolbar.tsx + 测试、SecurityPanel.tsx + css、Rust `set/remove_pdfpassword` 命令）但**未集成到 AppShell**：
+
+- SecurityPanel 没有 `import`，UI 不可达
+- TextSelectionToolbar 在 AppShell 里是 `bounds={null}` 占位 wiring，真选区不触发
+- Rust 命令存在但**没注册到 `invoke_handler!`**，前端 invoke 会 404
+- `app.css` 缺 `.text-selection-toolbar` 选择器（jsdom 不报，但浏览器无样式）
+
+### 决策
+
+把 ISS-060 / ISS-061 / ISS-064 三者阶段 1 集成在**一次提交**收口，原因：
+
+1. AppShell.tsx / types.ts / app.css 被 3 个 ISS 共享，按 ISS 拆 hunk-by-hunk 太碎
+2. 三者都属同一波 v0.2 PDF Expert 对齐推进，单测都已绿、依赖一致
+3. 单独 commit 不构成可独立回滚的最小单元（types.ts 一改一起改）
+
+具体集成：
+
+- **ISS-060（RightPanel）**：`types.ts` 加 `UtilityPanelId "security"`（兼容 ISS-064）+ RightPanel 已在 AppShell 渲染（前序 working tree）。
+- **ISS-061（TextSelectionToolbar）**：
+  - AppShell 引入 `useRef<HTMLDivElement>` 挂在 `workspace__main` div
+  - 调 `usePdfTextSelection(workspaceMainRef)` 拿真 bounds
+  - 维护 `toolbarHidden` state，onClose / onAction 时设 true，bounds 变 null 时自动重置
+  - onAction 处理 `copy` → `navigator.clipboard.writeText` + 反馈 `已复制选中文本到剪贴板。`
+  - app.css 加 `.text-selection-toolbar` 完整样式（fixed 1000 zIndex + 8px 圆角 + 16px box-shadow + 7 按钮水平排列）
+  - `usePdfTextSelection` hook 加 `typeof range.getBoundingClientRect !== "function"` 防御，避免 jsdom 报 22 个 selectionchange error
+- **ISS-064（SecurityPanel）**：
+  - `commands.ts` 加 `export-set-password` / `export-remove-password`（tertiary / export / requiresDocument / targetMode export / targetUtilityPanel security / more-menu + native-menu / feedback 文案）
+  - `APP_TOOL_LAUNCHER_SECTIONS.deliver` 把这两个 commandId 加到末尾
+  - `AppCommandTargetUtilityPanel` 联合加 `"security"`
+  - AppShell `UtilityPanel` 加 `if (panel === "security")` 分支，传入 `currentPdfPath = document?.path ?? null` + `onClose` + `onFeedback`
+  - `lib.rs` `.invoke_handler(tauri::generate_handler![..., set_pdfpassword, remove_pdfpassword])` 注册
+
+### 验证
+
+- typecheck：0 错
+- lint：0 错
+- 全量单测：897 通过 + 1 pre-existing zoom 失败（与本次无关；DEC-100 §已知限制登记）
+- cargo check：17 warnings（pre-existing；`set/remove_pdfpassword unused` 消失，证明已正确注册）
+- 新增 3 个测试：
+  - `commands.test.ts`：`ISS-064: 设置 / 移除密码命令进入导出模式 + security 面板`
+  - `AppShell.test.tsx`：`set-password command enters export mode and opens security panel`
+  - `AppShell.test.tsx`：`remove-password command enters export mode and opens security panel`
+
+### 已知限制
+
+- **`set_pdfpassword` 是 stub**：v0.1 lopdf 不支持加密 API，前端 invoke 会拿到 `"设置密码（PDF 加密）暂未启用：v0.2 升级 lopdf 到 0.34 或引入 qpdf。"` 错误。UI 已 ready，待 lopdf 升级或 qpdf 引入。
+- **`remove_pdfpassword` 真实可用**：用 lopdf `Document::load + decrypt + save`，输出 `<原名>-unsecured.pdf`。
+- **RightPanel v0.1 skeleton**：仅渲染 hint + placeholder 文字，真实内容（图章网格 / 签名列表 / 导出预览 / OCR 队列）留 ISS-060 阶段 2。
+- **TextSelectionToolbar `armed mode`**：选区中点 Hl/Ul/St/Note → 通过 `floating-annotation-tool` 自定义事件激活 `annotationArmed.activeToolType`，用户仍需在画布上二次拖拽落 draft。阶段 2 优化为「选区直接转化为 draft」。
+- **翻译 / 朗读两个 disabled 占位**：v0.1 无能力，仅 UI 预留位。
+
+### 关联
+
+- ISS-060 / ISS-061 / ISS-062 / ISS-064 / ISS-065
+- DEC-100（Cargo.lock 同步）
+- DEC-097（ISS-NEW-A PDF 插入 / 合并 / 提取 阶段 1 引擎）
+- DEC-098（ISS-NEW-A 阶段 2 UI）
+- `research/pdf-expert/FEATURE_CATALOG.md` 截图 23 / 50 / 52 / 55 / 65 / 68 / 83
+
+

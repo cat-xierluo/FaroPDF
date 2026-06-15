@@ -710,6 +710,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：UI 信息架构
+- 状态：阶段 1 已完成（2026-06-15，右栏 `RightPanel` skeleton 接入 AppShell，按 activeMode 推导内容）；阶段 2 显式 Toolbar 切换按钮 + 各 mode 真实内容（图章网格 / 签名列表 / 导出预览 / OCR 队列）待启动。
 - 来源：截图 50, 65, 68（右侧栏随工具切换显示签章/图章/OCR 面板）
 - 目标：
   1. 引入右栏：与左栏对称的 200-320px 宽的 `UtilityPane` 容器。
@@ -724,6 +725,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：批注 UI 强化
+- 状态：阶段 1 已完成（2026-06-15，`TextSelectionToolbar` + `usePdfTextSelection` hook 接入 AppShell 真选区，5 启用 + 2 disabled 占位 + Esc 关闭）；阶段 2 选区→直接 draft（跳过 user 二次拖拽）+ 翻译 / 朗读真接入待启动。
 - 来源：截图 23 floating annotate toolbar（PDF Expert 选区后立即出现的微型工具条）
 - 目标：
   1. `TextSelectionOverlay` 重构：选区确定后即出现靠近选区中心的浮动工具条。
@@ -761,6 +763,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：安全 / 导出
+- 状态：阶段 1 已完成（2026-06-15，`SecurityPanel` UI + `export-set-password / export-remove-password` 命令接入工具启动器和原生菜单 + `remove_pdfpassword` Rust 命令用 lopdf 真实解密生成 `-unsecured.pdf` 新副本）；阶段 2 `set_pdfpassword` 真实加密待 lopdf 升级到 0.34 或引入 qpdf。
 - 来源：截图 52（设置密码 modal：密码输入 + 确认输入 + 取消/确定）
 - 目标：
   1. 在工具启动器「导出」分组中加 `设置密码 / 移除密码` 命令。
@@ -811,6 +814,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
+- 2026-06-15：完成 ISS-060 / ISS-061 / ISS-064 阶段 1 集成（详见 DEC-101）。`RightPanel` 接入 AppShell 按 activeMode 推导内容；`TextSelectionToolbar` 接入 `usePdfTextSelection` hook 真选区，5 启用 + 2 disabled 占位；`SecurityPanel` 接入 utility panel slot，`export-set-password / export-remove-password` 命令进入导出模式打开面板，`remove_pdfpassword` Rust 命令注册到 `invoke_handler!` 并能用 lopdf 真实解密；新增 3 个测试（commands 1 + AppShell 2），typecheck / lint / 全量单测 897 通过 / cargo check 17 warnings（pre-existing）全部 0 回归。
 - 2026-06-15：完成 ISS-062 阶段 1（内置图章 5→9 + diagonal 对角斜条带形态）。`PdfStampName` 扩 4 个（forReview / notForDistribution / internalOnly / proprietary），`PdfStampShape` 加 `diagonal`，`PdfAnnotationStamp.image` 字段为阶段 2 自定义图章预留；stamps.test.ts 12/12 通过；阶段 2 自定义上传 tab + 缩略图渲染留下次推进。
 - 2026-06-15：登记 DEC-100 修正 DEC-099 与 Cargo 现实矛盾——HEAD 上 Cargo.toml = 0.1.2 但 lock = 0.1.1 本就不同步，working tree lock 升 0.1.2 是修复同步，应保留，DEC-099 "撤回 Cargo.lock" 条款作废。
 - 2026-06-15：登记 ISS-056 / 057 / 058 + 综合评估段。`computer-use` skill 调研结论：当前走 `osascript + System Events` 是"路径 B 最轻量"路线，能用但会动真实鼠标；Codex 那种"独立光标 + 不抢焦点"靠的是 AXPress 优先 + 自绘覆盖层 / MCP 代理。给出三条升级路径（A 自改 / B 装第三方 MCP / C 学官方 quickstart 架构）暂缓入队，综合评估不互斥、A 最轻先做、B/C 安全风险需评估。

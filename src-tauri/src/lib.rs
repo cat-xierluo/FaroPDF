@@ -11,6 +11,7 @@ use std::{
 use tauri::menu::{MenuBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use url::Url;
+use lopdf::Document;
 
 mod ocr_credentials;
 mod ocr_dispatch;
@@ -538,6 +539,52 @@ fn extract_ocr_text(pdf_path: String) -> Result<OcrTextExtractionResponse, Strin
     })
 }
 
+#[tauri::command]
+fn set_pdfpassword(request: serde_json::Value) -> Result<serde_json::Value, String> {
+    // v0.1：依赖的 encrypt API 暂不在默认 lopdf features 中（需 pdf_writer feature）。
+    // 等 v0.2 升级到 0.34 或引入 qpdf；本阶段先返回 not-supported 让 UI 走备用通道。
+    let _ = request;
+    Err("设置密码（PDF 加密）暂未启用：v0.2 升级 lopdf 到 0.34 或引入 qpdf。".to_string())
+}
+
+#[tauri::command]
+fn remove_pdfpassword(request: serde_json::Value) -> Result<serde_json::Value, String> {
+    let input_path = request
+        .get("input_path")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let user_pwd = request
+        .get("user_password")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let source_path = PathBuf::from(input_path.trim());
+    if !source_path.exists() {
+        return Err(format!("文件不存在: {input_path}"));
+    }
+    let mut doc = Document::load(&source_path).map_err(|e| format!("解析 PDF 失败: {e}"))?;
+    if !doc.is_encrypted() {
+        return Err("PDF 没有设置密码，无需移除。".to_string());
+    }
+    if user_pwd.is_empty() {
+        return Err("请提供用户密码。".to_string());
+    }
+    doc.decrypt(&user_pwd).map_err(|e| format!("密码错误或解密失败: {e}"))?;
+    let stem = source_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("document");
+    let parent = source_path.parent().unwrap_or(Path::new("."));
+    let output_path = parent.join(format!("{stem}-unsecured.pdf"));
+    doc.save(&output_path).map_err(|e| format!("保存副本失败: {e}"))?;
+    Ok(serde_json::json!({
+        "path": output_path.to_string_lossy(),
+        "size_bytes": std::fs::metadata(&output_path).map(|m| m.len()).unwrap_or(0),
+    }))
+}
+
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -654,7 +701,9 @@ pub fn run() {
             list_ocr_jobs,
             poll_ocr_job,
             cancel_ocr_job,
-            extract_ocr_text
+            extract_ocr_text,
+            set_pdfpassword,
+            remove_pdfpassword
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
