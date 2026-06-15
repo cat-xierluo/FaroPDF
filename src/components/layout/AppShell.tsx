@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AnnotationSidecar, PdfAnnotation } from "../../shared";
 import type { ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
@@ -25,7 +25,12 @@ import { AnnotationToolbar } from "./AnnotationToolbar";
 import { PageOrganizerWorkspace } from "./PageOrganizerWorkspace";
 import { RightPanel } from "./RightPanel";
 import { SecurityPanel } from "./SecurityPanel";
-import { TextSelectionToolbar, usePdfTextSelection } from "./TextSelectionToolbar";
+import {
+  TextSelectionToolbar,
+  usePdfTextSelection,
+  type AnnotationAction,
+  type CopyAction,
+} from "./TextSelectionToolbar";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 import { SettingsPanel } from "../../modules/settings/SettingsPanel";
@@ -123,29 +128,27 @@ export function AppShell({
     nonce: 0,
   });
   const [settingsInitialSection, setSettingsInitialSection] = useState<SectionId>("general");
-  // ISS-060：右栏驱动（activeMode 决定内容）。v0.1 暂不在 Toolbar 加按钮，AppShell 顶层保留。
-  // useState with 1-tuple destructure keeps the type checker aware of "read" without
-  // producing a "declared but never read" diagnostic.
-  const [rightPanel] = useState<RightPanelId>(() => {
+  // ISS-060：右栏驱动 — useMemo 而非 useState：activeMode 切换时需要重新推导。
+  // P2-6 修复：之前用 useState(() => initial) 只在 mount 时算一次，read→annotate
+  // 切换后 rightPanel 永远 stuck 在 mount 时的 "none"，导致右栏永不显示。
+  const rightPanel = useMemo<RightPanelId>(() => {
     if (activeMode === "annotate") return "stamps";
     if (activeMode === "ocr") return "ocr-queue";
     if (activeMode === "export") return "export-preview";
     return "none";
-  });
+  }, [activeMode]);
   const [commandFeedback, setCommandFeedback] = useState<string | null>(null);
   // ISS-061 阶段 2：真接选区——usePdfTextSelection 监听 workspace__main 内的文本选择。
-  // 用户主动点 onClose 或选中某个动作后用 toolbarHidden 强制隐藏；bounds 变 null（选区消失）时
-  // 自动重置 toolbarHidden，让下一次选区可以重新触发。
+  // P1-3 修复：toolbarHidden 在每次 selectionBounds 变化时无条件重置（不是只在 null 时），
+  // 让用户主动关掉 toolbar 后，下次重新选区可以再次浮出。
   const workspaceMainRef = useRef<HTMLDivElement>(null);
   const selectionBounds = usePdfTextSelection(workspaceMainRef);
   const [toolbarHidden, setToolbarHidden] = useState(false);
   useEffect(() => {
-    if (!selectionBounds) {
-      setToolbarHidden(false);
-    }
+    setToolbarHidden(false);
   }, [selectionBounds]);
   const handleSelectionAction = useCallback(
-    (action: import("./TextSelectionToolbar").AnnotationAction | import("./TextSelectionToolbar").CopyAction) => {
+    (action: AnnotationAction | CopyAction) => {
       if (action === "copy") {
         const selectedText = window.getSelection?.()?.toString() ?? "";
         if (selectedText && typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
@@ -345,7 +348,9 @@ export function AppShell({
       return;
     }
     void executeCommand(commandSignal.id);
-  }, [commandSignal?.nonce, executeCommand]);
+    // P1-2：依赖加 commandSignal?.id 以支持同 nonce 不同 id 的边界（理论上 App 层
+    // 通过 nonce 递增控制重发，但 effect 列出全部源以满足 react-hooks/exhaustive-deps）。
+  }, [commandSignal?.id, commandSignal?.nonce, executeCommand]);
 
   return (
     <div className="app-shell" role="application" aria-label="FaroPDF PDF 工作台">

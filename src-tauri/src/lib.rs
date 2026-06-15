@@ -543,6 +543,8 @@ fn extract_ocr_text(pdf_path: String) -> Result<OcrTextExtractionResponse, Strin
 fn set_pdfpassword(request: serde_json::Value) -> Result<serde_json::Value, String> {
     // v0.1：依赖的 encrypt API 暂不在默认 lopdf features 中（需 pdf_writer feature）。
     // 等 v0.2 升级到 0.34 或引入 qpdf；本阶段先返回 not-supported 让 UI 走备用通道。
+    // 注意：UI 端 (SecurityPanel) 应当 disable「设置密码」按钮、避免用户在本阶段意外
+    // 把 owner_password 作为 IPC payload 发出。
     let _ = request;
     Err("设置密码（PDF 加密）暂未启用：v0.2 升级 lopdf 到 0.34 或引入 qpdf。".to_string())
 }
@@ -559,29 +561,67 @@ fn remove_pdfpassword(request: serde_json::Value) -> Result<serde_json::Value, S
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    let source_path = PathBuf::from(input_path.trim());
-    if !source_path.exists() {
-        return Err(format!("文件不存在: {input_path}"));
+    let raw_source_path = PathBuf::from(input_path.trim());
+    if !raw_source_path.exists() {
+        // 不回显完整路径（DEC-102 P0-1）：仅给 basename + 提示。
+        return Err(format!(
+            "文件不存在: {}",
+            redact_path_for_error(&raw_source_path)
+        ));
     }
-    let mut doc = Document::load(&source_path).map_err(|e| format!("解析 PDF 失败: {e}"))?;
-    if !doc.is_encrypted() {
-        return Err("PDF 没有设置密码，无需移除。".to_string());
-    }
+    // canonicalize 防 path traversal（DEC-102 P0-3）。如果 canonicalize 失败（例如
+    // symlink loop、权限不足），按原 trimmed 路径继续，但仍走 basename 脱敏。
+    let source_path = raw_source_path
+        .canonicalize()
+        .unwrap_or_else(|_| raw_source_path.clone());
     if user_pwd.is_empty() {
         return Err("请提供用户密码。".to_string());
     }
-    doc.decrypt(&user_pwd).map_err(|e| format!("密码错误或解密失败: {e}"))?;
+    // lopdf 错误不直接 format 进 Err（DEC-102 P0-2）：只 eprintln 内部细节，
+    // 用户看到的错误是固定文案 + 脱敏路径 basename。
+    let mut doc = Document::load(&source_path).map_err(|e| {
+        eprintln!("remove_pdfpassword load error: {e}");
+        format!("解析 PDF 失败：{}", redact_path_for_error(&source_path))
+    })?;
+    if !doc.is_encrypted() {
+        return Err("PDF 没有设置密码，无需移除。".to_string());
+    }
+    doc.decrypt(&user_pwd).map_err(|e| {
+        eprintln!("remove_pdfpassword decrypt error: {e}");
+        // 密码错误不区分具体 lopdf 失败原因（避免反向诱导用户试密码字典）。
+        "密码错误或解密失败。".to_string()
+    })?;
     let stem = source_path
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("document");
     let parent = source_path.parent().unwrap_or(Path::new("."));
     let output_path = parent.join(format!("{stem}-unsecured.pdf"));
-    doc.save(&output_path).map_err(|e| format!("保存副本失败: {e}"))?;
+    // 不静默覆盖已有副本（DEC-102 P0-3）：若存在则报错，用户先手动处理。
+    if output_path.exists() {
+        return Err(format!(
+            "输出副本 {} 已存在，请先删除或重命名后重试。",
+            redact_path_for_error(&output_path)
+        ));
+    }
+    doc.save(&output_path).map_err(|e| {
+        eprintln!("remove_pdfpassword save error: {e}");
+        format!("保存副本失败：{}", redact_path_for_error(&output_path))
+    })?;
     Ok(serde_json::json!({
         "path": output_path.to_string_lossy(),
         "size_bytes": std::fs::metadata(&output_path).map(|m| m.len()).unwrap_or(0),
     }))
+}
+
+/// 把绝对路径脱敏为「[path:<basename>]」形式，避免 IPC 错误回显时把完整目录暴露给前端。
+/// DEC-102 P0-1：与 ocr_queue::redact_path 行为对齐（保留 basename 用于用户辨识）。
+fn redact_path_for_error(path: &Path) -> String {
+    let basename = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("[unknown]");
+    format!("[path:{basename}]")
 }
 
 

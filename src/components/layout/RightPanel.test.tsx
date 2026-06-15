@@ -13,7 +13,8 @@ describe("RightPanel (ISS-060 skeleton)", () => {
   test("annotate 模式 + stamps → 渲染「图章」", () => {
     render(<RightPanel activeMode="annotate" rightPanel="stamps" />);
     expect(screen.getByRole("heading", { name: "图章" })).toBeTruthy();
-    expect(screen.getByTestId("right-pane-placeholder").textContent).toContain("v0.1 skeleton");
+    // ISS-060 阶段 2 之前只渲染 hint，不再显示 v0.1 skeleton placeholder
+    expect(screen.queryByTestId("right-pane-placeholder")).toBeNull();
   });
 
   test("ocr 模式 + ocr-queue → 渲染「OCR 队列」", () => {
@@ -35,5 +36,16 @@ describe("RightPanel (ISS-060 skeleton)", () => {
     render(<RightPanel activeMode="annotate" rightPanel="stamps" />);
     const pill = screen.getByText("annotate");
     expect(pill.className).toContain("right-pane__mode-pill");
+  });
+
+  test("read 模式 + stamps（非法组合）→ 强制折叠（READ_INACTIVE_IDS）", () => {
+    // P2-7：read / pages 模式不应展示模式驱动栏，即便 rightPanel 字段被错传
+    const { container } = render(<RightPanel activeMode="read" rightPanel="stamps" />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  test("pages 模式 + ocr-queue → 强制折叠", () => {
+    const { container } = render(<RightPanel activeMode="pages" rightPanel="ocr-queue" />);
+    expect(container.firstChild).toBeNull();
   });
 });

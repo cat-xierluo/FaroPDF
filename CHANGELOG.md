@@ -20,6 +20,13 @@ UI 信息架构：
 - 同步 `src-tauri/Cargo.lock` 中 faropdf 包版本 `0.1.1 → 0.1.2`，与 `Cargo.toml` 对齐（DEC-100 修正 DEC-099 的 Cargo.lock 撤回条款）。
 - TextSelectionToolbar hook 加 `getBoundingClientRect` jsdom 防御，避免 vitest 环境下 22 个 selectionchange error。
 
+安全 / 修复（DEC-102 code review 后修复）：
+
+- **P0**：`remove_pdfpassword` 错误信息不再泄露完整路径（用 `[path:<basename>]` 脱敏）；不再回吐 lopdf::Error 内部 PDF dict 片段；`canonicalize` 规范化 input_path 防 traversal；输出副本碰撞检测（避免静默覆盖既有 `-unsecured.pdf`）。
+- **P1**：`SecurityPanel` set 模式按钮永久 disabled（v0.2 阶段 2 激活）；密码输入框加 `autoComplete` + `spellCheck=false` + `data-1p-ignore`；`rightPanel` 改 useMemo（修复 ISS-060 切模式右栏不响应核心 bug）；`AppShell` 浮动工具条 `toolbarHidden` 重置逻辑修复（用户关掉后下次选区仍能浮出）；commandSignal effect 依赖补齐 id。
+- **测试覆盖**：新增 `SecurityPanel.test.tsx` 7 个测试（vi.mock @tauri-apps/api/core 覆盖 invoke 边界）+ `RightPanel.test.tsx` 2 个边界（read+stamps / pages+ocr-queue 强折叠）。
+- **polish**：CSS 命名 BEM 一致（`security_panel*` → `security-panel*`）；`RightPanel` 删除让用户困惑的 v0.1 skeleton placeholder 文案。
+
 ---
 
 ## 0.1.2 - 2026-06-14

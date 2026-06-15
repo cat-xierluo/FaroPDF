@@ -84,9 +84,6 @@ export function RightPanel({ activeMode, rightPanel }: RightPanelProps) {
       </header>
       <div className="right-pane__body" data-testid="right-pane-body">
         <p className="right-pane__hint">{hint}</p>
-        <p className="right-pane__placeholder" data-testid="right-pane-placeholder">
-          （v0.1 skeleton — 真实内容将在后续 ISS 中接入。）
-        </p>
       </div>
     </aside>
   );

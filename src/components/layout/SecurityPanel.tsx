@@ -62,7 +62,10 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
     setSuccessMessage(null);
   }
 
-  async function handleSetPassword() {
+  // P1-1：v0.1 stub 阶段「设置密码」按钮已 disabled（避免无意义 IPC + 密码回显）。
+  // handleSetPassword 保留为 v0.2 阶段 2 lopdf 0.34 / qpdf 引入后激活时直接 wire 即可。
+  // 用 `_` 前缀让 tsc noUnusedLocals + ESLint @typescript-eslint/no-unused-vars 放过。
+  async function _handleSetPassword() {
     if (!currentPdfPath) {
       setErrMessage("请先打开一个 PDF 文档。");
       return;
@@ -124,15 +127,20 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
       setLoading(false);
     }
   }
+  // P1-1：v0.1 阶段「设置密码」按钮已 disabled（避免无意义 IPC + 用户密码回显）。
+  // _handleSetPassword 作为 v0.2 阶段 2 lopdf 0.34 / qpdf 引入后激活时直接 wire 的占位。
+  // 用 void 强引用，让 tsc noUnusedLocals 不报；v0.2 阶段 2 把 button 改回 disabled={loading||!ownerPwd}
+  // + onClick={_handleSetPassword} 即可。
+  void _handleSetPassword;
 
   return (
     <aside
       aria-label="文档安全面板"
-      className="security_panel"
+      className="security-panel"
       data-layout={isNarrow ? "bottom-sheet" : "panel"}
       data-testid="security-panel"
     >
-      <header className="security_panel__header">
+      <header className="security-panel__header">
         <div>
           <h2>文档安全</h2>
           <p>{currentPdfPath ? "当前文档：" + currentPdfPath : "请先打开一个 PDF 文档。"}</p>
@@ -148,11 +156,11 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
       </header>
 
       {!currentPdfPath ? (
-        <p className="security_panel__empty">打开 PDF 后才能设置 / 移除密码。</p>
+        <p className="security-panel__empty">打开 PDF 后才能设置 / 移除密码。</p>
       ) : null}
 
       {errMessage ? (
-        <div className="security_panel__error" role="alert">
+        <div className="security-panel__error" role="alert">
           <span>{errMessage}</span>
           <button className="compact-button" onClick={() => setErrMessage(null)} type="button">
             知道了
@@ -160,7 +168,7 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
         </div>
       ) : null}
       {successMessage ? (
-        <div className="security_panel__success" role="status">
+        <div className="security-panel__success" role="status">
           <span>{successMessage}</span>
           <button className="compact-button" onClick={() => setSuccessMessage(null)} type="button">
             知道了
@@ -169,11 +177,11 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
       ) : null}
 
       {currentPdfPath ? (
-        <div className="security_panel__actions">
-          <div className="security_panel__mode" role="tablist" aria-label="密码操作">
+        <div className="security-panel__actions">
+          <div className="security-panel__mode" role="tablist" aria-label="密码操作">
             <button
               aria-pressed={mode === "set"}
-              className={`security_panel__mode-button${mode === "set" ? " security_panel__mode-button--active" : ""}`}
+              className={`security-panel__mode-button${mode === "set" ? " security-panel__mode-button--active" : ""}`}
               onClick={() => setMode("set")}
               type="button"
             >
@@ -181,7 +189,7 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
             </button>
             <button
               aria-pressed={mode === "remove"}
-              className={`security_panel__mode-button${mode === "remove" ? " security_panel__mode-button--active" : ""}`}
+              className={`security-panel__mode-button${mode === "remove" ? " security-panel__mode-button--active" : ""}`}
               onClick={() => setMode("remove")}
               type="button"
             >
@@ -190,48 +198,60 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
           </div>
 
           {mode === "set" ? (
-            <section aria-label="设置密码表单" className="security_panel__form">
-              <p className="security_panel__hint">
-                为当前 PDF 副本重加密，输出 <code>&lt;原名&gt;-secured.pdf</code>。
-                v0.1 命令暂未启用——v0.2 升级 lopdf 到 0.34 或引入 qpdf 即可生效。
+            <section aria-label="设置密码表单" className="security-panel__form">
+              <p className="security-panel__hint" data-testid="security-panel-stub-hint">
+                ⚠️ ISS-064 阶段 1 仅完成 UI 骨架；
+                <strong>设置密码命令待 v0.2 升级 lopdf 到 0.34 或引入 qpdf 后激活</strong>。
+                按钮已禁用以避免无意义的 IPC 调用与密码输入回显。
               </p>
-              <label className="security_panel__input-row" htmlFor={userPwdId}>
+              <p className="security-panel__hint">
+                激活后将为当前 PDF 副本重加密，输出 <code>&lt;原名&gt;-secured.pdf</code>。
+              </p>
+              <label className="security-panel__input-row" htmlFor={userPwdId}>
                 <span>用户密码（留空 = 沿用旧用户密码，仅设置 owner）</span>
                 <input
+                  autoComplete="new-password"
+                  data-1p-ignore=""
                   id={userPwdId}
                   onChange={(event) => setUserPwd(event.target.value)}
+                  spellCheck={false}
                   type="password"
                   value={userPwd}
                 />
               </label>
-              <label className="security_panel__input-row" htmlFor={ownerPwdId}>
+              <label className="security-panel__input-row" htmlFor={ownerPwdId}>
                 <span>拥有者密码</span>
                 <input
+                  autoComplete="new-password"
+                  data-1p-ignore=""
                   id={ownerPwdId}
                   onChange={(event) => setOwnerPwd(event.target.value)}
+                  spellCheck={false}
                   type="password"
                 />
               </label>
               <button
                 className="context-tool context-tool--primary"
-                disabled={loading || !ownerPwd}
-                onClick={handleSetPassword}
+                disabled
+                title="ISS-064 阶段 2 激活：lopdf 升级或 qpdf 引入后开启。"
                 type="button"
               >
-                {loading ? "处理中..." : "设置密码并导出"}
+                设置密码并导出（v0.2 候选）
               </button>
             </section>
           ) : (
-            <section aria-label="移除密码表单" className="security_panel__form">
-              <p className="security_panel__hint">
+            <section aria-label="移除密码表单" className="security-panel__form">
+              <p className="security-panel__hint">
                 输入原密码后另存一份未加密副本 <code>&lt;原名&gt;-unsecured.pdf</code>。
-                v0.1 命令暂未启用（与 ISS-064 同样的依赖），v0.2 落地。
               </p>
-              <label className="security_panel__input-row" htmlFor={originalPwdId}>
+              <label className="security-panel__input-row" htmlFor={originalPwdId}>
                 <span>原密码</span>
                 <input
+                  autoComplete="current-password"
+                  data-1p-ignore=""
                   id={originalPwdId}
                   onChange={(event) => setOriginalPwd(event.target.value)}
+                  spellCheck={false}
                   type="password"
                 />
               </label>
@@ -247,7 +267,7 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
           )}
 
           <button
-            className="compact-button security_panel__reset"
+            className="compact-button security-panel__reset"
             disabled={loading}
             onClick={clearAll}
             type="button"

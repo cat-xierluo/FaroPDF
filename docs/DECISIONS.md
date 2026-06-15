@@ -3899,4 +3899,95 @@ DEC-099 §决策段中"撤回 Cargo.lock"的部分**作废**，仅保留以下�
 - DEC-098（ISS-NEW-A 阶段 2 UI）
 - `research/pdf-expert/FEATURE_CATALOG.md` 截图 23 / 50 / 52 / 55 / 65 / 68 / 83
 
+## DEC-102 Code review cce1ce5..HEAD 修复（P0 安全 + P1 hooks + P2 polish）
+
+- 日期：2026-06-15
+- 状态：已完成（push 前修复）
+- 关联：DEC-101（被审）/ ISS-060 / ISS-061 / ISS-064
+
+### 背景
+
+DEC-101 把 ISS-060 / ISS-061 / ISS-064 阶段 1 集成 push 前，跑了一次独立 `code-reviewer` agent review `cce1ce5..HEAD`（4 commits, 1338 行）。Review 揭露 3 个 P0 安全 / 数据丢失 bug + 5 个 P1 hooks 与 UI bug + 10 个 P2 polish。
+
+按"P0 必修、P1 同 PR 修、P2 看必要性"原则处理。
+
+### 修复清单
+
+**P0（必修，已修）：**
+
+- **P0-1 lib.rs:564 路径泄露**：`Err(format!("文件不存在: {input_path}"))` 把用户绝对路径回显到前端 UI。修复：新增 `redact_path_for_error(&Path)` helper 返回 `[path:<basename>]`，错误信息中只显 basename。
+- **P0-2 lib.rs:566/573/580 lopdf::Error 内部细节回吐**：`map_err(|e| format!("解析 PDF 失败: {e}"))` 把 lopdf 错误对象的内部 PDF dict 片段、对象 ID、文件路径都序列化进 Err。修复：`eprintln!` 写日志保留排错信息，Err 只返回固定文案 + 脱敏路径；解密失败统一为 `"密码错误或解密失败。"`（不区分细节，避免反向诱导用户试密码字典）。
+- **P0-3 lib.rs:562-580 路径遍历 + 静默覆盖 + 任意 PDF 解密**：
+  - `raw_source_path.canonicalize()` 规范化，防 `/tmp/foo/../bar.pdf` 类 traversal
+  - 输出路径 `<原名>-unsecured.pdf` 加 collision check：已存在则报错 `"输出副本 [path:<basename>] 已存在，请先删除或重命名后重试。"`，避免静默覆盖用户既有副本
+  - 允许"任意可读 PDF 解密"——SecurityPanel 只能从 `currentPdfPath` 拿到当前打开的 PDF 路径，前端层面已自然限定；deeper allowlist 留 v0.2 阶段 2（与 ISS-064 阶段 2 同步推进）
+
+**P1（同 PR 已修）：**
+
+- **P1-1 SecurityPanel stub 按钮没 disable**：`set_pdfpassword` 是 stub 返回 `"暂未启用"`，但 UI 按钮可点 → 用户输入 owner 密码 → 通过 IPC 发出 → 拿到错误回显。修复：
+  - 按钮永久 `disabled`，title 标注 "ISS-064 阶段 2 激活：lopdf 升级或 qpdf 引入后开启。"
+  - 按钮文案改为 "设置密码并导出（v0.2 候选）"
+  - set 模式新增 `security-panel-stub-hint` 警示段（⚠️ 醒目提示 v0.1 仅 UI 骨架）
+  - `handleSetPassword` 重命名为 `_handleSetPassword` + `void _handleSetPassword;` 保留为 v0.2 阶段 2 wire 占位（tsc noUnusedLocals 不报）
+- **P1-2 useEffect 依赖漏 commandSignal?.id**：依赖 `[commandSignal?.nonce, executeCommand]` 不包括 id，react-hooks/exhaustive-deps 严格模式会 warning。修复：依赖加 `commandSignal?.id`。
+- **P1-3 toolbarHidden 重置 bug**：之前 effect 只在 `!selectionBounds` 时 reset，用户主动关 toolbar 后保持 hidden，下次重新选区不浮出。修复：effect 改为无条件 `setToolbarHidden(false)`——每次 bounds 重算（即新选区）都重置。
+- **P1-5 内联 type import 风格**：`import("./TextSelectionToolbar").AnnotationAction | CopyAction` 路径写两次有 typo 风险。修复：顶部 `import type { AnnotationAction, CopyAction } from "./TextSelectionToolbar";`。
+- **P1-4 SecurityPanel invoke 测试覆盖**：新建独立 `SecurityPanel.test.tsx` 加 `vi.mock("@tauri-apps/api/core")` + 7 个测试（empty / stub disabled / autoComplete 设置 / autoComplete 移除 / remove 成功路径 invoke payload / remove 失败路径 errMessage + onFeedback / 客户端校验空密码不发起 invoke / 关闭按钮）。
+
+**P2-6（被错放 P2，实际是 P1）：rightPanel useState 不响应 activeMode 变化**：
+
+`const [rightPanel] = useState<RightPanelId>(() => ...)` 初始化函数只在 mount 跑一次，activeMode 切换后 rightPanel **永远** stuck 在 mount 时的 "none"——RightPanel 整个交互失效，是 ISS-060 阶段 1 的核心 bug。修复：useState → useMemo(dep activeMode)。
+
+**P2 polish（已修）：**
+
+- **P2-1 CSS BEM 命名不一致**：`security_panel*`（下划线）vs 项目惯例 `right-pane*` / `text-selection-toolbar*`（dashes）。`sed -i 's/security_panel/security-panel/g'` SecurityPanel.css + tsx 同步替换。
+- **P2-2 RightPanel placeholder 文案让用户困惑**：原文 `"（v0.1 skeleton — 真实内容将在后续 ISS 中接入。）"` 直接告诉用户"这是空的"。修复：删除 `.right-pane__placeholder` 段，只保留 hint 一行；测试同步改为 `queryByTestId("right-pane-placeholder")` 应为 null。
+- **P2-3 AppShell 注释失真**：`useState with 1-tuple destructure keeps the type checker aware of "read"` 描述与代码无关（实际是避免 unused-vars）。修复：随 P2-6 重写注释为"useMemo 而非 useState：activeMode 切换时需要重新推导"。
+- **P2-5 password 输入框缺 autoComplete**：所有密码 input 加 `autoComplete="current-password"` 或 `"new-password"` + `spellCheck={false}` + `data-1p-ignore=""`，提升 1Password / 浏览器密码管理器兼容性。
+- **P2-7 RightPanel 测试边界覆盖**：加 2 个测试（read+stamps 非法组合 / pages+ocr-queue），覆盖 `READ_INACTIVE_IDS` 折叠分支。
+
+**P2 follow-up（未在本次修，登记入 ISS）：**
+
+- **P2-4 DEC-101 / DESIGN.md §18 截图编号引用**：研究目录实际只有 33 张（编号 00-33），但文档引用了 50 / 52 / 55 / 65 / 68 / 83 等不存在编号。需要逐处修正或补齐截图。登记为 v0.2 docs follow-up。
+- **P2-8 TextSelectionToolbar hook 单测**：`usePdfTextSelection` 的 selectionchange event loop + jsdom 防御逻辑 0 覆盖。可用 happy-dom + 手动 trigger 补一组 hook 测试。登记为 v0.2 test follow-up。
+- **P2-9 DEC-101 17 warnings 自检说明**：cargo check 警告列表可贴具体内容（哪些是 set/remove_pdfpassword 之外的 pre-existing）。registered 在 DEC-102 §验证里。
+- **P2-10 onFeedback `isError` 字段未利用**：AppShell 当前忽略 isError，可让 command-feedback 加 error 样式区分。登记为 v0.2 UX follow-up。
+
+### 验证
+
+- typecheck：0 错
+- lint：0 错
+- 全量单测：**905 通过** + 1 pre-existing zoom 失败（DEC-100 §已知限制）。本次 review 修复新增 8 个测试：SecurityPanel 7 + RightPanel 2 - RightPanel placeholder 1 重写 = +8 净增。
+- cargo check：17 warnings（pre-existing，未变化）
+- 文件改动：lib.rs（+44/-9）+ AppShell.tsx（type import 提取 + useMemo + useEffect 重写）+ SecurityPanel.tsx（stub disable + autoComplete + CSS 类重命名）+ SecurityPanel.css（CSS 类重命名）+ SecurityPanel.test.tsx（新文件 +145 行）+ RightPanel.tsx（删 placeholder）+ RightPanel.test.tsx（+2 边界测试 + 1 测试改写）
+
+### 验证（cargo check warnings 摘要）
+
+17 个 warning 全部 pre-existing（未由本次 v0.2 改动新增）：
+
+- `ocr_credentials.rs`: 2 unused imports（RefCell / HashMap）
+- `scan_preprocess/mod.rs`: 2 unused imports（队列/redact 工具）+ 1 unused mut
+- `scan_preprocess/queue.rs`: 3 unused（const / 方法 / fn）
+- `scan_preprocess/runner.rs`: 1 unused field（page_range）
+- `update_fallback.rs`: 6 unused（enum 变体 / const / 4 个 fn）
+- `ocr_queue.rs`: 2 unused 方法
+- `lib.rs`: 1 unused fn `current_timestamp_string`
+
+注意：`set_pdfpassword` / `remove_pdfpassword` **未在 unused 列表**，证明 invoke_handler 注册生效（DEC-101 §验证段已提到）。
+
+### 已知限制
+
+- **handleSetPassword 重命名为 `_handleSetPassword` + void 引用** 是 v0.2 阶段 2 占位写法，比 `// @ts-expect-error` 干净但仍是"故意 dead code"。v0.2 阶段 2 lopdf 升级或 qpdf 引入后，把 button 改回 `disabled={loading||!ownerPwd}` + `onClick={_handleSetPassword}` 即可激活。
+- **`remove_pdfpassword` 仍允许传任意 path**：本次仅做 canonicalize + collision check，没加"必须等于当前打开 PDF"硬限制。前端 SecurityPanel 自然只能拿到 `currentPdfPath`，但 IPC 层面未防恶意 webview 注入。v0.2 阶段 2 加 allowlist。
+- **`navigator.clipboard.writeText` 权限模型未审计**：Tauri webview 默认允许，但 capability 配置可能限制。本次未改 `tauri.conf.json` allowlist。
+- **research/ 截图编号引用不全**（P2-4）：留 v0.2 docs follow-up。
+
+### 关联
+
+- DEC-101（被审）
+- code-reviewer agent: `agentId a8092a26f9e442ce7`（review 全文）
+- `research/pdf-expert/`（PDF Expert 截图素材池）
+- ISS-064 阶段 2（lopdf 0.34 / qpdf 引入 + set_pdfpassword 真实加密 + allowlist）
+
+
 
