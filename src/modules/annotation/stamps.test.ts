@@ -10,8 +10,18 @@ import {
 } from "./stamps";
 
 describe("annotation stamp templates", () => {
-  test("5 个内置图章模板都存在并带有默认颜色和文本", () => {
-    const ids = ["reviewed", "important", "todo", "evidence", "custom"] as const;
+  test("8 + 1 个内置图章模板都存在并带有默认颜色和文本", () => {
+    const ids = [
+      "reviewed",
+      "important",
+      "todo",
+      "evidence",
+      "forReview",
+      "notForDistribution",
+      "internalOnly",
+      "proprietary",
+      "custom",
+    ] as const;
     for (const id of ids) {
       const template = STAMP_TEMPLATES[id];
       expect(template.id).toBe(id);
@@ -19,6 +29,7 @@ describe("annotation stamp templates", () => {
       expect(template.defaultLabel.length).toBeGreaterThan(0);
       expect(template.defaultColor).toMatch(/^#[0-9a-fA-F]{6}$/);
     }
+    expect(Object.keys(STAMP_TEMPLATES)).toHaveLength(9);
   });
 
   test("resolveStampTemplate 使用 stamp.label 覆盖默认", () => {
@@ -51,12 +62,16 @@ describe("annotation stamp templates", () => {
     expect(svg).toContain("&apos;");
   });
 
-  test("5 个图章各自使用不同的形状", () => {
-    expect(renderStampSvg("reviewed", { width: 200, height: 50 })).toContain("<rect");
-    expect(renderStampSvg("important", { width: 200, height: 50 })).toContain("<ellipse");
-    expect(renderStampSvg("todo", { width: 200, height: 50 })).toContain("<rect");
-    expect(renderStampSvg("evidence", { width: 200, height: 50 })).toContain("<path");
-    expect(renderStampSvg("custom", { width: 200, height: 50 })).toContain("<rect");
+  test("8 + 1 个图章各自使用对应的形状 (rect/rounded/ellipse/banner/diagonal)", () => {
+    expect(renderStampSvg("reviewed", { width: 200, height: 50 })).toContain("<rect");                // rectangle
+    expect(renderStampSvg("important", { width: 200, height: 50 })).toContain("<ellipse");         // ellipse
+    expect(renderStampSvg("todo", { width: 200, height: 50 })).toContain("<rect");              // rounded (rect with rx)
+    expect(renderStampSvg("evidence", { width: 200, height: 50 })).toContain("<path");            // banner
+    expect(renderStampSvg("forReview", { width: 200, height: 50 })).toContain("<rect");          // rounded (rect with rx)
+    expect(renderStampSvg("notForDistribution", { width: 200, height: 50 })).toContain("<polygon"); // diagonal
+    expect(renderStampSvg("internalOnly", { width: 200, height: 50 })).toContain("<rect");       // rectangle
+    expect(renderStampSvg("proprietary", { width: 200, height: 50 })).toContain("<path");         // banner
+    expect(renderStampSvg("custom", { width: 200, height: 50 })).toContain("<rect");              // rounded
   });
 });
 

@@ -13,7 +13,7 @@ export interface StampTemplate {
   label: string;
   defaultLabel: string;
   defaultColor: string;
-  shape: "rectangle" | "rounded" | "ellipse" | "banner";
+  shape: "rectangle" | "rounded" | "ellipse" | "banner" | "diagonal";
 }
 
 export const STAMP_TEMPLATES: Record<PdfStampName, StampTemplate> = {
@@ -45,6 +45,35 @@ export const STAMP_TEMPLATES: Record<PdfStampName, StampTemplate> = {
     defaultColor: "#2a4d8f",
     shape: "banner",
   },
+  // v0.2 新增三个常用 stamp
+  forReview: {
+    id: "forReview",
+    label: "FOR REVIEW",
+    defaultLabel: "FOR REVIEW",
+    defaultColor: "#7c3aed",
+    shape: "rounded",
+  },
+  notForDistribution: {
+    id: "notForDistribution",
+    label: "NOT FOR DISTRIBUTION",
+    defaultLabel: "NOT FOR DISTRIBUTION",
+    defaultColor: "#b91c1c",
+    shape: "diagonal",
+  },
+  internalOnly: {
+    id: "internalOnly",
+    label: "INTERNAL ONLY",
+    defaultLabel: "INTERNAL ONLY",
+    defaultColor: "#0f766e",
+    shape: "rectangle",
+  },
+  proprietary: {
+    id: "proprietary",
+    label: "PROPRIETARY",
+    defaultLabel: "PROPRIETARY",
+    defaultColor: "#374151",
+    shape: "banner",
+  },
   custom: {
     id: "custom",
     label: "自定义",
@@ -59,6 +88,10 @@ export const STAMP_TEMPLATE_LIST: StampTemplate[] = [
   STAMP_TEMPLATES.important,
   STAMP_TEMPLATES.todo,
   STAMP_TEMPLATES.evidence,
+  STAMP_TEMPLATES.forReview,
+  STAMP_TEMPLATES.notForDistribution,
+  STAMP_TEMPLATES.internalOnly,
+  STAMP_TEMPLATES.proprietary,
   STAMP_TEMPLATES.custom,
 ];
 
@@ -102,6 +135,8 @@ export function renderStampSvg(name: PdfStampName, options: RenderStampOptions):
       return renderEllipseStamp(label, color);
     case "banner":
       return renderBannerStamp(label, color);
+    case "diagonal":
+      return renderDiagonalStamp(label, color);
     default:
       return renderRectangleStamp(label, color);
   }
@@ -134,6 +169,20 @@ function renderBannerStamp(label: string, color: string): string {
   return [
     `<path d="M14 14 L386 14 L386 86 L14 86 Z M386 14 L350 50 L386 86 M14 14 L50 50 L14 86" fill="none" stroke="${color}" stroke-width="6" stroke-linejoin="miter"/>`,
     `<text x="200" y="64" font-family="serif" font-size="40" font-weight="700" fill="${color}" text-anchor="middle" letter-spacing="4">${escapeXml(label)}</text>`,
+  ].join("");
+}
+
+/** 对角斜条带印章：左下 → 右上 的 ribbon，配合扁长 label 文字（NOT FOR DISTRIBUTION / FOR REVIEW ONLY 等场景） */
+function renderDiagonalStamp(label: string, color: string): string {
+  return [
+    // 矩形外框（对角线 ribbon 背景）
+    `<rect x="6" y="6" width="388" height="88" fill="none" stroke="${color}" stroke-width="2" rx="2" ry="2"/>`,
+    // 主对角条带（左下 → 右上）
+    `<polygon points="6,80 320,6 394,6 80,80" fill="${color}" opacity="0.18"/>`,
+    // 副对角条带
+    `<line x1="6" y1="50" x2="394" y2="50" stroke="${color}" stroke-width="1.5" stroke-dasharray="6,4"/>`,
+    // 文字
+    `<text x="200" y="62" font-family="sans-serif" font-size="28" font-weight="700" fill="${color}" text-anchor="middle" letter-spacing="3" transform="rotate(-6 200 50)">${escapeXml(label)}</text>`,
   ].join("");
 }
 
@@ -207,6 +256,13 @@ export function renderStampPreview(name: PdfStampName, options: RenderStampPrevi
       return [
         `<path d="M14 14 L386 14 L386 86 L14 86 Z M386 14 L350 50 L386 86 M14 14 L50 50 L14 86" fill="none" stroke="${safeColor}" stroke-width="6" stroke-linejoin="miter"/>`,
         `<text x="200" y="62" font-family="serif" font-size="${fontSize - 4}" font-weight="700" fill="${safeColor}" text-anchor="middle" letter-spacing="${letterSpacing}">${safeLabel}</text>`,
+      ].join("");
+    case "diagonal":
+      return [
+        `<rect x="6" y="6" width="388" height="88" fill="none" stroke="${safeColor}" stroke-width="2" rx="2" ry="2"/>`,
+        `<polygon points="6,80 320,6 394,6 80,80" fill="${safeColor}" opacity="0.18"/>`,
+        `<line x1="6" y1="50" x2="394" y2="50" stroke="${safeColor}" stroke-width="1.5" stroke-dasharray="6,4"/>`,
+        `<text x="200" y="62" font-family="sans-serif" font-size="${fontSize - 4}" font-weight="700" fill="${safeColor}" text-anchor="middle" letter-spacing="3" transform="rotate(-6 200 50)">${safeLabel}</text>`,
       ].join("");
     default:
       return renderRectangleStamp(label, color);

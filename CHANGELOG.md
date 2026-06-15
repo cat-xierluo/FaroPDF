@@ -1,3 +1,17 @@
+## Unreleased
+
+> v0.2 起步：PDF Expert 视觉与功能对照（ISS-059..065 立项）+ ISS-062 阶段 1 图章扩展。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100。
+
+批注：
+
+- ISS-062 阶段 1：标准图章模板从 5 个扩到 9 个（新增 `FOR REVIEW` / `NOT FOR DISTRIBUTION` / `INTERNAL ONLY` / `PROPRIETARY`），新增 `diagonal` 对角斜条带形态用于带状对角印章；`PdfAnnotationStamp.image` 字段为阶段 2 自定义上传预留。
+
+工程：
+
+- 同步 `src-tauri/Cargo.lock` 中 faropdf 包版本 `0.1.1 → 0.1.2`，与 `Cargo.toml` 对齐（DEC-100 修正 DEC-099 的 Cargo.lock 撤回条款）。
+
+---
+
 ## 0.1.2 - 2026-06-14
 
 
