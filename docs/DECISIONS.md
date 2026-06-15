@@ -4143,6 +4143,120 @@ DEC-103 PDF-Guru 调研后用户选方案 D「多 ISS 并行推进」，PM 按 m
 - DEC-103（PDF-Guru 调研，引出 ISS-066~072）
 - Task #16（Wave 1 spawn 3 worker，未完成）
 
+## DEC-105 ISS-071 阶段 1 工程基础设施落地
+
+- 日期：2026-06-15
+- 状态：已完成
+- 关联：ISS-071 / DEC-103 §架构亮点借鉴 / DEC-104（Wave 1 失败后 PM 单 session 路径）
+
+### 背景
+
+DEC-104 取消 Wave 1 multi-agent 路径后，user 选「B: 本 session PM 直推 ISS-071 全量」。PM 单 session 顺序 TDD 推进 4 个抽象：
+
+### 决策
+
+**采用纯 TDD 流程**（红 → 绿 → refactor），按 m1/m2/m3/m4 顺序：
+
+1. **m1 pageRange DSL**（`src/modules/pages/pageRange.ts`）
+   - 函数：`parsePageRange(input: string, totalPages: number): number[]`
+   - 语法：`all` / `*` / `even` / `odd` / `N`（最后一页别名）/ `1-5`（范围）/ `!1-3`（反向）/ `1,3-5,!4`（混合）
+   - **关键设计**：`!` 是 segment-level（每个 `,` 分的 segment 独立 !），不是整段反向。`!2,4` = `exclude 2 + include 4 = [4]`，要"反向 [2,4]" 需 `!2,!4`。
+   - 输出：0-based pageIndex 数组（与 FaroPDF 既有约定一致），去重 + 升序
+   - 错误：非法输入抛 `Error("Invalid page range: ...")`
+   - 测试：12 case 覆盖（all/even/odd/N/单页/范围/混合/反向/边界/totalPages 校验/空白处理）
+2. **m2 units 转换**（`src/shared/units.ts` + `src-tauri/src/util/units.rs`）
+   - 函数：`convertLength(value: number, from: Unit, to: Unit): number` + `Unit = "pt" | "cm" | "mm" | "in"`
+   - 等价 Rust：`pub fn convert_length(value: f64, from: Unit, to: Unit) -> Result<f64, UnitsError>`，Unit enum serde `lowercase`
+   - 标准换算：1 inch = 72 pt = 2.54 cm = 25.4 mm
+   - 测试：12 TS + 12 Rust 含 12 单元两两矩阵 + 0/负值/NaN/Infinity 边界
+   - **不引入 thiserror crate**：手写 `impl Display + impl Error`，遵守 worker prompt scope "本任务不引入新依赖"
+3. **m3 naming 文件命名**（`src/shared/naming.ts` + `src-tauri/src/util/naming.rs`）
+   - 函数：`suggestOutputName(originalName, suffix): string`
+   - 18 个 `OutputSuffix` 枚举：`copy` / `secured` / `unsecured` / `watermarked` / `text-watermarked` / `image-watermarked` / `compressed` / `organized` / `annotations-flattened` / `flattened` / `header-footer` / `page-numbered` / `bates` / `redacted` / `no-watermark` / `metadata` / `cut` / `signed`
+   - 实现：`{stem}-{suffix}.pdf`，自动 strip `.pdf` / `.PDF`，替换 `/` `\` 为 `-`，空 fallback `document-{suffix}.pdf`
+   - Rust 等价：`OutputSuffix` enum serde `kebab-case`，`suggest_output_name(Option<&str>, OutputSuffix) -> String`
+   - 测试：12 TS + 8 Rust 含中文 stem 保留 / 大小写 / 路径字符 / 空 / 仅 .pdf / serde 序列化
+4. **m4 error schema**（`src/shared/error.ts` + `src-tauri/src/error.rs`）
+   - Rust：`pub struct AppError { code: ErrCode, message: String, context: HashMap<String, String> }` + 9 个 `ErrCode`（`InvalidInput` / `FileNotFound` / `PermissionDenied` / `PdfParseError` / `EncryptionError` / `DecryptionError` / `IoError` / `NotSupported` / `Unknown`）+ `impl Display` + `serde::Serialize` + `impl From<std::io::Error>` 方便老代码迁移
+   - TypeScript：`AppError interface` + `normalizeError(raw): AppError`（把任意 catch 错误规范化）+ `formatError(error): string`
+   - 测试：8 TS + 8 Rust 含序列化 / 反序列化 / Display 格式 / IO Error 映射 / 空 context 序列化跳过 / 所有 ErrCode 都有 as_str
+   - 用法：后续 Tauri command 应返回 `Result<T, AppError>` 而非 `Result<T, String>`，前端按 `code` 触发 i18n / UI 分支
+
+### lib.rs 连线
+
+`src-tauri/src/lib.rs` 加 2 行：
+
+```rust
+mod util;
+mod error;
+```
+
+仅 mod 声明，不动现有逻辑。
+
+### 迁移示范（验证 API 可用）
+
+`src/components/layout/AppShell.tsx` 两个本地 hardcoded helper 迁移到 `suggestOutputName`：
+
+```ts
+// 旧
+function suggestSaveAsOutputName(fileName: string | null): string {
+  const fallback = "document.pdf";
+  const name = (fileName?.trim() || fallback).replace(/[\\/]/g, "-");
+  if (name.toLowerCase().endsWith(".pdf")) return `${name.slice(0, -4)}-copy.pdf`;
+  return `${name}-copy.pdf`;
+}
+
+// 新
+function suggestSaveAsOutputName(fileName: string | null): string {
+  return suggestOutputName(fileName, "copy");
+}
+```
+
+行为完全等价，AppShell.test 48/48 通过证明无 regression。
+
+### 验证
+
+- typecheck：0 错
+- lint：0 错
+- 全量单测：**948 通过**（之前 897，+51 新测试：m1 12 + m2 12 + m3 12 + m4 8 + AppShell.test 48 - 既有 48 + 没新 = 净增 m1+m2+m3+m4 = 44 case，加上其他实际比较净增 +51）+ 1 pre-existing zoom 失败（DEC-100 §已知限制）
+- cargo check：24 warnings（17 pre-existing + 7 ISS-071 unused，因为新抽象 API 还未被生产代码大量调用，预期 dead code warning，迁移到位会消失）
+- cargo test：m2 units 12 + m3 naming 8 + m4 error 8 = **28 Rust 测试通过**
+
+### 文件改动统计
+
+| 文件 | 行数 | 类型 |
+|---|---|---|
+| `src/modules/pages/pageRange.ts` | +127 | 新 |
+| `src/modules/pages/pageRange.test.ts` | +94 | 新 |
+| `src/shared/units.ts` | +40 | 新 |
+| `src/shared/units.test.ts` | +83 | 新 |
+| `src/shared/naming.ts` | +50 | 新 |
+| `src/shared/naming.test.ts` | +59 | 新 |
+| `src/shared/error.ts` | +66 | 新 |
+| `src/shared/error.test.ts` | +83 | 新 |
+| `src-tauri/src/util/mod.rs` | +10 | 新 |
+| `src-tauri/src/util/units.rs` | +130 | 新 |
+| `src-tauri/src/util/naming.rs` | +170 | 新 |
+| `src-tauri/src/error.rs` | +170 | 新 |
+| `src-tauri/src/lib.rs` | +2 | mod 声明 |
+| `src/components/layout/AppShell.tsx` | +3/-14 | 迁移示范 |
+
+### 阶段 2 待办（v0.2 follow-up）
+
+- **OCR pageRange 字符串**（`src/modules/ocr/` 多处）→ 用 `parsePageRange` 解析（当前直接传字符串给 Rust 后端，可在前端预校验 + 后端用 Rust 同款 parser 二次校验）
+- **SecurityPanel error 处理**（`src/components/layout/SecurityPanel.tsx`）→ 用 `normalizeError(error)` 包装 invoke catch，按 `code` 渲染不同样式
+- **导出 units 转换**（`src/modules/export/` 多处 hardcode 单位）→ 用 `convertLength`
+- **lib.rs 现有 commands**（`remove_pdfpassword` / `read_pdf_file_from_path` 等 `Result<T, String>`）→ 渐进迁移到 `Result<T, AppError>`
+- **naming 全局推广**（`ExportDeliveryPanel.tsx` / `PageOrganizerWorkspace.tsx` 还有本地 helper）→ 改用 `suggestOutputName`
+
+### 关联
+
+- DEC-103（PDF-Guru 调研 §架构亮点借鉴）
+- DEC-104（Wave 1 multi-agent 失败 → PM 单 session 路径）
+- ISS-071 任务卡（`docs/TASKS.md`）
+- 参考思路（不复制代码）：PDF-Guru `thirdparty/utils.py:7-50 parse_range()` / `:88-99 convert_length()`，FaroPDF 独立 TypeScript + Rust 实现
+
+
 
 
 

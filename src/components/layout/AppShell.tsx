@@ -3,6 +3,7 @@ import type { AnnotationSidecar, PdfAnnotation } from "../../shared";
 import type { ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
 import type { AppSettings } from "../../shared";
+import { suggestOutputName } from "../../shared/naming";
 import { getCommandById, type AppCommandId, type AppCommandSignal } from "../../shared/app/commands";
 import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
@@ -619,21 +620,13 @@ function matchZoomPreset(zoom: number): ZoomPresetId | undefined {
 }
 
 function suggestAnnotationFlattenOutputName(fileName: string | null): string {
-  const fallback = "document.pdf";
-  const name = (fileName?.trim() || fallback).replace(/[\\/]/g, "-");
-  if (name.toLowerCase().endsWith(".pdf")) {
-    return `${name.slice(0, -4)}-annotations-flattened.pdf`;
-  }
-  return `${name}-annotations-flattened.pdf`;
+  // ISS-071 迁移示范：使用 shared/naming suggestOutputName 替代本地 hardcode
+  return suggestOutputName(fileName, "annotations-flattened");
 }
 
 function suggestSaveAsOutputName(fileName: string | null): string {
-  const fallback = "document.pdf";
-  const name = (fileName?.trim() || fallback).replace(/[\\/]/g, "-");
-  if (name.toLowerCase().endsWith(".pdf")) {
-    return `${name.slice(0, -4)}-copy.pdf`;
-  }
-  return `${name}-copy.pdf`;
+  // ISS-071 迁移示范：使用 shared/naming suggestOutputName 替代本地 hardcode
+  return suggestOutputName(fileName, "copy");
 }
 
 function ContextToolbar({

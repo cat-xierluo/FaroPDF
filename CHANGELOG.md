@@ -1,6 +1,14 @@
 ## Unreleased
 
-> v0.2 起步：PDF Expert 视觉与功能对照（ISS-059..065 立项）+ ISS-060/061/062/064 阶段 1 集成。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100 / DEC-101。
+> v0.2 起步：PDF Expert 视觉与功能对照（ISS-059..065 立项）+ ISS-060/061/062/064 阶段 1 集成 + ISS-071 工程基础设施抽象。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100/101/102/103/104/105。
+
+工程基础设施（ISS-071 阶段 1，DEC-105）：
+
+- 新增 `src/modules/pages/pageRange.ts` 页码范围 DSL parser：支持 `all` / `even` / `odd` / `N`（最后一页）/ `1-5` / `!1-3`（反向）/ `1,3-5,!4`（混合），统一所有页码字符串输入（OCR / 导出 / 提取 / 拆分）。
+- 新增 `src/shared/units.ts` + `src-tauri/src/util/units.rs` 单元转换：pt / cm / mm / in 互转 TS + Rust 双侧。
+- 新增 `src/shared/naming.ts` + `src-tauri/src/util/naming.rs` 文件命名约定：18 个 `OutputSuffix` 枚举集中管理 `{stem}-{suffix}.pdf` 命名。
+- 新增 `src/shared/error.ts` + `src-tauri/src/error.rs` 统一错误 schema：`AppError { code, message, context }` + 9 个 `ErrCode` + `serde::Serialize`，让前端按 code 触发 i18n / UI 分支（替代旧 `Result<T, String>` 字符串错误）。
+- AppShell.tsx 迁移示范：本地 `suggestSaveAsOutputName` / `suggestAnnotationFlattenOutputName` 改用 `suggestOutputName(..., "copy")` / `suggestOutputName(..., "annotations-flattened")`。
 
 UI 信息架构：
 
