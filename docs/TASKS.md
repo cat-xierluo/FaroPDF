@@ -613,6 +613,177 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 回归条件：ISS-007 真实双层 PDF 落地、ISS-013 真实压缩落地、ISS-022 设置浮层合并，或 v0.3 整体收口。
 - 不在 v0.3 实施；后续回到这个方向时从设计文档 §6 / §7 / §8 切入。
 
+### ISS-056 computer-use skill 路径 A：AXPress 优先 + 真实光标存/恢复
+
+- 优先级：P2
+- 类型：工具链调研 / skill 内部升级
+- 状态：暂缓（待综合评估后选定一条或多条并行）
+- 来源：2026-06-15 `computer-use` skill 调研。背景：当前 SKILL.md 走 `osascript` + `System Events`，底层是 `CGEventPost` 全局路径，会动真实鼠标光标；想达到 Codex / Operator 的"独立光标 + 不抢焦点"体验，最低成本是先在 skill 内部改造。
+- 目标：
+  1. 在 `computer-use` skill 的"阶段 2：循环操作"前置一个 AX tree 解析层（`osascript` 拉 AX 元素，匹配描述/标题），命中时优先用 `AXPress` 触发，失败再降级到现有 click button / keystroke。
+  2. 阶段 0.5 用 `cliclick p` 缓存真实光标位置，阶段 2.3 之后用 `cliclick m:原x,原y` 移回去，减少"光标跳"感。
+  3. 阶段 2.4 之后比对新旧 AX tree，触发态变化才算"操作成功"，未变化回退一次 keystroke。
+  4. 输出不变，仍是截图 + README 索引表 + DESIGN.md 对照。
+- 关键文件：
+  - `.claude/skills/computer-use/SKILL.md`
+- 验收：
+  - [ ] 复测 `research/pdf-expert/` 13 张截图，AXPress 路径覆盖至少 5 个原 keystroke 步骤。
+  - [ ] 操作前后真实光标位置一致（`cliclick p` 对比）。
+  - [ ] README 索引表新增"操作方式"列（AXPress / click / keystroke）。
+  - [ ] 失败回退有明确日志（哪个 AX 解析失败 → 降级到哪条路径）。
+
+### ISS-057 computer-use skill 路径 B：装 `minghinmatthewlam/computer-use-mcp` 验证 Codex 体验
+
+- 优先级：P2
+- 类型：工具链调研 / MCP 集成
+- 状态：暂缓（待综合评估）
+- 来源：2026-06-15 调研。该项目是 macOS 14+ Swift 原生 Computer Use MCP，2026-06-10 创建、Stars 少，但实现路径（AXPress → per-window event → per-pid event → opt-in global cursor + 自绘 agent cursor 覆盖层）正是 Codex 那种"独立光标 + 不抢焦点"机制。
+- 目标：
+  1. 在**专用空 macOS 账户**或 VM 内（不要在生产账户）安装 `computer-use-mcp`，授权 Accessibility + Screen Recording。
+  2. 在 Claude Code 注册为 stdio MCP，复用 `computer-use` skill 的 operation 配置跑一次 PDF Expert 截图任务。
+  3. 验证：(a) 真实光标不动 / 不抢焦点 / 用户可并行操作；(b) 自绘 agent cursor 显示在正确位置；(c) AXPress 解析速度与纯 osascript 路径对比。
+  4. 记录权限授权的"宿主进程绑定"问题（TCC 把权限绑到启动 server 的 terminal/agent app，签名 / notarize 需评估）。
+- 关键文件：
+  - `.claude/settings.local.json` 或 `.mcp.json`（MCP 注册）
+  - `.claude/skills/computer-use/SKILL.md`（新增"v2 路径"小节）
+- 验收：
+  - [ ] 在隔离账户 / VM 内 `computer-use-mcp serve` 跑通，`doctor --prompt` 授权成功。
+  - [ ] 同样 13 张截图任务在 MCP 路径下产出截图 + AX tree dump。
+  - [ ] 主观评估"独立光标体验"是否达到 Codex 水平（不是 / 一般 / 接近 / 超过）。
+  - [ ] 安全评估：是否需要 Developer ID 签名 + notarytool 公证，签名前后对权限绑定的影响。
+- 风险：项目新、Stars 少、Swift 原生二进制需要 Accessibility 权限，不要在生产/含敏感数据的 macOS 账户跑。
+
+### ISS-058 computer-use skill 路径 C：clone `anthropic-quickstarts/computer-use-best-practices` 学架构
+
+- 优先级：P2
+- 类型：工具链调研 / 架构学习
+- 状态：暂缓（待综合评估）
+- 来源：2026-06-15 调研。Anthropic 官方 quickstart 是 macOS 原生 Computer Use 参考实现，强调 "run it in a VM!"，展示 explicit tool definitions / image sizing & pruning / prompt caching / server-side compaction / batched tool calls / sandboxed shell / trajectory recording。我们的 `computer-use` skill 离生产可用差的就是这三件事的明确分层。
+- 目标：
+  1. `git clone --depth 1 https://github.com/anthropics/anthropic-quickstarts`，只读 `computer-use-best-practices/` 源码。
+  2. 提炼**不抄代码、只抄心智模型**的三件事：
+     - explicit tool definitions（operation schema 化）
+     - trajectory recording（截图 + 命令 + 时间戳的 JSON 记录，而非纯 README 表格）
+     - verification 闭环（多模态 prompt 模板，让模型自己填"预期 vs 实际"列）
+  3. 把这三件并到 `computer-use` skill SKILL.md，不重复造 quickstart 已经做好的事。
+- 关键文件：
+  - `.claude/skills/computer-use/SKILL.md`
+  - `research/pdf-expert/README.md`（现成的 13 张图做 case study）
+- 验收：
+  - [ ] 一份 **1-2 页的笔记**（`docs/notes/computer-use-quickstart-mental-model.md`），说明 quickstart 怎么把"显式工具 + 轨迹 + 验证"组织成一个 skill，我们怎么学。
+  - [ ] SKILL.md 决定保留 operations 配置 + 加 trajectory.json 输出 + 加多模态验收 prompt 模板。
+  - [ ] 至少在一个新截图任务里跑通 trajectory.json → contact sheet → 多模态 prompt 闭环。
+
+### 综合评估（ISS-056 / 057 / 058 共用）
+
+三条路径不互斥。综合评估的目标是确定：
+
+- **当前阶段**（v0.1.x）：用哪条 / 哪几条？轻量改进先上 ISS-056，重型验证后做。
+- **下一阶段**（v0.2）：是否把 `computer-use` skill 升级到 v2（封装 MCP + trajectory + verification）？
+- **绝对不要**：在 v0.1.x 内把 ISS-057 装到生产账户；ISS-058 不要阻塞 v0.1.x 收口。
+
+## ISS-059..065：PDF Expert 视觉与功能对照复检（v0.2 候选）
+
+> 触发：2026-06-15 大批次 PDF Expert 截图复检（v0.1.2 封箱期间 30 张 + 6 月 15 日新增 39 张），目标是把 PDF Expert 界面语言、画面语义和交互行为系统化记录到仓内，供后续 v0.2 设计 / 实现对照参考。
+> 详细图片索引：见 `research/pdf-expert/FEATURE_CATALOG.md`（按 chrome / 视图与导航 / 侧边栏 / 批注 / 对话框 5 大块罗列 69 张截图要点）。
+> 详细架构对照与落地建议：见 `docs/ARCHITECTURE.md` 中新增的「PDF Expert 视觉与架构对照（v0.2 起点）」节。
+> 详细设计语言对照：见 `docs/DESIGN.md` §18 已扩展的分层与交互对照表。
+
+### ISS-059 多 Tab 与 inline rename
+
+- 优先级：P0
+- 类型：UI 信息架构 / 窗口
+- 来源：PDF Expert 截图 30, 65, 83（窗口顶部文件 tab bar）
+- 目标：
+  1. 同一窗口内开多个 PDF tab；右上角 `+` 新建 tab；选中 tab 内编辑。
+  2. Tab 标题可 inline rename（双击进入编辑态、ESC 取消、Enter 提交）。
+  3. tab 拖拽排序、tab 关闭按钮（X）、tab 拖离窗口剥离为新窗口。
+  4. 不引入新依赖；不破坏现有 `recentFiles`/`utilityPanel` 状态。
+- 关键文件：候选新文件 `src/components/layout/TitlebarTabs.tsx`、`src/state/tabStore.ts`，与 `AppShell.tsx` 集成。
+- 验收：
+  - [ ] 单窗口 ≥ 3 PDF 同时打开，可独立关闭/激活。
+  - [ ] tab 重命名后，主窗口标题/最近文件命名均同步。
+  - [ ] tab 拖放重排序生效，跨窗口剥离生成独立窗口。
+- 备注：v0.1 缺位，但属于「重大交互变化」，先做技术 spike（react-aria/headless UI 选型 + Tauri 多窗口通信）。
+
+### ISS-060 左 + 右 双侧栏（模式驱动侧栏内容）
+
+- 优先级：P1
+- 类型：UI 信息架构
+- 来源：截图 50, 65, 68（右侧栏随工具切换显示签章/图章/OCR 面板）
+- 目标：
+  1. 引入右栏：与左栏对称的 200-320px 宽的 `UtilityPane` 容器。
+  2. 当选择「批注 / 签名 / 图章 / OCR」类工具时，右栏自动打开并展示对应模板/列表/选项。
+  3. 选择「阅读」或「编辑」时右栏关闭，左栏 4 tabs（书签/大纲/批注/缩略图）不受影响。
+  4. 与现有 4-tab Sidebar 同级别但独立；左右栏宽度各自持久化。
+- 关键文件：`src/components/layout/AppShell.tsx`（布局层）、`src/components/layout/RightPane.tsx`（新增）、`src/components/layout/Sidebar.tsx`。
+- 验收：切换工具模式时，右栏内容随之替换；高度 0 折叠态折叠；阴影 16% 透明不挡主内容。
+- 备注：v0.1 留有 `Tool` 入口（v0.3 follow-up）；本次仅做主路径。
+
+### ISS-061 浮动文本工具条（高亮 / 下划线 / 删除线 / 便签 / 复制 / 翻译 / 朗读）
+
+- 优先级：P1
+- 类型：批注 UI 强化
+- 来源：截图 23 floating annotate toolbar（PDF Expert 选区后立即出现的微型工具条）
+- 目标：
+  1. `TextSelectionOverlay` 重构：选区确定后即出现靠近选区中心的浮动工具条。
+  2. 操作 5 个：Hl（高亮）/ Ul / St / Note / Copy。
+  3. 工具条锚定到选区 bbox 中心 + 偏移，bounds 内吸附到视口边缘。
+  4. 翻译 / 朗读两个 v0.1 没能力的按钮可以 v0.2 预留位但 disabled。
+- 关键文件：`src/components/layout/TextSelectionOverlay.tsx`、`src/components/layout/TextSelectionOverlay.css`。
+- 验收：选完文本 100ms 内浮现；可逐项点击执行；Esc 关闭；不抢主选择区域焦点。
+- 备注：v0.1 已有 `TextSelectionOverlay` 简化版（仅高亮颜色条），本 ISS 升级为 PDF Expert 同位级浮动工具条。
+
+### ISS-062 图章模板可编辑（标准 + 自定义）
+
+- 优先级：P1
+- 类型：批注
+- 状态：阶段 1 已完成（2026-06-15，内置 5→9 + diagonal 形态）；阶段 2 自定义上传 tab + 缩略图渲染待启动。
+- 来源：截图 55（图章面板：标准 2×2 = 4 个 + 自定义 8 个）
+- 目标：
+  1. 现状 `stamps.ts` 已有 5 个内置模板（APPROVED / DRAFT / CONFIDENTIAL / FINAL / DRAFT COPY）。需扩展至 ≥ 8 个内置（新增 FOR REVIEW / NOT FOR DISTRIBUTION / INTERNAL ONLY / PROPRIETARY 等常用印章）。
+  2. 新增「自定义」tab，承载用户上传 PNG/JPG 印章图（≤ 4 张 / 用户，缩略图 + 名称）。
+  3. 落点：右侧 utility pane `StampPanel`，图章由「批注」二级工具条入口。
+- 关键文件：`src/modules/annotation/stamps.ts`、`src/modules/annotation/ui/StampPanel.tsx`（新增）。
+- 验收：内置 5→8 模板；可上传/删除自定义；图章拖入 PDF 落点合理；同质化标准圆框。
+
+### ISS-063 文档属性对话框
+
+- 优先级：P2
+- 类型：UI 补充
+- 来源：截图 14（设置 / 文档属性面板）
+- 目标：补一个文档属性页（标题、作者、创建时间、页数、文件大小、字体、安全属性、是否加密）。
+- 关键文件：`src/modules/document/properties.ts`（新）、`src/modules/document/ui/PropertiesDialog.tsx`（新）、`src/shared/app/commands.ts` 新增 `document-properties` 命令。
+- 验收：File > Properties 弹出 modal；可只读展示，可编辑标题/作者/页数（如果原 PDF 允许）；窗口关闭后不污染状态。
+- 备注：v0.2 候选；如不优先，可合并到 v0.3。
+
+### ISS-064 文档密码保护（设置 / 移除）
+
+- 优先级：P1
+- 类型：安全 / 导出
+- 来源：截图 52（设置密码 modal：密码输入 + 确认输入 + 取消/确定）
+- 目标：
+  1. 在工具启动器「导出」分组中加 `设置密码 / 移除密码` 命令。
+  2. 通过 Rust 后端封装 qpdf 1.7 类的密码设置 / 移除。
+  3. 安全策略：默认输出新副本（`* -secured.pdf` / `* -unsecured.pdf`），不覆盖原文件。
+- 关键文件：`src-tauri/src/export/password.rs`（新）、`src/modules/export/ui/ExportDeliveryPanel.tsx`。
+- 验收：选定文件路径后调出密码设置 modal；确认可重新打开 PDF 不需要密码；重新打开需要密码。
+
+### ISS-065 v0.2 起步：PDF Expert 视觉信息架构对齐
+
+- 优先级：P0（v0.2 顶层目标）
+- 类型：UI 信息架构 / 整体 polish
+- 状态：进行中（自 ISS-055 起延续至 v0.2 起点）
+- 目标（截至 v0.2）：
+  1. **多 Tab**（ISS-059 解决）：单窗口可开多个 PDF，互不干扰。
+  2. **左 + 右 双侧栏**（ISS-060 解决）：左 tabs（书签/大纲/批注/缩略图），右 pane 模式驱动（签章/图章/OCR）。
+  3. **浮动工具条**（ISS-061 解决）：选区中心弹出 Hl/Ul/St/Note/Copy。
+  4. **图章扩展**（ISS-062 解决）：内置 5→8，新增自定义上传。
+  5. **密码保护**（ISS-064 解决）：设置/移除密码的新模态对话框。
+- 跨任务约束：v0.2 阶段不再为这些特性引入新顶层按钮、不修改 `app.menu` 顶层结构、不变更导出二级工具条布局、不破坏 v0.1 顶栏克制原则（`ISS-030`/`ISS-037`）。
+- 关键参考：`docs/DESIGN.md` § 当前设计差距（"顶栏仍过密"）+ `research/pdf-expert/FEATURE_CATALOG.md`。
+- 验收：ISS-059/060/061/062/064 全部通过且互不破坏；`npm test`/`tsc -p .`/`cargo test`/lint 全绿。
+
 ## 归档任务索引
 
 已合并到 main 或第一版已发布的功能，详细任务卡归档在 `docs/DECISIONS.md` 的「ISS 任务归档」一节。索引按领域分组：
@@ -640,6 +811,9 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
+- 2026-06-15：完成 ISS-062 阶段 1（内置图章 5→9 + diagonal 对角斜条带形态）。`PdfStampName` 扩 4 个（forReview / notForDistribution / internalOnly / proprietary），`PdfStampShape` 加 `diagonal`，`PdfAnnotationStamp.image` 字段为阶段 2 自定义图章预留；stamps.test.ts 12/12 通过；阶段 2 自定义上传 tab + 缩略图渲染留下次推进。
+- 2026-06-15：登记 DEC-100 修正 DEC-099 与 Cargo 现实矛盾——HEAD 上 Cargo.toml = 0.1.2 但 lock = 0.1.1 本就不同步，working tree lock 升 0.1.2 是修复同步，应保留，DEC-099 "撤回 Cargo.lock" 条款作废。
+- 2026-06-15：登记 ISS-056 / 057 / 058 + 综合评估段。`computer-use` skill 调研结论：当前走 `osascript + System Events` 是"路径 B 最轻量"路线，能用但会动真实鼠标；Codex 那种"独立光标 + 不抢焦点"靠的是 AXPress 优先 + 自绘覆盖层 / MCP 代理。给出三条升级路径（A 自改 / B 装第三方 MCP / C 学官方 quickstart 架构）暂缓入队，综合评估不互斥、A 最轻先做、B/C 安全风险需评估。
 - 2026-06-09：完成 ISS-055。针对用户继续反馈的多层级菜单与整体简洁问题，收口顶栏任务模式入口：`OCR / 批注 / 填写和签名 / 导出` 统一进入 `工具` 工作流启动器，顶栏只保留阅读和全局入口；切入后继续显示对应上下文工具条或工作台。
 - 2026-06-09：完成 ISS-054。深色模式作为 `设置 > 常规` 的外观偏好接入，默认浅色、旧设置缺字段回退浅色；切换深色后根节点写入 `data-theme="dark"` 并套用深色 token，不新增顶栏、二级工具条或工具启动器入口，PDF 纸面内容保持不反相。
 - 2026-06-09：完成 ISS-053。页眉页脚继续保持工具启动器 / 原生菜单深层入口，不进入导出二级工具条；右侧交付设置面板新增页眉 / 页脚各自的左 / 中 / 右视觉位置选择器，导出时映射到上方 / 下方 watermark placement，并继续与奇偶页范围共存。

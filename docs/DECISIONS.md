@@ -3737,3 +3737,98 @@ DEC-097 阶段 1 落 3 个 PDF 改写能力的引擎 + 共享契约 + 单元测�
 - `src/components/layout/PageOrganizerWorkspace.tsx`（3 按钮 + 3 对话框 + 错误处理）
 - `src/components/layout/PageOrganizerWorkspace.css`（4 个新 class）
 - `src/components/layout/PageOrganizerWorkspace.test.tsx`（8 新测试，16/16 通过）
+
+## DEC-099 撤回 working tree 半做的 0.1.2 updater 启用尝试
+
+- 日期：2026-06-15
+- 状态：已撤回
+- 关联任务：ISS-021（v0.3 评估）/ ISS-036（仓库私有）
+- 前置：cce1ce5（删 pubkey 字段）/ v0.1.2 tag（d538247，22:17:18 +0800）
+
+### 背景
+
+`v0.1.2` tag 注释里写了 6 步"启用 updater"配方（`cargo tauri signer generate` → GitHub Secret 注入 → 替换 pubkey → 翻转 `createUpdaterArtifacts` / `updater.active` → 删 `release.yml` publish 段 `if: false` → 重打 `v0.1.2-rc.1`）。在 2026-06-14 23:30 前后的 session 末尾，有人按 6 步配方**只走了 1.5 步**就停了：
+
+- `src-tauri/Cargo.lock`：`faropdf` 包 `version = "0.1.1" → "0.1.2"`（uncommitted）
+- `src-tauri/tauri.conf.json`：在 `plugins.updater` 内加回 `pubkey` 字段（旧 placeholder pubkey，私钥已 rm 丢弃；DEC-065 记录），但 `active: false` 和 `createUpdaterArtifacts: false` **没改**
+- 没有新 commit、没新文件（除 research/ + docs/handoffs/）、没 CHANGELOG 追加、没 push、没新 tag、没生成新 keypair
+
+这构成 working tree 与 v0.1.2 tag / HEAD 的不一致状态。
+
+### 决策
+
+**直接 `git checkout -- src-tauri/Cargo.lock src-tauri/tauri.conf.json` 撤回 working tree 改动**，回到与 `cce1ce5` / `v0.1.2` tag 完全一致的状态。
+
+理由：
+
+1. **半做状态自相矛盾**：`updater.active: false` 与 `pubkey` 字段共存，文档和审计上都需要额外解释；下个 session 接手时要花成本解释"为什么 active 是 false 但 pubkey 在"。
+2. **pubkey 是孤儿**：当前 working tree 加回的 pubkey 对应的私钥已 `rm` 丢弃（DEC-065 记录），即便上线也校验不过；要真启用 updater 必须先生成新 keypair，再走 1-6 步。半做 pubkey 替换不构成"启用了 updater"，只构成"看起来要启用但实际不能用"。
+3. **ISS-036 仓库私有没有解**：`https://github.com/cat-xierluo/FaroPDF/releases/latest/download/latest.json` 仍 404，updater 端点本身在仓库公开前**完全不可用**。在产品侧把仓库转 public 之前，启用 updater 的全部前置条件没凑齐，工程层 6 步配方开了也没用。
+4. **v0.1 阶段显式收口的边界更清晰**：撤回后 v0.1.2 等同于"封箱但 updater 禁用"，与 6 步配方注释和 `release.yml` publish `if: false` 状态完全一致；下个 PR / release 的工作面更窄。
+
+### 验证
+
+- `git status --short` 当前只剩 untracked（`docs/handoffs/` + `research/`），无 modified。
+- `git diff v0.1.2 HEAD -- src-tauri/Cargo.lock src-tauri/tauri.conf.json package.json` 为空。
+- `git show v0.1.2:src-tauri/tauri.conf.json` 与 `git show HEAD:src-tauri/tauri.conf.json` 完全一致（无 pubkey、`updater.active: false`、`createUpdaterArtifacts: false`）。
+- `git show HEAD:src-tauri/Cargo.lock` `faropdf` 包仍 `version = "0.1.1"`。
+
+### 已知限制
+
+- **updater 启用计划延期到 0.1.3 之后**：本期 6 步配方整体后移；下个 session 如果要重做，先解 ISS-036（仓库公开）+ 走完整 1-6 步，不要再做"半做 pubkey + active: false"的中间态。
+- **research/pdf-expert/ + docs/handoffs/ 仍 untracked**：这两项是**预期新增**而非遗漏，按 .gitignore 当前规则需要手动 `git add`。`research/` 是否入仓留给 v0.3 阶段（可能走 `git lfs` 或文档子目录）；`docs/handoffs/` 入仓需新 PR。
+
+### 关联
+
+- `docs/handoffs/2026-06-14-context-handoff.md` §3.1（未完成项 P0 / 决策点 A）
+- `docs/ROADMAP.md` §9（v0.3 评估范围）
+- `docs/DECISIONS.md` DEC-065（pubkey 替换与 keypair 强密码）/ DEC-070（v0.1.0 4 轮 CI 修复复盘）/ DEC-071（v0.1.1 Folia 对齐）
+- `CHANGELOG.md` 0.1.2 段（不修改；撤回属于内部清理，不打断用户可见变更）
+- v0.1.2 tag 注释（6 步配方原文）
+
+## DEC-100 修正 DEC-099：Cargo.lock 升 0.1.2 是正确同步，不应撤回
+
+- 日期：2026-06-15
+- 状态：已修正
+- 关联：DEC-099 / ISS-021
+
+### 背景
+
+DEC-099 §决策段写"直接 `git checkout -- src-tauri/Cargo.lock src-tauri/tauri.conf.json` 撤回 working tree 改动"，并在 §验证段断言 `git show HEAD:src-tauri/Cargo.lock` 上 faropdf 包 `version = "0.1.1"`，意指撤回后 lock 与 HEAD 一致。
+
+2026-06-15 复检发现 DEC-099 的事实判断与现状矛盾：
+
+- `git show HEAD:src-tauri/Cargo.toml` 中 faropdf 包 `version = "0.1.2"`（cce1ce5 committed）。
+- `git show HEAD:src-tauri/Cargo.lock` 中 faropdf 包 `version = "0.1.1"`（即 v0.1.2 tag 上 lock 没跟着升）。
+- `git show v0.1.2:src-tauri/Cargo.toml` 也是 `0.1.2`；`git show v0.1.2:src-tauri/Cargo.lock` 也是 `0.1.1`。
+
+也就是说，**HEAD 与 v0.1.2 tag 上的 Cargo.toml/Cargo.lock 本身就不同步**。Working tree 的 lock 升到 0.1.2（cargo 编译时自动同步触发）反而**修复**了 toml/lock 不同步问题，DEC-099 的"撤回"建议如果照做会让 lock/toml 重新不一致，下次 cargo check 又会把 lock 改回 0.1.2，撤回毫无意义。
+
+### 决策
+
+**保留 working tree 的 Cargo.lock 0.1.1 → 0.1.2 改动**，让 lock 与 toml 同步。这一项作为独立 `chore(release):` commit 提交，不与 v0.2 业务代码混。
+
+DEC-099 §决策段中"撤回 Cargo.lock"的部分**作废**，仅保留以下生效结论：
+
+- ✅ `tauri.conf.json` 中 `updater.active: false` + 无 pubkey 字段是正确状态（cce1ce5 已 committed）。
+- ✅ updater 启用 6 步配方整体后移到 0.1.3 之后，前置条件 ISS-036（仓库私有）+ 新 keypair 一起解。
+- ❌ `Cargo.lock` 撤回（本 DEC-100 修正）。
+
+### 验证
+
+- `git show HEAD:src-tauri/Cargo.toml | grep -E '^(name|version)'`：`name = "faropdf"` + `version = "0.1.2"`。
+- `git show HEAD:src-tauri/Cargo.lock | awk '/name = "faropdf"/,/^$/'`：`version = "0.1.1"`（不同步源头）。
+- `cat src-tauri/Cargo.lock | awk '/name = "faropdf"/,/^$/'`（working tree）：`version = "0.1.2"`（同步修复）。
+
+### 已知限制
+
+- **DEC-099 的事实段不修订**：作为决策快照保留，本 DEC-100 是其修正版本。引用 DEC-099 时同时读 DEC-100。
+- **v0.1.2 tag 上的 lock 不同步**已成既成事实，后续若需要从 v0.1.2 tag 完全重建二进制，需要先在 tag 上重新跑 `cargo build` 让 lock 同步（或者标识 `release` 时只信任 Cargo.toml 的 version 字段）。
+
+### 关联
+
+- DEC-099（被部分修正）
+- DEC-065（pubkey 替换与 keypair 强密码）
+- ISS-036（仓库私有导致 updater endpoint 404）
+- DEC-097 / DEC-098（v0.1.2 PR #62 + #64 累计）
+
