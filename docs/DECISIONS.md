@@ -3989,5 +3989,83 @@ DEC-101 把 ISS-060 / ISS-061 / ISS-064 阶段 1 集成 push 前，跑了一次�
 - `research/pdf-expert/`（PDF Expert 截图素材池）
 - ISS-064 阶段 2（lopdf 0.34 / qpdf 引入 + set_pdfpassword 真实加密 + allowlist）
 
+## DEC-103 PDF-Guru 参考项目调研结论
+
+- 日期：2026-06-15
+- 状态：已归档（调研报告）
+- 关联：ISS-066~072（基于调研新立）/ DEC-101 / DEC-102 / 用户原始请求 2026-06-15 第 11 turn
+
+### 背景
+
+用户提供参考项目 `/Users/maoking/Library/Application Support/maoscripts/参考项目/PDF-Guru` 让 FaroPDF 对照学习。spawn `Explore` agent 做了全功能领域对照调研（含已完成功能学习优化点）。
+
+### 项目元信息
+
+| 维度 | PDF-Guru | FaroPDF |
+|---|---|---|
+| 技术栈 | Go + Wails v2.5.1 + Vue 3 + Pinia + Ant Design Vue + Python（PyMuPDF + pdfcpu + PaddleOCR + Tesseract） | Rust + Tauri v2 + React + Vite + TypeScript + pdf-lib + lopdf + PDF.js |
+| License | **AGPL-3.0**（强 copyleft） | （FaroPDF 当前未明示，路线倾向闭源 / 商业友好） |
+| PDF 处理 | PyMuPDF 主力 + pdfcpu 压缩 | pdf-lib（前端）+ lopdf（Rust 后端）+ PDF.js（阅读） |
+| 形态 | 操作工具箱（无独立阅读器 + 无检索 + 无 AcroForm） | 完整阅读器 + 工具集 |
+
+### 关键决策
+
+1. **不直接复制代码**：PyMuPDF 是 AGPL-3.0，Wails 也是；引入即"传染" FaroPDF。**只学 API 设计 + 数据流 + 算法思路**，所有实现必须独立 Rust / TypeScript 重写。
+2. **必要时走子进程边界**：若某些功能（如 AES-256 加密 / PaddleOCR 标题识别）必须用 PyMuPDF，参考 PDF-Guru "Python sidecar + JSON IPC"模式（FaroPDF 现已对 OCR 走 ocrmypdf 子进程，可复用同套框架），保持 license 边界清晰。
+
+### FaroPDF 已完成功能学习优化点（4 个）
+
+| 现状 | PDF-Guru 做法 | 优化建议 |
+|---|---|---|
+| 水印（单行） | `thirdparty/watermark.py:43-69` 多行 + 网格平铺 + angle + line_spacing + word_spacing | 加多行 / 平铺模式到 `ExportDeliveryPanel`（low cost） |
+| 批注 9 类 | `thirdparty/annot.py:6-30` `annot_type_code` 字典含 freetext / caret / line / polygon / polyline / squiggly | 律师"批注框"场景强需求 freetext，补到 `src/modules/annotation/`（low cost） |
+| 页码 | FaroPDF 只能加，PDF-Guru `page_number.go:42-61` `RemovePDFPageNumber` 按 margin_bbox + remove_list 去除 | 加去除功能（low cost） |
+| 文件命名 | FaroPDF `{stem}-export.pdf` 太单一 | PDF-Guru 按操作分后缀 `{stem}-加密.pdf` / `-双层.pdf` / `-加页眉页脚.pdf`；抽 `src-tauri/src/export/naming.rs`（low cost） |
+
+### 新立 ISS（v0.2 / v0.3 候选）
+
+详见 `docs/TASKS.md` ISS-066~072。摘要：
+
+| ISS | 名称 | 优先级 | 工作量 | 律师场景价值 |
+|---|---|---|---|---|
+| **ISS-066** | 扫描清洁校正（拆双页 / 网格切 / 自定义断点切） | P1 | medium | 高（v0.1 仍有缺口） |
+| **ISS-067** | 矩形遮罩涂黑 + 去页眉页脚 | **P0** | low | **极高**（证据遮蔽 + 卷宗格式清洁） |
+| **ISS-068** | 去水印（按索引 / 按文本内容） | **P0** | medium | **高**（卷宗常见"草稿"水印清除） |
+| **ISS-069** | OCR 后自动生成目录（字号 + 字体 + 缩进聚类） | P0 | high | 高（律师卷宗自动出目录） |
+| **ISS-070** | 签名手写板（v-perfect-signature 等价 React） | P1 | low | 高（弥补 v0.1 表单签名只支持 PNG/JPG） |
+| **ISS-071** | 工程基础设施抽象（页码 DSL / 单元转换 / 文件命名 / 错误 schema） | P1 | low | 中（一次性受益所有 ISS） |
+| **ISS-072** | 文档属性写回（扩展 ISS-063 从只读到读写） | P2 | low | 中（律师整理客户文件常用） |
+
+### 架构亮点借鉴（4 个）
+
+1. **统一页码范围 DSL** `parse_range()` 支持 `all` / `even` / `odd` / `1,4-5` / `!1-3` / `N`（`thirdparty/utils.py:7-50`）→ 抽 `src/modules/pages/pageRange.ts` 给所有页码输入复用。
+2. **单元转换工具** `convert_length()` pt ↔ cm ↔ mm ↔ in（`thirdparty/utils.py:88-99`）→ `src-tauri/src/util/units.rs` + `src/shared/units.ts`。
+3. **统一结构化错误返回**：PDF-Guru Python 端每个函数 `try/except` 写 `cmd_output.json` 含 `{status, message}`。FaroPDF 当前 Rust 命令 `Result<T, String>` 字符串化错误，建议改 `Result<T, AppError>` + `AppError` 可序列化到前端 + i18n key。
+4. **文件命名按操作分后缀**：`{stem}-加密.pdf` / `-双层.pdf` / `-加页眉页脚.pdf`（PDF-Guru 全 Python 一致）→ 抽 `src-tauri/src/export/naming.rs` 统一管理。
+
+### 明确不参考（5 项）
+
+1. **`thirdparty/crack.py` 密码破解**（hashcat）—— 法律风险 + 道德风险
+2. **`trial.go` 试用次数限制**（基于 `debug.log` 数字）—— 法律材料工具不能做这种限制
+3. **Python sidecar JSON 文件 IPC**（`cmd_output.json`）—— 性能差，FaroPDF Tauri 直接走 Rust ↔ JS 双向绑定更好
+4. **27 个散乱 Pinia store**（按操作切而非按领域切）—— FaroPDF 按 reader / annotation / pages / export / forms / ocr / settings 领域切更可维护
+5. **全局单例 PaddleOCR 进程**（`thirdparty/ocr.py:31-33`）—— FaroPDF 已多后端 + 子进程隔离 + consent guard 更安全
+
+### License 风险评估
+
+- **PyMuPDF AGPL-3.0**：若 FaroPDF 引入 → 必须开源 FaroPDF 或走子进程边界（PDF-Guru 路径）。
+- **Wails AGPL-3.0**：FaroPDF 用 Tauri Apache-2.0 / MIT，路线干净。
+- **pdfcpu Apache-2.0**：可考虑引入作 Rust crate（已有 `pdfcpu` Go 库，无 Rust 绑定；待评估）。
+- **action**：不引入 PyMuPDF；如需 ISS-069 OCR 标题识别，先调研纯 Rust / TypeScript 替代（如 `tesseract-rs` + 字号聚类算法独立实现）。
+
+### 关联
+
+- 调研 agent: `Explore` subagent_type，本次 turn 内 spawn
+- ISS-066 / 067 / 068 / 069 / 070 / 071 / 072（基于本调研新立）
+- DEC-102（v0.2 集成 + code review 修复）
+- 参考项目本地路径：`/Users/maoking/Library/Application Support/maoscripts/参考项目/PDF-Guru`
+- 参考项目 GitHub：`kevin2li/PDF-Guru`
+
+
 
 

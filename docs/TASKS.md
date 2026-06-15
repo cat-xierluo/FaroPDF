@@ -787,6 +787,179 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 关键参考：`docs/DESIGN.md` § 当前设计差距（"顶栏仍过密"）+ `research/pdf-expert/FEATURE_CATALOG.md`。
 - 验收：ISS-059/060/061/062/064 全部通过且互不破坏；`npm test`/`tsc -p .`/`cargo test`/lint 全绿。
 
+## ISS-066..072：基于 PDF-Guru 调研立的能力候选（v0.2 / v0.3）
+
+> 来源：DEC-103 PDF-Guru 调研结论。律师场景刚需 + 工程基础设施。**只学思路 + 独立重写**（PDF-Guru 是 AGPL-3.0，不引入代码）。
+
+### ISS-066 扫描清洁校正（拆双页 / 网格切 / 自定义断点切）
+
+- 优先级：P1
+- 类型：扫描预处理 / 页面整理 / 律师场景刚需
+- 状态：未启动
+- 来源：DEC-103 / ROADMAP §5 v0.1 缺口"扫描清洁校正"+ PDF-Guru `cut.go` + `thirdparty/cut.py:15-79`
+- 律师场景：扫描卷宗常见双页合一（A3 扫成 A4 两页粘一起）/ 多面 A4 拼图扫成单页 / 需要按断点切单页为多页
+- 目标：
+  1. 实现 3 种切页模式：
+     - **网格切**（n_row × n_col）：把每页按矩阵切成 N 个子页，常用于 2×1 拆双页
+     - **自定义断点切**：用户在缩略图上拖断点线（横/纵），按断点切成多页
+     - **裁边切**：按 margin_bbox 裁掉页边白边或扫描黑边
+  2. 反操作：**组合**（`combine_pdf_by_grid` 思路）—— 把多页按网格拼成大页（用于打印场景）
+  3. 接入页面管理工作台，作为 `extract` 类操作的扩展
+  4. 默认输出 `*-cut.pdf` 新副本
+- 关键文件：
+  - `src/modules/pages/scanSplit.ts`（新）：算法
+  - `src/components/layout/PageOrganizerWorkspace.tsx`：UI 入口
+  - `src/modules/export/pdfOperationEngine.ts`：导出引擎扩展
+- 参考思路（不复制）：PyMuPDF `page.set_cropbox(bbox)` + 多次 `show_pdf_page` 拼接
+- 验收：
+  - [ ] 网格切 2×1 可拆双页扫描件为单页流（验收用 fixture 横向 A4 双页 PDF）
+  - [ ] 用户在缩略图上拖断点可视化切页
+  - [ ] 输出 `*-cut.pdf` 新副本，不覆盖原文件
+
+### ISS-067 矩形遮罩涂黑 + 去页眉页脚
+
+- 优先级：**P0**
+- 类型：导出 / 律师证据遮蔽 / 律师场景刚需
+- 状态：未启动
+- 来源：DEC-103 / PDF-Guru `mask.go` + `thirdparty/mask.py:18-60` + `header_and_footer.go:60-83`
+- 律师场景：
+  - **证据遮蔽**：身份证号 / 隐私电话 / 商业秘密在出具材料时必须涂黑，是律师工作高频操作
+  - **去页眉页脚**：扫描卷宗多有原始页眉页脚（"机密"/"内部资料"/页码），出庭前清理
+- 目标：
+  1. **矩形遮罩**：用户在阅读区拖矩形 → 黑色 / 白色 / 自定义颜色填充覆盖 → 写入新副本（`*-redacted.pdf`）
+  2. **多矩形批量**：支持一次遮罩多个区域，同页或跨页
+  3. **去页眉页脚**：按 `margin_bbox` 自动裁掉上/下边的页眉页脚区域（不是覆盖，是真删除内容流）
+  4. 进入工具启动器「标注填写」分组（与批注体系并列，因为本质是"信息处置"）
+  5. 默认输出 `*-redacted.pdf` 不覆盖原文件
+- 关键文件：
+  - `src/modules/redaction/`（新模块）
+  - `src/components/layout/RedactionOverlay.tsx`（新）：阅读区拖矩形 UI
+  - `src/modules/export/pdfOperationEngine.ts`：加 `redact` operation
+  - `src/shared/app/commands.ts`：加 `redaction-add-rect` / `redaction-export` 命令
+- 参考思路（不复制）：PDF-Guru 用 `reportlab.canvas` 生成黑色矩形 PDF 再 `show_pdf_page(overlay=True)`，FaroPDF 用 pdf-lib `drawRectangle({color: rgb(0,0,0)})` + `flushAnnotations` 真删除批注层
+- 验收：
+  - [ ] 在阅读区拖矩形添加 1 个遮罩，预览实时显示黑色覆盖
+  - [ ] 跨页多矩形批量遮罩
+  - [ ] 去页眉页脚按 `margin_bbox` 真删除内容
+  - [ ] 输出 `*-redacted.pdf` 新副本，原文件保留
+  - [ ] 输出的遮罩区域**真不可恢复**（不是 PDF annotation，是 content stream 编辑）
+
+### ISS-068 去水印（按索引 / 按文本内容）
+
+- 优先级：**P0**
+- 类型：导出 / 律师卷宗清洁
+- 状态：未启动
+- 来源：DEC-103 / PDF-Guru `watermark.go:115-138` + `thirdparty/watermark.py` remove 段
+- 律师场景：卷宗常带原始水印（"草稿"/"机密"/版权 logo），开庭前清洁
+- 目标：
+  1. **检测水印**：扫描 PDF 内容流找 watermark 候选（重复出现的文本对象 / 半透明图片 / 旋转文本）
+  2. **按索引删**：用户在检测列表里勾选要删的水印对象
+  3. **按文本内容删**：输入要删除的水印文本（如"草稿"），自动批量删除所有匹配项
+  4. 默认输出 `*-no-watermark.pdf` 新副本
+- 关键文件：
+  - `src/modules/redaction/watermarkRemover.ts`（新）
+  - `src-tauri/src/lib.rs`：可能需 Rust 后端处理内容流（lopdf 可解析 PDF 对象）
+  - `src/modules/export/ui/ExportDeliveryPanel.tsx`：增"去水印"工具
+- 参考思路（不复制）：PDF-Guru 解析 PDF object stream 找 watermark 对象，本质是 PDF 内容流 patch
+- 验收：
+  - [ ] 检测出测试 PDF（含明显"草稿"水印）的水印对象列表
+  - [ ] 按索引或文本删除水印
+  - [ ] 输出 `*-no-watermark.pdf` 验证视觉上无水印
+
+### ISS-069 OCR 后自动生成目录（字号 + 字体 + 缩进聚类）
+
+- 优先级：P0
+- 类型：OCR 后处理 / 自动出目录
+- 状态：未启动
+- 来源：DEC-103 / PDF-Guru `thirdparty/bookmark.py:1-72` 600+ 行
+- 律师场景：扫描卷宗 OCR 后自动生成目录（章节 / 证据 / 附件），免手动编排
+- 目标：
+  1. OCR 完成后扫描文字层，按字号 + 字体 + 缩进三维度聚类识别章节
+  2. 中文章节模式正则识别：`第X章` / `1.1.1` / `\t` 缩进 / `证据X`
+  3. 自动生成 PDF bookmark（outline），写入新 PDF 副本
+  4. 用户可在 UI 预览生成的目录树，二次手工编辑
+- 关键文件：
+  - `src/modules/ocr/autoToc.ts`（新）
+  - `src-tauri/src/auto_toc.rs`（新，可能需 PyO3 子进程或独立实现）
+- 参考思路（不复制）：PDF-Guru `title_preprocess()` 80-130 行 + `bookmark.py` 主算法。FaroPDF 应纯 Rust / TypeScript 重写，不引入 PyMuPDF（AGPL 风险）
+- 验收：
+  - [ ] 测试卷宗（5 章 + 10 证据 + 3 附件）自动识别 ≥ 90% 的章节标题
+  - [ ] 用户在 UI 二次编辑目录
+  - [ ] 输出含 outline 的新 PDF 副本
+
+### ISS-070 签名手写板（v-perfect-signature 等价 React）
+
+- 优先级：P1
+- 类型：表单签名 / 律师材料签字
+- 状态：未启动
+- 来源：DEC-103 / PDF-Guru `sign.go` + `sign.py:8-38` + `v-perfect-signature` Vue 库
+- 律师场景：律师在客户文件、和解协议、授权委托书上签字，弥补 v0.1 表单签名只支持上传 PNG/JPG 的缺口
+- 目标：
+  1. 引入手写签名 React 库（如 `react-signature-canvas` MIT）
+  2. 用户在 modal 内画签名 → 自动把白底变透明 + bbox 裁剪 → 保存为 PNG
+  3. 接入表单签名流程：用户在表单签名字段 / 文档任意位置拖入签名
+  4. 签名持久化（用户的"我的签名"列表，可保存多个）
+  5. 默认输出 `*-signed.pdf` 新副本
+- 关键文件：
+  - `src/modules/forms/ui/SignaturePad.tsx`（新）
+  - `src/modules/forms/signatureStore.ts`（新）：签名持久化
+  - `src/shared/app/commands.ts`：加 `forms-sign-handwrite` 命令
+- 参考思路（不复制）：PDF-Guru `sign_img()` 用 PIL 像素级遍历转透明（O(w×h) 慢）。FaroPDF 用 Canvas `getImageData` + 阈值算法，更快
+- 验收：
+  - [ ] 用户可在 modal 内画手写签名
+  - [ ] 签名背景透明，签字部分清晰
+  - [ ] 签名持久化，下次打开仍在
+  - [ ] 接入表单签名字段，可拖入 / 单击落点
+
+### ISS-071 工程基础设施抽象（页码 DSL / 单元转换 / 文件命名 / 错误 schema）
+
+- 优先级：P1
+- 类型：工程基础设施 / 重构 / 复用
+- 状态：未启动
+- 来源：DEC-103 §架构亮点借鉴
+- 目标：一次性受益所有 ISS 的 4 个基础抽象
+  1. **页码范围 DSL**（`src/modules/pages/pageRange.ts`）
+     - 支持 `all` / `even` / `odd` / `1,4-5` / `!1-3`（反向）/ `N`（最后一页）
+     - 解析为 `number[]` 给所有页码输入复用（OCR 范围 / 导出范围 / 提取范围 / 删除范围）
+  2. **单元转换工具**（`src-tauri/src/util/units.rs` + `src/shared/units.ts`）
+     - pt ↔ cm ↔ mm ↔ in 互转
+     - 当前各模块（导出 / 页面整理 / 水印）重复 hardcode
+  3. **统一文件命名约定**（`src-tauri/src/export/naming.rs` + `src/shared/naming.ts`）
+     - 集中管理 `{stem}-加密.pdf` / `-双层.pdf` / `-加页眉页脚.pdf` 等后缀
+     - 当前 AppShell / ExportDeliveryPanel / PageOrganizerWorkspace 各自硬编码
+  4. **统一错误 schema**（`src-tauri/src/error.rs` + `src/shared/error.ts`）
+     - `pub struct AppError { code: ErrCode, message: String, context: HashMap<String, String> }`
+     - Rust 命令返回 `Result<T, AppError>`，前端按 `code` 触发 i18n + UI 分支
+     - 当前 Rust 命令返回 `Result<T, String>` 字符串化错误，前端难按类型处理
+- 关键文件：见目标各项
+- 验收：
+  - [ ] 4 个抽象都有单测
+  - [ ] 至少 3 个现有模块迁移到新抽象（页码 DSL → OCR 范围 / 单元 → 导出 / 错误 → SecurityPanel）
+  - [ ] 文档化 API + 迁移指南
+
+### ISS-072 文档属性写回（扩展 ISS-063 从只读到读写）
+
+- 优先级：P2
+- 类型：文档属性 / 元数据
+- 状态：未启动（扩展 ISS-063）
+- 来源：DEC-103 / PDF-Guru `MetaForm.vue` + `thirdparty/metadata.py`
+- 律师场景：律师整理客户文件，需要修改 Title / Author / Subject / Keywords，避免泄露原作者
+- 目标：
+  1. ISS-063 文档属性对话框基础上加"编辑模式"
+  2. 用户可修改 Title / Author / Subject / Keywords / Producer（可选）
+  3. CreationDate / ModDate 可保留或重置为当前时间
+  4. 默认输出 `*-metadata.pdf` 新副本（不覆盖原文件，遵守 v0.1 安全策略）
+- 关键文件：
+  - `src/modules/document/ui/PropertiesDialog.tsx`（ISS-063 + 编辑模式）
+  - `src/modules/document/properties.ts`：metadata 读 + 写
+  - `src-tauri/src/lib.rs`：加 `write_pdf_metadata` Tauri command
+- 参考思路（不复制）：PDF-Guru `doc.set_metadata({producer, creator, modDate, creationDate})`，FaroPDF 用 pdf-lib `pdfDoc.setTitle()` / `setAuthor()` 等
+- 验收：
+  - [ ] 用户可编辑 Title / Author / Subject / Keywords
+  - [ ] 输出 `*-metadata.pdf` 新副本验证 metadata 已更新
+  - [ ] Producer 字段默认写"FaroPDF"，不写底层库名（避免实现细节泄露）
+
+
 ## 归档任务索引
 
 已合并到 main 或第一版已发布的功能，详细任务卡归档在 `docs/DECISIONS.md` 的「ISS 任务归档」一节。索引按领域分组：
@@ -814,6 +987,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
+- 2026-06-15：归档 PDF-Guru 参考项目调研（DEC-103）。新立 ISS-066~072 律师场景刚需 + 工程基础设施任务卡。**P0 候选**：ISS-067（证据遮蔽 + 去页眉页脚）、ISS-068（去水印）、ISS-069（OCR 自动出目录）。**P1**：ISS-066（扫描清洁校正）、ISS-070（签名手写板）、ISS-071（页码 DSL / 单元转换 / 文件命名 / 错误 schema 抽象）。明确不引入 PyMuPDF（AGPL-3.0 传染风险），所有实现 Rust / TypeScript 独立重写。
+- 2026-06-15：完成 code review cce1ce5..HEAD 4 个 commit（DEC-102）+ push origin/main。3 个 P0 安全 bug + 5 个 P1 hooks/UI + 1 个被错放 P2 的核心交互 bug（rightPanel useState→useMemo）+ 5 个 P2 polish 全部修复。新增 SecurityPanel.test.tsx 7 + RightPanel.test.tsx +2 测试覆盖。907 单测通过 + 1 pre-existing zoom 失败。
 - 2026-06-15：完成 ISS-060 / ISS-061 / ISS-064 阶段 1 集成（详见 DEC-101）。`RightPanel` 接入 AppShell 按 activeMode 推导内容；`TextSelectionToolbar` 接入 `usePdfTextSelection` hook 真选区，5 启用 + 2 disabled 占位；`SecurityPanel` 接入 utility panel slot，`export-set-password / export-remove-password` 命令进入导出模式打开面板，`remove_pdfpassword` Rust 命令注册到 `invoke_handler!` 并能用 lopdf 真实解密；新增 3 个测试（commands 1 + AppShell 2），typecheck / lint / 全量单测 897 通过 / cargo check 17 warnings（pre-existing）全部 0 回归。
 - 2026-06-15：完成 ISS-062 阶段 1（内置图章 5→9 + diagonal 对角斜条带形态）。`PdfStampName` 扩 4 个（forReview / notForDistribution / internalOnly / proprietary），`PdfStampShape` 加 `diagonal`，`PdfAnnotationStamp.image` 字段为阶段 2 自定义图章预留；stamps.test.ts 12/12 通过；阶段 2 自定义上传 tab + 缩略图渲染留下次推进。
 - 2026-06-15：登记 DEC-100 修正 DEC-099 与 Cargo 现实矛盾——HEAD 上 Cargo.toml = 0.1.2 但 lock = 0.1.1 本就不同步，working tree lock 升 0.1.2 是修复同步，应保留，DEC-099 "撤回 Cargo.lock" 条款作废。
