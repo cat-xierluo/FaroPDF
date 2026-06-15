@@ -4010,8 +4010,12 @@ DEC-101 把 ISS-060 / ISS-061 / ISS-064 阶段 1 集成 push 前，跑了一次�
 
 ### 关键决策
 
-1. **不直接复制代码**：PyMuPDF 是 AGPL-3.0，Wails 也是；引入即"传染" FaroPDF。**只学 API 设计 + 数据流 + 算法思路**，所有实现必须独立 Rust / TypeScript 重写。
-2. **必要时走子进程边界**：若某些功能（如 AES-256 加密 / PaddleOCR 标题识别）必须用 PyMuPDF，参考 PDF-Guru "Python sidecar + JSON IPC"模式（FaroPDF 现已对 OCR 走 ocrmypdf 子进程，可复用同套框架），保持 license 边界清晰。
+1. **借鉴思路，独立重写**：学 PDF-Guru 的 API 设计、数据流、算法思路。clean room 重写 ≠ 衍生作品，**不构成 AGPL 传染**（算法思想本身不受 copyright 保护，API shape 借鉴在 Oracle vs Google 后被认定为 fair use）。研究、阅读、学习 PDF-Guru 源码完全自由。
+2. **底线规则（仍然保留）**：
+   - **不在 Cargo.toml / package.json 引入 PyMuPDF / Wails / 任何 AGPL 库作为依赖** —— 这才会构成"基于 / 链接"导致传染
+   - **不直接 cp 文件或逐行翻译 source code** —— 独立写，参考 API shape 即可
+   - **算法层面（数据流 / 状态机 / 数据结构 / API 设计）借鉴 OK**
+3. **必要时走子进程边界**：若某些功能（如 AES-256 加密 / PaddleOCR 标题识别）必须用 PyMuPDF，参考 PDF-Guru "Python sidecar + JSON IPC"模式（FaroPDF 现已对 OCR 走 ocrmypdf 子进程，可复用同套框架）。子进程边界本身也是安全的（CLI 工具调用不构成衍生）。
 
 ### FaroPDF 已完成功能学习优化点（4 个）
 
@@ -4053,10 +4057,12 @@ DEC-101 把 ISS-060 / ISS-061 / ISS-064 阶段 1 集成 push 前，跑了一次�
 
 ### License 风险评估
 
-- **PyMuPDF AGPL-3.0**：若 FaroPDF 引入 → 必须开源 FaroPDF 或走子进程边界（PDF-Guru 路径）。
-- **Wails AGPL-3.0**：FaroPDF 用 Tauri Apache-2.0 / MIT，路线干净。
-- **pdfcpu Apache-2.0**：可考虑引入作 Rust crate（已有 `pdfcpu` Go 库，无 Rust 绑定；待评估）。
-- **action**：不引入 PyMuPDF；如需 ISS-069 OCR 标题识别，先调研纯 Rust / TypeScript 替代（如 `tesseract-rs` + 字号聚类算法独立实现）。
+**澄清（2026-06-15 修订）**：clean room 借鉴 ≠ 衍生作品。研究 / 学习 / 借鉴算法 / 模仿 API shape 都 OK，**不会传染**。AGPL 传染的真正触发条件是「在自己代码里 link / import / `cp` 对方源码」。
+
+- **PyMuPDF AGPL-3.0**：不在 FaroPDF 依赖里引入即可。如需 PyMuPDF 能力（AES-256 加密 / OCR 标题聚类），走 Python sidecar 子进程（PDF-Guru 自己也是这模式）；CLI 调用不构成衍生。
+- **Wails AGPL-3.0**：FaroPDF 用 Tauri Apache-2.0 / MIT，技术栈本来就不交集，无关。
+- **pdfcpu Apache-2.0**：可考虑引入作 Rust crate（待评估，目前无 Rust 绑定）。
+- **action**：不引入 PyMuPDF 作为 npm/cargo 依赖；如需 ISS-069 OCR 标题识别，要么走 PyMuPDF 子进程模式，要么独立用 Rust / TypeScript 实现（tesseract-rs + 字号聚类算法）。
 
 ### 关联
 
@@ -4065,6 +4071,78 @@ DEC-101 把 ISS-060 / ISS-061 / ISS-064 阶段 1 集成 push 前，跑了一次�
 - DEC-102（v0.2 集成 + code review 修复）
 - 参考项目本地路径：`/Users/maoking/Library/Application Support/maoscripts/参考项目/PDF-Guru`
 - 参考项目 GitHub：`kevin2li/PDF-Guru`
+
+## DEC-104 Wave 1 multi-agent spawn 实战教训：claude -p batch 模式 autocompact thrash + spawn-worker `<` redirect bug
+
+- 日期：2026-06-15
+- 状态：已记录（未完成的实战，留 follow-up）
+- 关联：ISS-071（未推完 Wave 1）/ Task #16 / multi-agent-orchestration skill / memory project_multi_agent_state
+
+### 背景
+
+DEC-103 PDF-Guru 调研后用户选方案 D「多 ISS 并行推进」，PM 按 multi-agent-orchestration §3.1 启动 Wave 1（3 worker：ISS-071 / 067 / 070）。先 spawn ISS-071 一个验证链路。结果 **2 个 bug 阻塞 Wave 1**：
+
+### Bug 1：`.git/main` 孤儿文件导致 `main` ref ambiguous
+
+- 现象：`spawn-worker.sh` 调 `git worktree add ... -b feat/iss-071-infrastructure main` 报「致命错误：歧义的对象名：'main'」。
+- 根因：本仓 `.git/main` 是一个孤儿文件（不在标准 `refs/` 路径），内容 `48cb9b4` 与 `refs/heads/main` 的 `eb26747` 冲突，git 视为两个 `main` ref。
+- 修复：`rm .git/main`，单一 `main` ref 恢复（`eb26747`）。
+- 来源：可能是历史上某次手动操作（`git update-ref main <sha>` 或编辑 `.git/` 直接误写）。
+
+### Bug 2：spawn-worker.sh `tmux new-session ... "$COMMAND"` 不展开 shell redirect
+
+- 现象：`--command 'claude --permission-mode acceptEdits -p < /tmp/prompt.md'` 启动后 worker tmux session 立刻退出，STATUS.json 永远不出现，sentinel 等 2 小时 `--max-wait 7200s` timeout 后 `SENTINEL_TIMEOUT`。
+- 根因：`spawn-worker.sh:305` `run tmux new-session -d -s "$SESSION" -c "$WORKTREE" "$COMMAND"` —— tmux 把 `$COMMAND` 直接 exec（不通过 shell），`<` redirect 是 shell metacharacter，被 tmux 当 literal argument 传给 `claude`，导致 claude 启动后没 stdin。
+- 修复：用 `bash -lc '...'` 包一层让 shell 解析 redirect：`--command "bash -lc 'claude ... -p < /tmp/prompt.md > /tmp/out.log 2>&1'"`。
+- 建议：在 `multi-agent-orchestration` skill 的 SKILL.md §6 commands 例子或 spawn-worker.sh `--help` 加注释，明确"`<` redirect 必须 `bash -lc` 包"，避免后续 worker 又踩。
+
+### Bug 3：claude `-p` batch 模式 + 大 prompt + 大项目上下文 → autocompact thrash
+
+- 现象：修了 Bug 1 + Bug 2 后 worker 真启动，4 分钟后写出第一个 STATUS.json（`phase=bootstrap` / `current_action="探查项目结构 + 写 m1 pageRange 测试 (RED)"`），worker output log 出现 `Autocompact is thrashing: the context refilled to the limit within 3 turns of the previous compact, 3 times in a row. ... Try reading in smaller chunks, or use /clear to start fresh.`，claude 进程自动终止。STATUS 停在 `in_progress / bootstrap`，无产物。
+- 根因：`claude -p < /tmp/prompt.md` 是 batch 模式，全 prompt 一次性吃完后跑全程；prompt 7KB（4 个抽象 + 测试要求 + Rust + TDD 流程）+ FaroPDF 项目大上下文（src/ + src-tauri/ 庞大）→ context 频繁 compact → 3 次内触发 autocompact thrash → 自动停止。
+- **本质**：claude `-p` batch 模式不适合 multi-agent skill 的"长 session + 多轮 plan-implement-verify"协议。`-p` 是"一发跑完"，PM 不能纠偏。
+
+### 决策
+
+**取消 Wave 1，转 PM 直接干 ISS-071**（最小修复路径）：
+
+1. ✅ 清理 worker worktree + branch（无产物，安全）
+2. ✅ 记录 3 个 bug 到 DEC-104（避免下次再踩）
+3. **不再用 multi-agent 路径推 ISS-071/067/070**，改 PM 单 session 顺序推进（ISS-071 先 + ISS-067 后），原因：
+   - claude -p 模式踩 autocompact thrash，且 PM 无法纠偏
+   - 交互式 claude（不带 -p）需要 PM tmux send-keys 多轮投递 prompt，编排成本不低于单 session 直接干
+   - ISS-071 是纯新建文件（pageRange / units / naming / error）+ 1 个迁移示范，PM 直接干 ~1-2 小时可完成
+   - ISS-067 / ISS-070 涉及更多文件 + 共享 commands.ts，仍按 v0.2 单 session 顺序推（与 v0.2 第一波 ISS-060/061/064 同样工作流）
+
+### 启用 multi-agent 的新条件（推迟到下次有合适任务时）
+
+未来 multi-agent 真正适用的场景：
+- 任务规模大且独立性强（如 5+ 个独立 i18n / 国际化字符串重写）
+- 每个 worker prompt < 3KB（避免大 prompt 触发 autocompact）
+- 使用交互式 claude（不带 -p）让 PM 可纠偏
+- worker scope 限定在 1-2 个文件，避免大 codebase context 加载
+
+### Skill 改进建议（留 follow-up）
+
+- `multi-agent-orchestration` skill SKILL.md §6 commands 例子加注释，明确 `<` redirect 必须 `bash -lc` 包
+- `spawn-worker.sh` 可以在 `--command` 内容检测到 `<`/`>` shell metacharacter 时自动包 `bash -lc`，或者在 `--help` 醒目提醒
+- `templates/worker-prompt.md` 加一节「claude -p batch 模式限制」，说明 prompt 大小、autocompact thrash 风险、不可纠偏特性
+- memory `project_multi_agent_state.md` 加 Wave 1 失败经验：claude -p + 大 prompt = autocompact thrash
+
+### 验证
+
+- `git worktree list` 仅剩主目录
+- `git branch -vv` 无 `feat/iss-071-infrastructure`
+- main 仍 `eb26747`（origin/main 同步）
+- 残留 prompt 文件 `/tmp/iss-071-worker-prompt.md` 保留（下次 PM 直接干 ISS-071 可参考其 Mission / Deliverables / Verification 字段，用作 implementation plan）
+
+### 关联
+
+- multi-agent-orchestration skill: `.claude/skills/multi-agent-orchestration/`
+- memory: `project-multi-agent-state`（Wave 1 失败经验需要更新进去）
+- DEC-103（PDF-Guru 调研，引出 ISS-066~072）
+- Task #16（Wave 1 spawn 3 worker，未完成）
+
 
 
 
