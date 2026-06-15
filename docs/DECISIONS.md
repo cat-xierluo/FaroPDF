@@ -4256,6 +4256,92 @@ function suggestSaveAsOutputName(fileName: string | null): string {
 - ISS-071 任务卡（`docs/TASKS.md`）
 - 参考思路（不复制代码）：PDF-Guru `thirdparty/utils.py:7-50 parse_range()` / `:88-99 convert_length()`，FaroPDF 独立 TypeScript + Rust 实现
 
+## DEC-106 Wave A 5-worker multi-agent 实战完全失败 + multi-agent 退役决策
+
+- 日期：2026-06-15 ~ 2026-06-16（跨午夜）
+- 状态：已记录（双 Wave 验证后明确退役）
+- 关联：DEC-104（Wave 1 失败）/ DEC-103（PDF-Guru 调研）/ ISS-073 路线图 / skill 侧 v1.16.2 [DEC-033]
+
+### 背景
+
+DEC-104 Wave 1 失败后，user 选「方案 D 多 ISS 并行推进」继续试 multi-agent。PM 按 v1.16.2 警示规避策略（bash -lc 包 / 交互式 claude 无 -p / 窄 scope prompt < 3KB）启动 Wave A 5 worker：
+
+- W1 ISS-067 redaction 算法
+- W2 ISS-070 SignaturePad 组件
+- W3 ISS-062 阶段 2 CustomStampPanel
+- W4 ISS-066 scanSplit 算法
+- W5 ISS-072 文档属性读写
+
+每个 worker prompt 2.4-2.8KB（满足 < 3KB），用交互式 `claude --permission-mode acceptEdits` 启动 + `tmux load-buffer + paste-buffer` 投递 prompt。
+
+### 实战结果（90 min）
+
+| Worker | tmux | STATUS | commits | files |
+|---|---|---|---|---|
+| iss-067 | 被 sentinel kill (timeout) | bootstrap | 0 | 0 |
+| iss-070 | alive | 无 | 0 | 0 |
+| iss-062-stage2 | alive | 无 | 0 | 0 |
+| iss-066 | alive | bootstrap | 0 | 0 |
+| iss-072 | alive | 无 | 0 | 0 |
+
+**5 worker 90 分钟内 0 commit / 0 文件 / 仅 2 个写出 STATUS bootstrap**。System load 持续 14-17（8 核机器，5 claude 重型进程 + 4 既有 tmux session）。ISS-067 sentinel 5400s max-wait 后 timeout exit 124 唤醒 PM。
+
+### 失败原因分析
+
+| 因素 | 影响 |
+|---|---|
+| **System load 严重过载** | 5 个 claude（每个 200-500MB）+ 既有 4 tmux session，load 17 表示 17 个进程等 8 核 CPU，每个 worker thinking 被严重拖慢（1 turn 30-60s 变 3-5 min） |
+| **paste-buffer 时序问题** | 4 个新 worker 首次 paste 在 claude REPL 没就绪时投递，prompt 丢失，需要 PM 手动 second paste（v1.16.2 没记录这个时序坑） |
+| **Permission prompt 重复出现** | 不止 "Do you want to create STATUS.json?" 一次，每次创建新文件 / Skill 加载 / 工具调用都可能弹，PM 无法一次性 accept all，每个 worker 需要 PM 多次 send-keys "1"+Enter |
+| **autocompact 仍触发**（ISS-072） | 即便 prompt < 3KB，FaroPDF 大 codebase + 多轮 thinking 还是 fill context；ISS-072 实测 37% compact 进度后 PM 看不到后续，可能已 thrash |
+| **PM 编排成本远大于 worker 产出** | spawn 5 + paste 5 + permission 处理 5 + sentinel 5 + 监控 5 = PM session 70% 时间在编排，worker 实际工作时间被资源压榨 |
+
+### 决策：multi-agent 在 FaroPDF 本机环境退役
+
+**双 Wave 实战验证（Wave 1 + Wave A，共 8 worker 尝试）全部失败**，证明：
+
+1. **本机 8 核 + 大 codebase + Claude Code 重型 REPL 配置不适合 5+ worker 并行**。理论 multi-agent §3.1 "默认 4-6 worker 可行" 在 FaroPDF 实际是 0-1 worker。
+2. **multi-agent skill 设计（sentinel + STATUS + paste-buffer + permission）在小项目 / 轻 claude 进程 / 高核数机器上可能 work，但 FaroPDF 不在该 envelope 内**。
+3. **未来同类 v0.2 推进任务一律走 PM 单 session 顺序**（DEC-105 ISS-071 阶段 1 已验证：1.5 小时干 4 个抽象 + 双侧测试 + 1 个迁移示范 + 全量验证 + 1 commit + push）。
+4. **保留 multi-agent skill 文档 + 工具**：未来场景可能合适（不同硬件 / 不同项目 / 不同 task shape），不要因为 FaroPDF 失败就删 skill。
+
+### 收口动作
+
+- ✅ 杀全部 5 tmux session（iss-067 已被 sentinel kill，其他 4 个手动 `tmux kill-session`）
+- ✅ 清理 5 worktree + 5 branch（无产物，安全 `--force` 删除）
+- ✅ Stop 4 个剩余 sentinel background task（避免 90 min timeout 重复唤醒 PM）
+- ✅ 0 残留 claude 进程，load 8 恢复
+- ✅ main 仍 `7272ea3`（ISS-073 路线图）
+- ⏳ 本 DEC-106 记录 + commit + push
+
+### 后续推进策略（替代方案）
+
+- **ISS-067 / ISS-070 / ISS-062-stage2 / ISS-066 / ISS-072 改 PM 单 session 顺序**。每个 ISS ~1-2h，5 个 ISS 共 5-10 小时 = 2-3 个 session 完成。
+- 单 session 优势：无 system load 过载、无 permission prompt 干扰、无 paste-buffer 时序、无 autocompact thrash、无 PM 编排成本。
+- 单 session 劣势：不能"并行"（但 multi-agent 实测也没真并行成功）。
+- 5 worker prompt 文件保留在 `/tmp/iss-*-worker-prompt.md`，下个 session 可直接读作 implementation plan。
+
+### Skill 改进建议（DEC-104 v1.16.2 follow-up 之上 + 本次新增）
+
+DEC-104 v1.16.2 已 patch：`<` redirect 必须 `bash -lc` + claude `-p` autocompact 警示。本次新增 follow-up：
+
+1. **paste-buffer 时序保护**：SKILL.md §6 加 "paste-buffer 前等 8-10s 让 claude REPL 就绪，否则 prompt 丢失"。
+2. **permission prompt 处理 helper**：脚本提供 `--auto-accept-permissions` flag，PM 不必每个 worker 手动 send "1"+Enter。
+3. **System load 检查 gate**：spawn 前 `check-dependencies.sh` 加 `--load-cap N` 检查，超过则警告或拒绝 spawn。
+4. **大 codebase + 大 claude REPL 的 envelope 文档**：SKILL.md 加 "Worker 资源占用" 一节，说明 claude REPL ≈ 200-500MB + 1 turn 30-60s 期望，PM 估算 max concurrency = 核数 / 4。
+
+记入 skill 仓 follow-up（不本次改 skill）。
+
+### 关联
+
+- DEC-104（Wave 1 失败 + skill v1.16.2 patch）
+- DEC-105（ISS-071 阶段 1 PM 单 session 成功路径）
+- ISS-073 路线图（Wave A/B/C 推进计划，Wave A 改 PM 单 session 顺序）
+- skill 侧 v1.16.2 [DEC-033]（< redirect + claude -p 警示）
+- skill SKILL.md 待 follow-up：paste-buffer 时序 / permission auto-accept / load-cap / worker envelope 文档
+- 5 worker prompt 保留：`/tmp/iss-{067,070,062-stage2,066,072}-worker-prompt.md`
+
+
 
 
 
