@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, test, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { RightPanel } from "./RightPanel";
 
 describe("RightPanel (ISS-060 skeleton)", () => {
@@ -70,5 +70,49 @@ describe("RightPanel (ISS-060 skeleton)", () => {
   test("pages 模式 + ocr-queue → 强制折叠", () => {
     const { container } = render(<RightPanel activeMode="pages" rightPanel="ocr-queue" />);
     expect(container.firstChild).toBeNull();
+  });
+});
+
+describe("RightPanel 显式 tab 切换（ISS-060 阶段 2 后续）", () => {
+  test("annotate 模式渲染 [图章][签名] 两个 tab", () => {
+    render(<RightPanel activeMode="annotate" rightPanel="stamps" />);
+    const tabs = screen.getAllByRole("tab");
+    const labels = tabs.map((t) => t.textContent);
+    expect(labels).toEqual(expect.arrayContaining(["图章", "签名"]));
+  });
+
+  test("当前 rightPanel=stamps → 图章 tab 标记为激活（aria-selected=true）", () => {
+    render(<RightPanel activeMode="annotate" rightPanel="stamps" />);
+    const stampTab = screen.getByRole("tab", { name: "图章" });
+    const signTab = screen.getByRole("tab", { name: "签名" });
+    expect(stampTab.getAttribute("aria-selected")).toBe("true");
+    expect(signTab.getAttribute("aria-selected")).toBe("false");
+  });
+
+  test("点击签名 tab → 调用 onPanelChange(\"signatures\")", () => {
+    const onPanelChange = vi.fn();
+    render(
+      <RightPanel activeMode="annotate" rightPanel="stamps" onPanelChange={onPanelChange} />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "签名" }));
+    expect(onPanelChange).toHaveBeenCalledTimes(1);
+    expect(onPanelChange.mock.calls[0][0]).toBe("signatures");
+  });
+
+  test("forms 模式也渲染 [图章][签名] tab", () => {
+    render(<RightPanel activeMode="forms" rightPanel="signatures" />);
+    expect(screen.getByRole("tab", { name: "图章" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "签名" })).toBeTruthy();
+  });
+
+  test("ocr 模式不渲染图章/签名 tab（OCR 队列单一面板）", () => {
+    render(<RightPanel activeMode="ocr" rightPanel="ocr-queue" />);
+    expect(screen.queryByRole("tab", { name: "图章" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "签名" })).toBeNull();
+  });
+
+  test("export 模式不渲染图章/签名 tab", () => {
+    render(<RightPanel activeMode="export" rightPanel="export-preview" />);
+    expect(screen.queryByRole("tab", { name: "图章" })).toBeNull();
   });
 });

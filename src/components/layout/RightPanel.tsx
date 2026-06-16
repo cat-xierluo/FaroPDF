@@ -22,6 +22,8 @@ export interface RightPanelProps {
   onSelectCustomStamp?: (stamp: CustomStamp) => void;
   /** 用户从右栏选中签名时的回调（接到 FormsPanel / annotationArmed） */
   onSelectSignature?: (signature: SignatureRecord) => void;
+  /** ISS-060 阶段 2 后续：用户点击 tab 显式切换面板内容（annotate/forms 模式有效） */
+  onPanelChange?: (panel: RightPanelId) => void;
 }
 
 interface PanelDescriptor {
@@ -70,7 +72,7 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
 
 const READ_INACTIVE_IDS: ReadonlyArray<RightPanelId> = ["stamps", "signatures", "export-preview", "ocr-queue"];
 
-export function RightPanel({ activeMode, rightPanel, onSelectCustomStamp, onSelectSignature }: RightPanelProps) {
+export function RightPanel({ activeMode, rightPanel, onSelectCustomStamp, onSelectSignature, onPanelChange }: RightPanelProps) {
   const headingId = useId();
 
   if (activeMode === "read" || activeMode === "pages") {
@@ -89,12 +91,38 @@ export function RightPanel({ activeMode, rightPanel, onSelectCustomStamp, onSele
   const showCustomStamp = rightPanel === "stamps" && (activeMode === "annotate" || activeMode === "forms" || activeMode === "export");
   const showSignaturePanel = rightPanel === "signatures" && (activeMode === "annotate" || activeMode === "forms");
 
+  // ISS-060 阶段 2 后续：annotate / forms 模式有 2 个可选面板（图章/签名），渲染显式 tab
+  // 让用户主动切换，不依赖 mode 派生。其他模式（ocr/export 单一面板）不显示 tab。
+  const showTabs = activeMode === "annotate" || activeMode === "forms";
+
   return (
     <aside aria-labelledby={headingId} className="right-pane" data-active-mode={activeMode} data-panel={rightPanel}>
       <header className="right-pane__header">
         <h2 id={headingId} className="right-pane__title">{title}</h2>
         <span aria-hidden="true" className="right-pane__mode-pill">{activeMode}</span>
       </header>
+      {showTabs ? (
+        <div className="right-pane__tabs" role="tablist" aria-label="右栏面板切换">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={rightPanel === "stamps"}
+            className={"right-pane__tab" + (rightPanel === "stamps" ? " right-pane__tab--active" : "")}
+            onClick={() => onPanelChange?.("stamps")}
+          >
+            图章
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={rightPanel === "signatures"}
+            className={"right-pane__tab" + (rightPanel === "signatures" ? " right-pane__tab--active" : "")}
+            onClick={() => onPanelChange?.("signatures")}
+          >
+            签名
+          </button>
+        </div>
+      ) : null}
       <div className="right-pane__body" data-testid="right-pane-body">
         <p className="right-pane__hint">{hint}</p>
         {showCustomStamp ? (

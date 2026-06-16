@@ -536,6 +536,35 @@ select.zoom-control {
   text-transform: uppercase;
 }
 
+/* ISS-060 阶段 2 后续：右栏显式 tab（annotate/forms 模式 stamps↔signatures 切换） */
+.right-pane__tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+}
+
+.right-pane__tab {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted, #666);
+  cursor: pointer;
+}
+
+.right-pane__tab:hover {
+  color: var(--color-text, #222);
+}
+
+.right-pane__tab--active {
+  color: var(--accent, #276f76);
+  border-bottom-color: var(--accent, #276f76);
+  font-weight: 600;
+}
+
 .right-pane__body {
   flex: 1;
   padding: 16px;

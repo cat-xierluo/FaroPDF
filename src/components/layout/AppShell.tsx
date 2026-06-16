@@ -142,15 +142,23 @@ export function AppShell({
     nonce: 0,
   });
   const [settingsInitialSection, setSettingsInitialSection] = useState<SectionId>("general");
-  // ISS-060：右栏驱动 — useMemo 而非 useState：activeMode 切换时需要重新推导。
+  // ISS-060 阶段 2 后续：用户显式 tab 切换的 override。annotate/forms 模式下用户可
+  // 在 [图章][签名] 间切换；切 mode 时 reset override 回 null（让默认派生接管）。
+  const [rightPanelOverride, setRightPanelOverride] = useState<RightPanelId | null>(null);
+  useEffect(() => {
+    setRightPanelOverride(null);
+  }, [activeMode]);
+  // ISS-060：右栏驱动 — 默认按 mode 派生；用户 tab override 优先。
   // P2-6 修复：之前用 useState(() => initial) 只在 mount 时算一次，read→annotate
   // 切换后 rightPanel 永远 stuck 在 mount 时的 "none"，导致右栏永不显示。
-  const rightPanel = useMemo<RightPanelId>(() => {
+  const defaultRightPanel = useMemo<RightPanelId>(() => {
     if (activeMode === "annotate") return "stamps";
     if (activeMode === "ocr") return "ocr-queue";
     if (activeMode === "export") return "export-preview";
     return "none";
   }, [activeMode]);
+  // override 优先（用户 tab 显式切换），否则用 mode 默认派生
+  const rightPanel: RightPanelId = rightPanelOverride ?? defaultRightPanel;
   const [commandFeedback, setCommandFeedback] = useState<string | null>(null);
   // ISS-072 阶段 2：文档属性对话框 state
   const [propertiesOpen, setPropertiesOpen] = useState(false);
@@ -504,6 +512,7 @@ export function AppShell({
         <RightPanel
           activeMode={activeMode}
           rightPanel={rightPanel}
+          onPanelChange={setRightPanelOverride}
           onSelectCustomStamp={(stamp) => {
             // DEC-112 ISS-060 阶段 2 + ISS-062 阶段 3：用户从右栏选自定义图章 →
             // 把 stamp.image (base64) 写到 annotationArmed 让画布 stamp 工具立刻可用。
