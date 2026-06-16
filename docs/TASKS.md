@@ -725,7 +725,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：批注 UI 强化
-- 状态：阶段 1 已完成（2026-06-15，`TextSelectionToolbar` + `usePdfTextSelection` hook 接入 AppShell 真选区，5 启用 + 2 disabled 占位 + Esc 关闭）；阶段 2 选区→直接 draft（跳过 user 二次拖拽）+ 翻译 / 朗读真接入待启动。
+- 状态：阶段 1 已完成（2026-06-15，`TextSelectionToolbar` + `usePdfTextSelection` hook 接入 AppShell 真选区，5 启用 + 2 disabled 占位 + Esc 关闭）；阶段 2 已完成（2026-06-16，salvage Wave 7 W2 RED + PM GREEN：选区→floating-annotation-tool draft（高亮/下划线/删除线/便签）+ 翻译 clipboard 占位 + 朗读 Web Speech + 7 动作全 enabled + commands.ts annotation-translate/annotation-tts，DEC-118）。
 - 来源：截图 23 floating annotate toolbar（PDF Expert 选区后立即出现的微型工具条）
 - 目标：
   1. `TextSelectionOverlay` 重构：选区确定后即出现靠近选区中心的浮动工具条。
@@ -891,7 +891,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：表单签名 / 律师材料签字
-- 状态：阶段 1 已完成（2026-06-16，SignaturePad 组件 + 8 测试）；阶段 2 已完成（2026-06-16，signatureStore localStorage 持久化 + SignaturePanel 缩略图列表 + RightPanel 接入 + 18 测试，DEC-113）；阶段 3 FormsPanel 集成 + commands.ts 入口 + 落入文档任意位置 UI 待启动。
+- 状态：阶段 1 已完成（2026-06-16，SignaturePad 组件 + 8 测试）；阶段 2 已完成（2026-06-16，signatureStore localStorage 持久化 + SignaturePanel 缩略图列表 + RightPanel 接入 + 18 测试，DEC-113）；阶段 3 部分完成（2026-06-16，PM 全 TDD 接管 Wave 7 W1：SignatureLibraryPicker + FormsPanel 签名库选择 + commands.ts forms-sign-handwrite + AppShell openPanel("sign")，DEC-119）；落入文档任意位置 UI（拖动定位）待后续。
 - 来源：DEC-103 / PDF-Guru `sign.go` + `sign.py:8-38` + `v-perfect-signature` Vue 库
 - 律师场景：律师在客户文件、和解协议、授权委托书上签字，弥补 v0.1 表单签名只支持上传 PNG/JPG 的缺口
 - 目标：

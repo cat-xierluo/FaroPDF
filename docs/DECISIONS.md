@@ -4861,3 +4861,80 @@ DEC-112 把 CustomStampPanel 接到 RightPanel 验证了"Wave A 模块 → Wave 
 
 
 
+
+## DEC-114 ISS-067 阶段 2 RedactionOverlay 拖矩形 UI + commands.ts 入口
+
+- 时间：2026-06-16
+- 类型：feature（律师证据遮蔽核心 UI）
+- 关联：DEC-107（阶段 1 算法）、ISS-067 阶段 2
+
+**交付**：RedactionOverlay 组件（mousedown→mousemove→mouseup 拖矩形 + draft 预览 + committed region 列表 + 应用按钮 disabled 直到 ≥1 region + 取消清空 + 5px 最小拖动阈值）+ commands.ts `redact-region`（tertiary / annotation / markup 分组）+ AppShell 集成（redactActive state + 离开 annotate 自动关闭 + handleApplyRedaction 从 `.reader-canvas canvas` DOM rect 计算屏幕→canvas→PDF 用户空间 Y 翻转）。
+
+**坐标转换要点**：RedactionOverlay 透传屏幕 clientX/Y；AppShell 在 handleApplyRedaction 中用 `canvas.getBoundingClientRect()` + `overlayViewport.width/rect.width` 缩放 + Y 翻转（PDF 原点左下 vs 屏幕原点左上）。测试 +11（10 overlay + 1 command 路由）。
+
+## DEC-115 ISS-066 阶段 2 扫描拆页 SplitPagesDialog + PageOrganizerWorkspace 集成
+
+- 时间：2026-06-16
+- 类型：feature（律师卷宗扫描拼图切分）
+- 关联：DEC-110（阶段 1 算法）、ISS-066 阶段 2
+
+**交付**：SplitPagesDialog（行数 + 列数 + 输出名，默认 1×2 拆双页；selectedPageNumbers 透传 1-based→0-based pageIndexes；行/列 ≥1 + 空名校验）+ PageOrganizerWorkspace 加「扫描拆页」按钮（handleConfirmSplit 调 splitPagesByGrid → suggestOutputName('cut') → saveUpdatedBytes）+ 测试 +9。
+
+## DEC-116 ISS-072 阶段 2 PropertiesDialog UI + commands.ts 入口
+
+- 时间：2026-06-16
+- 类型：feature（律师整理客户文件元数据）
+- 关联：DEC-109（阶段 1 算法）、ISS-072 阶段 2
+
+**交付**：PropertiesDialog（Title/Author/Subject/Keywords/CreationDate 可编辑 + Producer/Creator/页数/加密状态只读 + dialog-card--wide）+ commands.ts `document-properties`（tertiary / export / deliver 分组）+ AppShell（openPropertiesDialog 读 readPdfMetadata 预填 + handleApplyProperties 写 writePdfMetadata → suggestOutputName('metadata')）+ 测试 +9。
+
+**已知限制延续**：Producer 字段 pdf-lib v1.17.1 force override（DEC-109 §决策），阶段 2 UI 仍只读展示 Producer，真覆盖留 Rust lopdf。
+
+## DEC-117 Wave 7 多 Agent 重试：MiniMax 配额耗尽 → graceful 降级（multi-agent skill §3.2 实证）
+
+- 时间：2026-06-16
+- 类型：multi-agent 教训 / 工程决策
+- 关联：DEC-104（Wave 1 失败）、DEC-106（Wave A 5-worker 失败）、multi-agent skill §3.1/§3.2
+
+**背景**：用户明确要求「2 worker 并行推进」（触发 §2.1 防逃逸门禁）。基于历史 3 轮失败教训，本轮采用收窄 envelope：2 worker（非 5）+ interactive claude（非 `-p`，规避 autocompact thrash）+ `bash -lc` 包 `<` 重定向 + 窄 scope + 独立 worktree/branch + 同宿主（§2.3）。
+
+**执行**：
+- W1 = ISS-070 阶段 3（FormsPanel + signature commands），W2 = ISS-061 阶段 2（text→draft + translate/tts）。文件域分离：W1=forms/FormsPanel，W2=TextSelectionToolbar；commands.ts 按 group 拆分（W1=forms，W2=annotation）。
+- tmux new-session + interactive claude（acceptEdits）+ paste-buffer 投递 Full Worker Prompt。
+- 2 worker 都通过 Isolation Gate（pwd + branch 正确），开始读文件、写 STATUS.json 草稿。
+
+**失败点**：**MiniMax Token Plan 硬配额上限**（`429 已达到 Token Plan 用量上限：请升级 Token Plan 套餐或购买积分补充用量`）。
+- W1 在 RED 阶段（写测试前）撞 429 → **0 文件落盘**，无可 salvage。
+- W2 在 RED 阶段已写完 TextSelectionToolbar.test.tsx +190 行（5+ 阶段 2 测试）→ 撞 429。
+- 这是**硬配额上限**（非瞬时限流），worker 进程会持续 429，不会自恢复。
+
+**降级处置（§7.2 graceful）**：
+1. kill 两个 worker tmux session（MiniMax 配额耗尽，worker 已无法推进）。
+2. salvage W2 的 +190 行 RED 测试到主 worktree（合法 TDD 起点 — 测试当前 fail for "feature missing"，我亲自 verify RED）。
+3. PM 全 TDD 接管两个 ISS：ISS-061 阶段 2（salvage + GREEN，DEC-118）+ ISS-070 阶段 3（全 TDD，DEC-119）。
+4. 修 W2 测试的环境假设 bug（jsdom 无 SpeechSynthesisUtterance，补 MockUtterance polyfill）。
+5. 清理 worktree + 分支。
+
+**实证结论（写回 multi-agent skill）**：
+- multi-agent skill §3.2「provider 配额耗尽必须停止」在本机被第三次验证。前两次是系统负载（DEC-104/106），这次是 provider 硬配额。**本机 multi-agent envelope 的真实瓶颈是 provider 配额，不是并发槽位或系统负载**。
+- salvage 模式有效：W2 的 RED 测试被完整复用，PM 只需补 GREEN，未浪费 190 行测试设计。未来 worker 撞配额时，先 grep worker worktree 的未 commit 改动（`git diff`）， salvage RED 阶段产物。
+- interactive claude（非 `-p`）+ paste-buffer 投递在本机能正常启动 worker 并通过 Isolation Gate；之前 Wave 1/A 的 `-p` autocompact thrash 问题未复现。但 worker 仍受 PM 同一 provider 配额约束 — **同宿主（§2.3）意味着 worker 和 PM 共享配额池**，PM 自己跑也会消耗同一池子，2 worker + PM = 3 个并发消耗者，配额耗尽更快。
+- 决策：**在 MiniMax 配额补充前，本机不再尝试 multi-agent worker；统一走 PM 单 session TDD**。DEC-104/106/117 三次失败 + salvage 成功已充分证明 PM 单 session 在本机的 ROI 远高于 multi-agent。
+
+## DEC-118 ISS-061 阶段 2 选区→draft + 翻译/朗读真接入
+
+- 时间：2026-06-16
+- 类型：feature（salvage Wave 7 W2 RED + PM GREEN）
+- 关联：DEC-117（Wave 7 salvage）、ISS-061 阶段 2
+
+**交付**：TextSelectionToolbar 阶段 2（新 prop color/noteContent/onToast；高亮/下划线/删除线 dispatch floating-annotation-tool {toolType,text,color}；便签 dispatch {…,content:noteContent}；翻译 navigator.clipboard.writeText 占位+原文 + onToast 待接翻译 API；朗读 window.speechSynthesis.speak(new SpeechSynthesisUtterance) + onToast；7 动作全 enabled）+ commands.ts `annotation-translate`/`annotation-tts`（markup 分组）+ AppShell（TextSelectionToolbar 接 color=annotationState.color + onToast→commandFeedback；命令路由进 annotate + 提示选中文本）+ 测试 +6（salvage W2 的自动 draft 4 + 翻译 clipboard + 朗读 tts，补 jsdom SpeechSynthesisUtterance polyfill）+ command 路由 1。
+
+## DEC-119 ISS-070 阶段 3 SignatureLibraryPicker + FormsPanel 签名库选择
+
+- 时间：2026-06-16
+- 类型：feature（PM 全 TDD 接管 Wave 7 W1）
+- 关联：DEC-117（Wave 7 W1 0 产出）、DEC-113（signatureStore）、ISS-070 阶段 3
+
+**交付**：SignatureLibraryPicker（渲染 signatureStore 全部签名为缩略图 + 空态提示 + 点击 onSelect(imageDataUrl)）+ FormsPanel 集成（SignatureEditor 新增 onSelectLibrarySignature；签名行下方加签名库选择区；handleSelectLibrarySignature 把 data URL → atob 解 base64 → Uint8Array → setSignatureImage，复用既有 applySignature 导出路径）+ commands.ts `forms-sign-handwrite`（forms / markup 分组）+ AppShell（formController.openPanel("sign")）+ 测试 +4（3 picker + 1 command 路由）。
+
+**设计要点**：SignatureRecord 字段是 `name`（非 label）；picker 透传 PNG data URL，bytes 转换在 FormsPanel 完成（picker 保持纯展示 + 回调，不耦合 PDF bytes 逻辑）。

@@ -1,6 +1,33 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + ISS-060 阶段 2 右栏真实内容（CustomStampPanel + SignaturePanel）+ ISS-070 阶段 2 签名持久化。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~113。
+> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~119。
+
+涂黑矩形遮蔽（ISS-067 阶段 2，DEC-114）：
+
+- 新增 `src/modules/redaction/ui/RedactionOverlay.tsx`：阅读区 mousedown→mousemove→mouseup 拖矩形 + draft 预览 + committed region 列表 + 应用按钮 disabled 直到 ≥1 region + 取消清空 + 5px 最小拖动阈值。
+- commands.ts `redact-region`（tertiary / annotation / markup 分组）进入 annotate + 右栏 annotation。
+- AppShell `redactActive` state；离开 annotate 自动关闭；handleApplyRedaction 从 `.reader-canvas canvas` DOM rect 算屏幕→canvas→PDF 用户空间 Y 翻转 → applyRedaction 算法 → `*-redacted.pdf` 新副本。+11 测试。
+
+扫描拆页（ISS-066 阶段 2，DEC-115）：
+
+- 新增 `src/components/layout/SplitPagesDialog.tsx`：行数 + 列数 + 输出名（默认 1×2 拆双页），selectedPageNumbers 透传切指定页。
+- PageOrganizerWorkspace 加「扫描拆页」按钮 → splitPagesByGrid → `*-cut.pdf` 新副本。+9 测试。
+
+文档属性对话框（ISS-072 阶段 2，DEC-116）：
+
+- 新增 `src/modules/document/ui/PropertiesDialog.tsx`：Title/Author/Subject/Keywords/CreationDate 可编辑 + Producer/Creator/页数/加密状态只读。
+- commands.ts `document-properties`（tertiary / export / deliver 分组）。AppShell openPropertiesDialog 读 metadata 预填 + handleApplyProperties 写回 → `*-metadata.pdf` 新副本。+9 测试。
+
+选区→draft + 翻译/朗读（ISS-061 阶段 2，DEC-118）：
+
+- TextSelectionToolbar 升级：新 prop color/noteContent/onToast；高亮/下划线/删除线/便签 dispatch floating-annotation-tool 携带文本+颜色（+便签 content）；翻译 clipboard 占位 + onToast；朗读 Web Speech speechSynthesis + onToast；7 动作全 enabled（不再 disabled 占位）。
+- commands.ts `annotation-translate` / `annotation-tts`（markup 分组）。+6 测试（salvage Wave 7 W2 RED + PM GREEN + jsdom SpeechSynthesisUtterance polyfill）。
+
+表单签名库选择（ISS-070 阶段 3，DEC-119）：
+
+- 新增 `src/modules/forms/ui/SignatureLibraryPicker.tsx`：渲染 signatureStore 全部签名为缩略图 + 空态提示 + 点击 onSelect。
+- FormsPanel SignatureEditor 加签名库选择区：data URL → atob → Uint8Array → setSignatureImage，复用既有 applySignature 导出。
+- commands.ts `forms-sign-handwrite`（forms / markup 分组）→ formController.openPanel("sign")。+4 测试。
 
 签名手写板持久化（ISS-070 阶段 2 + ISS-060 阶段 2 第二步，DEC-113）：
 
