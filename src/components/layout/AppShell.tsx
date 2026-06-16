@@ -397,6 +397,22 @@ export function AppShell({
         <RightPanel
           activeMode={activeMode}
           rightPanel={rightPanel}
+          onSelectCustomStamp={(stamp) => {
+            // DEC-112 ISS-060 阶段 2 + ISS-062 阶段 3：用户从右栏选自定义图章 →
+            // 把 stamp.image (base64) 写到 annotationArmed 让画布 stamp 工具立刻可用。
+            if (!annotationArmed) {
+              setCommandFeedback("请先打开 PDF 文档并进入批注模式。");
+              return;
+            }
+            annotationArmed.onStateChange({
+              ...annotationArmed.state,
+              activeToolType: "stamp",
+              stampName: "custom",
+              stampLabel: stamp.name,
+              stampImage: stamp.image,
+            });
+            setCommandFeedback(`已选中图章「${stamp.name}」，请在画布点按落点。`);
+          }}
         />
         <div ref={workspaceMainRef} className="workspace__main" style={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, position: "relative" }}>
           {activeMode === "pages" ? (

@@ -10,11 +10,17 @@ describe("RightPanel (ISS-060 skeleton)", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  test("annotate 模式 + stamps → 渲染「图章」", () => {
+  test("annotate 模式 + stamps → 渲染「图章」 + 接入 CustomStampPanel（DEC-112）", () => {
     render(<RightPanel activeMode="annotate" rightPanel="stamps" />);
     expect(screen.getByRole("heading", { name: "图章" })).toBeTruthy();
-    // ISS-060 阶段 2 之前只渲染 hint，不再显示 v0.1 skeleton placeholder
+    // ISS-060 阶段 2 接入 CustomStampPanel
+    expect(screen.getByTestId("custom-stamp-panel")).toBeTruthy();
     expect(screen.queryByTestId("right-pane-placeholder")).toBeNull();
+  });
+
+  test("非 annotate 模式不渲染 CustomStampPanel", () => {
+    render(<RightPanel activeMode="ocr" rightPanel="ocr-queue" />);
+    expect(screen.queryByTestId("custom-stamp-panel")).toBeNull();
   });
 
   test("ocr 模式 + ocr-queue → 渲染「OCR 队列」", () => {

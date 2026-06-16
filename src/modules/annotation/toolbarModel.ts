@@ -76,6 +76,8 @@ export interface AnnotationToolState {
   stampName: PdfStampName;
   /** stamp 工具下用户输入的图章文字 */
   stampLabel: string;
+  /** stamp 工具下自定义图章的 base64 image data URL（仅 stampName="custom" 时使用，ISS-062 阶段 3 / DEC-112） */
+  stampImage?: string;
 }
 
 export function createInitialAnnotationToolState(): AnnotationToolState {

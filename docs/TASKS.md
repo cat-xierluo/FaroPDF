@@ -710,7 +710,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：UI 信息架构
-- 状态：阶段 1 已完成（2026-06-15，右栏 `RightPanel` skeleton 接入 AppShell，按 activeMode 推导内容）；阶段 2 显式 Toolbar 切换按钮 + 各 mode 真实内容（图章网格 / 签名列表 / 导出预览 / OCR 队列）待启动。
+- 状态：阶段 1 已完成（2026-06-15）；阶段 2 进行中（2026-06-16 第一步 DEC-112：annotate+stamps 真渲染 CustomStampPanel + AppShell 接 onSelectCustomStamp → annotationArmed）；阶段 2 后续待启动：annotate+signatures 接 SignaturePad / export+export-preview 真预览 / ocr+ocr-queue 真队列 / forms+signatures 真签名列表 + Toolbar 显式切换按钮 + 左右栏宽度持久化
 - 来源：截图 50, 65, 68（右侧栏随工具切换显示签章/图章/OCR 面板）
 - 目标：
   1. 引入右栏：与左栏对称的 200-320px 宽的 `UtilityPane` 容器。
@@ -1090,6 +1090,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
+- 2026-06-16：完成 ISS-060 阶段 2 第一步 + ISS-062 阶段 3 集成（DEC-112）。RightPanel 从 skeleton placeholder → **真实渲染 CustomStampPanel**（annotate + stamps 模式）。AppShell 接 `onSelectCustomStamp` → `annotationArmed`：用户从右栏选自定义图章立即 set `activeToolType="stamp"` + `stampName="custom"` + `stampLabel` + `stampImage` → 画布可点按落点。`AnnotationToolState` 加 `stampImage?: string` 字段（base64 data URL）。RightPanel 测试 +2（annotate+stamps 真渲染 / 非 annotate 不渲染）。**全量 1008 通过**（+1 测试，CustomStampPanel 与 RightPanel 共用 test-id 测试稳定）。这是 PDF Expert 风格右栏的首次真实内容接入；后续 ISS-060 阶段 2 第二/三/四步接 SignaturePad（forms+signatures）/ 标准图章 grid 增强 / OCR 队列简版 / 导出预览简版。
 - 2026-06-16：完成 ISS-062 阶段 2 自定义图章上传 + 持久化（DEC-111）。**Wave A 5/5 完成**。`customStampStore` localStorage 持久化（saveCustomStamp / listCustomStamps / deleteCustomStamp / 上限 4 张 FIFO 强制 + 损坏数据兜底过滤 + 10 测试）+ `CustomStampPanel` React 组件（2×2 缩略图网格 + 上传 PNG/JPG ≤ 1MB + 删除按钮 + 错误提示 + 上限禁用 + 9 测试 含 FileReader prototype mock）。**全量 1007 通过**（+19）。**Wave A 累计**：5 个 ISS 阶段 1 全部 ship（067/070/072/066/062-stage2），988 → 1007 共 +29 测试，~2.5 小时纯 PM 单 session TDD。阶段 3 集成到 RightPanel + commands.ts 入口待启动。
 - 2026-06-16：完成 ISS-066 阶段 1 扫描拆双页 + 网格切 + 自定义断点切算法（DEC-110）。PM 单 session TDD 第 4 个 ISS（**Wave A 4/5 完成**）。`splitPagesByGrid(pdfBytes, { rows, cols, pageIndexes? })` 按 N×M 网格切每页 → 输出 N×M 倍页数；`splitPagesByBreakpoints(pdfBytes, { pageIndex, horizontalBreaks?, verticalBreaks? })` 按自定义断点切单页。**真切**（不是只改 cropbox）：用 pdf-lib `embedPage` + `drawPage` 平移 offset 让目标子矩形落入新 page (0,0)~(cellW,cellH) 区域。11 测试覆盖：1×2 拆双页 / 2×2 网格切 / 子页尺寸 / pageIndexes 限定（只切指定页其他保留）/ rows=0 / cols=0 / pageIndexes 越界 / 1 水平断点 / 1 横+1 纵 / 不切 / 断点越界。**全量 988 通过**（+11）。
 - 2026-06-16：完成 ISS-072 阶段 1 PDF 文档属性读写层（DEC-109）。PM 单 session TDD 第 3 个 ISS。`readPdfMetadata(pdfBytes)` + `writePdfMetadata(pdfBytes, updates)` + `PdfMetadata { title, author, subject, keywords[], producer, creator, creationDate, modDate, pageCount, isEncrypted }`。Title / Author / Subject / Keywords / Creator / Dates 字段正常通过 pdf-lib API 读写。**Producer 字段 pdf-lib v1.17.1 已知限制**（DEC-109 §决策）：`save()` force override + XMP metadata 双写让 SaveOptions + 字节流 patch 都无法稳定覆盖；本阶段把 "FaroPDF" 标识写入 **Creator** 字段，Producer 真覆盖留阶段 2 用 Rust lopdf 直接编辑 InfoDict。10 测试覆盖：empty/含字段读取 / 写 title / 写 author+keywords / 保留既有字段 / Creator 默认 FaroPDF / Creator 可覆盖 / ModDate 自动更新 / 空 updates / 输出合法 PDF。**全量 977 通过**（+10）。

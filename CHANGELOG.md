@@ -1,6 +1,14 @@
 ## Unreleased
 
-> v0.2 起步：PDF Expert 视觉与功能对照 + ISS-060/061/062/064 阶段 1 集成 + ISS-071 工程基础设施 + ISS-067 矩形遮罩 + ISS-070 手写签名板 + ISS-072 文档属性 + ISS-066 拆双页 + ISS-062 阶段 2 自定义图章。**Wave A 5/5 完成**。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~111。
+> v0.2 PDF Expert 视觉信息架构对齐 + ISS-060 阶段 2 右栏真实内容首接（CustomStampPanel）。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~112。
+
+PDF Expert 风格右栏（ISS-060 阶段 2 + ISS-062 阶段 3，DEC-112）：
+
+- RightPanel `annotate + stamps` 配置从 skeleton placeholder → **真实渲染 `CustomStampPanel`**（Wave A ship 的自定义图章持久化模块）。
+- AppShell 把 `onSelectCustomStamp` 回调接入 annotationArmed：用户从右栏点击自定义图章 → 立即设置 `activeToolType="stamp"` + `stampName="custom"` + `stampLabel=stamp.name` + `stampImage=stamp.image` → 画布上可立即点按落点。
+- `AnnotationToolState` 加 `stampImage?: string` 字段（base64 data URL，仅 `stampName="custom"` 时使用）。
+- 选中提示通过 `commandFeedback` 反馈到顶部 toast：「已选中图章「<name>」，请在画布点按落点」。
+- RightPanel 测试 +2（annotate+stamps 真渲染 CustomStampPanel / 非 annotate 不渲染）。
 
 自定义图章（ISS-062 阶段 2，DEC-111）：
 

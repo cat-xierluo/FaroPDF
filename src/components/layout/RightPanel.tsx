@@ -1,20 +1,23 @@
 import { useId } from "react";
+import { CustomStampPanel } from "../../modules/annotation/ui/CustomStampPanel";
+import type { CustomStamp } from "../../modules/annotation/customStampStore";
 import type { AppModeId, RightPanelId } from "./types";
 
 /**
- * ISS-060：右栏模式驱动面板（v0.2 候选）。
+ * ISS-060：右栏模式驱动面板（v0.2）。
  *
- * 当前为 skeleton：只按 activeMode / rightPanel 切换标题与占位提示，
- * 等后续 ISS 把各 mode 的 right-panel 真实内容接入：
- * - annotate 模式 → 图章 / 签名的选中态面板
- * - export 模式 → 导出任务预览
- * - ocr 模式 → OCR 任务队列
- * - forms 模式 → 字段 / 签名区列表（v0.1 留空）
- * - read 模式 → 折叠
+ * 阶段 1 是 skeleton 占位；阶段 2（DEC-112）开始把 Wave A 已 ship 的真实模块接入：
+ * - annotate + stamps → 渲染 CustomStampPanel（ISS-062 阶段 3 接入）
+ * - annotate + signatures → SignaturePad 入口（ISS-070 阶段 2 待启动）
+ * - export + export-preview → 导出预览（待启动）
+ * - ocr + ocr-queue → OCR 任务队列（v0.2 follow-up）
+ * - forms / read / pages → 折叠或简版
  */
 export interface RightPanelProps {
   activeMode: AppModeId;
   rightPanel: RightPanelId;
+  /** 用户从右栏选中自定义图章时的回调（PM 收口时由 AppShell 注入到 annotationArmed） */
+  onSelectCustomStamp?: (stamp: CustomStamp) => void;
 }
 
 interface PanelDescriptor {
@@ -24,8 +27,8 @@ interface PanelDescriptor {
 
 const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, PanelDescriptor>> = {
   annotate: {
-    stamps: { title: "图章", hint: "在批注侧栏选 stamp 后回到画布点按" },
-    signatures: { title: "签名", hint: "签名模板将作为 PDF 资源加载" },
+    stamps: { title: "图章", hint: "标准 9 个图章在批注工具条；下方自定义图章可上传 PNG / JPG。" },
+    signatures: { title: "签名", hint: "签名手写板入口（ISS-070 阶段 2 接入）。" },
     "export-preview": { title: "导出预览", hint: "在导出模式下，右栏展示导出文件预览" },
     "ocr-queue": { title: "OCR 队列", hint: "OCR 模式不进入批注流程" },
   },
@@ -63,7 +66,7 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
 
 const READ_INACTIVE_IDS: ReadonlyArray<RightPanelId> = ["stamps", "signatures", "export-preview", "ocr-queue"];
 
-export function RightPanel({ activeMode, rightPanel }: RightPanelProps) {
+export function RightPanel({ activeMode, rightPanel, onSelectCustomStamp }: RightPanelProps) {
   const headingId = useId();
 
   if (activeMode === "read" || activeMode === "pages") {
@@ -76,6 +79,9 @@ export function RightPanel({ activeMode, rightPanel }: RightPanelProps) {
   const title = descriptor?.title ?? "右栏";
   const hint = descriptor?.hint ?? "v0.2 候选";
 
+  // annotate 模式 + stamps panel → 直接渲染 CustomStampPanel（DEC-112 第一个真实接入）
+  const showCustomStamp = activeMode === "annotate" && rightPanel === "stamps";
+
   return (
     <aside aria-labelledby={headingId} className="right-pane" data-active-mode={activeMode} data-panel={rightPanel}>
       <header className="right-pane__header">
@@ -84,6 +90,9 @@ export function RightPanel({ activeMode, rightPanel }: RightPanelProps) {
       </header>
       <div className="right-pane__body" data-testid="right-pane-body">
         <p className="right-pane__hint">{hint}</p>
+        {showCustomStamp ? (
+          <CustomStampPanel onSelectStamp={onSelectCustomStamp ?? (() => undefined)} />
+        ) : null}
       </div>
     </aside>
   );

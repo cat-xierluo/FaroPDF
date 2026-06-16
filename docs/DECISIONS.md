@@ -4700,6 +4700,79 @@ DEC-107 ISS-067 跑通 PM 单 session TDD 路径（20 min 一个阶段 1）后�
 - `/tmp/iss-062-stage2-worker-prompt.md`（原 worker prompt 作 implementation plan）
 - 参考思路（不复制）：PDF-Guru `thirdparty/sign.py` PNG 缩略图持久化 + 自定义图章 tab 模式
 
+## DEC-112 ISS-060 阶段 2 第一步：RightPanel 接 CustomStampPanel（PDF Expert 风格右栏首次真实内容）
+
+- 日期：2026-06-16
+- 状态：已完成（阶段 2 第一步）
+- 关联：ISS-060 / ISS-062 / DEC-103 / DEC-111（Wave A 5/5 收官后第 1 个 Wave B 集成）
+
+### 背景
+
+Wave A 5/5 完成后所有 v0.2 候选模块（CustomStampPanel / SignaturePad / RedactionEngine / scanSplit / properties）已 ship。**user 指令**：继续推 PDF Expert 视觉信息架构对齐。
+
+最显眼的差距是 **ISS-060 阶段 2 右栏真实内容**——v0.1 RightPanel 只是 skeleton hint，PDF Expert 右栏在不同模式下浮现签章 / 图章 / OCR 任务等真实面板。
+
+### 决策
+
+**Wave B 第一步**：把 Wave A 第 5 个 ship 的 `CustomStampPanel` 接到 `RightPanel`，**annotate + stamps** 配置自动渲染。
+
+### 实现
+
+1. `RightPanel.tsx`：
+   - 加 `onSelectCustomStamp?: (stamp: CustomStamp) => void` prop
+   - `showCustomStamp = activeMode === "annotate" && rightPanel === "stamps"` 条件渲染 `<CustomStampPanel onSelectStamp={onSelectCustomStamp ?? noop} />`
+   - 改 hint 描述，标注阶段 2 接入状态
+2. `AppShell.tsx`：
+   - `<RightPanel>` 注入 `onSelectCustomStamp` 回调：用户选中自定义图章 → 立即 set `annotationArmed` (`activeToolType="stamp"` + `stampName="custom"` + `stampLabel=stamp.name` + `stampImage=stamp.image`) → 提示 toast「已选中图章「<name>」，请在画布点按落点」
+3. `AnnotationToolState`：加 `stampImage?: string` 字段（base64 data URL，仅 `stampName="custom"` 时使用）
+4. `RightPanel.test.tsx`：+2 测试（annotate+stamps 真渲染 CustomStampPanel / 非 annotate 模式不渲染）
+
+### 关键设计
+
+- **showCustomStamp 条件**：activeMode + rightPanel 双匹配（不污染其他模式）
+- **onSelectCustomStamp 默认 noop**：让 RightPanel 在没注入 callback 时（测试 / 早期开发）也能渲染 CustomStampPanel
+- **annotationArmed 复用**：不新建 stamp store，用现有 annotationArmed state 承载 stampImage（已是 v0.1 stamp 工具的设计延续）
+- **commandFeedback toast**：用户操作即时反馈，与既有 set-password / forms-flatten 等命令反馈一致
+
+### 验证
+
+- typecheck：0 错
+- lint：0 错
+- 全量单测：**1008 通过**（之前 1007，+1 RightPanel 测试净增）+ 1 pre-existing zoom 失败
+- RightPanel.test.tsx 9/9 通过（含 2 新测试）
+- AppShell 既有测试 60+ 全过（onSelectCustomStamp 是可选 prop 不破坏）
+
+### 文件改动统计
+
+| 文件 | 行数 | 类型 |
+|---|---|---|
+| `src/components/layout/RightPanel.tsx` | +14 / -1 | 修（接 CustomStampPanel + onSelectCustomStamp prop） |
+| `src/components/layout/AppShell.tsx` | +19 / -1 | 修（注入 onSelectCustomStamp 回调到 annotationArmed） |
+| `src/modules/annotation/toolbarModel.ts` | +2 | 修（AnnotationToolState 加 stampImage 字段） |
+| `src/components/layout/RightPanel.test.tsx` | +12 / -4 | 修（+2 真渲染测试） |
+
+### 后续待办（ISS-060 阶段 2 完整接入）
+
+- **annotate + signatures**：接 SignaturePad（ISS-070 阶段 2 同步推进）
+- **forms + signatures**：接「我的签名」缩略图列表（signatureStore 持久化）
+- **export + export-preview**：右栏实时预览导出 PDF（pdf-lib render thumbnail）
+- **ocr + ocr-queue**：右栏显示 OCR 任务列表 + 进度 + 报告跳转
+- **Toolbar 显式切换按钮**：让用户在 annotate 模式手动切 stamps/signatures（当前自动按 activeMode 推导）
+- **左右栏宽度持久化**：localStorage 存用户调整的 column-widths
+
+### 经验
+
+- **Wave A → Wave B 转换顺滑**：底层模块（store + Component）已 ship 后，集成只是 prop 接入 + state 桥接，单步 ~10 min。这是 ISS-060 阶段 2 拆步骤的设计胜利
+- **`AnnotationToolState` 渐进扩展**：加 optional `stampImage?` 字段不破坏现有 9 测试（既有调用方都 pass 默认无 stampImage），证明阶段化 schema 演化安全
+
+### 关联
+
+- DEC-111（ISS-062 阶段 2 CustomStampPanel ship 提供基础）
+- DEC-101（ISS-060 阶段 1 RightPanel skeleton）
+- ISS-073 路线图（Wave B 第 1 步）
+- 参考思路：PDF Expert 右栏 stamps 配置（截图 55）
+
+
 
 
 
