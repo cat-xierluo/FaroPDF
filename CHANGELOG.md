@@ -1,6 +1,13 @@
 ## Unreleased
 
-> v0.2 起步：PDF Expert 视觉与功能对照（ISS-059..065 立项）+ ISS-060/061/062/064 阶段 1 集成 + ISS-071 工程基础设施抽象。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100/101/102/103/104/105。
+> v0.2 起步：PDF Expert 视觉与功能对照（ISS-059..065 立项）+ ISS-060/061/062/064 阶段 1 集成 + ISS-071 工程基础设施抽象 + ISS-067 阶段 1 矩形遮罩。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100/101/102/103/104/105/106/107。
+
+律师场景（ISS-067 阶段 1，DEC-107）：
+
+- 新增 `src/modules/redaction/` 模块 + `applyRedaction(pdfBytes, regions)` 算法：用 pdf-lib drawRectangle 在指定 pageIndex 区域绘制不透明矩形（默认黑色 rgb(0,0,0)）覆盖原内容。**真不可恢复**（不是 PDF annotation，是 content stream 直接绘制），律师证据遮蔽场景输出安全。
+- `RedactionRegion { pageIndex, x, y, width, height, color? }` 共享类型；color 默认 `#000000`，可选 6 位 hex。
+- 10 测试覆盖：单页单矩形、多页多矩形、跨页同 pageIndex、默认黑色、自定义 hex 颜色、空 regions、越界 pageIndex 抛错、负数 pageIndex、非法 color、负数 width/height。
+- 阶段 2 待启动：RedactionOverlay 阅读区拖矩形 UI + commands.ts 入口 + 去页眉页脚（按 margin_bbox 真删除内容流）。
 
 工程基础设施（ISS-071 阶段 1，DEC-105）：
 

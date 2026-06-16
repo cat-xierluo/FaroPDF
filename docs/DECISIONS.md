@@ -4341,6 +4341,72 @@ DEC-104 v1.16.2 已 patch：`<` redirect 必须 `bash -lc` + claude `-p` autocom
 - skill SKILL.md 待 follow-up：paste-buffer 时序 / permission auto-accept / load-cap / worker envelope 文档
 - 5 worker prompt 保留：`/tmp/iss-{067,070,062-stage2,066,072}-worker-prompt.md`
 
+## DEC-107 ISS-067 阶段 1 矩形遮罩算法落地
+
+- 日期：2026-06-16
+- 状态：已完成
+- 关联：ISS-067 / DEC-103 / DEC-105 / DEC-106（multi-agent 退役后第一个 PM 单 session ISS）
+
+### 背景
+
+DEC-106 multi-agent 在本机退役后，按 ISS-073 路线图 Wave A 优先级 + DEC-105 验证的 PM 单 session 路径，第一个推 ISS-067（律师证据遮蔽刚需，pdf-lib 实现 low cost）。
+
+### 决策
+
+**TDD 流程（按 superpowers test-driven-development skill）**：
+
+1. **RED**: 写 `src/modules/redaction/redactionEngine.test.ts` 10 测试 case → 跑 vitest → vite transform fail（模块不存在，正确的 RED）
+2. **GREEN**: 实现 `redactionEngine.ts`：
+   - `applyRedaction(pdfBytes, regions): Promise<Uint8Array>`
+   - 用 pdf-lib `PDFDocument.load` → 预校验所有 region（fail fast）→ `page.drawRectangle({ x, y, width, height, color, opacity: 1, borderWidth: 0 })` → `pdf.save()`
+   - 输出 Uint8Array（调用方用 `suggestOutputName(name, "redacted")` 命名）
+   - `parseHexColor` helper 内联实现（与 `pdfOperationEngine.ts` 同行为，避免改动 export 模块）
+3. **Verify GREEN**: 10/10 测试通过
+
+### 关键设计
+
+- **真不可恢复 vs PDF annotation**：用 `page.drawRectangle({ opacity: 1 })` 直接画到 content stream，不是 PDF annotation。annotation 可被 reader 切换显示 → 不安全；content stream 是 PDF 原始内容的一部分，输出后原内容被覆盖且无 layer 可恢复。律师证据遮蔽场景**必须**用 content stream 路径。
+- **Fail fast 验证**：所有 region 先校验完毕再绘制。如果 region 1 OK 但 region 5 越界，不应"画 region 1 然后报错"（半应用状态），应该原 PDF bytes 完全不动直接抛错。
+- **无外部依赖**：纯 pdf-lib（已有 dep）+ Uint8Array，不引入新 npm package。
+- **`opacity: 1` + `borderWidth: 0`**：覆盖效果完整，无边框漏字。
+
+### 验证
+
+- typecheck：0 错
+- lint：0 错
+- 全量单测：**958 通过**（之前 948，+10 ISS-067 redaction 测试）+ 1 pre-existing zoom 失败（DEC-100 §已知）
+- cargo check：未跑（纯前端改动）
+- 测试覆盖：单页单矩形 / 多页多矩形 / 跨页同 pageIndex / 默认黑色 / 自定义 hex / 空 regions / 越界 pageIndex / 负数 pageIndex / 非法 color / 负数 width/height
+
+### 文件改动统计
+
+| 文件 | 行数 | 类型 |
+|---|---|---|
+| `src/modules/redaction/index.ts` | +8 | 新（barrel export） |
+| `src/modules/redaction/redactionEngine.ts` | +103 | 新（核心算法） |
+| `src/modules/redaction/redactionEngine.test.ts` | +119 | 新（10 测试） |
+
+### 阶段 2 待办（v0.2 follow-up）
+
+- **RedactionOverlay 阅读区拖矩形 UI**：在 ReaderCanvas 上覆盖透明层，鼠标 mousedown → mousemove 实时画矩形 → mouseup 写入 region 列表
+- **commands.ts 入口**：`redaction-add-rect` / `redaction-clear` / `redaction-export` 命令进入工具启动器「标注填写」分组
+- **AppShell 集成**：进入 redaction mode → 显示 overlay + 右栏 region 列表 + 导出按钮 → 调 `applyRedaction` + `suggestOutputName(name, "redacted")` → 保存新副本
+- **去页眉页脚**（ISS-067 §去页眉页脚）：按 `margin_bbox` 自动裁掉上/下边页眉页脚区域（PDF-Guru `header_and_footer.go:60-83` 思路，独立实现）
+
+### 经验
+
+- **PM 单 session TDD 路径速度**：写测试 10 min + 实现 5 min + 验证 5 min = **~20 min 一个阶段 1 模块**。对比 multi-agent 1.5h 启动 + 90 min 等待 = 0 产出，PM 直推效率高数十倍。
+- **DEC-104 / DEC-106 教训确认**：multi-agent 在 FaroPDF 本机环境的 envelope 边界确实窄；同类 ISS-070 / 062-stage2 / 066 / 072 都应继续 PM 单 session 推。
+
+### 关联
+
+- DEC-106（multi-agent 退役 + 5 worker prompt 保留作 plan）
+- DEC-105（ISS-071 PM 单 session 验证路径）
+- ISS-073 路线图（Wave A 改 PM 单 session 顺序）
+- `/tmp/iss-067-worker-prompt.md`（原 worker prompt 作 implementation plan 参考）
+- 参考思路（不复制）：PDF-Guru `thirdparty/mask.py:18-60` `mask_pdf_by_rect()`
+
+
 
 
 
