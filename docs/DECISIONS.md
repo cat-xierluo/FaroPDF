@@ -4938,3 +4938,19 @@ DEC-112 把 CustomStampPanel 接到 RightPanel 验证了"Wave A 模块 → Wave 
 **交付**：SignatureLibraryPicker（渲染 signatureStore 全部签名为缩略图 + 空态提示 + 点击 onSelect(imageDataUrl)）+ FormsPanel 集成（SignatureEditor 新增 onSelectLibrarySignature；签名行下方加签名库选择区；handleSelectLibrarySignature 把 data URL → atob 解 base64 → Uint8Array → setSignatureImage，复用既有 applySignature 导出路径）+ commands.ts `forms-sign-handwrite`（forms / markup 分组）+ AppShell（formController.openPanel("sign")）+ 测试 +4（3 picker + 1 command 路由）。
 
 **设计要点**：SignatureRecord 字段是 `name`（非 label）；picker 透传 PNG data URL，bytes 转换在 FormsPanel 完成（picker 保持纯展示 + 回调，不耦合 PDF bytes 逻辑）。
+
+## DEC-120 ISS-060 阶段 2 后续：右栏显式 tab 切换 stamps↔signatures
+
+- 时间：2026-06-16
+- 类型：feature（PDF Expert 风格右栏交互）
+- 关联：DEC-112/DEC-113（右栏模块接入）、ISS-060 阶段 2 后续
+
+**交付**：RightPanel header 下方渲染 [图章][签名] tablist（仅 annotate/forms 模式），用户点击 tab 显式切换面板内容；AppShell rightPanel 从纯 useMemo 改为 `override ?? default`（override 优先，activeMode 切换时 useEffect reset）。
+
+**设计要点**：
+- tab 用 role="tab" + aria-selected 标记激活，符合 ARIA tablist 模式。
+- ocr/export 模式不显示 tab（单一面板 ocr-queue/export-preview，无切换意义）。
+- activeMode 切换时 reset override → null，让新 mode 默认派生接管（避免 annotate 选了 signatures 后切到 ocr 还残留 override）。
+- CSS .right-pane__tab--active 下边框激活态。
+
+**测试 +6**（RightPanel.test.tsx 新 describe）：tab 渲染 / 当前激活 aria-selected / 点击 onPanelChange / forms 显示 / ocr 不显示 / export 不显示。
