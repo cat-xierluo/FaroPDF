@@ -39,6 +39,7 @@ import type { SectionId } from "../../modules/settings/sections";
 import { AnnotationOverlay, type AnnotationDraftInput, type AnnotationOverlayViewport } from "./AnnotationOverlay";
 import { RedactionOverlay, type RedactionRegionDraft } from "../../modules/redaction/ui/RedactionOverlay";
 import { applyRedaction } from "../../modules/redaction/redactionEngine";
+import { regionsScreenToPdf, selectPageCanvas } from "../../modules/redaction/redactionCoords";
 import { readPdfMetadata, writePdfMetadata, type PdfMetadata } from "../../modules/document/properties";
 import { PropertiesDialog } from "../../modules/document/ui/PropertiesDialog";
 import type {
@@ -287,6 +288,9 @@ export function AppShell({
 
   // ISS-067 阶段 2：应用涂黑矩形 → 调 applyRedaction → 输出 *-redacted.pdf 新副本。
   // 坐标转换：RedactionOverlay 传的是屏幕 clientX/Y，需减去 canvas origin 并按 PDF 视口缩放。
+  // DEC-114 review P0-1 修复：选择器从虚构的 ".reader-canvas canvas" 改为真实 DOM
+  // `.pdf-page[data-page-number="N"] canvas`（ReaderCanvas 给每页 section 加 data-page-number），
+  // 精确命中当前页 canvas。之前选择器指向不存在的类名，querySelector 永远 null，涂黑功能死。
   const handleApplyRedaction = useCallback(
     async (regions: RedactionRegionDraft[]): Promise<void> => {
       if (!document || !overlayViewport) {
@@ -297,22 +301,14 @@ export function AppShell({
         setCommandFeedback("请先画出至少一个遮蔽矩形。");
         return;
       }
-      const canvas = globalThis.document.querySelector(".reader-canvas canvas") as HTMLCanvasElement | null;
+      const canvas = selectPageCanvas(currentPageNumber);
       if (!canvas) {
-        setCommandFeedback("找不到阅读画布，无法转换坐标。");
+        setCommandFeedback("找不到当前页画布，无法转换坐标。");
         return;
       }
       const rect = canvas.getBoundingClientRect();
-      const scaleX = overlayViewport.width / rect.width;
-      const scaleY = overlayViewport.height / rect.height;
-      // 将屏幕 clientX/Y → canvas-local → PDF 用户空间（Y 翻转）
-      const pdfRegions = regions.map((r) => ({
-        pageIndex: r.pageIndex,
-        x: (r.x - rect.left) * scaleX,
-        y: overlayViewport.height - (r.y - rect.top) * scaleY - r.height * scaleY,
-        width: r.width * scaleX,
-        height: r.height * scaleY,
-      }));
+      // 屏幕 clientX/Y → PDF 用户空间（Y 翻转），逻辑提取到 redactionCoords 可测模块
+      const pdfRegions = regionsScreenToPdf(regions, rect, overlayViewport);
       try {
         setCommandFeedback("正在应用遮蔽...");
         const sourceBytes = await reader.getFileBytes();
@@ -328,7 +324,7 @@ export function AppShell({
         setCommandFeedback(error instanceof Error ? error.message : "应用遮蔽失败。");
       }
     },
-    [document, overlayViewport, reader],
+    [document, overlayViewport, reader, currentPageNumber],
   );
 
   // ISS-072 阶段 2：打开文档属性对话框 — 读当前 PDF metadata 预填
@@ -427,10 +423,6 @@ export function AppShell({
       setAnnotationViewSignal((prev) => ({ view: "list", nonce: prev.nonce + 1 }));
     } else if (command.id === "redact-region") {
       setRedactActive(true);
-    } else if (command.id === "annotation-translate" || command.id === "annotation-tts") {
-      // ISS-061 阶段 2：翻译 / 朗读命令只负责进入 annotate 模式 + 打开选区工具；
-      // 实际翻译 / 朗读由 TextSelectionToolbar 在用户选中文本后触发。
-      setCommandFeedback("请选中文本，点击浮动工具条的「翻译」或「朗读」。");
     } else if (command.id === "forms-sign-handwrite") {
       // ISS-070 阶段 3：进 forms 模式 + 打开签名编辑器（含签名库选择）
       formController.openPanel("sign");

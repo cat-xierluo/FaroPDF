@@ -40,7 +40,9 @@ function rectFromDrag(drag: DragState): {
 }
 
 export function RedactionOverlay(props: RedactionOverlayProps): ReactElement | null {
-  const { active, viewport, pageIndex = 0, onApply, onCancel } = props;
+  // DEC-114 review P0-2：viewport 改为 fixed 全屏后不再用于定位（仍保留在接口供调用方传 PDF 视口尺寸，
+  // AppShell handleApplyRedaction 用它做坐标 scale；组件内部只读 active/pageIndex/onApply/onCancel）。
+  const { active, pageIndex = 0, onApply, onCancel } = props;
   const [drag, setDrag] = useState<DragState | null>(null);
   const [regions, setRegions] = useState<RedactionRegionDraft[]>([]);
 
@@ -105,11 +107,12 @@ export function RedactionOverlay(props: RedactionOverlayProps): ReactElement | n
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       style={{
-        position: "absolute",
-        left: 0,
-        top: 0,
-        width: viewport.width,
-        height: viewport.height,
+        // DEC-114 review P0-2 修复：fixed 全屏覆盖，让 region 的 clientX/Y 直接作为
+        // left/top（fixed 起点为视口 0,0）。之前用 PDF pt 当 CSS px 定位 + 挂错容器
+        // 导致矩形画在错误位置。viewport prop 仅供 handleApplyRedaction 做 PDF 坐标 scale。
+        position: "fixed",
+        inset: 0,
+        zIndex: 20,
       }}
     >
       <div className="redaction-overlay__panel">

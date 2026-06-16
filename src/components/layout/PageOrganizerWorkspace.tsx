@@ -156,7 +156,7 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
   }, []);
 
   const handleConfirmSplit = useCallback(
-    async (options: { rows: number; cols: number; pageIndexes?: number[]; outputName: string }): Promise<void> => {
+    async (options: { rows: number; cols: number; pageIndexes?: number[]; outputName: string }): Promise<boolean> => {
       setRewriteBusy(true);
       setRewriteError(null);
       try {
@@ -171,8 +171,10 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
         });
         await reader.saveUpdatedBytes(newBytes, options.outputName);
         setSplitDialogOpen(false);
+        return true;
       } catch (error) {
         setRewriteError(error instanceof Error ? error.message : "拆页失败。");
+        return false;
       } finally {
         setRewriteBusy(false);
       }
@@ -358,8 +360,10 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
           selectedPageNumbers={selectedPageNumbers.size > 0 ? Array.from(selectedPageNumbers).sort((a, b) => a - b) : undefined}
           onClose={closeSplitDialog}
           onConfirm={(opts) => {
-            void handleConfirmSplit(opts).then(() => {
-              if (!rewriteError) {
+            // DEC-115 review P1-1：用 handleConfirmSplit 返回的 boolean 判断成败，
+            // 不再读闭包里的 rewriteError（那是渲染时旧值，setRewriteError 要等下次渲染才反映）。
+            void handleConfirmSplit(opts).then((ok) => {
+              if (ok) {
                 setAppliedActionCount((count) => count + 1);
               }
             });

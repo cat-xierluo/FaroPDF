@@ -136,13 +136,19 @@ export function FormsPanel({ controller, layoutMode = "auto" }: FormsPanelProps)
       setErrorMessage("签名库里的签名格式异常，必须是 PNG 或 JPG。");
       return;
     }
-    const base64 = dataUrl.split(",")[1] ?? "";
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) {
-      bytes[i] = binary.charCodeAt(i);
+    try {
+      const base64 = dataUrl.split(",")[1] ?? "";
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      setSignatureImage(bytes, detectedType);
+    } catch {
+      // DEC-119 review P1-3：localStorage 数据损坏 / 非法 base64 时 atob 抛 DOMException，
+      // 不让整个 FormsPanel 渲染崩；提示用户重新新建签名。
+      setErrorMessage("签名库数据损坏，请重新新建签名。");
     }
-    setSignatureImage(bytes, detectedType);
   }
 
   return (

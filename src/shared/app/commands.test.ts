@@ -99,6 +99,7 @@ describe("app command catalog", () => {
     expect(removeCommand?.targetMode).toBe("export");
     expect(removeCommand?.targetUtilityPanel).toBe("security");
     expect(removeCommand?.requiresDocument).toBe(true);
+    expect(removeCommand?.entryPoints).toEqual(expect.arrayContaining(["more-menu", "native-menu"]));
   });
 
   test("ISS-067: 涂黑矩形命令进入 annotate 模式 + 标注侧栏", () => {

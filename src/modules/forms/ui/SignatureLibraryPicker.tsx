@@ -1,4 +1,4 @@
-import { type ReactElement } from "react";
+import { useMemo, type ReactElement } from "react";
 import { listSignatures } from "../signatureStore";
 
 export interface SignatureLibraryPickerProps {
@@ -13,7 +13,9 @@ export interface SignatureLibraryPickerProps {
  * 嵌入 FormsPanel 的签名行，让律师填表时直接选已保存的签名，不必每次重新上传文件。
  */
 export function SignatureLibraryPicker({ onSelect }: SignatureLibraryPickerProps): ReactElement {
-  const signatures = listSignatures();
+  // DEC-119 review P1-5：useMemo 避免 FormsPanel 每次 state 变化（如 draftValue 输入）
+  // 都触发一次 localStorage 同步读。组件挂载时读一次。
+  const signatures = useMemo(() => listSignatures(), []);
 
   if (signatures.length === 0) {
     return (
