@@ -4954,3 +4954,29 @@ DEC-112 把 CustomStampPanel 接到 RightPanel 验证了"Wave A 模块 → Wave 
 - CSS .right-pane__tab--active 下边框激活态。
 
 **测试 +6**（RightPanel.test.tsx 新 describe）：tab 渲染 / 当前激活 aria-selected / 点击 onPanelChange / forms 显示 / ocr 不显示 / export 不显示。
+
+## DEC-121 ISS-060 后续宽度持久化 store 层 + P0 安全修复
+
+- 时间：2026-06-17
+- 类型：feature（partial）+ 安全
+- 关联：DEC-114 P0-1 教训（避免再次布局盲改）、AGENTS.md「不提交密钥到版本库」
+
+### 交付
+
+**panelWidthStore（src/shared/panelWidthStore.ts）**：
+- getPanelWidth/setPanelWidth + DEFAULT_LEFT_WIDTH (290) / DEFAULT_RIGHT_WIDTH (320)
+- MIN_WIDTH 160 + MAX_LEFT 480 + MAX_RIGHT 560 clamp
+- localStorage JSON 序列化 + 损坏数据兜底 + 隐私模式静默
+- 测试 8（默认值 / 写读 / 左右独立 / 损坏 JSON / 0/负数 clamp / 超大 clamp / 非数字 fallback）
+
+**P0 安全修复**：`.claude/-settings.json`（含 `ANTHROPIC_AUTH_TOKEN`）未在 `.gitignore` 覆盖。`git add .` 会误带 token 入仓。补一行 `.claude/-settings.json` 到 ignore（原本只 ignore 了 `settings.json`，前缀 `-` 区别文件）。
+
+### AppShell 集成延后
+
+发现 `.workspace` 当前是 2 列 grid（`290px minmax(420px, 1fr)`）但 DOM 有 `UtilityPanel/RightPanel/workspace__main` 3 child，RightPanel 当前如何正确定位在右栏我**没确认清楚**（`.right-pane` CSS 无 grid-column / position:absolute）。
+
+这是布局盲改风险 — 类似 DEC-114 review P0-1（虚构选择器导致涂黑功能死）。panelWidthStore 作为独立可交付组件先 ship，AppShell 应用层（divider 拖拽 + inline grid-template-columns 注入）**留待具备 Playwright MCP 实操验证时再做**。
+
+### 教训（与 DEC-114 P0-1 同源）
+
+布局 DOM 结构的修改必须有真实 DOM 验证，不能凭直觉假设「RightPanel 应该在 col 3 所以 grid 列序也对」。Task #7 实操验证（Playwright/截图）的价值再次被印证 —— 一直 pending 的代价就是这类 bug 反复出现。
