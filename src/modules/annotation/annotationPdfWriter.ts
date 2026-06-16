@@ -435,11 +435,20 @@ async function drawStamp(
     opacity: 0,
   });
 
+  // ISS-062 阶段 3 / DEC-122：customStamp 图片分支。优先嵌入 PNG / JPG 图章
+  // 图片（base64 dataURL）；非 data: 前缀或 base64 损坏 → fallback 到文字 stamp
+  // （保留边框，不计入 skipped，与既有「字体失败」兜底一致）。
+  if (annotation.stamp.image?.startsWith("data:image/")) {
+    const embedded = await tryEmbedStampImage(workingPdf, page, annotation.stamp.image, rect);
+    if (embedded) {
+      return { drawn: true };
+    }
+  }
+
   let font: PDFFont | null;
   try {
     font = await resolveStampFont(workingPdf, label);
   } catch {
-    // 字体加载失败时保留边框（与原行为一致：不计入 skipped）
     font = null;
   }
 
@@ -457,10 +466,43 @@ async function drawStamp(
         opacity: STAMP_BORDER_OPACITY,
       });
     } catch {
-      // 字体编码异常（极端字符）时保留边框，不计入 skipped
+      // 字体编码异常（极端字符）时保留边框
     }
   }
   return { drawn: true };
+}
+
+/**
+ * 尝试把 base64 dataURL 图章嵌入到 PDF page。
+ * 成功返回 true（caller 不再画文字），失败返回 false（caller fallback 到文字 stamp）。
+ */
+async function tryEmbedStampImage(
+  workingPdf: PDFDocument,
+  page: PDFPage,
+  imageDataUrl: string,
+  rect: PdfRect,
+): Promise<boolean> {
+  try {
+    const commaIdx = imageDataUrl.indexOf(",");
+    if (commaIdx < 0) return false;
+    const base64 = imageDataUrl.slice(commaIdx + 1);
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const isJpeg = imageDataUrl.startsWith("data:image/jpeg");
+    const image = isJpeg ? await workingPdf.embedJpg(bytes) : await workingPdf.embedPng(bytes);
+    page.drawImage(image, {
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function computeArrowHead(

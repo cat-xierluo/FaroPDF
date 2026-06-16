@@ -591,6 +591,7 @@ export function AppShell({
               activeColor={annotationState.color}
               activeStampLabel={annotationState.stampLabel}
               activeStampName={annotationState.stampName}
+              activeStampImage={annotationState.stampImage}
               activeToolType={annotationState.activeToolType}
               annotations={currentPageAnnotations}
               onAnnotationClick={(annotationId) => {

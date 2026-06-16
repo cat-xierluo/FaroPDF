@@ -33,6 +33,8 @@ export interface AnnotationOverlayProps {
   activeStampName?: PdfStampName;
   /** 当前 armed stamp 工具的图章文字 */
   activeStampLabel?: string;
+  /** ISS-062 阶段 3：customStamp 图章图片 base64 dataURL（透传到 annotation.stamp.image） */
+  activeStampImage?: string;
   /** 用户在 overlay 上完成一次新建（click/drag/ink）后回调，参数是已经规整好的 PdfAnnotationInput */
   onAnnotationDraft?: (input: AnnotationDraftInput) => void;
   /** 已有批注被点击的回调（用于列表跳转、弹窗等） */
@@ -58,6 +60,7 @@ export interface AnnotationDraftInput {
 export function AnnotationOverlay({
   activeAnnotationId,
   activeColor,
+  activeStampImage,
   activeStampLabel,
   activeStampName,
   activeToolType,
@@ -104,7 +107,7 @@ export function AnnotationOverlay({
 
     if (interaction === "click") {
       event.preventDefault();
-      onAnnotationDraft(buildClickDraft(activeToolType, point, viewport, activeColor, activeStampName, activeStampLabel));
+      onAnnotationDraft(buildClickDraft(activeToolType, point, viewport, activeColor, activeStampName, activeStampLabel, activeStampImage));
       return;
     }
 
@@ -229,6 +232,7 @@ function buildClickDraft(
   color: string | undefined,
   stampName: PdfStampName | undefined,
   stampLabel: string | undefined,
+  stampImage?: string,
 ): AnnotationDraftInput {
   const resolvedColor = color ?? "#f6d66f";
   const defaultSize: Record<string, PdfRect> = {
@@ -247,6 +251,9 @@ function buildClickDraft(
       stamp: {
         label: stampLabel?.trim() || "已阅",
         name: stampName ?? "reviewed",
+        // ISS-062 阶段 3 / DEC-122：customStamp 图片透传到 annotation.stamp.image
+        // drawStamp（annotationPdfWriter）读 image 字段调 pdf-lib embedPng/Jpg + drawImage。
+        ...(stampImage ? { image: stampImage } : {}),
       },
     };
   }

@@ -326,3 +326,82 @@ describe("writeAnnotationPdf schemaVersion", () => {
     expect(ANNOTATION_SIDECAR_SCHEMA_VERSION).toBe(1);
   });
 });
+
+// 1x1 红色 PNG（最小有效 fixture，DEC-122 customStamp 真实嵌入测试用）
+const ONE_PX_PNG_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABXvMqOgAAAABJRU5ErkJggg==";
+
+describe("writeAnnotationPdf customStamp image (ISS-062 阶段 3 / DEC-122)", () => {
+  test("stamp.image 是 data:image/png → drawn=true，PDF 含图像 XObject（Subtype/Image）", async () => {
+    const source = await makeBlankPdfBytes(1, 400, 400);
+    const result = await writeAnnotationPdf({
+      sourceBytes: source,
+      sidecar: makeSidecar([
+        makeAnnotation({
+          id: "cs",
+          pageIndex: 0,
+          type: "stamp",
+          stamp: {
+            label: "公司业务章",
+            name: "custom",
+            image: ONE_PX_PNG_DATA_URL,
+          },
+          rects: [{ x: 100, y: 100, width: 200, height: 100 }],
+        }),
+      ]),
+    });
+    expect(result.summary.drawnCount).toBe(1);
+    expect(result.summary.skippedCount).toBe(0);
+    // PDF raw bytes 必须含图像 XObject 标识（/Subtype/Image）—— 证明 drawStamp 真嵌入图，不是 fallback 文字
+    const decoder = new TextDecoder("latin1");
+    const pdfText = decoder.decode(result.bytes);
+    expect(pdfText).toMatch(/\/Subtype\s*\/Image/);
+    // 重新 load 验证 PDF 合法
+    const loaded = await PDFDocument.load(result.bytes);
+    expect(loaded.getPageCount()).toBe(1);
+  });
+
+  test("stamp.image 是非法 base64 → 不抛错，drawn=true（fallback 到文字矩形）", async () => {
+    const source = await makeBlankPdfBytes(1, 400, 400);
+    const result = await writeAnnotationPdf({
+      sourceBytes: source,
+      sidecar: makeSidecar([
+        makeAnnotation({
+          id: "bad",
+          pageIndex: 0,
+          type: "stamp",
+          stamp: {
+            label: "fallback",
+            name: "custom",
+            image: "data:image/png;base64,!!!NOT_BASE64!!!",
+          },
+          rects: [{ x: 50, y: 50, width: 100, height: 50 }],
+        }),
+      ]),
+    });
+    expect(result.summary.drawnCount).toBe(1);
+    expect(result.summary.skippedCount).toBe(0);
+  });
+
+  test("stamp.image 是非 image/ 前缀 → 忽略 image，按文字 stamp 处理", async () => {
+    const source = await makeBlankPdfBytes(1, 400, 400);
+    const result = await writeAnnotationPdf({
+      sourceBytes: source,
+      sidecar: makeSidecar([
+        makeAnnotation({
+          id: "txt",
+          pageIndex: 0,
+          type: "stamp",
+          stamp: {
+            label: "文字章",
+            name: "reviewed",
+            image: "https://example.com/not-image.png", // 非 data: 前缀 → 忽略
+          },
+          rects: [{ x: 50, y: 50, width: 100, height: 50 }],
+        }),
+      ]),
+    });
+    expect(result.summary.drawnCount).toBe(1);
+    expect(result.summary.skippedCount).toBe(0);
+  });
+});
