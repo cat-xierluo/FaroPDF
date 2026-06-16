@@ -46,6 +46,8 @@ export type AppCommandId =
   | "annotations-flatten"
   | "forms-flatten"
   | "redact-region"
+  | "annotation-translate"
+  | "annotation-tts"
   | "document-properties"
   | "help-about";
 
@@ -317,6 +319,30 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     feedback: "已进入涂黑模式，请在阅读区拖出矩形遮蔽区域，点击「应用遮蔽」导出 -redacted.pdf。",
   },
   {
+    id: "annotation-translate",
+    label: "翻译",
+    description: "把选中文本翻译占位写入剪贴板（v0.2 占位，待接入翻译 API）。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["more-menu", "native-menu"],
+    requiresDocument: true,
+    targetMode: "annotate",
+    targetUtilityPanel: "annotation",
+    feedback: "已进入批注模式，选中文本后点击浮动工具条的「翻译」。",
+  },
+  {
+    id: "annotation-tts",
+    label: "朗读",
+    description: "用 Web Speech 朗读选中文本。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["more-menu", "native-menu"],
+    requiresDocument: true,
+    targetMode: "annotate",
+    targetUtilityPanel: "annotation",
+    feedback: "已进入批注模式，选中文本后点击浮动工具条的「朗读」。",
+  },
+  {
     id: "document-properties",
     label: "文档属性",
     description: "编辑标题 / 作者 / 主题 / 关键词 / 创建日期，输出 *-metadata.pdf 新副本。",
@@ -368,7 +394,7 @@ export const APP_TOOL_LAUNCHER_SECTIONS: AppToolLauncherSectionDefinition[] = [
     id: "markup",
     label: "标注填写",
     summary: "批注、签名和表单交付。",
-    commandIds: ["mode-annotate", "export-annotation-summary", "annotations-flatten", "redact-region", "mode-forms", "forms-flatten"],
+    commandIds: ["mode-annotate", "export-annotation-summary", "annotations-flatten", "redact-region", "annotation-translate", "annotation-tts", "mode-forms", "forms-flatten"],
   },
   {
     id: "scan",

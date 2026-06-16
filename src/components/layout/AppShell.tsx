@@ -427,6 +427,10 @@ export function AppShell({
       setAnnotationViewSignal((prev) => ({ view: "list", nonce: prev.nonce + 1 }));
     } else if (command.id === "redact-region") {
       setRedactActive(true);
+    } else if (command.id === "annotation-translate" || command.id === "annotation-tts") {
+      // ISS-061 阶段 2：翻译 / 朗读命令只负责进入 annotate 模式 + 打开选区工具；
+      // 实际翻译 / 朗读由 TextSelectionToolbar 在用户选中文本后触发。
+      setCommandFeedback("请选中文本，点击浮动工具条的「翻译」或「朗读」。");
     } else if (command.id === "document-properties") {
       void openPropertiesDialog();
     }
@@ -612,8 +616,10 @@ export function AppShell({
       </div>
       <TextSelectionToolbar
         bounds={toolbarHidden ? null : selectionBounds}
+        color={annotationState.color}
         onAction={handleSelectionAction}
         onClose={handleSelectionClose}
+        onToast={(message) => setCommandFeedback(message)}
       />
       <StatusBar readerState={reader.state} />
       {commandFeedback ? (

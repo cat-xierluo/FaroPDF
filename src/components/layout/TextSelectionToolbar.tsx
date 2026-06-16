@@ -21,6 +21,12 @@ export interface TextSelectionToolbarProps {
   onAction: (action: AnnotationAction | CopyAction) => void;
   /** 工具条主动关闭回调（用户按 Esc 或点击外部） */
   onClose: () => void;
+  /** ISS-061 阶段 2：当前批注颜色（hex），dispatch 进 floating-annotation-tool 供 AppShell 落 draft */
+  color?: string;
+  /** ISS-061 阶段 2：便签预填内容，dispatch 进 content 字段 */
+  noteContent?: string;
+  /** ISS-061 阶段 2：翻译 / 朗读完成后的 toast 反馈 */
+  onToast?: (message: string) => void;
 }
 
 export type AnnotationAction =
@@ -45,12 +51,12 @@ const ACTIONS: ActionDescriptor[] = [
   { id: "annotate-strikeout", label: "删除线", glyph: "̶", enabled: true, hint: "对选中文本应用删除线批注" },
   { id: "annotate-note", label: "便签", glyph: "💬", enabled: true, hint: "在选中文本旁添加便签" },
   { id: "copy", label: "复制", glyph: "⧉", enabled: true, hint: "复制选中文本到剪贴板" },
-  // v0.1 没能力：仅占位、disabled
-  { id: "annotate-translate-placeholder" as unknown as AnnotationAction, label: "翻译", glyph: "A", enabled: false, hint: "翻译（v0.2 候选）" },
-  { id: "annotate-read-aloud-placeholder" as unknown as AnnotationAction, label: "朗读", glyph: "♪", enabled: false, hint: "朗读（v0.2 候选）" },
+  // ISS-061 阶段 2：翻译 / 朗读真接入（v0.2 不再 disabled）
+  { id: "annotate-translate", label: "翻译", glyph: "A", enabled: true, hint: "对选中文本请求翻译占位" },
+  { id: "annotate-read-aloud", label: "朗读", glyph: "♪", enabled: true, hint: "朗读选中文本" },
 ];
 
-export function TextSelectionToolbar({ bounds, onAction, onClose }: TextSelectionToolbarProps) {
+export function TextSelectionToolbar({ bounds, onAction, onClose, color, noteContent, onToast }: TextSelectionToolbarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [adjusted, setAdjusted] = useState<{ top: number; left: number; placement: "top" | "bottom" }>(
     () => ({ top: 0, left: 0, placement: "top" }),
@@ -107,19 +113,58 @@ export function TextSelectionToolbar({ bounds, onAction, onClose }: TextSelectio
       if (!action.enabled) {
         return;
       }
-      // 通知 AppShell 武装工具；选区 rect 在 floating-select event 里给出来。
       const sel = window.getSelection?.();
-      window.dispatchEvent(
-        new CustomEvent("floating-annotation-tool", {
-          detail: {
-            toolType: action.id as string,
-            text: sel?.toString() ?? "",
-          },
-        }),
-      );
+      const text = sel?.toString() ?? "";
+
+      // 批注类（高亮 / 下划线 / 删除线 / 便签）：dispatch floating-annotation-tool
+      // 携带 toolType + text + color（+ content for note），AppShell 监听后落 draft
+      if (
+        action.id === "annotate-highlight" ||
+        action.id === "annotate-underline" ||
+        action.id === "annotate-strikeout" ||
+        action.id === "annotate-note"
+      ) {
+        window.dispatchEvent(
+          new CustomEvent("floating-annotation-tool", {
+            detail: {
+              toolType: action.id as string,
+              text,
+              ...(color ? { color } : {}),
+              ...(action.id === "annotate-note" && noteContent ? { content: noteContent } : {}),
+            },
+          }),
+        );
+      }
+
+      // 翻译（v0.2 占位：把原文 + 说明写进剪贴板，等真翻译 API 接入）
+      if (action.id === "annotate-translate") {
+        const placeholder = `翻译（占位 · 待接入翻译 API）\n原文：${text}`;
+        try {
+          void navigator.clipboard?.writeText(placeholder);
+        } catch {
+          // jsdom / 非安全上下文 clipboard 可能不可用，忽略
+        }
+        onToast?.(`翻译：已把原文写入剪贴板（占位）`);
+        onAction(action.id as AnnotationAction | CopyAction);
+        return;
+      }
+
+      // 朗读（Web Speech API speechSynthesis）
+      if (action.id === "annotate-read-aloud") {
+        const synth = (window as unknown as { speechSynthesis?: { speak: (u: SpeechSynthesisUtterance) => void } }).speechSynthesis;
+        const UtteranceCtor = (window as unknown as { SpeechSynthesisUtterance?: typeof SpeechSynthesisUtterance }).SpeechSynthesisUtterance;
+        if (synth?.speak && UtteranceCtor) {
+          const utterance = new UtteranceCtor(text);
+          synth.speak(utterance);
+        }
+        onToast?.("朗读：已开始播放选中文本");
+        onAction(action.id as AnnotationAction | CopyAction);
+        return;
+      }
+
       onAction(action.id as AnnotationAction | CopyAction);
     },
-    [onAction],
+    [onAction, color, noteContent, onToast],
   );
 
   if (!bounds) {

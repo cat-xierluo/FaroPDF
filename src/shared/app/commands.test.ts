@@ -128,6 +128,20 @@ describe("app command catalog", () => {
     ).toBe(true);
   });
 
+  test("ISS-061 阶段 2: 翻译 / 朗读命令进入 annotate + 标注侧栏 + markup 分组", () => {
+    const translate = getCommandById("annotation-translate");
+    expect(translate?.group).toBe("annotation");
+    expect(translate?.targetMode).toBe("annotate");
+    expect(translate?.targetUtilityPanel).toBe("annotation");
+    expect(translate?.requiresDocument).toBe(true);
+    const tts = getCommandById("annotation-tts");
+    expect(tts?.group).toBe("annotation");
+    expect(tts?.targetMode).toBe("annotate");
+    expect(tts?.requiresDocument).toBe(true);
+    const markup = APP_TOOL_LAUNCHER_SECTIONS.find((s) => s.id === "markup")?.commandIds ?? [];
+    expect(markup).toEqual(expect.arrayContaining(["annotation-translate", "annotation-tts"]));
+  });
+
   test("native menu entries are backed by the same command definitions", () => {
     const nativeIds = getNativeMenuCommands().map((command) => command.id);
     expect(nativeIds).toEqual(expect.arrayContaining<AppCommandId>([
