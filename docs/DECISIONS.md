@@ -4980,3 +4980,26 @@ DEC-112 把 CustomStampPanel 接到 RightPanel 验证了"Wave A 模块 → Wave 
 ### 教训（与 DEC-114 P0-1 同源）
 
 布局 DOM 结构的修改必须有真实 DOM 验证，不能凭直觉假设「RightPanel 应该在 col 3 所以 grid 列序也对」。Task #7 实操验证（Playwright/截图）的价值再次被印证 —— 一直 pending 的代价就是这类 bug 反复出现。
+
+## DEC-123 ISS-068 去水印评估：本 session 暂缓
+
+- 时间：2026-06-17
+- 类型：风险评估 / 暂缓决策
+- 关联：DEC-103（PDF-Guru 调研）、ISS-068
+
+**为什么不本 session 做**：
+
+1. **算法风险高**：去水印需要 **PDF content stream 操作**（解析/移除 `Tj`/`TJ` 操作符），是 PDF 编程公认的雷区。低层修改易破坏 PDF 结构（xref 表、content stream 长度）。
+2. **pdf-lib 无高层 API**：`PDFContentStream.items` 可枚举但要写 parser；移除 items 后必须重新计算 content stream 长度，否则 PDF 打开失败。
+3. **测试验证难**：水印真消失只能靠 PDF.js / pdf-lib 重新提取文本后断言不再包含目标字符串；jsdom + node 端不便测。
+4. **上下文边界**：本 session 累计 14 commits（DEC-114~122），再做半成品风险 > 收益；建议开新 session 专门做（需要 Playwright 截图二次验证水印真消失）。
+
+**最小后续（待专门 session）**：
+- 算法：`removeWatermark(pdfBytes, options: { text?: string; pageIndexes?: number[] })`：扫描每页 content stream，匹配 `Tj`/`TJ` 操作符的字符串参数，替换为 `""` 或删除该操作符，重写 content stream。
+- 测试：端到端 PDF round-trip（write → load → 提取文本 → 断言目标串消失）。
+- UI：工具启动器「交付导出」分组加 `remove-watermark` 命令 → dialog 输入关键词或按页索引 → 调算法 → 输出 `*-no-watermark.pdf`。
+- 跨平台验证：PDF.js 重新打开看水印真消失（避免 pdf-lib 重写破坏）。
+
+**临时可用方案**（已 ship）：用 ISS-067 的 `applyRedaction` 在水印位置涂白矩形——视觉上消除但 PDF 内容流仍有水印。律师场景下「看起来没了」可接受但严格 PDF 编辑需求会暴露。
+
+**open follow-ups**：Task #7 实操验证（Playwright）支持后，本 ISS 可正式推进。
