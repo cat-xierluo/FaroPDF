@@ -115,6 +115,19 @@ describe("app command catalog", () => {
     ).toBe(true);
   });
 
+  test("ISS-072: 文档属性命令进入 read 模式 + 交付导出分组", () => {
+    const props = getCommandById("document-properties");
+    expect(props?.group).toBe("export");
+    expect(props?.layer).toBe("tertiary");
+    expect(props?.targetMode).toBe("read");
+    expect(props?.requiresDocument).toBe(true);
+    expect(props?.entryPoints).toEqual(expect.arrayContaining(["more-menu", "native-menu"]));
+    // 进入「交付导出」分组
+    expect(
+      APP_TOOL_LAUNCHER_SECTIONS.find((s) => s.id === "deliver")?.commandIds.includes("document-properties"),
+    ).toBe(true);
+  });
+
   test("native menu entries are backed by the same command definitions", () => {
     const nativeIds = getNativeMenuCommands().map((command) => command.id);
     expect(nativeIds).toEqual(expect.arrayContaining<AppCommandId>([

@@ -46,6 +46,7 @@ export type AppCommandId =
   | "annotations-flatten"
   | "forms-flatten"
   | "redact-region"
+  | "document-properties"
   | "help-about";
 
 export interface AppCommandDefinition {
@@ -316,6 +317,17 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     feedback: "已进入涂黑模式，请在阅读区拖出矩形遮蔽区域，点击「应用遮蔽」导出 -redacted.pdf。",
   },
   {
+    id: "document-properties",
+    label: "文档属性",
+    description: "编辑标题 / 作者 / 主题 / 关键词 / 创建日期，输出 *-metadata.pdf 新副本。",
+    layer: "tertiary",
+    group: "export",
+    entryPoints: ["more-menu", "native-menu"],
+    requiresDocument: true,
+    targetMode: "read",
+    feedback: "已打开文档属性对话框，请在表单内编辑后保存。",
+  },
+  {
     id: "help-about",
     label: "关于 FaroPDF",
     layer: "tertiary",
@@ -349,6 +361,7 @@ export const APP_TOOL_LAUNCHER_SECTIONS: AppToolLauncherSectionDefinition[] = [
       "export-compress",
       "export-set-password",
       "export-remove-password",
+      "document-properties",
     ],
   },
   {

@@ -39,6 +39,8 @@ import type { SectionId } from "../../modules/settings/sections";
 import { AnnotationOverlay, type AnnotationDraftInput, type AnnotationOverlayViewport } from "./AnnotationOverlay";
 import { RedactionOverlay, type RedactionRegionDraft } from "../../modules/redaction/ui/RedactionOverlay";
 import { applyRedaction } from "../../modules/redaction/redactionEngine";
+import { readPdfMetadata, writePdfMetadata, type PdfMetadata } from "../../modules/document/properties";
+import { PropertiesDialog } from "../../modules/document/ui/PropertiesDialog";
 import type {
   AnnotationArmedStateBundle,
   AnnotationDraftSubmission,
@@ -149,6 +151,9 @@ export function AppShell({
     return "none";
   }, [activeMode]);
   const [commandFeedback, setCommandFeedback] = useState<string | null>(null);
+  // ISS-072 阶段 2：文档属性对话框 state
+  const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const [propertiesMetadata, setPropertiesMetadata] = useState<PdfMetadata | null>(null);
   // ISS-061 阶段 2：真接选区——usePdfTextSelection 监听 workspace__main 内的文本选择。
   // P1-3 修复：toolbarHidden 在每次 selectionBounds 变化时无条件重置（不是只在 null 时），
   // 让用户主动关掉 toolbar 后，下次重新选区可以再次浮出。
@@ -326,6 +331,49 @@ export function AppShell({
     [document, overlayViewport, reader],
   );
 
+  // ISS-072 阶段 2：打开文档属性对话框 — 读当前 PDF metadata 预填
+  const openPropertiesDialog = useCallback(async (): Promise<void> => {
+    if (!document) {
+      setCommandFeedback("请先打开 PDF 文档。");
+      return;
+    }
+    try {
+      const sourceBytes = await reader.getFileBytes();
+      if (!sourceBytes) {
+        throw new Error("未找到当前 PDF 的源文件字节。");
+      }
+      const metadata = await readPdfMetadata(new Uint8Array(sourceBytes));
+      setPropertiesMetadata(metadata);
+      setPropertiesOpen(true);
+    } catch (error) {
+      setCommandFeedback(error instanceof Error ? error.message : "读取文档属性失败。");
+    }
+  }, [document, reader]);
+
+  // ISS-072 阶段 2：应用属性写回 → 调 writePdfMetadata → 输出 *-metadata.pdf 新副本
+  const handleApplyProperties = useCallback(
+    async (options: { updates: Partial<PdfMetadata>; outputName: string }): Promise<void> => {
+      if (!document) {
+        setCommandFeedback("请先打开 PDF 文档。");
+        return;
+      }
+      try {
+        setCommandFeedback("正在写回元数据...");
+        const sourceBytes = await reader.getFileBytes();
+        if (!sourceBytes) {
+          throw new Error("未找到当前 PDF 的源文件字节。");
+        }
+        const newBytes = await writePdfMetadata(new Uint8Array(sourceBytes), options.updates);
+        await reader.saveUpdatedBytes(newBytes, options.outputName);
+        setCommandFeedback(`已写回元数据，另存为 ${options.outputName}。`);
+        setPropertiesOpen(false);
+      } catch (error) {
+        setCommandFeedback(error instanceof Error ? error.message : "写回元数据失败。");
+      }
+    },
+    [document, reader],
+  );
+
   const executeCommand = useCallback(async (commandId: AppCommandId) => {
     const command = getCommandById(commandId);
     if (!command) {
@@ -379,6 +427,8 @@ export function AppShell({
       setAnnotationViewSignal((prev) => ({ view: "list", nonce: prev.nonce + 1 }));
     } else if (command.id === "redact-region") {
       setRedactActive(true);
+    } else if (command.id === "document-properties") {
+      void openPropertiesDialog();
     }
 
     if (command.id === "help-about") {
@@ -578,6 +628,16 @@ export function AppShell({
             ×
           </button>
         </div>
+      ) : null}
+      {propertiesOpen && propertiesMetadata && document ? (
+        <PropertiesDialog
+          metadata={propertiesMetadata}
+          defaultFileName={reader.getCurrentFileName() ?? document.name}
+          onClose={() => setPropertiesOpen(false)}
+          onConfirm={(opts) => {
+            void handleApplyProperties(opts);
+          }}
+        />
       ) : null}
       <SettingsPanel
         initialSection={settingsInitialSection}
