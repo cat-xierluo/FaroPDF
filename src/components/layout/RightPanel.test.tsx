@@ -18,9 +18,26 @@ describe("RightPanel (ISS-060 skeleton)", () => {
     expect(screen.queryByTestId("right-pane-placeholder")).toBeNull();
   });
 
-  test("非 annotate 模式不渲染 CustomStampPanel", () => {
+  test("annotate 模式 + signatures → 渲染「签名」 + 接入 SignaturePanel（DEC-113）", () => {
+    render(<RightPanel activeMode="annotate" rightPanel="signatures" />);
+    expect(screen.getByRole("heading", { name: "签名" })).toBeTruthy();
+    expect(screen.getByTestId("signature-panel")).toBeTruthy();
+  });
+
+  test("forms 模式 + signatures → 渲染 SignaturePanel", () => {
+    render(<RightPanel activeMode="forms" rightPanel="signatures" />);
+    expect(screen.getByTestId("signature-panel")).toBeTruthy();
+  });
+
+  test("forms 模式 + stamps → 也渲染 CustomStampPanel（让表单签字时也能盖业务章）", () => {
+    render(<RightPanel activeMode="forms" rightPanel="stamps" />);
+    expect(screen.getByTestId("custom-stamp-panel")).toBeTruthy();
+  });
+
+  test("非 annotate / forms / export 模式不渲染 CustomStampPanel / SignaturePanel", () => {
     render(<RightPanel activeMode="ocr" rightPanel="ocr-queue" />);
     expect(screen.queryByTestId("custom-stamp-panel")).toBeNull();
+    expect(screen.queryByTestId("signature-panel")).toBeNull();
   });
 
   test("ocr 模式 + ocr-queue → 渲染「OCR 队列」", () => {

@@ -1,0 +1,148 @@
+/* ISS-070 阶段 2：签名面板样式。
+ * 缩略图列表 + 错误带 + 「+ 新画签名」按钮 + 内嵌 SignaturePad。
+ */
+
+.signature-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.signature-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.signature-panel__header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.signature-panel__count {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.signature-panel__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--warning-bg, #fde68a);
+  border: 1px solid var(--warning-border, #d97706);
+  color: var(--danger, #b45309);
+  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.signature-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.signature-panel__empty {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+  padding: 12px 8px;
+  text-align: center;
+}
+
+.signature-panel__item {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.signature-panel__thumbnail {
+  display: block;
+  width: 100%;
+  height: 60px;
+  padding: 4px;
+  background: #ffffff;
+  border: none;
+  cursor: pointer;
+}
+
+.signature-panel__thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.signature-panel__thumbnail:hover {
+  background: var(--surface-soft, #f6f8f9);
+}
+
+.signature-panel__item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  font-size: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.signature-panel__item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+}
+
+.signature-panel__delete {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.signature-panel__delete:hover {
+  color: var(--danger, #b91c1c);
+}
+
+.signature-panel__drawing {
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px;
+  background: var(--surface-soft, #f6f8f9);
+}
+
+.signature-panel__add {
+  margin-top: 4px;
+  padding: 8px;
+  border: 1px solid var(--accent, #276f76);
+  border-radius: 4px;
+  background: var(--accent, #276f76);
+  color: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.signature-panel__add:disabled {
+  background: var(--surface-soft, #e5e7eb);
+  color: var(--muted);
+  border-color: var(--border);
+  cursor: not-allowed;
+}
+
+.signature-panel__add:hover:not(:disabled) {
+  background: var(--accent-hover, #1f5a60);
+}

@@ -4772,6 +4772,83 @@ Wave A 5/5 完成后所有 v0.2 候选模块（CustomStampPanel / SignaturePad /
 - ISS-073 路线图（Wave B 第 1 步）
 - 参考思路：PDF Expert 右栏 stamps 配置（截图 55）
 
+## DEC-113 ISS-070 阶段 2 + ISS-060 阶段 2 第二步：签名持久化 + RightPanel 接入
+
+- 日期：2026-06-16
+- 状态：已完成
+- 关联：ISS-070 阶段 2 / ISS-060 / DEC-103 / DEC-108 / DEC-111 / DEC-112（Wave B 第 2 步）
+
+### 背景
+
+DEC-112 把 CustomStampPanel 接到 RightPanel 验证了"Wave A 模块 → Wave B 集成" pattern。继续按同套路把 Wave A 第 2 个 ship 的 `SignaturePad` 升级为 `SignaturePanel`（含持久化 store + 历史列表）并接入 RightPanel。
+
+### 决策
+
+**Wave B 第 2 步**：复刻 `customStampStore` + `CustomStampPanel` 模式建 `signatureStore` + `SignaturePanel`，接入 RightPanel signatures panel。
+
+### 实现
+
+1. `src/modules/forms/signatureStore.ts`：
+   - 与 `customStampStore` 同款 API（saveSignature / listSignatures / deleteSignature / MAX_USER_SIGNATURES = 4 上限 + 损坏数据兜底 + 跨 tab `storage` event 同步）
+   - localStorage key `faropdf-signatures`
+2. `src/modules/forms/ui/SignaturePanel.tsx`：
+   - 「我的签名」标题 + 计数 (n/4) + 错误提示带
+   - 缩略图列表（已保存的签名）+ 删除 × + 点击触发 onSelectSignature
+   - 「+ 新画签名」按钮 → 弹出内嵌 `SignaturePad` → onSave 自动 saveSignature + 刷新列表
+   - 内嵌 SignaturePad 用 width=280 / height=120（适配右栏 320px 容器）
+3. `RightPanel.tsx`：
+   - 加 `onSelectSignature` prop
+   - `showSignaturePanel = rightPanel === "signatures" && (activeMode === "annotate" || activeMode === "forms")` 条件渲染
+   - `showCustomStamp` 扩到 forms / export 模式（律师表单签字也能盖业务章）
+4. `AppShell.tsx`：
+   - 注入 `onSelectSignature` 回调：annotate 模式把 signature.image 当 custom stamp 落点（与 customStamp 同套路）；forms 模式反馈提示（后续接入 formController.applySignature）
+5. 测试：signatureStore.test.ts 9 + SignaturePanel.test.tsx 9 + RightPanel.test.tsx +3 = 21 新测试
+
+### 关键设计
+
+- **stamp / signature 共用 stampImage 字段**：annotate 模式选 signature → 复用 `annotationArmed.stampImage` 让画布 stamp 工具直接渲染 signature PNG（不需要新工具类型）
+- **stamps panel 扩到 forms/export 模式**：律师场景痛点："填写完表单后盖业务章"是高频，不应该限定 annotate 模式
+- **SignaturePanel 内嵌 SignaturePad**：用户在右栏内一站式画 + 保存 + 选用，无需弹 modal（与 PDF Expert 右栏内嵌签名手写板的设计一致）
+
+### 验证
+
+- typecheck / lint：0 错
+- 全量单测：**1028 通过**（之前 1008，+20 新测试）+ 1 pre-existing zoom 失败（DEC-100 §已知）
+- signatureStore.test.ts 9/9 + SignaturePanel.test.tsx 9/9 + RightPanel.test.tsx 12/12
+
+### 文件改动统计
+
+| 文件 | 行数 | 类型 |
+|---|---|---|
+| `src/modules/forms/signatureStore.ts` | +85 | 新 |
+| `src/modules/forms/signatureStore.test.ts` | +83 | 新（9 测试） |
+| `src/modules/forms/ui/SignaturePanel.tsx` | +133 | 新 |
+| `src/modules/forms/ui/SignaturePanel.css` | +149 | 新 |
+| `src/modules/forms/ui/SignaturePanel.test.tsx` | +96 | 新（9 测试） |
+| `src/components/layout/RightPanel.tsx` | +18 / -6 | 修（接 SignaturePanel + 扩 stamps 到 forms/export） |
+| `src/components/layout/RightPanel.test.tsx` | +21 / -5 | 修（+3 测试） |
+| `src/components/layout/AppShell.tsx` | +24 / -1 | 修（onSelectSignature 回调） |
+
+### 后续待办（ISS-070 阶段 3）
+
+- **FormsPanel 集成**：表单签名字段（AcroForm signature field）点击 → 自动打开右栏 SignaturePanel
+- **commands.ts 入口**：`forms-sign-handwrite` 命令进入工具启动器「标注填写」分组
+- **落入文档任意位置 UI**：拖拽签名缩略图到 PDF 任意位置 → 用 pdf-lib drawImage 嵌入
+
+### 经验
+
+- **Wave A → Wave B 第 2 次集成**：复刻 customStampStore + CustomStampPanel 模式建 signatureStore + SignaturePanel，~30 min。pattern 已稳定可复制，下次（ocr-queue / export-preview）继续这套路
+- **stamps panel 扩展到 forms / export 是关键洞察**：用户场景驱动 UI 配置，不要让 v0.1 modal 心智（"批注模式才有图章"）限制 v0.2
+
+### 关联
+
+- DEC-112（ISS-060 阶段 2 第一步 CustomStampPanel 接入）
+- DEC-111（ISS-062 阶段 2 CustomStampPanel ship）
+- DEC-108（ISS-070 阶段 1 SignaturePad ship）
+- ISS-073 路线图（Wave B 第 2 步）
+- 参考思路：PDF Expert 签名面板（截图 50）
+
+
 
 
 

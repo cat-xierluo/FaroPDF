@@ -1,6 +1,14 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + ISS-060 阶段 2 右栏真实内容首接（CustomStampPanel）。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~112。
+> v0.2 PDF Expert 视觉信息架构对齐 + ISS-060 阶段 2 右栏真实内容（CustomStampPanel + SignaturePanel）+ ISS-070 阶段 2 签名持久化。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~113。
+
+签名手写板持久化（ISS-070 阶段 2 + ISS-060 阶段 2 第二步，DEC-113）：
+
+- 新增 `src/modules/forms/signatureStore.ts` localStorage 持久化层：`saveSignature(name, base64Image)` / `listSignatures()` / `deleteSignature(id)` / `MAX_USER_SIGNATURES = 4` 上限 + 损坏数据兜底过滤。
+- 新增 `src/modules/forms/ui/SignaturePanel.tsx` 签名面板：「我的签名」缩略图列表 + 「+ 新画签名」按钮（弹出 Wave A ship 的 SignaturePad）+ 删除 × + 错误提示带 + 上限禁用。
+- RightPanel：`signatures` panel 在 annotate / forms 模式下自动渲染 SignaturePanel。`stamps` panel 扩到 forms / export 模式也可显示 CustomStampPanel（律师表单签字时盖业务章场景）。
+- AppShell 注入 `onSelectSignature` 回调：annotate 模式 → 把 signature.image 当 stamp 落点（与 customStamp 同套路）；forms 模式 → 反馈提示（后续接入 formController.applySignature）。
+- 18 新测试覆盖：signatureStore 9（save/list/delete/上限/空 name/JSON 损坏/类型过滤/持久化）+ SignaturePanel 9（空态/已有签名/选中触发/删除/上限禁用/弹 SignaturePad/取消/保存 onSelectSignature + 列表刷新/达上限保险）+ RightPanel 3 新测试（annotate+signatures 真渲染 / forms+signatures 渲染 / forms+stamps 渲染）。
 
 PDF Expert 风格右栏（ISS-060 阶段 2 + ISS-062 阶段 3，DEC-112）：
 

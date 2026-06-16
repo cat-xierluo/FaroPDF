@@ -413,6 +413,29 @@ export function AppShell({
             });
             setCommandFeedback(`已选中图章「${stamp.name}」，请在画布点按落点。`);
           }}
+          onSelectSignature={(signature) => {
+            // DEC-113 ISS-060 阶段 2 + ISS-070 阶段 2：用户从右栏选签名 →
+            // 当 annotate 模式：把 signature.image 当 stamp 落点（与 customStamp 同套路）
+            // 当 forms 模式：暂只反馈，后续接入 formController.applySignature
+            if (activeMode === "annotate") {
+              if (!annotationArmed) {
+                setCommandFeedback("请先打开 PDF 文档并进入批注模式。");
+                return;
+              }
+              annotationArmed.onStateChange({
+                ...annotationArmed.state,
+                activeToolType: "stamp",
+                stampName: "custom",
+                stampLabel: signature.name,
+                stampImage: signature.image,
+              });
+              setCommandFeedback(`已选中签名「${signature.name}」，请在画布点按落点。`);
+            } else if (activeMode === "forms") {
+              setCommandFeedback(`已选中签名「${signature.name}」，下次接入填写签名字段后可直接落入。`);
+            } else {
+              setCommandFeedback(`已选中签名「${signature.name}」。`);
+            }
+          }}
         />
         <div ref={workspaceMainRef} className="workspace__main" style={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, position: "relative" }}>
           {activeMode === "pages" ? (

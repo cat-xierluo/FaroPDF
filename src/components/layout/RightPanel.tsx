@@ -1,23 +1,27 @@
 import { useId } from "react";
 import { CustomStampPanel } from "../../modules/annotation/ui/CustomStampPanel";
 import type { CustomStamp } from "../../modules/annotation/customStampStore";
+import { SignaturePanel } from "../../modules/forms/ui/SignaturePanel";
+import type { SignatureRecord } from "../../modules/forms/signatureStore";
 import type { AppModeId, RightPanelId } from "./types";
 
 /**
  * ISS-060：右栏模式驱动面板（v0.2）。
  *
- * 阶段 1 是 skeleton 占位；阶段 2（DEC-112）开始把 Wave A 已 ship 的真实模块接入：
- * - annotate + stamps → 渲染 CustomStampPanel（ISS-062 阶段 3 接入）
- * - annotate + signatures → SignaturePad 入口（ISS-070 阶段 2 待启动）
+ * 阶段 1 是 skeleton 占位；阶段 2（DEC-112 / DEC-113）真实模块接入：
+ * - annotate / forms / export + stamps → 渲染 CustomStampPanel（DEC-112）
+ * - annotate / forms / export + signatures → 渲染 SignaturePanel（DEC-113）
  * - export + export-preview → 导出预览（待启动）
  * - ocr + ocr-queue → OCR 任务队列（v0.2 follow-up）
- * - forms / read / pages → 折叠或简版
+ * - read / pages → 折叠或简版
  */
 export interface RightPanelProps {
   activeMode: AppModeId;
   rightPanel: RightPanelId;
-  /** 用户从右栏选中自定义图章时的回调（PM 收口时由 AppShell 注入到 annotationArmed） */
+  /** 用户从右栏选中自定义图章时的回调（接到 annotationArmed） */
   onSelectCustomStamp?: (stamp: CustomStamp) => void;
+  /** 用户从右栏选中签名时的回调（接到 FormsPanel / annotationArmed） */
+  onSelectSignature?: (signature: SignatureRecord) => void;
 }
 
 interface PanelDescriptor {
@@ -28,7 +32,7 @@ interface PanelDescriptor {
 const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, PanelDescriptor>> = {
   annotate: {
     stamps: { title: "图章", hint: "标准 9 个图章在批注工具条；下方自定义图章可上传 PNG / JPG。" },
-    signatures: { title: "签名", hint: "签名手写板入口（ISS-070 阶段 2 接入）。" },
+    signatures: { title: "签名", hint: "右栏画手写签名或选历史签名，落入文档" },
     "export-preview": { title: "导出预览", hint: "在导出模式下，右栏展示导出文件预览" },
     "ocr-queue": { title: "OCR 队列", hint: "OCR 模式不进入批注流程" },
   },
@@ -40,7 +44,7 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
   },
   forms: {
     stamps: { title: "图章", hint: "在表单填充后加盖业务图章" },
-    signatures: { title: "签名", hint: "可直接拖入签名 PNG 到签名区" },
+    signatures: { title: "签名", hint: "我的签名缩略图，点击选用或新画签名" },
     "export-preview": { title: "导出预览", hint: "表单填写 + 扁平的合并预览" },
     "ocr-queue": { title: "OCR 队列", hint: "扫描表单可走 OCR 后再补填" },
   },
@@ -66,7 +70,7 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
 
 const READ_INACTIVE_IDS: ReadonlyArray<RightPanelId> = ["stamps", "signatures", "export-preview", "ocr-queue"];
 
-export function RightPanel({ activeMode, rightPanel, onSelectCustomStamp }: RightPanelProps) {
+export function RightPanel({ activeMode, rightPanel, onSelectCustomStamp, onSelectSignature }: RightPanelProps) {
   const headingId = useId();
 
   if (activeMode === "read" || activeMode === "pages") {
@@ -79,8 +83,11 @@ export function RightPanel({ activeMode, rightPanel, onSelectCustomStamp }: Righ
   const title = descriptor?.title ?? "右栏";
   const hint = descriptor?.hint ?? "v0.2 候选";
 
-  // annotate 模式 + stamps panel → 直接渲染 CustomStampPanel（DEC-112 第一个真实接入）
-  const showCustomStamp = activeMode === "annotate" && rightPanel === "stamps";
+  // 真实模块接入条件（DEC-112 / DEC-113）：
+  // - stamps panel：annotate / forms / export 模式都可以叠加自定义图章
+  // - signatures panel：annotate / forms 模式都可以叠加签名
+  const showCustomStamp = rightPanel === "stamps" && (activeMode === "annotate" || activeMode === "forms" || activeMode === "export");
+  const showSignaturePanel = rightPanel === "signatures" && (activeMode === "annotate" || activeMode === "forms");
 
   return (
     <aside aria-labelledby={headingId} className="right-pane" data-active-mode={activeMode} data-panel={rightPanel}>
@@ -92,6 +99,9 @@ export function RightPanel({ activeMode, rightPanel, onSelectCustomStamp }: Righ
         <p className="right-pane__hint">{hint}</p>
         {showCustomStamp ? (
           <CustomStampPanel onSelectStamp={onSelectCustomStamp ?? (() => undefined)} />
+        ) : null}
+        {showSignaturePanel ? (
+          <SignaturePanel onSelectSignature={onSelectSignature ?? (() => undefined)} />
         ) : null}
       </div>
     </aside>

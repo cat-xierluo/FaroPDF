@@ -891,7 +891,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：表单签名 / 律师材料签字
-- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，SignaturePad 组件 + 8 测试）；阶段 2 FormsPanel 集成 + signatureStore 持久化 + commands.ts 入口 + 落入文档任意位置 待启动
+- 状态：阶段 1 已完成（2026-06-16，SignaturePad 组件 + 8 测试）；阶段 2 已完成（2026-06-16，signatureStore localStorage 持久化 + SignaturePanel 缩略图列表 + RightPanel 接入 + 18 测试，DEC-113）；阶段 3 FormsPanel 集成 + commands.ts 入口 + 落入文档任意位置 UI 待启动。
 - 来源：DEC-103 / PDF-Guru `sign.go` + `sign.py:8-38` + `v-perfect-signature` Vue 库
 - 律师场景：律师在客户文件、和解协议、授权委托书上签字，弥补 v0.1 表单签名只支持上传 PNG/JPG 的缺口
 - 目标：
@@ -1090,6 +1090,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
+- 2026-06-16：完成 ISS-070 阶段 2 + ISS-060 阶段 2 第二步签名持久化（DEC-113）。新增 `signatureStore.ts` localStorage 持久化（save/list/delete + 上限 4 + 损坏数据兜底 + 9 测试）+ `SignaturePanel.tsx`（缩略图列表 + 「+ 新画签名」按钮弹 SignaturePad + 删除 + 错误提示 + 9 测试）。`RightPanel` 扩 signatures panel 接入 SignaturePanel（annotate/forms 模式可用），同时 stamps panel 扩到 forms/export 模式让律师表单签字时也能盖业务章。AppShell 注入 `onSelectSignature` 回调：annotate 模式把 signature.image 当 custom stamp 落点；forms 模式反馈提示。**全量 1028 通过**（+20 新测试）+ typecheck/lint 全绿。阶段 3 FormsPanel 真集成 + commands.ts 入口 + 落入文档任意位置 UI 待启动。
 - 2026-06-16：完成 ISS-060 阶段 2 第一步 + ISS-062 阶段 3 集成（DEC-112）。RightPanel 从 skeleton placeholder → **真实渲染 CustomStampPanel**（annotate + stamps 模式）。AppShell 接 `onSelectCustomStamp` → `annotationArmed`：用户从右栏选自定义图章立即 set `activeToolType="stamp"` + `stampName="custom"` + `stampLabel` + `stampImage` → 画布可点按落点。`AnnotationToolState` 加 `stampImage?: string` 字段（base64 data URL）。RightPanel 测试 +2（annotate+stamps 真渲染 / 非 annotate 不渲染）。**全量 1008 通过**（+1 测试，CustomStampPanel 与 RightPanel 共用 test-id 测试稳定）。这是 PDF Expert 风格右栏的首次真实内容接入；后续 ISS-060 阶段 2 第二/三/四步接 SignaturePad（forms+signatures）/ 标准图章 grid 增强 / OCR 队列简版 / 导出预览简版。
 - 2026-06-16：完成 ISS-062 阶段 2 自定义图章上传 + 持久化（DEC-111）。**Wave A 5/5 完成**。`customStampStore` localStorage 持久化（saveCustomStamp / listCustomStamps / deleteCustomStamp / 上限 4 张 FIFO 强制 + 损坏数据兜底过滤 + 10 测试）+ `CustomStampPanel` React 组件（2×2 缩略图网格 + 上传 PNG/JPG ≤ 1MB + 删除按钮 + 错误提示 + 上限禁用 + 9 测试 含 FileReader prototype mock）。**全量 1007 通过**（+19）。**Wave A 累计**：5 个 ISS 阶段 1 全部 ship（067/070/072/066/062-stage2），988 → 1007 共 +29 测试，~2.5 小时纯 PM 单 session TDD。阶段 3 集成到 RightPanel + commands.ts 入口待启动。
 - 2026-06-16：完成 ISS-066 阶段 1 扫描拆双页 + 网格切 + 自定义断点切算法（DEC-110）。PM 单 session TDD 第 4 个 ISS（**Wave A 4/5 完成**）。`splitPagesByGrid(pdfBytes, { rows, cols, pageIndexes? })` 按 N×M 网格切每页 → 输出 N×M 倍页数；`splitPagesByBreakpoints(pdfBytes, { pageIndex, horizontalBreaks?, verticalBreaks? })` 按自定义断点切单页。**真切**（不是只改 cropbox）：用 pdf-lib `embedPage` + `drawPage` 平移 offset 让目标子矩形落入新 page (0,0)~(cellW,cellH) 区域。11 测试覆盖：1×2 拆双页 / 2×2 网格切 / 子页尺寸 / pageIndexes 限定（只切指定页其他保留）/ rows=0 / cols=0 / pageIndexes 越界 / 1 水平断点 / 1 横+1 纵 / 不切 / 断点越界。**全量 988 通过**（+11）。
