@@ -4406,6 +4406,70 @@ DEC-106 multi-agent 在本机退役后，按 ISS-073 路线图 Wave A 优先级 
 - `/tmp/iss-067-worker-prompt.md`（原 worker prompt 作 implementation plan 参考）
 - 参考思路（不复制）：PDF-Guru `thirdparty/mask.py:18-60` `mask_pdf_by_rect()`
 
+## DEC-108 ISS-070 阶段 1 SignaturePad 手写签名板落地
+
+- 日期：2026-06-16
+- 状态：已完成
+- 关联：ISS-070 / DEC-103 / DEC-105 / DEC-106 / DEC-107（PM 单 session 第 2 个 ISS）
+
+### 背景
+
+DEC-107 ISS-067 跑通 PM 单 session TDD 路径（20 min 一个阶段 1）后，按 ISS-073 路线图 Wave A 优先级继续 ISS-070 手写签名板。律师签字场景刚需，弥补 v0.1 表单签名只支持上传 PNG/JPG 静态图片的缺口。
+
+### 决策
+
+**TDD 流程 + 纯 Canvas API（无 react-signature-canvas 等外部库）**：
+
+1. **RED**: 写 `src/modules/forms/ui/SignaturePad.test.tsx` 8 测试 case → 跑 vitest → 模块不存在 fail（正确 RED）
+2. **GREEN**: 实现 `SignaturePad.tsx` + `SignaturePad.css`
+3. **修一个测试 bug**: `handleClear` 在 jsdom 下因 `getContext` 返回 null 提前 return → setStrokeCount(0) 不执行 → 测试 fail。修复：让 `setStrokeCount(0)` + ref reset 在 ctx 检查**之前**，保证状态机不依赖 canvas ctx
+4. **Verify GREEN**: 8/8 测试通过
+
+### 关键设计
+
+- **纯 Canvas API 无外部依赖**：`react-signature-canvas` 是 MIT 可用但本任务 scope 不引入新 dep。Canvas 2D API 写笔触足够：`beginPath` + `moveTo` + `lineTo` + `stroke`，配 `lineCap=round` / `lineJoin=round` 平滑。
+- **白底变透明保存**：`getImageData` → 遍历 RGBA → R/G/B 都 > 250 视为白底 → alpha 置 0 → `putImageData` → `toDataURL("image/png")` → onSave。粗略阈值 250 平衡灵敏度（避免抗锯齿灰色像素被误判透明）。
+- **多笔画支持**：用 `drawingRef` (mutable ref) 跟踪当前是否在笔画中，mousedown 时 strokeCount++，mouseup / mouseleave 时 drawing=false。多次按下 = 多个独立笔画。
+- **jsdom 兼容**：所有 canvas ctx 操作前 null check，jsdom 环境下静默 skip（saveButton 仍能调 toDataURL 因为它是 HTMLCanvasElement 方法，jsdom 默认 mock 为空字符串）。
+- **状态机独立于 canvas ctx**：`handleClear` 总是 reset strokeCount + drawingRef + lastPointRef，即便 jsdom 下 ctx 为 null。
+
+### 验证
+
+- typecheck：0 错
+- lint：0 错
+- 全量单测：**966 通过**（之前 958，+8 ISS-070 SignaturePad 测试）+ 1 pre-existing zoom 失败（DEC-100 §已知）
+- 测试覆盖：默认渲染（canvas + 3 按钮） / width-height props 可控 / 单笔画 strokeCount=1 / 多笔画 strokeCount=2 / 清空 reset / 保存 toDataURL 调用 + onSave 收到 data:image/png string / 取消 onCancel / mouseleave 中止当前 stroke
+
+### 文件改动统计
+
+| 文件 | 行数 | 类型 |
+|---|---|---|
+| `src/modules/forms/ui/SignaturePad.tsx` | +156 | 新（核心组件） |
+| `src/modules/forms/ui/SignaturePad.css` | +49 | 新（样式） |
+| `src/modules/forms/ui/SignaturePad.test.tsx` | +93 | 新（8 测试） |
+
+### 阶段 2 待办（v0.2 follow-up）
+
+- **signatureStore localStorage 持久化**：「我的签名」列表（≤ 4 张），含 id / name / pngDataUrl / createdAt
+- **FormsPanel 集成**：「手写签名」按钮 → 打开 SignaturePad modal → onSave → 保存到 store + onSelect → 落入表单签名字段
+- **commands.ts 入口**：`forms-sign-handwrite` 命令进入工具启动器「标注填写」分组
+- **落入文档任意位置 UI**：拖拽签名缩略图到 PDF 任意位置 → 用 pdf-lib drawImage 嵌入
+
+### 经验
+
+- **PM 单 session TDD 路径速度（第 2 次验证）**：写测试 10 min + 实现 10 min + 修 1 个 jsdom edge case + 验证 = **~25 min 一个阶段 1 模块**。
+- **jsdom canvas 限制**：`getContext` 返回 null，`getImageData` 抛错。组件必须 null-safe 且测试用 spy 验证调用契约而非真实像素。
+- **修复策略：状态独立于 effect**：handleClear 让 `setStrokeCount(0)` 在 ctx null check 之前确保状态机推进，是 jsdom + 真实浏览器双兼容的关键。
+
+### 关联
+
+- DEC-107（ISS-067 PM 单 session TDD 验证）
+- DEC-106（multi-agent 退役 → PM 单 session 第 2 次成功）
+- ISS-073 路线图（Wave A 第 2 个 ISS）
+- `/tmp/iss-070-worker-prompt.md`（原 worker prompt 作 implementation plan）
+- 参考思路（不复制）：PDF-Guru `thirdparty/sign.py:8-38` `sign_img()` PIL 白底变透明算法
+
+
 
 
 

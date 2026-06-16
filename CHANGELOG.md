@@ -1,6 +1,13 @@
 ## Unreleased
 
-> v0.2 起步：PDF Expert 视觉与功能对照（ISS-059..065 立项）+ ISS-060/061/062/064 阶段 1 集成 + ISS-071 工程基础设施抽象 + ISS-067 阶段 1 矩形遮罩。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100/101/102/103/104/105/106/107。
+> v0.2 起步：PDF Expert 视觉与功能对照 + ISS-060/061/062/064 阶段 1 集成 + ISS-071 工程基础设施 + ISS-067 矩形遮罩 + ISS-070 手写签名板。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~108。
+
+律师材料签字（ISS-070 阶段 1，DEC-108）：
+
+- 新增 `src/modules/forms/ui/SignaturePad.tsx` 手写签名板 React 组件 + 纯 Canvas API（无外部库依赖）：mousedown→mousemove→mouseup 鼠标笔触绘制，多笔画支持，清空/保存/取消 3 按钮，保存前白底变透明（getImageData R/G/B > 250 像素 alpha 置 0）+ onSave 回调 PNG data URL。
+- 8 测试覆盖：默认渲染、width/height 可控、单笔画 strokeCount、多笔画、清空 reset、保存 toDataURL + onSave、取消 onCancel、mouseleave 中止笔画。
+- 弥补 v0.1 表单签名只支持上传 PNG/JPG 静态图片的缺口。
+- 阶段 2 待启动：FormsPanel 集成 + signatureStore localStorage 持久化 + commands.ts forms-sign-handwrite + 落入文档任意位置 UI。
 
 律师场景（ISS-067 阶段 1，DEC-107）：
 

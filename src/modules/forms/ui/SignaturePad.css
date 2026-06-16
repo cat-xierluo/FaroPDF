@@ -1,0 +1,54 @@
+/* ISS-070 阶段 1：手写签名板样式。
+ * 简洁深色边框 + 白色 canvas + 3 个 action 按钮（保存 primary / 清空+取消 secondary）。
+ */
+
+.signature-pad {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.signature-pad__canvas {
+  display: block;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: crosshair;
+  /* canvas width/height 由 props 控制，CSS 不再覆盖 */
+}
+
+.signature-pad__actions {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.signature-pad__action {
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.signature-pad__action:hover {
+  background: var(--surface-soft, #f6f8f9);
+}
+
+.signature-pad__action--primary {
+  background: var(--accent, #276f76);
+  color: #ffffff;
+  border-color: var(--accent, #276f76);
+}
+
+.signature-pad__action--primary:hover {
+  background: var(--accent-hover, #1f5a60);
+}
