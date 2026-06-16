@@ -142,6 +142,17 @@ describe("app command catalog", () => {
     expect(markup).toEqual(expect.arrayContaining(["annotation-translate", "annotation-tts"]));
   });
 
+  test("ISS-070 阶段 3: 手写签名命令进入 forms + markup 分组", () => {
+    const sign = getCommandById("forms-sign-handwrite");
+    expect(sign?.group).toBe("forms");
+    expect(sign?.targetMode).toBe("forms");
+    expect(sign?.targetUtilityPanel).toBe("forms");
+    expect(sign?.requiresDocument).toBe(true);
+    expect(sign?.entryPoints).toEqual(expect.arrayContaining(["more-menu", "native-menu"]));
+    const markup = APP_TOOL_LAUNCHER_SECTIONS.find((s) => s.id === "markup")?.commandIds ?? [];
+    expect(markup).toContain("forms-sign-handwrite");
+  });
+
   test("native menu entries are backed by the same command definitions", () => {
     const nativeIds = getNativeMenuCommands().map((command) => command.id);
     expect(nativeIds).toEqual(expect.arrayContaining<AppCommandId>([

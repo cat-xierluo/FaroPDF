@@ -19,6 +19,7 @@ import {
   formsPanelDrawerMediaQuery,
 } from "../breakpoints";
 import type { FormController } from "../useFormController";
+import { SignatureLibraryPicker } from "./SignatureLibraryPicker";
 import "./FormsPanel.css";
 
 interface FormsPanelProps {
@@ -124,6 +125,26 @@ export function FormsPanel({ controller, layoutMode = "auto" }: FormsPanelProps)
     event.target.value = "";
   }
 
+  // ISS-070 阶段 3：从签名库（signatureStore）选历史签名 → 转 bytes → setSignatureImage
+  function handleSelectLibrarySignature(dataUrl: string): void {
+    const detectedType: "png" | "jpg" | null = dataUrl.startsWith("data:image/png")
+      ? "png"
+      : dataUrl.startsWith("data:image/jpeg")
+        ? "jpg"
+        : null;
+    if (!detectedType) {
+      setErrorMessage("签名库里的签名格式异常，必须是 PNG 或 JPG。");
+      return;
+    }
+    const base64 = dataUrl.split(",")[1] ?? "";
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    setSignatureImage(bytes, detectedType);
+  }
+
   return (
     <aside
       aria-label="填写和签名面板"
@@ -216,6 +237,7 @@ export function FormsPanel({ controller, layoutMode = "auto" }: FormsPanelProps)
           signatureImageType={signatureImageType}
           onPickFile={() => fileInputRef.current?.click()}
           onFileChange={handleSignatureFileChange}
+          onSelectLibrarySignature={handleSelectLibrarySignature}
           onClear={clearSignatureImage}
           onApply={() => void applySignature()}
         />
@@ -389,6 +411,8 @@ interface SignatureEditorProps {
   signatureImageType: "png" | "jpg" | null;
   onPickFile: () => void;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  /** ISS-070 阶段 3：从签名库选历史签名（data URL） */
+  onSelectLibrarySignature: (dataUrl: string) => void;
   onClear: () => void;
   onApply: () => void;
 }
@@ -401,6 +425,7 @@ function SignatureEditor({
   signatureImageType,
   onPickFile,
   onFileChange,
+  onSelectLibrarySignature,
   onClear,
   onApply,
 }: SignatureEditorProps): ReactNode {
@@ -431,6 +456,10 @@ function SignatureEditor({
         ) : (
           <span className="forms-panel__signature-meta">未选择</span>
         )}
+      </div>
+      <div className="forms-panel__signature-library">
+        <p className="forms-panel__hint">或从签名库选择已保存的签名：</p>
+        <SignatureLibraryPicker onSelect={onSelectLibrarySignature} />
       </div>
       <button
         className="context-tool context-tool--primary"

@@ -45,6 +45,7 @@ export type AppCommandId =
   | "export-annotation-summary"
   | "annotations-flatten"
   | "forms-flatten"
+  | "forms-sign-handwrite"
   | "redact-region"
   | "annotation-translate"
   | "annotation-tts"
@@ -307,6 +308,18 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     feedback: "已进入填写和签名面板，请在面板内读取字段并确认扁平化导出。",
   },
   {
+    id: "forms-sign-handwrite",
+    label: "手写签名",
+    description: "进入表单签名模式，可上传图片或从签名库选历史签名嵌入字段。",
+    layer: "tertiary",
+    group: "forms",
+    entryPoints: ["more-menu", "native-menu"],
+    requiresDocument: true,
+    targetMode: "forms",
+    targetUtilityPanel: "forms",
+    feedback: "已进入签名模式，请在侧栏选签名字段后上传或从签名库选择。",
+  },
+  {
     id: "redact-region",
     label: "涂黑矩形",
     description: "在阅读区拖矩形遮蔽原文（不可恢复，用于证据遮蔽）。",
@@ -394,7 +407,7 @@ export const APP_TOOL_LAUNCHER_SECTIONS: AppToolLauncherSectionDefinition[] = [
     id: "markup",
     label: "标注填写",
     summary: "批注、签名和表单交付。",
-    commandIds: ["mode-annotate", "export-annotation-summary", "annotations-flatten", "redact-region", "annotation-translate", "annotation-tts", "mode-forms", "forms-flatten"],
+    commandIds: ["mode-annotate", "export-annotation-summary", "annotations-flatten", "redact-region", "annotation-translate", "annotation-tts", "mode-forms", "forms-flatten", "forms-sign-handwrite"],
   },
   {
     id: "scan",
