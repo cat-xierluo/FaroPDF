@@ -795,7 +795,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：扫描预处理 / 页面整理 / 律师场景刚需
-- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，splitPagesByGrid + splitPagesByBreakpoints + 11 测试）；阶段 2 PageOrganizerWorkspace 集成 + 缩略图拖断点 UI + 裁边切待启动
+- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，splitPagesByGrid + splitPagesByBreakpoints + 11 测试）；阶段 2 PageOrganizerWorkspace 集成已完成（2026-06-16，SplitPagesDialog + 「扫描拆页」按钮 + handleConfirmSplit，DEC-115）；缩略图拖断点 UI + 裁边切 待启动
 - 来源：DEC-103 / ROADMAP §5 v0.1 缺口"扫描清洁校正"+ PDF-Guru `cut.go` + `thirdparty/cut.py:15-79`
 - 律师场景：扫描卷宗常见双页合一（A3 扫成 A4 两页粘一起）/ 多面 A4 拼图扫成单页 / 需要按断点切单页为多页
 - 目标：
@@ -820,7 +820,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：**P0**
 - 类型：导出 / 律师证据遮蔽 / 律师场景刚需
-- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，applyRedaction 算法 + 10 测试）；阶段 2 RedactionOverlay UI + commands.ts 入口 + 去页眉页脚 + 多矩形拖拽 待启动
+- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，applyRedaction 算法 + 10 测试）；阶段 2 RedactionOverlay 拖矩形 UI + commands.ts redact-region 入口 + AppShell 集成已完成（2026-06-16，DEC-114）；去页眉页脚 + 多矩形拖拽（已支持多矩形，批量应用）的 UI 细化 待启动
 - 来源：DEC-103 / PDF-Guru `mask.go` + `thirdparty/mask.py:18-60` + `header_and_footer.go:60-83`
 - 律师场景：
   - **证据遮蔽**：身份证号 / 隐私电话 / 商业秘密在出具材料时必须涂黑，是律师工作高频操作
@@ -941,7 +941,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P2
 - 类型：文档属性 / 元数据
-- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，readPdfMetadata + writePdfMetadata + 10 测试，Producer 字段 pdf-lib 限制 → DEC-109 阶段 2 用 Rust lopdf 解决）；阶段 2 PropertiesDialog UI + commands.ts 入口 + Producer 真覆盖 待启动
+- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，readPdfMetadata + writePdfMetadata + 10 测试，Producer 字段 pdf-lib 限制 → DEC-109 阶段 2 用 Rust lopdf 解决）；阶段 2 PropertiesDialog UI + commands.ts document-properties 入口 + AppShell 集成已完成（2026-06-16，DEC-116）；Producer 真覆盖（Rust lopdf 直接编辑 InfoDict 绕过 pdf-lib force override）待启动
 - 来源：DEC-103 / PDF-Guru `MetaForm.vue` + `thirdparty/metadata.py`
 - 律师场景：律师整理客户文件，需要修改 Title / Author / Subject / Keywords，避免泄露原作者
 - 目标：
