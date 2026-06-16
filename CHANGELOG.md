@@ -1,6 +1,12 @@
 ## Unreleased
 
-> v0.2 起步：PDF Expert 视觉与功能对照 + ISS-060/061/062/064 阶段 1 集成 + ISS-071 工程基础设施 + ISS-067 矩形遮罩 + ISS-070 手写签名板 + ISS-072 文档属性 + ISS-066 拆双页。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~110。
+> v0.2 起步：PDF Expert 视觉与功能对照 + ISS-060/061/062/064 阶段 1 集成 + ISS-071 工程基础设施 + ISS-067 矩形遮罩 + ISS-070 手写签名板 + ISS-072 文档属性 + ISS-066 拆双页 + ISS-062 阶段 2 自定义图章。**Wave A 5/5 完成**。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~111。
+
+自定义图章（ISS-062 阶段 2，DEC-111）：
+
+- 新增 `src/modules/annotation/customStampStore.ts` localStorage 持久化层：`saveCustomStamp(name, base64Image)` / `listCustomStamps()` / `deleteCustomStamp(id)` / `MAX_CUSTOM_STAMPS = 4` 上限 + 损坏数据兜底过滤 + 跨 tab `storage` event 同步。
+- 新增 `src/modules/annotation/ui/CustomStampPanel.tsx` React UI：2×2 缩略图网格 + 「+ 上传 PNG / JPG」按钮 + 删除 × + 错误提示带 + 达上限禁用按钮 + 文件类型/大小校验（PNG/JPG ≤ 1MB）。
+- 19 测试覆盖：store 10（save/list/delete/上限/空 name fallback/JSON 损坏/类型过滤/持久化）+ UI 9（空态/已有 stamp/点击 onSelectStamp/删除/上限禁用/类型错/大小超限/合法上传 FileReader 触发/「知道了」关闭错误）。
 
 扫描清洁校正（ISS-066 阶段 1，DEC-110）：
 

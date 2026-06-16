@@ -4621,6 +4621,86 @@ DEC-107 ISS-067 跑通 PM 单 session TDD 路径（20 min 一个阶段 1）后�
 - `/tmp/iss-066-worker-prompt.md`（原 worker prompt 作 implementation plan）
 - 参考思路（不复制）：PDF-Guru `thirdparty/cut.py:15-79` `cut_pdf_by_grid` / `cut_pdf_by_breakpoints` 用 PyMuPDF `page.set_cropbox`
 
+## DEC-111 ISS-062 阶段 2 自定义图章上传 + Wave A 5/5 收官
+
+- 日期：2026-06-16
+- 状态：已完成
+- 关联：ISS-062 阶段 2 / ISS-060 / DEC-103 / DEC-105~110（**Wave A 5/5 收官**）
+
+### 背景
+
+按 ISS-073 路线图 Wave A 推进，第 5 个也是最后一个 PM 单 session TDD 的 ISS。律师场景：律师上传公章/私章/印鉴的 PNG/JPG 扫描到 FaroPDF，每次批注盖章可直接选用（vs 每次重新上传）。
+
+### 决策
+
+**TDD 流程 + localStorage 持久化 + 纯 React Canvas API（无外部库）**：
+
+1. **RED**: 写 `customStampStore.test.ts` 10 + `CustomStampPanel.test.tsx` 9 测试
+2. **GREEN**: 实现 store + UI
+3. **修一个 FileReader mock 问题**：第一次用 `global.FileReader = vi.fn(() => mockReader)` 没生效（vitest jsdom 环境 FileReader 已绑定到 prototype）；改用 `FileReader.prototype.readAsDataURL` 替换 + `Object.defineProperty(this, "result", ...)` 设 readonly result，10/10 测试通过
+4. **Verify GREEN**: 19/19 测试通过
+
+### 关键设计
+
+- **localStorage 持久化层独立**：`customStampStore.ts` 不依赖 React，可在任何 module 复用（如 Rust IPC 序列化、跨组件同步）
+- **JSON 损坏兜底**：`loadAll()` 用 `try/catch` 包 `JSON.parse`，损坏数据返回 `[]`，过滤非 `CustomStamp` 结构（防 localStorage 被外部污染）
+- **上限 FIFO 强制**：超过 4 张抛错而不是静默淘汰，让 UI 显式提示用户"先删旧再上传新"
+- **空 name 自动 fallback**：用户文件名为 `.png` / 空字符串时自动生成 "图章 N"（避免空 name 显示空白）
+- **跨 tab `storage` event 同步**：用户在另一 tab 改了 stamps，本 tab 自动刷新 UI（React `useEffect` 监听）
+- **FileReader prototype mock**：vitest jsdom 下 `global.FileReader = vi.fn()` 不生效，必须 patch `FileReader.prototype.readAsDataURL`
+- **文件校验 fail fast**：mime type 不在 PNG/JPG 白名单 / 大小 > 1MB 立即提示错误，不读取文件
+
+### 验证
+
+- typecheck：0 错
+- lint：0 错
+- 全量单测：**1007 通过**（之前 988，+19 ISS-062 阶段 2）+ 1 pre-existing zoom 失败（DEC-100 §已知）
+- 测试覆盖：customStampStore 10（save/list/delete/上限/空 name fallback/JSON 损坏/类型过滤/跨调用持久化/类型契约）+ CustomStampPanel 9（空态/已有 stamp/点击 onSelectStamp/删除/上限禁用文案/文件类型错/大小超限/合法上传 FileReader/「知道了」关闭错误）
+
+### 文件改动统计
+
+| 文件 | 行数 | 类型 |
+|---|---|---|
+| `src/modules/annotation/customStampStore.ts` | +88 | 新（持久化） |
+| `src/modules/annotation/customStampStore.test.ts` | +99 | 新（10 测试） |
+| `src/modules/annotation/ui/CustomStampPanel.tsx` | +138 | 新（UI） |
+| `src/modules/annotation/ui/CustomStampPanel.css` | +130 | 新（样式） |
+| `src/modules/annotation/ui/CustomStampPanel.test.tsx` | +136 | 新（9 测试） |
+
+### Wave A 5/5 收官总结
+
+| ISS | 工作量 | 测试 | DEC |
+|---|---|---|---|
+| **ISS-067** redaction（矩形遮罩） | ~20 min | 10 | DEC-107 |
+| **ISS-070** SignaturePad（手写签名） | ~25 min | 8 | DEC-108 |
+| **ISS-072** properties（文档属性） | ~40 min | 10 | DEC-109 |
+| **ISS-066** scanSplit（拆双页） | ~20 min | 11 | DEC-110 |
+| **ISS-062 阶段 2** CustomStamp（自定义图章） | ~30 min | 19 | DEC-111 |
+| **合计** | **~2.5 h** | **+58 测试** | 5 DEC |
+
+**Wave A 全成功**：5 ISS 阶段 1 / 阶段 2 全部 ship，对比 Wave 1 + Wave A multi-agent 双 wave 0 产出，PM 单 session 路径**完胜**。
+
+### 阶段 3 待办（v0.2 follow-up）
+
+- **CustomStampPanel 集成到 RightPanel**（ISS-060 阶段 2 + ISS-062 阶段 3）：annotate 模式右栏自动渲染 CustomStampPanel + onSelectStamp 触发 `annotationArmed.activeToolType = "stamp"` + `activeStampName` / `activeStampLabel` 配置
+- **AnnotationOverlay 用 customStamp 渲染**：用户点击画布时把 stamp.image base64 直接画为 PDF annotation（pdf-lib drawImage）
+- **commands.ts 入口**：可选 `annotate-custom-stamp` 命令（如果用户不想通过右栏）
+
+### 经验
+
+- **PM 单 session 第 5 次（Wave A 收官）验证**：DEC-107 (20m) + DEC-108 (25m) + DEC-109 (40m) + DEC-110 (20m) + DEC-111 (30m) = **5/5 全成功 ~2.5h**
+- **vitest jsdom FileReader mock 规律**：直接替换 `global.FileReader` 不生效，必须 patch `FileReader.prototype.readAsDataURL` + 用 `Object.defineProperty` 设 readonly `result`。建议加入 [project skill]：未来 vitest UI 测试涉及 FileReader / Blob API 都用这个 pattern
+- **PM 单 session 路径已稳定可复制**：Wave B/C 后续 ISS 继续走这条路径
+
+### 关联
+
+- DEC-110（ISS-066 PM 单 session）
+- DEC-103（PDF-Guru 调研，ISS-062 自定义图章思路来源）
+- ISS-073 路线图（**Wave A 5/5 收官**，Wave B/C 待启动）
+- `/tmp/iss-062-stage2-worker-prompt.md`（原 worker prompt 作 implementation plan）
+- 参考思路（不复制）：PDF-Guru `thirdparty/sign.py` PNG 缩略图持久化 + 自定义图章 tab 模式
+
+
 
 
 

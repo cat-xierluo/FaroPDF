@@ -1,0 +1,144 @@
+/* ISS-062 阶段 2：自定义图章面板样式。
+ * 4 缩略图网格 (2×2) + 上传按钮 + 错误提示带，紧凑布局适配右栏 320px。
+ */
+
+.custom-stamp-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.custom-stamp-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.custom-stamp-panel__header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.custom-stamp-panel__count {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.custom-stamp-panel__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--warning-bg, #fde68a);
+  border: 1px solid var(--warning-border, #d97706);
+  color: var(--danger, #b45309);
+  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.custom-stamp-panel__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.custom-stamp-panel__item {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.custom-stamp-panel__thumbnail {
+  display: block;
+  width: 100%;
+  height: 80px;
+  padding: 4px;
+  background: #ffffff;
+  border: none;
+  cursor: pointer;
+}
+
+.custom-stamp-panel__thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.custom-stamp-panel__thumbnail:hover {
+  background: var(--surface-soft, #f6f8f9);
+}
+
+.custom-stamp-panel__item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  font-size: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.custom-stamp-panel__item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+}
+
+.custom-stamp-panel__delete {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.custom-stamp-panel__delete:hover {
+  color: var(--danger, #b91c1c);
+}
+
+.custom-stamp-panel__slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  background: var(--surface-soft, #f6f8f9);
+}
+
+.custom-stamp-panel__upload {
+  margin-top: 4px;
+  padding: 8px;
+  border: 1px solid var(--accent, #276f76);
+  border-radius: 4px;
+  background: var(--accent, #276f76);
+  color: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.custom-stamp-panel__upload:disabled {
+  background: var(--surface-soft, #e5e7eb);
+  color: var(--muted);
+  border-color: var(--border);
+  cursor: not-allowed;
+}
+
+.custom-stamp-panel__upload:hover:not(:disabled) {
+  background: var(--accent-hover, #1f5a60);
+}
