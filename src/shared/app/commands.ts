@@ -45,6 +45,7 @@ export type AppCommandId =
   | "export-annotation-summary"
   | "annotations-flatten"
   | "forms-flatten"
+  | "redact-region"
   | "help-about";
 
 export interface AppCommandDefinition {
@@ -303,6 +304,18 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     feedback: "已进入填写和签名面板，请在面板内读取字段并确认扁平化导出。",
   },
   {
+    id: "redact-region",
+    label: "涂黑矩形",
+    description: "在阅读区拖矩形遮蔽原文（不可恢复，用于证据遮蔽）。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["more-menu", "native-menu"],
+    requiresDocument: true,
+    targetMode: "annotate",
+    targetUtilityPanel: "annotation",
+    feedback: "已进入涂黑模式，请在阅读区拖出矩形遮蔽区域，点击「应用遮蔽」导出 -redacted.pdf。",
+  },
+  {
     id: "help-about",
     label: "关于 FaroPDF",
     layer: "tertiary",
@@ -342,7 +355,7 @@ export const APP_TOOL_LAUNCHER_SECTIONS: AppToolLauncherSectionDefinition[] = [
     id: "markup",
     label: "标注填写",
     summary: "批注、签名和表单交付。",
-    commandIds: ["mode-annotate", "export-annotation-summary", "annotations-flatten", "mode-forms", "forms-flatten"],
+    commandIds: ["mode-annotate", "export-annotation-summary", "annotations-flatten", "redact-region", "mode-forms", "forms-flatten"],
   },
   {
     id: "scan",

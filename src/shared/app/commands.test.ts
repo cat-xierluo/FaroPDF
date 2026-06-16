@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   APP_COMMANDS,
+  APP_TOOL_LAUNCHER_SECTIONS,
   getCommandById,
   getCommandsByLayer,
   getNativeMenuCommands,
@@ -98,7 +99,20 @@ describe("app command catalog", () => {
     expect(removeCommand?.targetMode).toBe("export");
     expect(removeCommand?.targetUtilityPanel).toBe("security");
     expect(removeCommand?.requiresDocument).toBe(true);
-    expect(removeCommand?.entryPoints).toEqual(expect.arrayContaining(["more-menu", "native-menu"]));
+  });
+
+  test("ISS-067: 涂黑矩形命令进入 annotate 模式 + 标注侧栏", () => {
+    const redact = getCommandById("redact-region");
+    expect(redact?.group).toBe("annotation");
+    expect(redact?.layer).toBe("tertiary");
+    expect(redact?.targetMode).toBe("annotate");
+    expect(redact?.targetUtilityPanel).toBe("annotation");
+    expect(redact?.requiresDocument).toBe(true);
+    expect(redact?.entryPoints).toEqual(expect.arrayContaining(["more-menu", "native-menu"]));
+    // 进入「标注填写」分组
+    expect(
+      APP_TOOL_LAUNCHER_SECTIONS.find((s) => s.id === "markup")?.commandIds.includes("redact-region"),
+    ).toBe(true);
   });
 
   test("native menu entries are backed by the same command definitions", () => {

@@ -37,6 +37,8 @@ import { Toolbar } from "./Toolbar";
 import { SettingsPanel } from "../../modules/settings/SettingsPanel";
 import type { SectionId } from "../../modules/settings/sections";
 import { AnnotationOverlay, type AnnotationDraftInput, type AnnotationOverlayViewport } from "./AnnotationOverlay";
+import { RedactionOverlay, type RedactionRegionDraft } from "../../modules/redaction/ui/RedactionOverlay";
+import { applyRedaction } from "../../modules/redaction/redactionEngine";
 import type {
   AnnotationArmedStateBundle,
   AnnotationDraftSubmission,
@@ -113,6 +115,14 @@ export function AppShell({
   utilityPanel,
 }: AppShellProps) {
   const showContextToolbar = activeMode !== "read" && activeMode !== "pages";
+  // ISS-067 阶段 2：涂黑模式开关（先声明，再写 useEffect 依赖）
+  const [redactActive, setRedactActive] = useState(false);
+  // 离开 annotate 模式自动退出涂黑状态，避免 overlay 卡在非文档页。
+  useEffect(() => {
+    if (activeMode !== "annotate" && redactActive) {
+      setRedactActive(false);
+    }
+  }, [activeMode, redactActive]);
   // ocr 模式独占主区域（OcrWorkspace 包含任务列表 + 质量报告），隐藏 utility panel
   const showUtilityPanel = utilityPanel !== "none" && activeMode !== "pages" && activeMode !== "ocr";
   const isOcrMode = activeMode === "ocr";
@@ -270,6 +280,52 @@ export function AppShell({
     };
   }, [annotations, document, reader]);
 
+  // ISS-067 阶段 2：应用涂黑矩形 → 调 applyRedaction → 输出 *-redacted.pdf 新副本。
+  // 坐标转换：RedactionOverlay 传的是屏幕 clientX/Y，需减去 canvas origin 并按 PDF 视口缩放。
+  const handleApplyRedaction = useCallback(
+    async (regions: RedactionRegionDraft[]): Promise<void> => {
+      if (!document || !overlayViewport) {
+        setCommandFeedback("请先打开 PDF 文档。");
+        return;
+      }
+      if (regions.length === 0) {
+        setCommandFeedback("请先画出至少一个遮蔽矩形。");
+        return;
+      }
+      const canvas = globalThis.document.querySelector(".reader-canvas canvas") as HTMLCanvasElement | null;
+      if (!canvas) {
+        setCommandFeedback("找不到阅读画布，无法转换坐标。");
+        return;
+      }
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = overlayViewport.width / rect.width;
+      const scaleY = overlayViewport.height / rect.height;
+      // 将屏幕 clientX/Y → canvas-local → PDF 用户空间（Y 翻转）
+      const pdfRegions = regions.map((r) => ({
+        pageIndex: r.pageIndex,
+        x: (r.x - rect.left) * scaleX,
+        y: overlayViewport.height - (r.y - rect.top) * scaleY - r.height * scaleY,
+        width: r.width * scaleX,
+        height: r.height * scaleY,
+      }));
+      try {
+        setCommandFeedback("正在应用遮蔽...");
+        const sourceBytes = await reader.getFileBytes();
+        if (!sourceBytes) {
+          throw new Error("未找到当前 PDF 的源文件字节。");
+        }
+        const newBytes = await applyRedaction(new Uint8Array(sourceBytes), pdfRegions);
+        const outputName = suggestOutputName(reader.getCurrentFileName() ?? document.name, "redacted");
+        await reader.saveUpdatedBytes(newBytes, outputName);
+        setCommandFeedback(`已应用 ${regions.length} 个遮蔽矩形，另存为 ${outputName}。`);
+        setRedactActive(false);
+      } catch (error) {
+        setCommandFeedback(error instanceof Error ? error.message : "应用遮蔽失败。");
+      }
+    },
+    [document, overlayViewport, reader],
+  );
+
   const executeCommand = useCallback(async (commandId: AppCommandId) => {
     const command = getCommandById(commandId);
     if (!command) {
@@ -321,6 +377,8 @@ export function AppShell({
       setAnnotationViewSignal((prev) => ({ view: "summary", nonce: prev.nonce + 1 }));
     } else if (command.id === "annotations-flatten") {
       setAnnotationViewSignal((prev) => ({ view: "list", nonce: prev.nonce + 1 }));
+    } else if (command.id === "redact-region") {
+      setRedactActive(true);
     }
 
     if (command.id === "help-about") {
@@ -487,6 +545,15 @@ export function AppShell({
                       onAnnotationDraft({ ...input, pageIndex: currentPageNumber - 1 })
                   : undefined
               }
+              pageIndex={currentPageNumber - 1}
+              viewport={overlayViewport}
+            />
+          ) : null}
+          {isAnnotateMode && redactActive && overlayViewport ? (
+            <RedactionOverlay
+              active={redactActive}
+              onApply={handleApplyRedaction}
+              onCancel={() => setRedactActive(false)}
               pageIndex={currentPageNumber - 1}
               viewport={overlayViewport}
             />

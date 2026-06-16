@@ -1,0 +1,65 @@
+/**
+ * ISS-067 阶段 2：涂黑矩形覆盖层样式
+ *
+ * 覆盖在 reader-canvas 之上的 absolute 容器。.panel 是浮动控制条（不遮挡阅读区），
+ * 用户在 .redaction-overlay 区域 mousedown→mousemove→mouseup 画矩形。
+ */
+
+.redaction-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  cursor: crosshair;
+  user-select: none;
+}
+
+.redaction-overlay__panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 240px;
+  padding: 12px;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #d0d0d0);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+  z-index: 21;
+}
+
+.redaction-overlay__title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--color-text, #222);
+}
+
+.redaction-overlay__hint {
+  font-size: 11px;
+  color: var(--color-text-muted, #666);
+  line-height: 1.4;
+  margin: 0 0 8px;
+}
+
+.redaction-overlay__count {
+  font-size: 12px;
+  margin: 0 0 10px;
+  color: var(--color-text, #222);
+}
+
+.redaction-overlay__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.redaction-overlay__draft {
+  border: 2px dashed #ff0000;
+  background: rgba(255, 0, 0, 0.1);
+  pointer-events: none;
+}
+
+.redaction-overlay__region {
+  background: rgba(255, 0, 0, 0.35);
+  border: 2px solid #ff0000;
+  pointer-events: none;
+}
