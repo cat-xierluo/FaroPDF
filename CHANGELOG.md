@@ -1,6 +1,14 @@
 ## Unreleased
 
-> v0.2 起步：PDF Expert 视觉与功能对照 + ISS-060/061/062/064 阶段 1 集成 + ISS-071 工程基础设施 + ISS-067 矩形遮罩 + ISS-070 手写签名板。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~108。
+> v0.2 起步：PDF Expert 视觉与功能对照 + ISS-060/061/062/064 阶段 1 集成 + ISS-071 工程基础设施 + ISS-067 矩形遮罩 + ISS-070 手写签名板 + ISS-072 文档属性。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~109。
+
+文档属性（ISS-072 阶段 1，DEC-109）：
+
+- 新增 `src/modules/document/` 模块 + `readPdfMetadata(bytes)` + `writePdfMetadata(bytes, updates)` 读写层。`PdfMetadata { title, author, subject, keywords[], producer, creator, creationDate, modDate, pageCount, isEncrypted }`。
+- Title / Author / Subject / Keywords / Creator / CreationDate / ModDate 均可读写。
+- "FaroPDF" 标识默认写入 **Creator** 字段（律师整理客户文件场景，避免泄露原作者）。
+- **Producer 字段已知限制**（DEC-109）：pdf-lib `save()` force override Producer 为 `pdf-lib (...)`，本阶段无法稳定覆盖；ISS-072 阶段 2 用 Rust lopdf 直接编辑 InfoDict 解决。
+- 10 测试覆盖：空/含字段读取、写 title、写 author+keywords、保留既有字段、Creator 默认 FaroPDF、Creator 可覆盖、ModDate 自动更新、空 updates、输出合法 PDF。
 
 律师材料签字（ISS-070 阶段 1，DEC-108）：
 

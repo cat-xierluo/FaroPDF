@@ -4469,6 +4469,86 @@ DEC-107 ISS-067 跑通 PM 单 session TDD 路径（20 min 一个阶段 1）后�
 - `/tmp/iss-070-worker-prompt.md`（原 worker prompt 作 implementation plan）
 - 参考思路（不复制）：PDF-Guru `thirdparty/sign.py:8-38` `sign_img()` PIL 白底变透明算法
 
+## DEC-109 ISS-072 阶段 1 PDF 文档属性读写层 + Producer 字段 pdf-lib 限制
+
+- 日期：2026-06-16
+- 状态：已完成（阶段 1）+ 阶段 2 follow-up 登记
+- 关联：ISS-072 / ISS-063 / DEC-103 / DEC-105~108（PM 单 session 第 3 个 ISS）
+
+### 背景
+
+按 ISS-073 路线图 Wave A 推进，第 3 个 PM 单 session TDD 的 ISS。律师场景：律师整理客户文件，修改 Title / Author / Subject / Keywords，避免泄露原作者；Producer 字段默认写 "FaroPDF" 不暴露底层 pdf-lib。
+
+### 决策
+
+**TDD 流程 + pdf-lib InfoDict API**：
+
+1. **RED**: 写 `src/modules/document/properties.test.ts` 10 测试 case
+2. **GREEN**: 实现 `properties.ts`：
+   - `readPdfMetadata(pdfBytes): Promise<PdfMetadata>`：用 pdf-lib `getTitle / getAuthor / getSubject / getKeywords / getProducer / getCreator / getCreationDate / getModificationDate` + `getPageCount` + `isEncrypted`
+   - `writePdfMetadata(pdfBytes, updates: Partial<PdfMetadata>)`: 同款 setter API + Producer 默认 "FaroPDF"
+3. **3 个测试 fail**：Producer 验证全失败
+4. **深入诊断 3 轮**：
+   - 第 1 轮：`save({ updateMetadata: false })` 不生效，Producer 仍 "pdf-lib (...)"
+   - 第 2 轮：发现 pdf-lib 默认用 ObjectStreams 压缩 InfoDict → 字节流 patch 不可能
+   - 第 3 轮：改 `useObjectStreams: false`，发现 setProducer 写入字节流是正确的 hex `<FEFF004600610072006F005000440046>` (= "FaroPDF")，但**getProducer 仍读出 "pdf-lib (...)"** —— pdf-lib 在 XMP metadata 双写 producer，读取时优先用 XMP
+5. **务实决策**：放弃 Producer 字段稳定覆盖（pdf-lib 行为顽固），改用 Creator 承载 "FaroPDF" 标识
+
+### Producer 字段 pdf-lib v1.17.1 已知限制（核心）
+
+- pdf-lib `save()` 在序列化 InfoDict 时**强制**把 Producer 写为 `pdf-lib (https://github.com/Hopding/pdf-lib)`
+- 即便手动 `setProducer("X")`，输出 PDF 的 trailer InfoDict 字节流里 Producer 确实是 "X"（hex string 形式）
+- **但 pdf-lib `load()` + `getProducer()` 读取时**优先读 XMP metadata（PDF 1.4+ 的 alternative metadata），XMP 里 Producer 仍是默认值
+- 即便 `useObjectStreams: false` 让字节流可见，字节流 patch（search/replace "pdf-lib (...)"）也无效因为 XMP 是单独的 stream
+- 真正修 Producer 需要：
+  - 直接修改 XMP metadata stream（pdf-lib 没暴露 API）
+  - 或用 Rust 后端 lopdf / qpdf 直接编辑 InfoDict + XMP（绕过 pdf-lib）
+
+### 关键设计
+
+- **Creator 承载 "FaroPDF" 标识**：pdf-lib setCreator → 字段名 `/Creator`（PDF 标准）→ 律师查阅文件属性时看到 "Creator: FaroPDF" 即知道工具来源
+- **Producer 字段不动**：保持 pdf-lib 默认值 `pdf-lib (...)` 作为 known limitation 记入 DEC-109，阶段 2 解决
+- **ModDate 自动更新**：pdf-lib `save()` 默认会再次 update ModificationDate，与我们手动 set 的值一致（都是 "现在"）
+- **keywords parser**：pdf-lib `getKeywords()` 类型在不同版本是 string 或 string[]，统一规整为 `string[] | undefined`，支持 PDF 标准空格/逗号/分号分隔
+
+### 验证
+
+- typecheck：0 错
+- lint：0 错
+- 全量单测：**977 通过**（之前 966，+10 ISS-072）+ 1 pre-existing zoom 失败（DEC-100 §已知）
+- 测试覆盖：empty/含字段读取（2）/ writePdfMetadata 8（写 title / 写 author+keywords / 保留既有字段 / Creator 默认 FaroPDF / Creator 可覆盖 / ModDate 自动更新 / 空 updates / 输出合法 PDF）
+
+### 文件改动统计
+
+| 文件 | 行数 | 类型 |
+|---|---|---|
+| `src/modules/document/index.ts` | +7 | 新（barrel） |
+| `src/modules/document/properties.ts` | +106 | 新（核心 read/write） |
+| `src/modules/document/properties.test.ts` | +120 | 新（10 测试） |
+
+### 阶段 2 待办（v0.2 follow-up）
+
+- **PropertiesDialog UI**（ISS-063 合并）：modal 对话框显示 metadata 字段 + 编辑表单 + 「保存到新副本」按钮
+- **commands.ts 入口**：`document-properties` 命令进入工具启动器
+- **Producer 真覆盖**（DEC-109 阶段 2 核心）：Rust 后端 lopdf 或 qpdf 直接编辑 PDF InfoDict + XMP metadata，绕过 pdf-lib 限制。前端 invoke 调 Rust command 而非 pdf-lib 完成最终 Producer 写入
+- **输出文件命名**：用 `suggestOutputName(name, "metadata")` 生成 `*-metadata.pdf`
+
+### 经验
+
+- **pdf-lib 行为复杂超预期**：本来预估 ISS-072 ~15 min（最简单 ISS），实际花 ~40 min（含 3 轮诊断 pdf-lib Producer 行为）。**教训**：未来 ISS 预估时把"第三方库行为不确定性"按 1.5-2x 系数加权
+- **第三方库限制 → 务实决策**：碰到库限制时不要硬刚，把限制文档化（DEC §限制段）+ 把功能分阶段（阶段 1 + 阶段 2），让阶段 1 仍可 ship 大部分价值
+- **PM 单 session 第 3 次验证**：DEC-107 ISS-067 (20 min) + DEC-108 ISS-070 (25 min) + DEC-109 ISS-072 (40 min) = **3/3 成功**，对比 multi-agent 双 Wave 全失败，PM 单 session 路径稳定
+
+### 关联
+
+- DEC-108（ISS-070 PM 单 session）
+- DEC-107（ISS-067 PM 单 session）
+- DEC-106（multi-agent 退役）
+- ISS-073 路线图（Wave A 第 3 个 ISS）
+- `/tmp/iss-072-worker-prompt.md`（原 worker prompt 作 implementation plan）
+- 参考思路（不复制）：PDF-Guru `thirdparty/metadata.py` 用 PyMuPDF `doc.set_metadata({...})` 写 producer/creator/dates
+
+
 
 
 

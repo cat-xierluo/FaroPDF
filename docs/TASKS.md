@@ -941,7 +941,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P2
 - 类型：文档属性 / 元数据
-- 状态：未启动（扩展 ISS-063）
+- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，readPdfMetadata + writePdfMetadata + 10 测试，Producer 字段 pdf-lib 限制 → DEC-109 阶段 2 用 Rust lopdf 解决）；阶段 2 PropertiesDialog UI + commands.ts 入口 + Producer 真覆盖 待启动
 - 来源：DEC-103 / PDF-Guru `MetaForm.vue` + `thirdparty/metadata.py`
 - 律师场景：律师整理客户文件，需要修改 Title / Author / Subject / Keywords，避免泄露原作者
 - 目标：
@@ -1090,6 +1090,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
+- 2026-06-16：完成 ISS-072 阶段 1 PDF 文档属性读写层（DEC-109）。PM 单 session TDD 第 3 个 ISS。`readPdfMetadata(pdfBytes)` + `writePdfMetadata(pdfBytes, updates)` + `PdfMetadata { title, author, subject, keywords[], producer, creator, creationDate, modDate, pageCount, isEncrypted }`。Title / Author / Subject / Keywords / Creator / Dates 字段正常通过 pdf-lib API 读写。**Producer 字段 pdf-lib v1.17.1 已知限制**（DEC-109 §决策）：`save()` force override + XMP metadata 双写让 SaveOptions + 字节流 patch 都无法稳定覆盖；本阶段把 "FaroPDF" 标识写入 **Creator** 字段，Producer 真覆盖留阶段 2 用 Rust lopdf 直接编辑 InfoDict。10 测试覆盖：empty/含字段读取 / 写 title / 写 author+keywords / 保留既有字段 / Creator 默认 FaroPDF / Creator 可覆盖 / ModDate 自动更新 / 空 updates / 输出合法 PDF。**全量 977 通过**（+10）。
 - 2026-06-16：完成 ISS-070 阶段 1 SignaturePad 手写签名板（DEC-108）。PM 单 session TDD 路径第 2 个 ISS。`SignaturePad` React 组件 + 纯 Canvas API（无外部库）：mousedown→mousemove→mouseup 画笔触 + 多笔画支持 + 清空/保存/取消 3 按钮 + 白底变透明（保存前 getImageData 把 R/G/B > 250 像素 alpha 置 0）+ onSave 回调 PNG data URL。8 测试覆盖：默认渲染 / width-height 可控 / 单笔画 strokeCount / 多笔画 / 清空 reset / 保存 toDataURL + onSave / 取消 onCancel / mouseleave 中止笔画。**全量 966 通过**（+8）。阶段 2 待启动：FormsPanel 集成 + signatureStore localStorage 持久化 + commands.ts forms-sign-handwrite + 落入文档任意位置 UI。
 - 2026-06-16：完成 ISS-067 阶段 1 矩形遮罩涂黑算法（DEC-107）。PM 单 session TDD 路径（DEC-106 multi-agent 退役后第一个 ISS）。`applyRedaction(pdfBytes, regions): Promise<Uint8Array>` + `RedactionRegion { pageIndex, x, y, width, height, color? }`，用 pdf-lib drawRectangle 在指定 pageIndex 区域绘制不透明矩形（默认黑色 rgb(0,0,0)）覆盖原内容。**真不可恢复**（不是 PDF annotation，是 content stream 直接绘制）。10 测试覆盖：单页单矩形、多页多矩形、跨页同 pageIndex、默认黑色、自定义 hex 颜色、空 regions、越界 pageIndex 抛错、负数 pageIndex、非法 color、负数 width/height。**全量 958 通过**（+10）+ typecheck/lint/cargo check 全绿。后续 ISS-067 阶段 2 接 AppShell + commands.ts + RedactionOverlay 拖矩形 UI + 去页眉页脚。
 - 2026-06-16：Wave A 5-worker multi-agent 实战**完全失败**（详见 DEC-106）。spawn 全 5 worker + paste-buffer 投递 prompt 成功，但 90 分钟内 0 commit / 0 文件 / 仅 2 worker 写出 STATUS bootstrap。System load 持续 14-17 严重过载（8 核机器跑 5 claude REPL + 既有 tmux session），permission prompt 重复弹出阻塞 worker，paste-buffer 时序坑（4 个 worker 首次 paste 在 REPL 没就绪时丢失，需要 PM 手动 second paste），ISS-072 触发 autocompact 37%。**决策**：multi-agent 在 FaroPDF 本机环境退役（双 Wave 8 worker 尝试全失败）；ISS-067/070/062-stage2/066/072 改 PM 单 session 顺序推进。5 worker prompt 保留在 `/tmp/iss-*-worker-prompt.md` 供下次 PM 直推参考。Skill 改进建议（paste-buffer 时序 / permission auto-accept / load-cap / worker envelope 文档）记入 skill follow-up。
