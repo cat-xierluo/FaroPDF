@@ -1,6 +1,14 @@
 ## Unreleased
 
-> v0.2 起步：PDF Expert 视觉与功能对照 + ISS-060/061/062/064 阶段 1 集成 + ISS-071 工程基础设施 + ISS-067 矩形遮罩 + ISS-070 手写签名板 + ISS-072 文档属性。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~109。
+> v0.2 起步：PDF Expert 视觉与功能对照 + ISS-060/061/062/064 阶段 1 集成 + ISS-071 工程基础设施 + ISS-067 矩形遮罩 + ISS-070 手写签名板 + ISS-072 文档属性 + ISS-066 拆双页。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~110。
+
+扫描清洁校正（ISS-066 阶段 1，DEC-110）：
+
+- 新增 `src/modules/pages/scanSplit.ts` 拆双页 / 网格切 / 自定义断点切算法。
+- `splitPagesByGrid(bytes, { rows, cols, pageIndexes? })` 按 N×M 网格切每页 → 输出 N×M 倍页数；常用 1×2 拆双页（A3 横向扫成单页双 A4 拼一起 → 拆成 2 个 A4 纵向）、2×2 网格切（A4 多面拼图）。
+- `splitPagesByBreakpoints(bytes, { pageIndex, horizontalBreaks?, verticalBreaks? })` 按用户自定义断点（缩略图拖断点线场景）切单页，其他页保留原样。
+- **真切**实现：用 pdf-lib `embedPage` + `drawPage` 平移 offset 让目标子矩形落入新 page (0,0)~(cellW,cellH) 区域，不是只改 cropbox（避免某些 reader 仍能显示裁掉部分的视觉残留）。
+- 11 测试覆盖：1×2 拆双页 / 2×2 网格切 / 子页尺寸 / pageIndexes 限定 / rows=0 / cols=0 / pageIndexes 越界 / 1 水平断点 / 1 横+1 纵 / 不切 / 断点越界。
 
 文档属性（ISS-072 阶段 1，DEC-109）：
 

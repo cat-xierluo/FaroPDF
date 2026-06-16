@@ -4548,6 +4548,80 @@ DEC-107 ISS-067 跑通 PM 单 session TDD 路径（20 min 一个阶段 1）后�
 - `/tmp/iss-072-worker-prompt.md`（原 worker prompt 作 implementation plan）
 - 参考思路（不复制）：PDF-Guru `thirdparty/metadata.py` 用 PyMuPDF `doc.set_metadata({...})` 写 producer/creator/dates
 
+## DEC-110 ISS-066 阶段 1 扫描拆双页 + 网格切 + 自定义断点切算法
+
+- 日期：2026-06-16
+- 状态：已完成
+- 关联：ISS-066 / DEC-103 / DEC-105~109（PM 单 session 第 4 个 ISS，**Wave A 4/5 完成**）
+
+### 背景
+
+按 ISS-073 路线图 Wave A 推进，第 4 个 PM 单 session TDD 的 ISS。律师卷宗扫描场景：A3 横向扫成单页双 A4 拼一起需要拆 → splitPagesByGrid(1, 2)；A4 多面拼图扫成单页 → splitPagesByGrid(2, 2)；用户在缩略图上拖断点切单页 → splitPagesByBreakpoints。
+
+### 决策
+
+**TDD 流程 + pdf-lib embedPage + drawPage 真切**：
+
+1. **RED**: 写 `src/modules/pages/scanSplit.test.ts` 11 测试 case
+2. **GREEN**: 实现 `scanSplit.ts`（一次跑通 11/11）
+3. **关键设计：真切 vs cropbox 裁视图**：
+   - 只改 cropbox：实现简单（copyPages + setCropBox）但是某些 PDF reader 不尊重 cropbox 仍能显示原 mediaBox 内容 → 视觉残留 → 不安全
+   - **真切**：用 `embedPage` 把源 page 嵌入为 PDFEmbeddedPage，再 `drawPage` 到新 page 上，offset 让目标子矩形落入 (0,0)~(cellW,cellH) 区域 → 输出真不可恢复
+4. 选**真切**路径
+
+### 关键设计
+
+- **embedPage + drawPage offset 算法**：
+  - 网格切：cellW = srcW / cols, cellH = srcH / rows
+  - 第 (row, col) 子页 (0,0) 应该映射到原页 (col×cellW, srcH - (row+1)×cellH)（PDF y 向上 → row 0 是顶部）
+  - drawPage 的 x/y 是源 page 在目标 page 上的位置，所以传 `x = -col×cellW`, `y = -(rows-1-row)×cellH` 把整个 embedded page 平移到负坐标，让目标子矩形对齐 (0,0)~(cellW,cellH)
+- **行优先输出**：从顶部第一行开始，每行左到右，符合用户阅读顺序
+- **pageIndexes 限定**：只切指定页（如 `pageIndexes: [0]` 只切第 0 页），其他页 copyPages 原样保留
+- **断点切算法**：
+  - horizontalBreaks 切 y 方向（PDF y 向上），过滤越界 + 排序，加 [0, ..., srcH] 形成边界数组
+  - verticalBreaks 切 x 方向，同理
+  - 双重循环按行优先输出
+  - 无断点时原页 copyPages 复制
+- **错误处理**：rows/cols 必须 ≥ 1；pageIndexes 越界抛错；pageIndex 越界抛错。Fail fast 不部分应用。
+
+### 验证
+
+- typecheck：0 错
+- lint：0 错
+- 全量单测：**988 通过**（之前 977，+11 ISS-066）+ 1 pre-existing zoom 失败（DEC-100 §已知）
+- 测试覆盖：1×2 拆双页（页数）/ 2×2 网格切（页数）/ 子页 width=原/cols（精度）/ pageIndexes 限定 / rows=0 抛错 / cols=0 抛错 / pageIndexes 越界 / 1 水平断点 / 1 横+1 纵 / 不切（保留原样）/ pageIndex 越界
+
+### 文件改动统计
+
+| 文件 | 行数 | 类型 |
+|---|---|---|
+| `src/modules/pages/scanSplit.ts` | +144 | 新（核心算法） |
+| `src/modules/pages/scanSplit.test.ts` | +109 | 新（11 测试） |
+
+### 阶段 2 待办（v0.2 follow-up）
+
+- **PageOrganizerWorkspace 集成**：「拆双页」按钮（一键调 splitPagesByGrid(1,2)）+「自定义切」按钮打开断点编辑器
+- **缩略图拖断点 UI**：用户在缩略图上拖横/纵断点线，实时预览切页结果
+- **commands.ts 入口**：`page-cut-grid` / `page-cut-breakpoints` 命令进入工具启动器「组织页面」分组
+- **裁边切**：按 margin_bbox 自动裁掉扫描黑边（PDF-Guru `cut.py` 思路）
+- **反操作 combine**：把多页按网格拼成大页（PDF-Guru `combine_pdf_by_grid` 思路），打印场景有用
+- **输出文件命名**：用 `suggestOutputName(name, "cut")` 生成 `*-cut.pdf`
+
+### 经验
+
+- **PM 单 session 第 4 次验证**：DEC-107 (20 min) + DEC-108 (25 min) + DEC-109 (40 min) + DEC-110 (~20 min) = **4/4 成功**
+- **真切 vs cropbox 决策**：律师场景的"真不可恢复"要求让我们选 embedPage + drawPage 而不是简单 cropbox。同 ISS-067 矩形遮罩 content stream 直接绘制思路一致
+- **pdf-lib embedPage + drawPage API 强大**：网格切 / 断点切 / 拼贴 / 缩放 / 旋转 都可以用这套 API 实现，是 PDF 页面级编辑的瑞士军刀
+
+### 关联
+
+- DEC-109（ISS-072 PM 单 session）
+- DEC-107（ISS-067 矩形遮罩 content stream 真不可恢复同思路）
+- ISS-073 路线图（Wave A 第 4 个 ISS，**4/5 完成**）
+- `/tmp/iss-066-worker-prompt.md`（原 worker prompt 作 implementation plan）
+- 参考思路（不复制）：PDF-Guru `thirdparty/cut.py:15-79` `cut_pdf_by_grid` / `cut_pdf_by_breakpoints` 用 PyMuPDF `page.set_cropbox`
+
+
 
 
 

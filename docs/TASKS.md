@@ -795,7 +795,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：扫描预处理 / 页面整理 / 律师场景刚需
-- 状态：未启动
+- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，splitPagesByGrid + splitPagesByBreakpoints + 11 测试）；阶段 2 PageOrganizerWorkspace 集成 + 缩略图拖断点 UI + 裁边切待启动
 - 来源：DEC-103 / ROADMAP §5 v0.1 缺口"扫描清洁校正"+ PDF-Guru `cut.go` + `thirdparty/cut.py:15-79`
 - 律师场景：扫描卷宗常见双页合一（A3 扫成 A4 两页粘一起）/ 多面 A4 拼图扫成单页 / 需要按断点切单页为多页
 - 目标：
@@ -1090,6 +1090,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
+- 2026-06-16：完成 ISS-066 阶段 1 扫描拆双页 + 网格切 + 自定义断点切算法（DEC-110）。PM 单 session TDD 第 4 个 ISS（**Wave A 4/5 完成**）。`splitPagesByGrid(pdfBytes, { rows, cols, pageIndexes? })` 按 N×M 网格切每页 → 输出 N×M 倍页数；`splitPagesByBreakpoints(pdfBytes, { pageIndex, horizontalBreaks?, verticalBreaks? })` 按自定义断点切单页。**真切**（不是只改 cropbox）：用 pdf-lib `embedPage` + `drawPage` 平移 offset 让目标子矩形落入新 page (0,0)~(cellW,cellH) 区域。11 测试覆盖：1×2 拆双页 / 2×2 网格切 / 子页尺寸 / pageIndexes 限定（只切指定页其他保留）/ rows=0 / cols=0 / pageIndexes 越界 / 1 水平断点 / 1 横+1 纵 / 不切 / 断点越界。**全量 988 通过**（+11）。
 - 2026-06-16：完成 ISS-072 阶段 1 PDF 文档属性读写层（DEC-109）。PM 单 session TDD 第 3 个 ISS。`readPdfMetadata(pdfBytes)` + `writePdfMetadata(pdfBytes, updates)` + `PdfMetadata { title, author, subject, keywords[], producer, creator, creationDate, modDate, pageCount, isEncrypted }`。Title / Author / Subject / Keywords / Creator / Dates 字段正常通过 pdf-lib API 读写。**Producer 字段 pdf-lib v1.17.1 已知限制**（DEC-109 §决策）：`save()` force override + XMP metadata 双写让 SaveOptions + 字节流 patch 都无法稳定覆盖；本阶段把 "FaroPDF" 标识写入 **Creator** 字段，Producer 真覆盖留阶段 2 用 Rust lopdf 直接编辑 InfoDict。10 测试覆盖：empty/含字段读取 / 写 title / 写 author+keywords / 保留既有字段 / Creator 默认 FaroPDF / Creator 可覆盖 / ModDate 自动更新 / 空 updates / 输出合法 PDF。**全量 977 通过**（+10）。
 - 2026-06-16：完成 ISS-070 阶段 1 SignaturePad 手写签名板（DEC-108）。PM 单 session TDD 路径第 2 个 ISS。`SignaturePad` React 组件 + 纯 Canvas API（无外部库）：mousedown→mousemove→mouseup 画笔触 + 多笔画支持 + 清空/保存/取消 3 按钮 + 白底变透明（保存前 getImageData 把 R/G/B > 250 像素 alpha 置 0）+ onSave 回调 PNG data URL。8 测试覆盖：默认渲染 / width-height 可控 / 单笔画 strokeCount / 多笔画 / 清空 reset / 保存 toDataURL + onSave / 取消 onCancel / mouseleave 中止笔画。**全量 966 通过**（+8）。阶段 2 待启动：FormsPanel 集成 + signatureStore localStorage 持久化 + commands.ts forms-sign-handwrite + 落入文档任意位置 UI。
 - 2026-06-16：完成 ISS-067 阶段 1 矩形遮罩涂黑算法（DEC-107）。PM 单 session TDD 路径（DEC-106 multi-agent 退役后第一个 ISS）。`applyRedaction(pdfBytes, regions): Promise<Uint8Array>` + `RedactionRegion { pageIndex, x, y, width, height, color? }`，用 pdf-lib drawRectangle 在指定 pageIndex 区域绘制不透明矩形（默认黑色 rgb(0,0,0)）覆盖原内容。**真不可恢复**（不是 PDF annotation，是 content stream 直接绘制）。10 测试覆盖：单页单矩形、多页多矩形、跨页同 pageIndex、默认黑色、自定义 hex 颜色、空 regions、越界 pageIndex 抛错、负数 pageIndex、非法 color、负数 width/height。**全量 958 通过**（+10）+ typecheck/lint/cargo check 全绿。后续 ISS-067 阶段 2 接 AppShell + commands.ts + RedactionOverlay 拖矩形 UI + 去页眉页脚。
