@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import type { ReaderController } from "../../modules/reader";
 import { createPdfOperationEngine } from "../../modules/export";
+import { splitPagesByGrid } from "../../modules/pages/scanSplit";
+import { SplitPagesDialog } from "./SplitPagesDialog";
 import "./PageOrganizerWorkspace.css";
 
 /**
@@ -36,6 +38,7 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
   const [insertDialogOpen, setInsertDialogOpen] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [extractDialogOpen, setExtractDialogOpen] = useState(false);
+  const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const lastClickedPageRef = useRef<number | null>(null);
   // 引擎单例：与 useFormController 同模式（每次渲染创建浪费，但 createPdfOperationEngine 轻量）
   const engineRef = useRef(createPdfOperationEngine());
@@ -50,6 +53,7 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
     setInsertDialogOpen(false);
     setMergeDialogOpen(false);
     setExtractDialogOpen(false);
+    setSplitDialogOpen(false);
     lastClickedPageRef.current = null;
   }, [reader.state.document?.documentId]);
 
@@ -142,6 +146,40 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
     setExtractDialogOpen(false);
   }, []);
 
+  const openSplitDialog = useCallback(() => {
+    setRewriteError(null);
+    setSplitDialogOpen(true);
+  }, []);
+
+  const closeSplitDialog = useCallback(() => {
+    setSplitDialogOpen(false);
+  }, []);
+
+  const handleConfirmSplit = useCallback(
+    async (options: { rows: number; cols: number; pageIndexes?: number[]; outputName: string }): Promise<void> => {
+      setRewriteBusy(true);
+      setRewriteError(null);
+      try {
+        const sourceBytes = await reader.getFileBytes();
+        if (!sourceBytes) {
+          throw new Error("未找到当前 PDF 的源文件字节。");
+        }
+        const newBytes = await splitPagesByGrid(new Uint8Array(sourceBytes), {
+          rows: options.rows,
+          cols: options.cols,
+          ...(options.pageIndexes ? { pageIndexes: options.pageIndexes } : {}),
+        });
+        await reader.saveUpdatedBytes(newBytes, options.outputName);
+        setSplitDialogOpen(false);
+      } catch (error) {
+        setRewriteError(error instanceof Error ? error.message : "拆页失败。");
+      } finally {
+        setRewriteBusy(false);
+      }
+    },
+    [reader],
+  );
+
   if (!reader.state.document) {
     return (
       <main className="page-organizer" aria-label="页面管理工作台">
@@ -217,6 +255,15 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
             type="button"
           >
             提取页码范围
+          </button>
+          <button
+            className="context-tool"
+            data-testid="page-organizer-split-pages"
+            disabled={rewriteBusy}
+            onClick={openSplitDialog}
+            type="button"
+          >
+            扫描拆页
           </button>
           <button
             className="context-tool context-tool--primary"
@@ -303,6 +350,20 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
             setAppliedActionCount((count) => count + 1);
           }}
           reader={reader}
+        />
+      ) : null}
+      {splitDialogOpen ? (
+        <SplitPagesDialog
+          defaultFileName={reader.state.document?.name ?? ""}
+          selectedPageNumbers={selectedPageNumbers.size > 0 ? Array.from(selectedPageNumbers).sort((a, b) => a - b) : undefined}
+          onClose={closeSplitDialog}
+          onConfirm={(opts) => {
+            void handleConfirmSplit(opts).then(() => {
+              if (!rewriteError) {
+                setAppliedActionCount((count) => count + 1);
+              }
+            });
+          }}
         />
       ) : null}
     </main>
