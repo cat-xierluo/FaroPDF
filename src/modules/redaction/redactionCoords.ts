@@ -49,5 +49,6 @@ export function regionsScreenToPdf(
     y: viewport.height - (r.y - canvasRect.top) * scaleY - r.height * scaleY,
     width: r.width * scaleX,
     height: r.height * scaleY,
+    color: r.color,
   }));
 }

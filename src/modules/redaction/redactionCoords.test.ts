@@ -91,4 +91,20 @@ describe("regionsScreenToPdf (DEC-114 坐标转换 + Y 翻转)", () => {
     expect(pdf[0].x).toBe(10);
     expect(pdf[1].x).toBe(200);
   });
+
+  test("保留 region color，避免白色 / 灰色遮蔽最终回退为默认黑色", () => {
+    const canvasRect = { left: 0, top: 0, width: 612, height: 792 };
+    const region: RedactionRegionDraft = {
+      pageIndex: 0,
+      x: 120,
+      y: 160,
+      width: 80,
+      height: 40,
+      color: "#ffffff",
+    };
+
+    const [pdf] = regionsScreenToPdf([region], canvasRect, VIEWPORT);
+
+    expect(pdf.color).toBe("#ffffff");
+  });
 });
