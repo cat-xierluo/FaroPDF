@@ -84,3 +84,72 @@ describe("ISS-071 m1: parsePageRange DSL", () => {
     expect(parsePageRange("1,,3", 10)).toEqual([0, 2]); // 空 segment 跳过
   });
 });
+
+import { isValidPageRangeFormat } from "./pageRange";
+
+describe("ISS-071 阶段 2: isValidPageRangeFormat (format-only 校验)", () => {
+  test("接受 all / * / even / odd", () => {
+    expect(isValidPageRangeFormat("all")).toBe(true);
+    expect(isValidPageRangeFormat("ALL")).toBe(true);
+    expect(isValidPageRangeFormat("*")).toBe(true);
+    expect(isValidPageRangeFormat("even")).toBe(true);
+    expect(isValidPageRangeFormat("odd")).toBe(true);
+  });
+
+  test("接受单页 N / 数字", () => {
+    expect(isValidPageRangeFormat("5")).toBe(true);
+    expect(isValidPageRangeFormat("N")).toBe(true);
+  });
+
+  test("接受范围 1-5", () => {
+    expect(isValidPageRangeFormat("1-5")).toBe(true);
+    expect(isValidPageRangeFormat("1-N")).toBe(true);
+    expect(isValidPageRangeFormat("N-5")).toBe(true);
+  });
+
+  test("接受多段 1,3-5,!4", () => {
+    expect(isValidPageRangeFormat("1,3-5")).toBe(true);
+    expect(isValidPageRangeFormat("1,3-5,!4")).toBe(true);
+    expect(isValidPageRangeFormat("!1-3")).toBe(true);
+  });
+
+  test("拒绝空字符串 / 纯空白", () => {
+    expect(isValidPageRangeFormat("")).toBe(false);
+    expect(isValidPageRangeFormat("   ")).toBe(false);
+  });
+
+  test("拒绝非字符串", () => {
+    expect(isValidPageRangeFormat(undefined as unknown as string)).toBe(false);
+    expect(isValidPageRangeFormat(null as unknown as string)).toBe(false);
+    expect(isValidPageRangeFormat(123 as unknown as string)).toBe(false);
+  });
+
+  test("拒绝范围 start > end（如 3-1）", () => {
+    expect(isValidPageRangeFormat("3-1")).toBe(false);
+  });
+
+  test("拒绝多 dash（1-2-3）", () => {
+    expect(isValidPageRangeFormat("1-2-3")).toBe(false);
+  });
+
+  test("拒绝空段（-- / 1- / -5 / ,）", () => {
+    expect(isValidPageRangeFormat("--")).toBe(false);
+    expect(isValidPageRangeFormat("1-")).toBe(false);
+    expect(isValidPageRangeFormat("-5")).toBe(false);
+    expect(isValidPageRangeFormat(",")).toBe(false);
+    // 1,,3 等价于 1,3（filter 掉空段后合法）— 容错
+    expect(isValidPageRangeFormat("1,,3")).toBe(true);
+  });
+
+  test("拒绝含非法字符（字母非 all/even/odd/N）", () => {
+    expect(isValidPageRangeFormat("abc")).toBe(false);
+    expect(isValidPageRangeFormat("1,a")).toBe(false);
+    expect(isValidPageRangeFormat("1.5")).toBe(false);
+  });
+
+  test("format check 不查越界（'3-5' 在 totalPages 未知时通过）", () => {
+    // OCR 启动时还不知道 totalPages
+    expect(isValidPageRangeFormat("3-5")).toBe(true);
+    expect(isValidPageRangeFormat("100")).toBe(true);
+  });
+});

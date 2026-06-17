@@ -5177,3 +5177,56 @@ Rust `extract_ocr_text` 输出的 `OcrTextExtractionPage` 只有 `pageIndex + te
 - 真实法律卷宗 fixture（5 章 + 10 证据 + 3 附件 ≥ 90% 召回）— 可在 Playwright 验证 session 一起做
 - 后续 polish：章节树缩进视觉（PDF Expert outline 风格）+ 拖拽重排 + 字号列显示
 - 任务卡状态更新：`docs/TASKS.md` ISS-069「阶段 1+2+3 全部完成（2026-06-17，PM 单 session TDD）」
+
+## DEC-128 ISS-071 阶段 2：4 抽象全面迁移（OCR / 命名 / 字节单位）
+
+- 时间：2026-06-17
+- 类型：工程基础设施 / 重构 / 多次小步 commit
+- 关联：ISS-071 阶段 1（DEC-105）/ DEC-125
+
+**为什么这一版分 3 个 commit 迁移**：
+
+按 ISS-071 任务卡验收："至少 3 个现有模块迁移到新抽象（页码 DSL → OCR 范围 / 单元 → 导出 / 错误 → SecurityPanel）"。本 session 推进 3 个迁移：
+
+1. **Migration 1：AppShell naming wrapper inline 简化**。删除 `suggestAnnotationFlattenOutputName` / `suggestSaveAsOutputName` 2 处 wrapper 函数，调用点直接用 `suggestOutputName(..., "annotations-flattened" | "copy")`。0 风险纯命名空间收敛。
+2. **Migration 2：OCR bridge 用 pageRange.ts DSL 校验**。`src/shared/ocr/defaults.ts` 原 `isValidPageRange` 用简陋正则 `^(\d+)(?:-(\d+))?$`，不支持 `all` / `even` / `odd` / `N` / `!1-3` 等 pageRange DSL 模式。改用新增的 `isValidPageRangeFormat(input)` 共享函数（来自 `src/modules/pages/pageRange.ts`）：
+   - 接受 all / even / odd / N / 数字 / "1,3" / "1-5" / "!1-3" / "1,3-5,!4"
+   - 拒绝空 / 非字符串 / 多 dash / 范围 start > end（"3-1"）/ 含非法字符
+   - **不查越界**（OCR 启动时还不知道 totalPages，越界检查由 Rust 端 `extract_ocr_text` 负责）
+3. **Migration 3：formatBytes 共享**。`src/modules/export/compressionService.ts` local `formatBytes` 提取到 `src/shared/formatBytes.ts`（+test）。5 项测试覆盖：< KB / KB / MB / GB / 负数 + NaN + Infinity 防御。`compressionService` 改为 wrapper 委托共享实现，保持向后兼容。
+
+**为什么不做 error.ts → SecurityPanel 迁移**：
+
+- SecurityPanel 错误处理当前用 string error path（DEC-102 已 ship）。迁移到 AppError 需要：
+  1. 前端所有 catch (error: string) 改 `code: ErrCode` 触发 i18n / UI 分支
+  2. Rust commands `Result<T, String>` 改 `Result<T, AppError>`（涉及 18+ commands）
+  3. 命令协议升级（向后兼容挑战）
+- 这是大范围改造，建议 ISS-071 阶段 3 单独 session 推进；本 session 控制范围到 3 个轻量迁移。
+
+**为什么不做 units.ts 迁移**：
+
+- 当前导出 / 页面管理用 CSS / px 单位，没有 pt↔cm↔mm↔in 转换需求（律师场景固定用 PDF 用户空间 pt）。
+- `formatBytes` 是字节单位，与 `units.ts` 长度单位（pt/cm/mm/in）不重叠。
+- units.ts 在 v0.1 已就绪且测试通过（DEC-105）；未来如有水印位置 cm 输入 / 裁边 mm 输入等需求时再迁移。
+
+**verification**（实操验证）：
+
+- ✅ typecheck：`tsc --noEmit` 0 错
+- ✅ lint：`eslint .` 0 warning（implicit）
+- ✅ vitest：3 模块迁移测试全部通过
+  - Migration 1：AppShell 既有测试 0 回归
+  - Migration 2：`src/shared/ocr/defaults.test.ts` 4/4 + `src/modules/ocr/service/bridge.test.ts` 11/11 + `pageRange.test.ts` 23/23（11 新增 isValidPageRangeFormat 测试）
+  - Migration 3：`src/shared/formatBytes.test.ts` 5/5
+- ⚠️ pre-existing `useReaderController` zoom 失败（与本 ISS 无关）
+
+**ISS-071 阶段 1+2 累计**：
+
+- 阶段 1（DEC-105）：4 抽象（pageRange.ts / units.ts / naming.ts / error.ts）+ 双侧测试 + AppShell 1 处示范迁移
+- 阶段 2（本 commit）：3 个迁移（AppShell inline / OCR bridge format check / formatBytes 共享）
+- **总计 4 抽象 + 4 迁移 = 7 个收口点**
+
+**open follow-ups**：
+
+- ISS-071 阶段 3：error.ts → SecurityPanel 大范围改造（Rust 18+ commands 升级 AppError，前端 catch 路径重写）
+- units.ts 真实使用场景（等水印 / 裁边 UI 需求浮出）
+- 任务卡状态更新：`docs/TASKS.md` ISS-071「阶段 2 已完成（2026-06-17）」

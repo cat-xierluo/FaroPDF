@@ -1,6 +1,7 @@
 import { PDFDict, PDFDocument, PDFName, PDFStream } from "pdf-lib";
 import type { PdfCompressionPreset } from "../../shared/pdf/export";
 import { COURT_UPLOAD_PRESETS, isCourtUploadPreset } from "./presets/courtUploadPresets";
+import { formatBytes as sharedFormatBytes } from "../../shared/formatBytes";
 
 export interface CompressionOptions {
   useObjectStreams?: boolean;
@@ -310,8 +311,9 @@ function emptyImageDiagnostics(): ImageResamplingDiagnostics {
   };
 }
 
+// ISS-071 阶段 2：本地 formatBytes 已迁移到 shared/formatBytes.ts。
+// 共享版本已 import 在文件顶部，本地 wrapper 保留以备向后兼容。
 function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  // 委托共享实现
+  return sharedFormatBytes(bytes);
 }

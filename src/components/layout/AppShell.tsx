@@ -292,7 +292,7 @@ export function AppShell({
       ],
       requestedAt,
     });
-    const fileName = suggestAnnotationFlattenOutputName(reader.getCurrentFileName() ?? document.name);
+    const fileName = suggestOutputName(reader.getCurrentFileName() ?? document.name, "annotations-flattened");
     await reader.saveUpdatedBytes(result.bytes, fileName);
     const plan = result.summary.annotationPlan;
 
@@ -494,7 +494,7 @@ export function AppShell({
         if (!sourceBytes) {
           throw new Error("未找到当前 PDF 的源文件字节。");
         }
-        const outputName = suggestSaveAsOutputName(reader.getCurrentFileName() ?? document?.name ?? null);
+        const outputName = suggestOutputName(reader.getCurrentFileName() ?? document?.name ?? null, "copy");
         await reader.saveUpdatedBytes(sourceBytes, outputName);
         setCommandFeedback(`已另存为 ${outputName}。`);
       } catch (error) {
@@ -906,16 +906,6 @@ function matchZoomPreset(zoom: number): ZoomPresetId | undefined {
     }
   }
   return undefined;
-}
-
-function suggestAnnotationFlattenOutputName(fileName: string | null): string {
-  // ISS-071 迁移示范：使用 shared/naming suggestOutputName 替代本地 hardcode
-  return suggestOutputName(fileName, "annotations-flattened");
-}
-
-function suggestSaveAsOutputName(fileName: string | null): string {
-  // ISS-071 迁移示范：使用 shared/naming suggestOutputName 替代本地 hardcode
-  return suggestOutputName(fileName, "copy");
 }
 
 function ContextToolbar({

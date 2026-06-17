@@ -915,7 +915,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：工程基础设施 / 重构 / 复用
-- 状态：阶段 1 已完成（2026-06-15，4 个抽象 + 双侧测试 + AppShell 迁移示范 1 处）；阶段 2 全面迁移其他模块（OCR pageRange / SecurityPanel error / 导出 units）待启动
+- 状态：阶段 1 已完成（2026-06-15，4 个抽象 + 双侧测试 + AppShell 迁移示范 1 处）；阶段 2 已完成（2026-06-17，3 模块迁移：AppShell naming inline / OCR bridge pageRange 校验 / formatBytes 共享，DEC-128）；阶段 3 error.ts → SecurityPanel 大范围改造 留 open follow-up
 - 来源：DEC-103 §架构亮点借鉴 / DEC-104 Wave 1 失败后 PM 直推
 - 目标：一次性受益所有 ISS 的 4 个基础抽象
   1. **页码范围 DSL**（`src/modules/pages/pageRange.ts`）

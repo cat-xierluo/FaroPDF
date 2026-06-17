@@ -4,6 +4,7 @@ import type {
   OcrRequest,
   PreparedOcrRequest,
 } from "./types";
+import { isValidPageRangeFormat } from "../../modules/pages/pageRange";
 
 export interface OcrValidationResult {
   valid: boolean;
@@ -89,7 +90,7 @@ export function validateOcrRequest(request: OcrRequest): OcrValidationResult {
     }
   }
 
-  if (request.pageRange && !isValidPageRange(request.pageRange)) {
+  if (request.pageRange && !isValidPageRangeFormat(request.pageRange)) {
     errors.push("页码范围必须使用正整数或正整数区间，例如 1,3-5。");
   }
 
@@ -172,27 +173,8 @@ function normalizePathForComparison(path: string): string {
   return `${prefix}${parts.join("/")}`.replace(/\/+$/, "").toLowerCase();
 }
 
-function isValidPageRange(raw: string): boolean {
-  const parts = raw
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
-
-  if (parts.length === 0) {
-    return false;
-  }
-
-  return parts.every((part) => {
-    const match = /^(\d+)(?:-(\d+))?$/.exec(part);
-    if (!match) {
-      return false;
-    }
-
-    const start = Number(match[1]);
-    const end = match[2] ? Number(match[2]) : start;
-    return isPositiveInteger(start) && isPositiveInteger(end) && end >= start;
-  });
-}
+// 旧的 `isValidPageRange` 已被 pageRange.ts 的 isValidPageRangeFormat 替代（ISS-071 阶段 2 迁移）。
+// 旧函数保留注释供 git history 参考，新调用方请用 isValidPageRangeFormat。
 
 function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;

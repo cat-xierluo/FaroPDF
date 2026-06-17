@@ -19,6 +19,69 @@
  * 错误：非法输入抛 `Error("Invalid page range: <details>")`。
  */
 
+/**
+ * 仅做格式校验（不查越界 / N 解析等需要 totalPages 的部分）。
+ *
+ * 接受模式：all / even / odd / N / 数字 / "1,3" / "1-5" / "!1-3" / "1,3-5,!4"
+ * 拒绝：包含非允许字符、嵌套范围错误、空字符串、范围 start > end（如 "3-1"）。
+ *
+ * 适用场景：OCR 启动时（还不知道 totalPages）做早期格式校验。
+ * totalPages 边界检查由 Rust 端 / parsePageRange 解析层后续负责。
+ */
+const PAGE_RANGE_TOKEN_PATTERN = /^[0-9N]+$/;
+
+export function isValidPageRangeFormat(input: string): boolean {
+  if (typeof input !== "string") return false;
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return false;
+
+  // 顶层关键字
+  const lower = trimmed.toLowerCase();
+  if (lower === "all" || trimmed === "*" || lower === "even" || lower === "odd") {
+    return true;
+  }
+
+  // 拆分逗号段，每段用 "-" 分开 / 校验
+  const segments = trimmed.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+  if (segments.length === 0) return false;
+
+  for (const seg of segments) {
+    let body = seg;
+    if (body.startsWith("!")) {
+      body = body.slice(1);
+    }
+    if (body.length === 0) return false;
+
+    const parts = body.split("-");
+    if (parts.length > 2) return false; // "1-2-3" 非法
+
+    let rangeStart: number | null = null;
+    for (const part of parts) {
+      if (part.length === 0) return false; // "--" / "1-" / "-5" 非法
+      // token 必须是数字或 "N"
+      const upper = part.toUpperCase();
+      if (upper === "N") {
+        if (parts.length === 2 && rangeStart === null) {
+          // "N-3" 形式合法（第一页到第 3 页）
+          continue;
+        }
+        // 单 token "N" 合法；"3-N" 中 N 作 end 也合法
+        continue;
+      }
+      if (!PAGE_RANGE_TOKEN_PATTERN.test(part)) return false;
+      const num = Number.parseInt(part, 10);
+      if (rangeStart === null) {
+        rangeStart = num;
+      } else {
+        // parts.length === 2 范围形式
+        if (num < rangeStart) return false; // "3-1" 非法
+      }
+    }
+  }
+
+  return true;
+}
+
 export function parsePageRange(input: string, totalPages: number): number[] {
   if (!Number.isFinite(totalPages) || totalPages <= 0 || !Number.isInteger(totalPages)) {
     throw new Error(`Invalid page range: totalPages must be a positive integer, got ${totalPages}`);
