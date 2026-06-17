@@ -301,3 +301,39 @@ export function buildOutlineTreeFromPages(
   const flat = detectChapterHeadings(allItems);
   return buildOutlineTree(flat);
 }
+
+/** OCR 文本（每页纯文本串）→ outline 树。
+ *
+ * Rust `extract_ocr_text` 输出的 `OcrTextExtractionPage` 只有 `pageIndex + text`，
+ * 无字号 / 字体 / 坐标。本函数按行 split，每行当 textItem（height 默认 12），
+ * 章节正则仍可识别（中文章节模式自身有定位能力）。
+ *
+ * y 坐标不可知 → outline 项跳转 PDF 阅读器会落页首（这是 OCR 流程的固有限制）。
+ */
+export interface OcrPageLike {
+  pageIndex: number;
+  text: string;
+}
+
+export function buildOutlineTreeFromOcrText(
+  pages: ReadonlyArray<OcrPageLike>,
+): ChapterHeadingNode[] {
+  const allItems: TextItemFeature[] = [];
+  for (const page of pages) {
+    const lines = page.text.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) continue;
+      allItems.push({
+        str: trimmed,
+        height: 12,
+        fontName: "g_ocr",
+        x: 0,
+        y: 0,
+        pageIndex: page.pageIndex,
+      });
+    }
+  }
+  const flat = detectChapterHeadings(allItems);
+  return buildOutlineTree(flat);
+}

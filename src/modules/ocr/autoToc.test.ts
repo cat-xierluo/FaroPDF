@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   buildOutlineTree,
+  buildOutlineTreeFromOcrText,
   clusterBySizeAndFont,
   detectChapterHeadings,
   extractTextItems,
@@ -253,5 +254,93 @@ describe("buildOutlineTree", () => {
     expect(tree).toHaveLength(1);
     expect(tree[0].text).toBe("第一章");
     expect(tree[0].children).toEqual([]);
+  });
+});
+
+describe("buildOutlineTreeFromOcrText", () => {
+  test("OCR 文本（无字号）识别第X章 + 证据X", () => {
+    const pages = [
+      {
+        pageIndex: 0,
+        text: "第一章 总则\n第一条 立法目的\n本法旨在规范...",
+      },
+      {
+        pageIndex: 1,
+        text: "第二章 义务\n第二条 付款\n证据一 借条\n证据二 银行流水",
+      },
+    ];
+    const tree = buildOutlineTreeFromOcrText(pages);
+    expect(tree.length).toBeGreaterThanOrEqual(2);
+    // 第一章 / 第二章 应该是 root
+    const rootTexts = tree.map((n) => n.text);
+    expect(rootTexts).toContain("第一章 总则");
+    expect(rootTexts).toContain("第二章 义务");
+  });
+
+  test("空 pages 返回空树", () => {
+    expect(buildOutlineTreeFromOcrText([])).toEqual([]);
+  });
+
+  test("单页多章节按行 split", () => {
+    const pages = [
+      { pageIndex: 0, text: "第一章\n第二章\n第三章" },
+    ];
+    const tree = buildOutlineTreeFromOcrText(pages);
+    expect(tree).toHaveLength(3);
+    expect(tree.map((n) => n.text)).toEqual(["第一章", "第二章", "第三章"]);
+  });
+
+  test("跨页 pageIndex 保留", () => {
+    const pages = [
+      { pageIndex: 2, text: "第一章 概述" },
+      { pageIndex: 5, text: "第二章 细节" },
+    ];
+    const tree = buildOutlineTreeFromOcrText(pages);
+    expect(tree[0].pageIndex).toBe(2);
+    expect(tree[1].pageIndex).toBe(5);
+  });
+
+  test("多行混合：识别非章节行忽略", () => {
+    const pages = [
+      {
+        pageIndex: 0,
+        text: "这是普通段落。\n第一章 总则\n这是另一段。\n第一条 目的",
+      },
+    ];
+    const tree = buildOutlineTreeFromOcrText(pages);
+    expect(tree).toHaveLength(1);
+    expect(tree[0].text).toBe("第一章 总则");
+    expect(tree[0].children[0].text).toBe("第一条 目的");
+  });
+
+  test("嵌套结构：1.1 / 1.1.1 在 OCR 文本中正确嵌套", () => {
+    const pages = [
+      { pageIndex: 0, text: "1. 概要\n1.1 背景\n1.1.1 当事人" },
+    ];
+    const tree = buildOutlineTreeFromOcrText(pages);
+    expect(tree).toHaveLength(1);
+    expect(tree[0].text).toBe("1. 概要");
+    expect(tree[0].children).toHaveLength(1);
+    expect(tree[0].children[0].text).toBe("1.1 背景");
+    expect(tree[0].children[0].children).toHaveLength(1);
+    expect(tree[0].children[0].children[0].text).toBe("1.1.1 当事人");
+  });
+
+  test("中文括号编号（一）作为 H3 嵌在 H1 下", () => {
+    const pages = [
+      { pageIndex: 0, text: "第一章 总则\n（一）立法依据\n（二）适用范围" },
+    ];
+    const tree = buildOutlineTreeFromOcrText(pages);
+    expect(tree).toHaveLength(1);
+    expect(tree[0].text).toBe("第一章 总则");
+    expect(tree[0].children.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("空白行 / 纯空格行忽略", () => {
+    const pages = [
+      { pageIndex: 0, text: "\n\n第一章\n   \n\n第二章\n" },
+    ];
+    const tree = buildOutlineTreeFromOcrText(pages);
+    expect(tree).toHaveLength(2);
   });
 });

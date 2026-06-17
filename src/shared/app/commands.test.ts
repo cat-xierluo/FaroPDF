@@ -129,6 +129,21 @@ describe("app command catalog", () => {
     ).toBe(true);
   });
 
+  test("ISS-069: 自动生成目录命令进入 read 模式 + 交付导出分组", () => {
+    const toc = getCommandById("auto-generate-toc");
+    expect(toc).toBeDefined();
+    expect(toc?.group).toBe("export");
+    expect(toc?.layer).toBe("tertiary");
+    expect(toc?.targetMode).toBe("read");
+    expect(toc?.requiresDocument).toBe(true);
+    expect(toc?.entryPoints).toEqual(expect.arrayContaining(["more-menu", "native-menu"]));
+    expect(toc?.label).toBe("自动生成目录");
+    // 进入「交付导出」分组
+    expect(
+      APP_TOOL_LAUNCHER_SECTIONS.find((s) => s.id === "deliver")?.commandIds.includes("auto-generate-toc"),
+    ).toBe(true);
+  });
+
   test("ISS-061 阶段 2: 翻译 / 朗读命令进入 annotate + 标注侧栏 + markup 分组", () => {
     const translate = getCommandById("annotation-translate");
     expect(translate?.group).toBe("annotation");

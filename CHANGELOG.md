@@ -19,6 +19,14 @@ OCR 后自动生成目录（ISS-069 阶段 1，DEC-125）：
 - **15 项 UI 测试**（`AutoTocDialog.test.tsx`）：初始渲染 / 勾选切换 / 全部取消 disabled / 删除（含连带后代）/ 新增 / 确认 / 取消 / 空文件名校验 / 非 .pdf 后缀校验 / loading / error / 空 tree + 新增 / 重命名 Enter / 重命名 Escape。
 - 阶段 3 OCR 衔接 + Playwright 实操验证待启动。
 
+自动生成目录 OCR 衔接（ISS-069 阶段 3，DEC-127）：
+
+- `src/modules/ocr/autoToc.ts` 加 `buildOutlineTreeFromOcrText` 入口：把 Rust `extract_ocr_text` 输出的 `OcrTextExtractionPage[]` 按行 split，每行当 textItem（height 默认 12）；章节正则复用；outline 跳页首（y 坐标不可知，OCR 流程固有限制）。
+- AppShell `openAutoTocDialog` 增强双路径：先 PDF.js 文字层（`page.getTextContent`），所有页无 str → fallback Rust `extract_ocr_text`（需 `document.path`）。统一到 AutoTocDialog UI。
+- 决策：**前端路径**（不重写 Rust 章节检测）。理由：现有协议稳定 / 章节正则自身有定位能力 / outline 跳页首可接受（用 reader 文本搜索二次定位）/ PM 单 session TDD 范围可控。
+- 8 项 buildOutlineTreeFromOcrText 单元测试 + 1 项 commands 集成测试。
+- **Playwright 端到端实操验证** 留 open follow-up（需 dev server + Tauri runtime + 真实 ocrmypdf，独立 session 推进）。
+
 涂黑矩形遮蔽（ISS-067 阶段 2，DEC-114）：
 
 - 新增 `src/modules/redaction/ui/RedactionOverlay.tsx`：阅读区 mousedown→mousemove→mouseup 拖矩形 + draft 预览 + committed region 列表 + 应用按钮 disabled 直到 ≥1 region + 取消清空 + 5px 最小拖动阈值。

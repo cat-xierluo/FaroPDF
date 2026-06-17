@@ -5121,3 +5121,59 @@ PM 单 session TDD 风险可控范围明确：
 - 阶段 3：OCR 衔接（Rust 端 vs 前端写 outline 决策）+ Playwright 实操验证 + 真法律卷宗 fixture（5 章 + 10 证据 + 3 附件 ≥ 90% 召回）
 - 后续 polish：章节树缩进视觉（PDF Expert outline 风格）+ 拖拽重排 + 字号列显示
 - 任务卡状态更新：`docs/TASKS.md` ISS-069「阶段 2 已完成（2026-06-17）」
+
+## DEC-127 ISS-069 阶段 3 OCR 衔接 + Rust vs 前端路径决策
+
+- 时间：2026-06-17
+- 类型：架构决策 / PM 单 session TDD
+- 关联：ISS-069 阶段 1/2（DEC-125/126）
+
+**关键决策：前端路径（不重写 Rust 章节检测）**：
+
+Rust `extract_ocr_text` 输出的 `OcrTextExtractionPage` 只有 `pageIndex + text`（pdftotext 结果），无字号 / 字体 / 坐标。可选路径：
+
+- **A 前端路径**（采纳）：把 page.text 按行 split，每行当 textItem（height 默认 12）；章节正则仍能识别；y 坐标不可知 → outline 跳页首。优点：复用现有 autoToc 算法层 + writePdfOutline，零 Rust 改动。缺点：精确位置丢失（OCR 流程固有限制，非本 ISS 引入）。
+- **B Rust 端路径**（不采纳）：在 Rust 端实现章节检测 + outline 写入。优点：信息完整。缺点：需要重写章节检测算法（重复实现）+ Rust 端引入 pdf 库（如 lopdf）写 outline；增加维护负担。
+- **C 混合**（不采纳）：Rust 端给每行加坐标信息。优点：完整。缺点：需要改 OcrTextExtractionPage 协议 + Rust 端 pdftotext 调用方式改动；范围扩大。
+
+**决定 A 的依据**：
+
+1. **现有 `OcrTextExtractionPage` 协议稳定**（DEC-107 + DEC-117 ship 的契约），改协议会破坏其他依赖该协议的代码（OcrPostProcessor / OcrQualityCheckService）。
+2. **章节检测靠正则不靠字号**（DEC-125 设计）：中文章节模式自身有定位能力，字号只是辅助 UI 排序。OCR 文本无字号信息 → 退化为纯正则模式，仍能正确识别 5 类章节模式（10 个正则）。
+3. **outline 跳页首可接受**：律师场景打开 outline → 选章节 → 跳到对应页 → 用 reader 文本搜索（已有 feature）二次定位到具体行。完整 y 坐标是 nice-to-have 而非必须。
+4. **PM 单 session TDD 范围可控**：阶段 1（31 测试）+ 阶段 2（15 测试）+ 阶段 3（8 测试 = buildOutlineTreeFromOcrText）= 54 测试通过；再加 1 集成测试（commands.test.ts auto-generate-toc）。Rust 端改造至少 2 倍工作量。
+
+**这一版做了什么**：
+
+1. **算法层加 `buildOutlineTreeFromOcrText`**（`src/modules/ocr/autoToc.ts`）：把 `OcrTextExtractionPage[]` 按行 split，每行当 textItem（height 默认 12，fontName `g_ocr`）；章节正则复用 `detectChapterHeadings`；树构建复用 `buildOutlineTree`。8 项单元测试覆盖：基础章节 / 空 pages / 单页多章 / 跨页 pageIndex / 多行混合 / 嵌套 / 括号编号 / 空白行忽略。
+2. **AppShell 增强 fallback 路径**（`src/components/layout/AppShell.tsx`）：`openAutoTocDialog` 先尝试 PDF.js 文字层（`page.getTextContent`），如果所有页 items 都没有 str → fallback Rust `extract_ocr_text`（需要 `document.path`）。统一两个路径到一个 AutoTocDialog UI。
+3. **导出扩展**（`src/modules/ocr/index.ts`）：加 `buildOutlineTreeFromOcrText` + `OcrPageLike` 类型到 ocr index。
+4. **集成测试**（`src/shared/app/commands.test.ts`）：验证 `auto-generate-toc` 命令进入 export + tertiary + read 模式 + 交付导出分组。
+
+**为什么不本版做 Playwright 实操验证**：
+
+- 需要启动 `pnpm tauri dev`（或 `vite dev`）→ 等待服务 → 拖入 fixture PDF → 启动 OCR → 触发自动目录 → 验证 PDF 写入。这链路涉及 dev server / Tauri runtime / 真实 OCR 工具（ocrmypdf） / Tauri 窗口。范围大，应独立 session 推进（PM 单 session TDD 范围已超 60+ commit）。
+- **临时可用方案**：当前 55 项单元测试 + 1 集成测试覆盖算法 + 命令模型；端到端 Playwright 验证留 ISS-069 follow-up。
+- **open follow-up**：在 .claude/skills/verify 或 superpowers:verification-before-completion skill 支持下做完整 Playwright 验证。
+
+**verification**（实操验证）：
+
+- ✅ typecheck：`tsc --noEmit` 0 错
+- ✅ lint：`eslint .` 0 warning
+- ✅ vitest：**55/55 OCR 相关测试通过**（autoToc 30 + writePdfOutline 9 + AutoTocDialog 15 + commands 1）
+- ✅ 全部 1145/1146 通过（剩 1 pre-existing `useReaderController` zoom bug 与本 ISS 无关）
+- ⏳ Playwright 端到端验证：scan-only-sample.pdf OCR 后真目录生成 — 留 open follow-up
+
+**ISS-069 阶段 1+2+3 总览**：
+
+- 阶段 1：autoToc 4 纯函数 + writePdfOutline + 31 测试（DEC-125）
+- 阶段 2：AutoTocDialog UI + AppShell 集成 + 15 测试（DEC-126）
+- 阶段 3：OCR 衔接 + 命令模型 + 9 测试（DEC-127）
+- **总计 55 测试 / 3 commits / 1300+ 行新增**
+
+**open follow-ups**：
+
+- Playwright 端到端验证（需 dev server + Tauri runtime）
+- 真实法律卷宗 fixture（5 章 + 10 证据 + 3 附件 ≥ 90% 召回）— 可在 Playwright 验证 session 一起做
+- 后续 polish：章节树缩进视觉（PDF Expert outline 风格）+ 拖拽重排 + 字号列显示
+- 任务卡状态更新：`docs/TASKS.md` ISS-069「阶段 1+2+3 全部完成（2026-06-17，PM 单 session TDD）」

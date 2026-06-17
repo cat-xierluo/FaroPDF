@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { AnnotationSidecar, PdfAnnotation } from "../../shared";
 import type { ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
@@ -43,10 +44,12 @@ import { regionsScreenToPdf, selectPageCanvas } from "../../modules/redaction/re
 import { readPdfMetadata, writePdfMetadata, type PdfMetadata } from "../../modules/document/properties";
 import { PropertiesDialog } from "../../modules/document/ui/PropertiesDialog";
 import {
+  buildOutlineTreeFromOcrText,
   buildOutlineTreeFromPages,
   type ChapterHeadingNode,
   writePdfOutline,
 } from "../../modules/ocr";
+import type { OcrTextExtractionResponse } from "../../shared/ocr/jobQueue";
 import { loadPdfFromBytes } from "../../modules/reader/pdfReaderService";
 import { AutoTocDialog } from "../../modules/ocr/ui/AutoTocDialog";
 import type {
@@ -410,14 +413,33 @@ export function AppShell({
         fileName: reader.getCurrentFileName() ?? document.name,
       });
       try {
+        // 路径 1：先尝试 PDF.js 文字层
         const pages: import("../../modules/ocr/autoToc").PdfJsTextContentLike[] = [];
+        let hasTextLayer = false;
         for (let i = 0; i < loaded.metadata.pageCount; i += 1) {
           const page = await (loaded as unknown as {
             getPage: (n: number) => Promise<{ getTextContent: () => Promise<import("../../modules/ocr/autoToc").PdfJsTextContentLike> }>;
           }).getPage(i + 1);
-          pages.push(await page.getTextContent());
+          const textContent = await page.getTextContent();
+          pages.push(textContent);
+          const items = (textContent.items ?? []) as Array<Record<string, unknown>>;
+          if (items.some((it) => typeof it.str === "string" && it.str.length > 0)) {
+            hasTextLayer = true;
+          }
         }
-        const tree = buildOutlineTreeFromPages(pages);
+        if (hasTextLayer) {
+          const tree = buildOutlineTreeFromPages(pages);
+          setAutoTocHeadings(tree);
+          return;
+        }
+        // 路径 2：fallback 到 Rust extract_ocr_text（纯扫描 OCR 后文档）
+        if (!document.path) {
+          throw new Error("当前 PDF 没有源文件路径，无法调用 OCR 提取。");
+        }
+        const ocrResponse = await invoke<OcrTextExtractionResponse>("extract_ocr_text", {
+          pdfPath: document.path,
+        });
+        const tree = buildOutlineTreeFromOcrText(ocrResponse.pages);
         setAutoTocHeadings(tree);
       } finally {
         await loaded.destroy();
