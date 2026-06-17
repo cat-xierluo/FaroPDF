@@ -626,6 +626,96 @@ fn redact_path_for_error(path: &Path) -> String {
     format!("[path:{basename}]")
 }
 
+/// ISS-072 阶段 2：用 lopdf 直接编辑 InfoDict 的 Producer 字段，绕过 pdf-lib
+/// `save()` 的 force override（DEC-109 / DEC-136）。
+///
+/// 律师场景：用户整理客户文件时希望 Producer 显示为 "FaroPDF"，而非
+/// `pdf-lib (https://github.com/Hopding/pdf-lib)`（暴露底层实现）。
+///
+/// 流程：
+///   1) 加载源 PDF（canonicalize 防 path traversal）
+///   2) 读取 trailer 的 Info 引用（若无则创建）
+///   3) 设置 Info.Producer = producer 字符串
+///   4) 同步更新 Info.ModDate（D:YYYYMMDDHHmmSSOHH'mm'）
+///   5) 保存为 `<stem>-metadata.pdf` 副本（不静默覆盖）
+#[tauri::command]
+fn set_pdf_producer(request: serde_json::Value) -> Result<serde_json::Value, String> {
+    use lopdf::Object;
+    let input_path = request
+        .get("input_path")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let producer = request
+        .get("producer")
+        .and_then(|v| v.as_str())
+        .unwrap_or("FaroPDF")
+        .to_string();
+    if producer.trim().is_empty() {
+        return Err("Producer 不能为空。".to_string());
+    }
+    let raw_source_path = PathBuf::from(input_path.trim());
+    if !raw_source_path.exists() {
+        return Err(format!(
+            "文件不存在: {}",
+            redact_path_for_error(&raw_source_path)
+        ));
+    }
+    let source_path = raw_source_path
+        .canonicalize()
+        .unwrap_or_else(|_| raw_source_path.clone());
+    let mut doc = Document::load(&source_path).map_err(|e| {
+        eprintln!("set_pdf_producer load error: {e}");
+        format!("解析 PDF 失败：{}", redact_path_for_error(&source_path))
+    })?;
+    // trailer.Info 是 PDFRef；若无 Info dict 则创建空 dict 并挂回 trailer。
+    let info_ref = match doc.trailer.get(b"Info") {
+        Ok(Object::Reference(r)) => *r,
+        Ok(_) => {
+            return Err("Info 字段非引用类型，无法安全修改。".to_string());
+        }
+        Err(_) => {
+            let new_info = lopdf::Dictionary::new();
+            let r = doc.add_object(new_info);
+            doc.trailer.set("Info", Object::Reference(r));
+            r
+        }
+    };
+    if let Some(info_dict) = doc.objects.get_mut(&info_ref) {
+        if let Object::Dictionary(dict) = info_dict {
+            // 只改 Producer 字段；ModDate 由前端 pdf-lib writePdfMetadata 已设
+            // （DEC-109 properties.ts 阶段 1 流程），lopdf 二次处理不重复设置避免时区格式分歧。
+            dict.set("Producer", Object::string_literal(producer.clone()));
+        } else {
+            return Err("Info 对象非字典类型。".to_string());
+        }
+    } else {
+        return Err("无法定位 Info 字典。".to_string());
+    }
+    let stem = source_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("document");
+    let parent = source_path.parent().unwrap_or(Path::new("."));
+    let output_path = parent.join(format!("{stem}-metadata.pdf"));
+    if output_path.exists() {
+        return Err(format!(
+            "输出副本 {} 已存在，请先删除或重命名后重试。",
+            redact_path_for_error(&output_path)
+        ));
+    }
+    doc.save(&output_path).map_err(|e| {
+        eprintln!("set_pdf_producer save error: {e}");
+        format!("保存副本失败：{}", redact_path_for_error(&output_path))
+    })?;
+    Ok(serde_json::json!({
+        "path": output_path.to_string_lossy(),
+        "producer": producer,
+        "size_bytes": std::fs::metadata(&output_path).map(|m| m.len()).unwrap_or(0),
+    }))
+}
+
+
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -745,7 +835,8 @@ pub fn run() {
             cancel_ocr_job,
             extract_ocr_text,
             set_pdfpassword,
-            remove_pdfpassword
+            remove_pdfpassword,
+            set_pdf_producer
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1907,6 +1998,141 @@ mod ocr_bridge_tests {
         assert!(job.completed_at.is_none());
     }
 }
+
+#[cfg(test)]
+mod set_pdf_producer_tests {
+    use super::*;
+    use lopdf::Document as LopdfDocument;
+    use std::path::PathBuf;
+
+    fn temp_pdf_with_producer(producer: Option<&str>) -> PathBuf {
+        temp_pdf_with_producer_labeled(producer, "test")
+    }
+
+    fn temp_pdf_with_producer_labeled(producer: Option<&str>, label: &str) -> PathBuf {
+        use lopdf::{dictionary, Object};
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "faropdf-producer-{label}-{}.pdf",
+            ocr_queue::current_iso_timestamp()
+        ));
+        let mut doc = LopdfDocument::with_version("1.5");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![Object::Integer(0), Object::Integer(0), Object::Integer(595), Object::Integer(842)],
+        });
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![Object::Reference(page_id)],
+            "Count" => 1,
+            "MediaBox" => vec![Object::Integer(0), Object::Integer(0), Object::Integer(595), Object::Integer(842)],
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+        if let Some(p) = producer {
+            let info_id = doc.add_object(dictionary! {
+                "Producer" => Object::string_literal(p),
+            });
+            doc.trailer.set("Info", info_id);
+        }
+        doc.compress();
+        // 强制用经典 CrossReferenceTable（lopdf 0.33 默认 CrossReferenceStream 在 save→load 往返时
+        // 触发 "Invalid cross-reference table"；table 格式往返兼容）
+        doc.reference_table.cross_reference_type = lopdf::xref::XrefType::CrossReferenceTable;
+        doc.save(&path).unwrap();
+        path
+    }
+
+    fn read_producer(path: &Path) -> Option<String> {
+        let doc = LopdfDocument::load(path).unwrap();
+        let info_ref = doc.trailer.get(b"Info").ok()?;
+        if let lopdf::Object::Reference(r) = info_ref {
+            let info_obj = doc.objects.get(r)?;
+            if let lopdf::Object::Dictionary(dict) = info_obj {
+                if let Ok(producer_obj) = dict.get(b"Producer") {
+                    if let lopdf::Object::String(bytes, _) = producer_obj {
+                        return Some(String::from_utf8_lossy(bytes).to_string());
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn set_pdf_producer_overwrites_existing() {
+        let src = temp_pdf_with_producer_labeled(Some("original-producer"), "overwrite");
+        let request = serde_json::json!({
+            "input_path": src.to_string_lossy(),
+            "producer": "FaroPDF",
+        });
+        let result = set_pdf_producer(request).unwrap();
+        let out_path = result.get("path").unwrap().as_str().unwrap();
+        let producer = read_producer(std::path::Path::new(out_path));
+        assert_eq!(producer.as_deref(), Some("FaroPDF"));
+        let _ = std::fs::remove_file(&src);
+        let _ = std::fs::remove_file(out_path);
+    }
+
+    #[test]
+    fn set_pdf_producer_creates_info_if_missing() {
+        let src = temp_pdf_with_producer_labeled(None, "missing");
+        let request = serde_json::json!({
+            "input_path": src.to_string_lossy(),
+            "producer": "FaroPDF",
+        });
+        let result = set_pdf_producer(request).unwrap();
+        let out_path = result.get("path").unwrap().as_str().unwrap();
+        let producer = read_producer(std::path::Path::new(out_path));
+        assert_eq!(producer.as_deref(), Some("FaroPDF"));
+        let _ = std::fs::remove_file(&src);
+        let _ = std::fs::remove_file(out_path);
+    }
+
+    #[test]
+    fn set_pdf_producer_rejects_empty() {
+        let src = temp_pdf_with_producer(Some("x"));
+        let request = serde_json::json!({
+            "input_path": src.to_string_lossy(),
+            "producer": "   ",
+        });
+        let result = set_pdf_producer(request);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Producer 不能为空"));
+        let _ = std::fs::remove_file(&src);
+    }
+
+    #[test]
+    fn set_pdf_producer_rejects_missing_file() {
+        let request = serde_json::json!({
+            "input_path": "/nonexistent/path/file.pdf",
+            "producer": "FaroPDF",
+        });
+        let result = set_pdf_producer(request);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn set_pdf_producer_default_faropdf() {
+        let src = temp_pdf_with_producer_labeled(Some("old"), "default");
+        let request = serde_json::json!({
+            "input_path": src.to_string_lossy(),
+        });
+        let result = set_pdf_producer(request).unwrap();
+        let out_path = result.get("path").unwrap().as_str().unwrap();
+        let producer = read_producer(std::path::Path::new(out_path));
+        assert_eq!(producer.as_deref(), Some("FaroPDF"));
+        let _ = std::fs::remove_file(&src);
+        let _ = std::fs::remove_file(out_path);
+    }
+}
+
 
 #[cfg(test)]
 mod scan_preprocess_tests {

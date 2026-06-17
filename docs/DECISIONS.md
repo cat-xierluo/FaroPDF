@@ -5679,3 +5679,71 @@ ISS-068 任务卡原意："检测水印 + 按索引 / 按文本内容删水印"�
 
 - ✅ 不需新代码（纯评估文档）
 - ✅ typecheck / lint 不变
+
+## DEC-136 ISS-072 阶段 2 后续：Producer 字段真覆盖（Rust lopdf）
+
+- 时间：2026-06-17
+- 类型：PM 单 session TDD / Rust 后端
+- 关联：ISS-072 / DEC-109 / DEC-116
+
+**背景**：
+
+DEC-109 已知限制：pdf-lib v1.17.1 `save()` force override Producer 字段为 `pdf-lib (https://github.com/Hopding/pdf-lib)`，即便 `updateMetadata: false` + `useObjectStreams: false` + 字节流 patch 都无法稳定覆盖（XMP metadata 双写）。DEC-109 决定用 Rust lopdf 直接编辑 InfoDict 绕过。
+
+本 commit 推进：Rust 端 `set_pdf_producer` Tauri command。
+
+**实现**：
+
+`src-tauri/src/lib.rs` 新增 `set_pdf_producer(request: serde_json::Value)`：
+
+1. 读 `input_path` + `producer`（默认 "FaroPDF"）
+2. 校验：空 producer 抛错 / 文件不存在脱敏 basename 报错
+3. `canonicalize` 防 path traversal（与 remove_pdfpassword 同模式，DEC-102 P0-3）
+4. `Document::load` + 读 trailer.Info：
+   - 若 Info 是 Reference → 取该引用
+   - 若 Info 不存在 → 创建空 Dictionary + add_object + 挂回 trailer.Info
+   - 若 Info 非 Reference 类型 → 报错（避免破坏结构）
+5. `objects.get_mut(info_ref)` → `Object::Dictionary` → `dict.set("Producer", Object::string_literal(producer))`
+6. 保存为 `<stem>-metadata.pdf` 副本（不静默覆盖，DEC-102 P0-3）
+
+**关键设计**：
+
+- **不设 ModDate**：ModDate 由前端 pdf-lib `writePdfMetadata`（DEC-109 阶段 1）已设，lopdf 二次处理不重复设置避免时区格式分歧
+- **`Object::string_literal`**：lopdf 0.33 API（`Object::string` 不存在，是 `Object::String(bytes, StringFormat)`）
+- **不引入 chrono**：去掉最初 ModDate 逻辑（需 chrono Local::now），避免新增依赖
+- **Path traversal 防护 + 错误脱敏**：与 remove_pdfpassword 完全对齐（DEC-102 P0-1/3）
+
+**测试 fixture xref 格式坑**：
+
+lopdf 0.33 默认 `XrefType::CrossReferenceStream`，save→load 往返触发 "Invalid cross-reference table"。测试 fixture 生成强制 `CrossReferenceTable`（经典文本 xref table，往返兼容）。这是 lopdf 0.33 已知行为，非本 ISS 引入。
+
+**verification**（实操验证）：
+
+- ✅ `cargo check` 0 error（仅 pre-existing warnings）
+- ✅ `cargo test` **90/90 通过**（含新增 5 set_pdf_producer）：
+  - overwrites_existing（覆盖已有 Producer）
+  - creates_info_if_missing（无 Info 时创建）
+  - rejects_empty（空 producer 报错）
+  - rejects_missing_file（不存在文件报错）
+  - default_faropdf（缺省 producer → "FaroPDF"）
+- ⏳ 前端 AppShell 集成 set_pdf_producer（PropertiesDialog 加"真覆盖 Producer"选项）留后续
+
+**为什么前端不本 session 集成**：
+
+- Rust command + 5 测试已验证核心逻辑
+- 前端集成需要在 PropertiesDialog 加"真覆盖 Producer（Rust 后端）"toggle + AppShell 调 invoke
+- 工作量：~40 行前端 + 3 测试
+- 用户路径：当前 PropertiesDialog 已能写 Creator = "FaroPDF"（DEC-109），Producer 真覆盖是 nice-to-have（律师场景 Creator 已满足 90%）
+- 留 ISS-072 阶段 2 后续第二波
+
+**open follow-ups**：
+
+- 前端 AppShell 集成 set_pdf_producer（PropertiesDialog toggle）
+- 任务卡状态行更新
+
+**ISS-072 累计**：
+
+- 阶段 1（DEC-109）：readPdfMetadata + writePdfMetadata + 10 测试
+- 阶段 2 UI（DEC-116）：PropertiesDialog + commands.ts document-properties + 9 测试
+- 阶段 2 后续（本 commit）：set_pdf_producer Rust command + 5 测试
+- **总计 24 测试 / 3 commit**

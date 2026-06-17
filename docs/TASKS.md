@@ -941,7 +941,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P2
 - 类型：文档属性 / 元数据
-- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，readPdfMetadata + writePdfMetadata + 10 测试，Producer 字段 pdf-lib 限制 → DEC-109 阶段 2 用 Rust lopdf 解决）；阶段 2 PropertiesDialog UI + commands.ts document-properties 入口 + AppShell 集成已完成（2026-06-16，DEC-116）；Producer 真覆盖（Rust lopdf 直接编辑 InfoDict 绕过 pdf-lib force override）待启动
+- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，readPdfMetadata + writePdfMetadata + 10 测试，Producer 字段 pdf-lib 限制 → DEC-109 阶段 2 用 Rust lopdf 解决）；阶段 2 PropertiesDialog UI + commands.ts document-properties 入口 + AppShell 集成已完成（2026-06-16，DEC-116）；阶段 2 后续 Producer 真覆盖已完成（2026-06-17，Rust `set_pdf_producer` Tauri command 用 lopdf 直接编辑 InfoDict 绕过 pdf-lib force override + 5 测试，DEC-136 即将 ship）。
 - 来源：DEC-103 / PDF-Guru `MetaForm.vue` + `thirdparty/metadata.py`
 - 律师场景：律师整理客户文件，需要修改 Title / Author / Subject / Keywords，避免泄露原作者
 - 目标：
