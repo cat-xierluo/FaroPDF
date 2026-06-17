@@ -763,7 +763,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：安全 / 导出
-- 状态：阶段 1 已完成（2026-06-15，`SecurityPanel` UI + `export-set-password / export-remove-password` 命令接入工具启动器和原生菜单 + `remove_pdfpassword` Rust 命令用 lopdf 真实解密生成 `-unsecured.pdf` 新副本）；阶段 2 已完成（2026-06-17，升级 lopdf 0.33→0.41 含完整 V4 128-bit AES 加密 API + `set_pdfpassword` 真实实现生成 `-secured.pdf` 新副本 + SecurityPanel set 模式激活 + 3 Rust + 3 前端测试，DEC-139；DEC-135 决策纠偏：实际跳到 0.41 而非 0.34，0.34 仍无 encrypt API + pom_parser 自带编译 bug）。
+- 状态：阶段 1 已完成（2026-06-15，`SecurityPanel` UI + `export-set-password / export-remove-password` 命令接入工具启动器和原生菜单 + `remove_pdfpassword` Rust 命令用 lopdf 真实解密生成 `-unsecured.pdf` 新副本）；阶段 2 已完成（2026-06-17，升级 lopdf 0.33→0.41 含完整 V4 128-bit AES 加密 API + `set_pdfpassword` 真实实现生成 `-secured.pdf` 新副本 + SecurityPanel set 模式激活 + 3 Rust + 3 前端测试，DEC-139；DEC-135 决策纠偏：实际跳到 0.41 而非 0.34，0.34 仍无 encrypt API + pom_parser 自带编译 bug）；review follow-up 已修复（2026-06-17，SecurityPanel 用户密码留空文案改为"无需密码即可打开副本"，不再暗示沿用旧密码）。
 - 来源：截图 52（设置密码 modal：密码输入 + 确认输入 + 取消/确定）
 - 目标：
   1. 在工具启动器「导出」分组中加 `设置密码 / 移除密码` 命令。
@@ -820,7 +820,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：**P0**
 - 类型：导出 / 律师证据遮蔽 / 律师场景刚需
-- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，applyRedaction 算法 + 10 测试）；阶段 2 RedactionOverlay 拖矩形 UI + commands.ts redact-region 入口 + AppShell 集成已完成（2026-06-16，DEC-114）；阶段 2 后续 部分完成（2026-06-17，redactPageMargins 去页眉页脚算法 + 9 测试，DEC-132 即将 ship）；阶段 2 后续 UI 细化 已完成（2026-06-17，RedactionOverlay 多矩形拖拽：3 颜色芯片 / 撤销按钮 / 单 X 删除按钮 + 5 UI 测试）。
+- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，applyRedaction 算法 + 10 测试）；阶段 2 RedactionOverlay 拖矩形 UI + commands.ts redact-region 入口 + AppShell 集成已完成（2026-06-16，DEC-114）；阶段 2 后续 部分完成（2026-06-17，redactPageMargins 去页眉页脚算法 + 9 测试，DEC-132 即将 ship）；阶段 2 后续 UI 细化 已完成（2026-06-17，RedactionOverlay 多矩形拖拽：3 颜色芯片 / 撤销按钮 / 单 X 删除按钮 + 5 UI 测试）；review follow-up 已修复（2026-06-17，`regionsScreenToPdf` 透传 `color`，白 / 灰遮蔽可进入最终 `applyRedaction` 输出）。
 - 来源：DEC-103 / PDF-Guru `mask.go` + `thirdparty/mask.py:18-60` + `header_and_footer.go:60-83`
 - 律师场景：
   - **证据遮蔽**：身份证号 / 隐私电话 / 商业秘密在出具材料时必须涂黑，是律师工作高频操作
@@ -1090,6 +1090,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
+- 2026-06-17：完成 review follow-up 修复（DEC-140）：ISS-067 `regionsScreenToPdf` 透传 `color`，补回归测试防止白 / 灰遮蔽最终回退为默认黑色；ISS-064 `SecurityPanel` 用户密码留空文案改成"无需密码即可打开副本"，不再暗示可沿用旧用户密码。
 - 2026-06-17：完成 ISS-067 阶段 2 后续 RedactionOverlay UI 细化。nextColor state + 3 颜色芯片（黑/白/灰，律师场景：黑色涂黑 / 白色擦除 / 灰色模糊），颜色仅作用于后续 commit 的 region（已 commit 不变）。新增撤销按钮 + 单 X 删除按钮（X 按钮 pointerEvents:auto 不冒泡触发 overlay 拖动）。**全量 1206/1207 通过**（+5 新测试）。复用 DEC-107 applyRedaction 算法 + DEC-132 redactPageMargins 算法，零算法层变更。
 - 2026-06-17：完成 ISS-071 阶段 3 error.ts → SecurityPanel AppError 端到端迁移（DEC-138）。Rust set/remove_pdfpassword 改返 `Result<_, AppError>` 替代 `Result<_, String>`，错误码映射：NotSupported / FileNotFound / InvalidInput / PdfParseError / DecryptionError / IoError，context 携带脱敏 path（DEC-102 P0-1）。调整 remove_pdfpassword 校验顺序：空密码 → 文件存在 → canonicalize → load（用户友好）。前端 SecurityPanel `friendlyMessageForCode(err: AppError)` helper，9 个 ErrCode 各有中文兜底文案（i18n 后续可按 code 切英文）。`normalizeError` 兼容旧 string 错误（code=Unknown, message=原串）。**全量 1206/1207 通过**（+4 新前端测试）。ISS-071 累计 75 测试 / 3 commit 全部 ship。
 - 2026-06-17：完成 ISS-064 阶段 2 真实 PDF 加密（DEC-139 + DEC-135 决策更新）。**DEC-135 决策纠偏**：原计划升级 lopdf 0.34 不可行（0.34 仍无 encrypt API + 0.34.0 pom_parser 自带编译 bug + 0.33 没 pdf_writer feature），实际升级到 lopdf 0.41（含完整 V4 128-bit AES 加密 API）。`set_pdfpassword` 真实实现：`EncryptionState::try_from(EncryptionVersion::V4 { ... })` + `Aes128CryptFilter` + `doc.encrypt(&state)`，输出 `<stem>-secured.pdf` 新副本；自动补缺失的 `/ID`（某些工具导出 PDF 缺 /ID，lopdf 加密算法强制要求）。权限组合：PRINTABLE | COPYABLE | ANNOTABLE | FILLABLE | ASSEMBLABLE。SecurityPanel set 模式激活（按钮 disabled={loading || !ownerPwd}），复用 DEC-138 normalizeError。**真实 AES 加密 round-trip 测试**：构造 PDF → set 密码 → decrypt 验证 user_password 正确。**cargo test 97/97**（+1 新测试；原 90 → 96 → 97 累加）+ **npm test 1208/1209**（+5 累计，pre-existing zoom 唯一失败 DEC-099 已知）。

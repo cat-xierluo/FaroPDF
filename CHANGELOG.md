@@ -2,6 +2,11 @@
 
 > v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~125。
 
+Review 修复（DEC-140）：
+
+- 修复 RedactionOverlay 白色 / 灰色遮蔽只在 UI 预览生效、最终 PDF 仍按默认黑色输出的问题：`regionsScreenToPdf` 现在会把 `color` 一并透传给 `applyRedaction`。
+- 修正 SecurityPanel 设置密码表单文案：用户密码留空表示生成"无需密码即可打开"的加密副本，不再误写为"沿用旧用户密码"。
+
 OCR 后自动生成目录（ISS-069 阶段 1，DEC-125）：
 
 - 新增 `src/modules/ocr/autoToc.ts`：4 个纯函数 `extractTextItems`（PDF.js textContent 标准化）/ `clusterBySizeAndFont`（2pt 精度归并）/ `detectChapterHeadings`（10 个中文章节正则：第X章/节/条/款/项/编 + 阿拉伯 X.Y + 证据X + 附件X + 中文括号）/ `buildOutlineTree`（栈式树构建）+ 便捷入口 `buildOutlineTreeFromPages`。

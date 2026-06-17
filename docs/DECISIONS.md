@@ -5886,3 +5886,36 @@ DEC-135 当时假设「升级 lopdf 0.34 即可获得 `Document::encrypt` API」
 - v0.2 候选：qpdf 作为 lopdf 加密的备选路径（更广兼容性 + 独立验证），但 lopdf 0.41 AES-128 已足够律师场景，不再阻塞
 - v0.2 候选：加密 PDF 的 metadata 清理（标题/作者/创建者应清空避免泄露），需要 set_pdfpassword 后置处理
 - v0.3 候选：密码强度校验（最小长度 / 字符复杂度），现在只校验非空
+
+## DEC-140 review follow-up：RedactionOverlay 颜色透传 + SecurityPanel 密码文案修复
+
+- 时间：2026-06-17
+- 类型：code review follow-up / TDD bugfix / 文案修复
+- 关联：ISS-067 / ISS-064 / DEC-107 / DEC-114 / DEC-139
+
+**背景**：
+
+最近更新 review 发现 2 个问题：
+
+- ISS-067 阶段 2 后续新增 RedactionOverlay 黑 / 白 / 灰颜色芯片，但 `regionsScreenToPdf` 在屏幕坐标 → PDF 用户空间坐标转换时只返回 pageIndex / x / y / width / height，丢掉 `color`，导致 UI 预览可显示白 / 灰，最终 `applyRedaction` 因缺少 color 回退默认黑色。
+- ISS-064 阶段 2 激活真实加密后，`SecurityPanel` 用户密码输入文案仍写"留空 = 沿用旧用户密码，仅设置 owner"。后端 `set_pdfpassword` 会拒绝已加密 PDF 直接重加密，实际语义是"留空 = 输出副本打开时不需要用户密码，但仍受 owner 权限限制"。
+
+**决策**：
+
+- 在 `regionsScreenToPdf` 结果中直接透传 `color: r.color`，保持坐标转换纯粹，不让转换层改变遮蔽语义。
+- 给 `redactionCoords.test.ts` 加回归测试：白色 region 经过坐标转换后仍保留 `#ffffff`。
+- 修改 `SecurityPanel` 文案为"用户密码（留空 = 无需密码即可打开副本）"，并在 hint 中说明 owner 权限仍生效。
+- 给 `SecurityPanel.test.tsx` 加回归测试：set 模式不再出现"沿用旧用户密码"。
+
+**verification**：
+
+- ✅ RED：`npm test -- src/modules/redaction/redactionCoords.test.ts --run` 曾失败，收到 `undefined` 而非 `#ffffff`。
+- ✅ RED：`npm test -- src/components/layout/SecurityPanel.test.tsx --run` 曾失败，旧文案仍显示"沿用旧用户密码"。
+- ✅ GREEN：`npm test -- src/modules/redaction/redactionCoords.test.ts --run` 8/8 通过。
+- ✅ GREEN：`npm test -- src/components/layout/SecurityPanel.test.tsx --run` 14/14 通过。
+- ✅ `npm test -- src/modules/redaction/redactionCoords.test.ts src/modules/redaction/ui/RedactionOverlay.test.tsx src/components/layout/SecurityPanel.test.tsx --run` 37/37 通过。
+- ✅ `npm run typecheck` 0 error。
+- ✅ `npm run lint` 0 error。
+- ✅ `npm run build` 通过（保留现有 Vite 大 chunk / node:* browser externalized warning）。
+- ✅ `cd src-tauri && cargo check` 通过（保留既有 unused warning）。
+- ✅ Vite dev 实操烟测：`http://127.0.0.1:5173/` 渲染 `[role="application"][aria-label="FaroPDF PDF 工作台"]`，console/page error = 0，截图 `/tmp/faropdf-review-fix-smoke.png`。
