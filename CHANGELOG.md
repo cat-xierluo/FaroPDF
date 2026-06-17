@@ -11,6 +11,14 @@ OCR 后自动生成目录（ISS-069 阶段 1，DEC-125）：
 - **31 项单元测试**：`autoToc.test.ts` 22（正则 / 聚类 / 树构建 5 边界）/ `writePdfOutline.test.ts` 9（空树 / 单层 / 多层 / 越界 / 负数 / maxItems / round-trip / 加密 PDF / 页数保留）。
 - 阶段 2 UI 二次编辑（AutoTocDialog）待启动；阶段 3 OCR 衔接 + Playwright 实操验证待启动。
 
+自动生成目录 UI 集成（ISS-069 阶段 2，DEC-126）：
+
+- 新增 `src/modules/ocr/ui/AutoTocDialog.tsx`：flat-list 树形预览（按 depth 缩进）+ 4 类编辑（勾选 / 重命名 / 删除 / 新增）+ 输出文件名输入 + loading / error 状态。删除父节点连带删除后代。
+- AppShell 集成 `openAutoTocDialog`（PDF.js `loadPdfFromBytes` + 逐页 `getTextContent` + `buildOutlineTreeFromPages`）和 `handleApplyAutoToc`（`writePdfOutline` + `reader.saveUpdatedBytes` → `*-auto-toc.pdf` 新副本）。
+- `commands.ts` 加 `auto-generate-toc` 命令（tertiary / export / deliver 分组）。
+- **15 项 UI 测试**（`AutoTocDialog.test.tsx`）：初始渲染 / 勾选切换 / 全部取消 disabled / 删除（含连带后代）/ 新增 / 确认 / 取消 / 空文件名校验 / 非 .pdf 后缀校验 / loading / error / 空 tree + 新增 / 重命名 Enter / 重命名 Escape。
+- 阶段 3 OCR 衔接 + Playwright 实操验证待启动。
+
 涂黑矩形遮蔽（ISS-067 阶段 2，DEC-114）：
 
 - 新增 `src/modules/redaction/ui/RedactionOverlay.tsx`：阅读区 mousedown→mousemove→mouseup 拖矩形 + draft 预览 + committed region 列表 + 应用按钮 disabled 直到 ≥1 region + 取消清空 + 5px 最小拖动阈值。

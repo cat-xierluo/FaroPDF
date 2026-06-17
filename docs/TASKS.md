@@ -870,7 +870,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P0
 - 类型：OCR 后处理 / 自动出目录
-- 状态：阶段 1 已完成（2026-06-17，PM 单 session TDD，autoToc 4 纯函数 + writePdfOutline pdf-lib outline 写入 + 31 测试通过，DEC-125）；阶段 2 UI 二次编辑（AutoTocDialog）待启动；阶段 3 OCR 衔接 + 实操验证 待启动
+- 状态：阶段 1 已完成（2026-06-17，PM 单 session TDD，autoToc 4 纯函数 + writePdfOutline pdf-lib outline 写入 + 31 测试通过，DEC-125）；阶段 2 已完成（2026-06-17，AutoTocDialog UI 二次编辑 + AppShell 集成 + commands.ts auto-generate-toc + 15 UI 测试通过，DEC-126）；阶段 3 OCR 衔接 + 实操验证 待启动
 - 来源：DEC-103 / PDF-Guru `thirdparty/bookmark.py:1-72` 600+ 行
 - 律师场景：扫描卷宗 OCR 后自动生成目录（章节 / 证据 / 附件），免手动编排
 - 目标：

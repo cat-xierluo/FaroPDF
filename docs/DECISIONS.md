@@ -5082,3 +5082,42 @@ PM 单 session TDD 风险可控范围明确：
 - 阶段 2：UI 二次编辑（AutoTocDialog）+ commands.ts 入口 + AppShell 集成
 - 阶段 3：OCR 衔接（Rust 端 vs 前端写 outline 决策）+ Playwright 实操验证
 - 任务卡状态更新：`docs/TASKS.md` ISS-069「阶段 1 已完成（2026-06-17）」
+
+## DEC-126 ISS-069 阶段 2 UI 二次编辑 + AppShell 集成落地
+
+- 时间：2026-06-17
+- 类型：PM 单 session TDD / UI 集成
+- 关联：ISS-069 阶段 1（DEC-125）
+
+**这一版做了什么**：
+
+1. **AutoTocDialog**（`src/modules/ocr/ui/AutoTocDialog.tsx`）：树形章节预览 + 4 类编辑操作（勾选 / 重命名 / 删除 / 新增）+ 输出文件名输入 + loading / error 状态。flat-list 渲染（带 `parentIndex` + `depth`）避免递归组件复杂度，参考 SplitPagesDialog 思路。15 项 UI 测试覆盖：初始渲染 / 勾选切换 / 全部取消 / 删除（连带后代）/ 新增 / 确认回调 / 取消回调 / 空文件名校验 / 非 .pdf 后缀校验 / loading / error / 空 tree / 重命名。
+2. **AppShell 集成**：`openAutoTocDialog` 用 `loadPdfFromBytes` + 逐页 `getTextContent` + `buildOutlineTreeFromPages` 异步拉数据；`handleApplyAutoToc` 调 `writePdfOutline` + `reader.saveUpdatedBytes` 输出 `*-auto-toc.pdf` 新副本。
+3. **命令模型**：`commands.ts` 加 `auto-generate-toc` 命令（tertiary / export / deliver 分组）；`targetMode: "read"` 不切模式（在阅读态浮层对话框）；description + feedback 文案与同类 export 命令对齐。
+4. **CSS 复用**：对话框复用 `dialog-overlay` / `dialog-card--wide` / `context-tool` / `dialog-card__error` 等 DESIGN.md 既有 class，无新样式；内联样式只用于章节缩进（`paddingLeft: ${depth * 20 + 8}px`）。
+
+**关键设计**：
+
+- **AppShell 异步拉数据 vs Dialog 自管**：选前者。Dialog 保持纯 UI（无 PDF.js 依赖），便于复用 + 测试；AppShell 集中管理副作用（loadPdfFromBytes + destroy + getTextContent + setState）。
+- **flat-list 渲染而非递归组件**：避免在 useState 中维护树形结构（深拷贝 / 不可变更新成本高）；每行有 `id` + `parentIndex` + `depth`，渲染时按 `depth * 20` 缩进。
+- **删除级联**：删除父节点连带全部后代（递归找 `parentIndex` 命中的项）。测试覆盖。
+- **unflattenTree 边界**：被删父节点的孩子被勾选时，自动提升为 root（`idToNode.get(parent) === undefined` → push to roots）。
+- **空 tree + 非 loading**：显示空态（"未识别到章节"）但仍允许 + 新增章节（用户手填），不让用户卡死。
+
+**为什么不本版做 OCR 衔接**：
+
+- 阶段 3（OCR 衔接 + Playwright 实操验证）需要 Rust `extract_ocr_text` 透传 textItem 数组（lossy）→ 在 Rust 端做 outline 写入决策。本阶段 2 走前端路径（用 PDF.js 重新读已 OCR 文档），两种路径并存是中间状态，等阶段 3 评估后再二选一固化。
+
+**verification**（实操验证）：
+
+- ✅ typecheck：`tsc --noEmit` 0 错
+- ✅ lint：`eslint .` 0 warning
+- ✅ vitest：**46/46 通过**（autoToc 22 + writePdfOutline 9 + AutoTocDialog 15）
+- ✅ pre-existing `useReaderController` zoom 失败（与本 ISS 无关，记录但不修）
+- ⏳ Playwright 实操验证：scan-only-sample.pdf OCR 后真目录生成 — 待阶段 3
+
+**open follow-ups**：
+
+- 阶段 3：OCR 衔接（Rust 端 vs 前端写 outline 决策）+ Playwright 实操验证 + 真法律卷宗 fixture（5 章 + 10 证据 + 3 附件 ≥ 90% 召回）
+- 后续 polish：章节树缩进视觉（PDF Expert outline 风格）+ 拖拽重排 + 字号列显示
+- 任务卡状态更新：`docs/TASKS.md` ISS-069「阶段 2 已完成（2026-06-17）」

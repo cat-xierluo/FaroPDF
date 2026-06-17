@@ -42,6 +42,13 @@ import { applyRedaction } from "../../modules/redaction/redactionEngine";
 import { regionsScreenToPdf, selectPageCanvas } from "../../modules/redaction/redactionCoords";
 import { readPdfMetadata, writePdfMetadata, type PdfMetadata } from "../../modules/document/properties";
 import { PropertiesDialog } from "../../modules/document/ui/PropertiesDialog";
+import {
+  buildOutlineTreeFromPages,
+  type ChapterHeadingNode,
+  writePdfOutline,
+} from "../../modules/ocr";
+import { loadPdfFromBytes } from "../../modules/reader/pdfReaderService";
+import { AutoTocDialog } from "../../modules/ocr/ui/AutoTocDialog";
 import type {
   AnnotationArmedStateBundle,
   AnnotationDraftSubmission,
@@ -378,6 +385,75 @@ export function AppShell({
     [document, reader],
   );
 
+  // ISS-069 阶段 2：自动生成目录状态
+  const [autoTocOpen, setAutoTocOpen] = useState(false);
+  const [autoTocHeadings, setAutoTocHeadings] = useState<ChapterHeadingNode[]>([]);
+  const [autoTocLoading, setAutoTocLoading] = useState(false);
+  const [autoTocError, setAutoTocError] = useState<string | null>(null);
+
+  const openAutoTocDialog = useCallback(async (): Promise<void> => {
+    if (!document) {
+      setCommandFeedback("请先打开 PDF 文档。");
+      return;
+    }
+    setAutoTocOpen(true);
+    setAutoTocLoading(true);
+    setAutoTocError(null);
+    setAutoTocHeadings([]);
+    try {
+      const sourceBytes = await reader.getFileBytes();
+      if (!sourceBytes) {
+        throw new Error("未找到当前 PDF 的源文件字节。");
+      }
+      const loaded = await loadPdfFromBytes({
+        data: new Uint8Array(sourceBytes),
+        fileName: reader.getCurrentFileName() ?? document.name,
+      });
+      try {
+        const pages: import("../../modules/ocr/autoToc").PdfJsTextContentLike[] = [];
+        for (let i = 0; i < loaded.metadata.pageCount; i += 1) {
+          const page = await (loaded as unknown as {
+            getPage: (n: number) => Promise<{ getTextContent: () => Promise<import("../../modules/ocr/autoToc").PdfJsTextContentLike> }>;
+          }).getPage(i + 1);
+          pages.push(await page.getTextContent());
+        }
+        const tree = buildOutlineTreeFromPages(pages);
+        setAutoTocHeadings(tree);
+      } finally {
+        await loaded.destroy();
+      }
+    } catch (error) {
+      setAutoTocError(error instanceof Error ? error.message : "扫描文字层失败。");
+    } finally {
+      setAutoTocLoading(false);
+    }
+  }, [document, reader]);
+
+  const handleApplyAutoToc = useCallback(
+    async (options: { tree: ChapterHeadingNode[]; outputName: string }): Promise<void> => {
+      if (!document) {
+        setCommandFeedback("请先打开 PDF 文档。");
+        return;
+      }
+      try {
+        const sourceBytes = await reader.getFileBytes();
+        if (!sourceBytes) {
+          throw new Error("未找到当前 PDF 的源文件字节。");
+        }
+        const newBytes = await writePdfOutline(
+          new Uint8Array(sourceBytes),
+          options.tree,
+        );
+        await reader.saveUpdatedBytes(newBytes, options.outputName);
+        setCommandFeedback(`已生成 ${options.outputName}，含 ${options.tree.length} 条目录项。`);
+        setAutoTocOpen(false);
+      } catch (error) {
+        setCommandFeedback(error instanceof Error ? error.message : "生成目录失败。");
+      }
+    },
+    [document, reader],
+  );
+
   const executeCommand = useCallback(async (commandId: AppCommandId) => {
     const command = getCommandById(commandId);
     if (!command) {
@@ -436,6 +512,8 @@ export function AppShell({
       formController.openPanel("sign");
     } else if (command.id === "document-properties") {
       void openPropertiesDialog();
+    } else if (command.id === "auto-generate-toc") {
+      void openAutoTocDialog();
     }
 
     if (command.id === "help-about") {
@@ -647,6 +725,18 @@ export function AppShell({
           onClose={() => setPropertiesOpen(false)}
           onConfirm={(opts) => {
             void handleApplyProperties(opts);
+          }}
+        />
+      ) : null}
+      {autoTocOpen ? (
+        <AutoTocDialog
+          initialHeadings={autoTocHeadings}
+          isLoading={autoTocLoading}
+          error={autoTocError}
+          defaultFileName={reader.getCurrentFileName() ?? document?.name ?? "document"}
+          onClose={() => setAutoTocOpen(false)}
+          onConfirm={(opts) => {
+            void handleApplyAutoToc(opts);
           }}
         />
       ) : null}

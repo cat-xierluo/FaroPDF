@@ -47,6 +47,7 @@ export type AppCommandId =
   | "forms-flatten"
   | "forms-sign-handwrite"
   | "redact-region"
+  | "auto-generate-toc"
   | "annotation-translate"
   | "annotation-tts"
   | "document-properties"
@@ -367,6 +368,17 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     feedback: "已打开文档属性对话框，请在表单内编辑后保存。",
   },
   {
+    id: "auto-generate-toc",
+    label: "自动生成目录",
+    description: "扫描文字层识别章节，输出 *-auto-toc.pdf 新副本（带 PDF outline）。",
+    layer: "tertiary",
+    group: "export",
+    entryPoints: ["more-menu", "native-menu"],
+    requiresDocument: true,
+    targetMode: "read",
+    feedback: "已打开自动生成目录对话框，请在预览后确认导出。",
+  },
+  {
     id: "help-about",
     label: "关于 FaroPDF",
     layer: "tertiary",
@@ -401,6 +413,7 @@ export const APP_TOOL_LAUNCHER_SECTIONS: AppToolLauncherSectionDefinition[] = [
       "export-set-password",
       "export-remove-password",
       "document-properties",
+      "auto-generate-toc",
     ],
   },
   {
