@@ -63,3 +63,61 @@
   border: 2px solid #ff0000;
   pointer-events: none;
 }
+
+/* ISS-067 阶段 2 后续：颜色选择器 + 撤销按钮 + 单矩形删除按钮 */
+.redaction-overlay__color-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 8px;
+}
+
+.redaction-overlay__color-label {
+  font-size: 11px;
+  color: var(--color-text-muted, #666);
+  margin-right: 2px;
+}
+
+.redaction-overlay__color-chip {
+  width: 28px;
+  height: 22px;
+  border: 1px solid var(--color-border, #d0d0d0);
+  border-radius: 4px;
+  font-size: 10px;
+  color: #fff;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.redaction-overlay__color-chip--active {
+  outline: 2px solid #ff0000;
+  outline-offset: 1px;
+}
+
+.redaction-overlay__region-delete {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  background: #ff0000;
+  color: #fff;
+  border: 1px solid #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.redaction-overlay__region-delete:hover {
+  background: #cc0000;
+}

@@ -176,3 +176,122 @@ describe("RedactionOverlay (ISS-067 阶段 2)", () => {
     expect(container.querySelectorAll(".redaction-overlay__region").length).toBe(0);
   });
 });
+
+describe("RedactionOverlay UI 细化 (ISS-067 阶段 2 后续)", () => {
+  test("颜色选择器默认选中黑色", () => {
+    render(
+      <RedactionOverlay
+        active={true}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+        viewport={VIEWPORT}
+      />,
+    );
+    const blackChip = screen.getByTestId("redaction-color-#000000");
+    expect(blackChip.getAttribute("aria-checked")).toBe("true");
+  });
+
+  test("点击白色芯片 → 切换 nextColor 为白色，新 region 带白色", () => {
+    const onApply = vi.fn();
+    render(
+      <RedactionOverlay
+        active={true}
+        onApply={onApply}
+        onCancel={vi.fn()}
+        viewport={VIEWPORT}
+      />,
+    );
+    const overlay = screen.getByTestId("redaction-overlay");
+    fireEvent.click(screen.getByTestId("redaction-color-#ffffff"));
+    fireEvent.mouseDown(overlay, { clientX: 10, clientY: 20 });
+    fireEvent.mouseMove(overlay, { clientX: 60, clientY: 70 });
+    fireEvent.mouseUp(overlay, { clientX: 60, clientY: 70 });
+    fireEvent.click(screen.getByRole("button", { name: /应用遮蔽/ }));
+    const passed = onApply.mock.calls[0][0] as RedactionRegionDraft[];
+    expect(passed[0].color).toBe("#ffffff");
+  });
+
+  test("撤销按钮 → 移除最后一个 region；空列表时按钮 disabled", () => {
+    const { container } = render(
+      <RedactionOverlay
+        active={true}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+        viewport={VIEWPORT}
+      />,
+    );
+    const overlay = screen.getByTestId("redaction-overlay");
+    const undoButton = screen.getByTestId("redaction-undo-last");
+    expect((undoButton as HTMLButtonElement).disabled).toBe(true);
+
+    // 拖 2 个
+    fireEvent.mouseDown(overlay, { clientX: 10, clientY: 20 });
+    fireEvent.mouseMove(overlay, { clientX: 60, clientY: 70 });
+    fireEvent.mouseUp(overlay, { clientX: 60, clientY: 70 });
+    fireEvent.mouseDown(overlay, { clientX: 100, clientY: 200 });
+    fireEvent.mouseMove(overlay, { clientX: 150, clientY: 240 });
+    fireEvent.mouseUp(overlay, { clientX: 150, clientY: 240 });
+    expect(container.querySelectorAll(".redaction-overlay__region").length).toBe(2);
+    expect((undoButton as HTMLButtonElement).disabled).toBe(false);
+
+    // 撤销
+    fireEvent.click(undoButton);
+    expect(container.querySelectorAll(".redaction-overlay__region").length).toBe(1);
+
+    // 再撤销
+    fireEvent.click(undoButton);
+    expect(container.querySelectorAll(".redaction-overlay__region").length).toBe(0);
+    expect((undoButton as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  test("单矩形 X 按钮 → 只移除该矩形，其他保持", () => {
+    const { container } = render(
+      <RedactionOverlay
+        active={true}
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+        viewport={VIEWPORT}
+      />,
+    );
+    const overlay = screen.getByTestId("redaction-overlay");
+    fireEvent.mouseDown(overlay, { clientX: 10, clientY: 20 });
+    fireEvent.mouseMove(overlay, { clientX: 60, clientY: 70 });
+    fireEvent.mouseUp(overlay, { clientX: 60, clientY: 70 });
+    fireEvent.mouseDown(overlay, { clientX: 100, clientY: 200 });
+    fireEvent.mouseMove(overlay, { clientX: 150, clientY: 240 });
+    fireEvent.mouseUp(overlay, { clientX: 150, clientY: 240 });
+    expect(container.querySelectorAll(".redaction-overlay__region").length).toBe(2);
+
+    // 删除第 0 个
+    fireEvent.click(screen.getByTestId("redaction-remove-0"));
+    expect(container.querySelectorAll(".redaction-overlay__region").length).toBe(1);
+  });
+
+  test("颜色选择不影响已 commit 的 region（nextColor 切换前已画的仍是旧色）", () => {
+    const onApply = vi.fn();
+    render(
+      <RedactionOverlay
+        active={true}
+        onApply={onApply}
+        onCancel={vi.fn()}
+        viewport={VIEWPORT}
+      />,
+    );
+    const overlay = screen.getByTestId("redaction-overlay");
+    // 第一个黑色
+    fireEvent.mouseDown(overlay, { clientX: 10, clientY: 20 });
+    fireEvent.mouseMove(overlay, { clientX: 60, clientY: 70 });
+    fireEvent.mouseUp(overlay, { clientX: 60, clientY: 70 });
+    // 切白
+    fireEvent.click(screen.getByTestId("redaction-color-#ffffff"));
+    // 第二个白色
+    fireEvent.mouseDown(overlay, { clientX: 100, clientY: 200 });
+    fireEvent.mouseMove(overlay, { clientX: 150, clientY: 240 });
+    fireEvent.mouseUp(overlay, { clientX: 150, clientY: 240 });
+
+    fireEvent.click(screen.getByRole("button", { name: /应用遮蔽/ }));
+    const passed = onApply.mock.calls[0][0] as RedactionRegionDraft[];
+    expect(passed[0].color).toBe("#000000");
+    expect(passed[1].color).toBe("#ffffff");
+  });
+});

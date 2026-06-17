@@ -26,6 +26,13 @@ interface DragState {
 
 const MIN_DRAG_SIZE = 5; // px
 
+/** 颜色选择器：黑（默认）/ 白 / 灰。律师场景：白色覆盖用于"擦除"，灰色用于"模糊"。 */
+const COLOR_OPTIONS: ReadonlyArray<{ label: string; value: string; preview: string }> = [
+  { label: "黑", value: "#000000", preview: "#000000" },
+  { label: "白", value: "#ffffff", preview: "#ffffff" },
+  { label: "灰", value: "#808080", preview: "#808080" },
+];
+
 function rectFromDrag(drag: DragState): {
   x: number;
   y: number;
@@ -40,11 +47,11 @@ function rectFromDrag(drag: DragState): {
 }
 
 export function RedactionOverlay(props: RedactionOverlayProps): ReactElement | null {
-  // DEC-114 review P0-2：viewport 改为 fixed 全屏后不再用于定位（仍保留在接口供调用方传 PDF 视口尺寸，
-  // AppShell handleApplyRedaction 用它做坐标 scale；组件内部只读 active/pageIndex/onApply/onCancel）。
   const { active, pageIndex = 0, onApply, onCancel } = props;
   const [drag, setDrag] = useState<DragState | null>(null);
   const [regions, setRegions] = useState<RedactionRegionDraft[]>([]);
+  // ISS-067 阶段 2 后续：选中的填充颜色，仅作用于后续新增的 region（已 commit 的不变）。
+  const [nextColor, setNextColor] = useState<string>("#000000");
 
   if (!active) {
     return null;
@@ -73,18 +80,30 @@ export function RedactionOverlay(props: RedactionOverlayProps): ReactElement | n
     const finalDrag = { ...drag, currentX: event.clientX, currentY: event.clientY };
     const rect = rectFromDrag(finalDrag);
     if (rect.width >= MIN_DRAG_SIZE && rect.height >= MIN_DRAG_SIZE) {
-      // 透传屏幕坐标；PDF 用户空间 Y 翻转（PDF 原点左下 vs 屏幕原点左上）
-      // 由 AppShell 在调用 applyRedaction 前根据 canvas getBoundingClientRect 完成。
       const newRegion: RedactionRegionDraft = {
         pageIndex,
         x: rect.x,
         y: rect.y,
         width: rect.width,
         height: rect.height,
+        color: nextColor,
       };
       setRegions([...regions, newRegion]);
     }
     setDrag(null);
+  };
+
+  // ISS-067 阶段 2 后续：移除单个已 commit region
+  const handleRemoveRegion = (idx: number): void => {
+    setRegions(regions.filter((_, i) => i !== idx));
+  };
+
+  // ISS-067 阶段 2 后续：撤销最后一个 region（比逐个删快）
+  const handleUndoLast = (): void => {
+    if (regions.length === 0) {
+      return;
+    }
+    setRegions(regions.slice(0, -1));
   };
 
   const handleApply = (): void => {
@@ -107,9 +126,6 @@ export function RedactionOverlay(props: RedactionOverlayProps): ReactElement | n
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       style={{
-        // DEC-114 review P0-2 修复：fixed 全屏覆盖，让 region 的 clientX/Y 直接作为
-        // left/top（fixed 起点为视口 0,0）。之前用 PDF pt 当 CSS px 定位 + 挂错容器
-        // 导致矩形画在错误位置。viewport prop 仅供 handleApplyRedaction 做 PDF 坐标 scale。
         position: "fixed",
         inset: 0,
         zIndex: 20,
@@ -120,6 +136,24 @@ export function RedactionOverlay(props: RedactionOverlayProps): ReactElement | n
         <p className="redaction-overlay__hint">
           在下方页面拖动鼠标画出遮蔽矩形；点击「应用遮蔽」调用 pdf-lib 写入不透明矩形覆盖原文。
         </p>
+        <div className="redaction-overlay__color-row" role="radiogroup" aria-label="填充颜色">
+          <span className="redaction-overlay__color-label">颜色：</span>
+          {COLOR_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={nextColor === opt.value}
+              aria-label={`填充颜色 ${opt.label}`}
+              data-testid={`redaction-color-${opt.value}`}
+              onClick={() => setNextColor(opt.value)}
+              className={`redaction-overlay__color-chip${nextColor === opt.value ? " redaction-overlay__color-chip--active" : ""}`}
+              style={{ background: opt.preview }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
         <p className="redaction-overlay__count">已选 {regions.length} 个矩形</p>
         <div className="redaction-overlay__actions">
           <button
@@ -129,6 +163,16 @@ export function RedactionOverlay(props: RedactionOverlayProps): ReactElement | n
             className="compact-button"
           >
             应用遮蔽
+          </button>
+          <button
+            type="button"
+            onClick={handleUndoLast}
+            disabled={regions.length === 0}
+            className="compact-button compact-button--ghost"
+            data-testid="redaction-undo-last"
+            aria-label="撤销最后一个矩形"
+          >
+            撤销
           </button>
           <button
             type="button"
@@ -150,11 +194,26 @@ export function RedactionOverlay(props: RedactionOverlayProps): ReactElement | n
             top: region.y,
             width: region.width,
             height: region.height,
-            background: "rgba(255, 0, 0, 0.35)",
-            border: "2px solid #ff0000",
+            background: region.color
+              ? `rgba(${parseInt(region.color.slice(1, 3), 16)}, ${parseInt(region.color.slice(3, 5), 16)}, ${parseInt(region.color.slice(5, 7), 16)}, 0.35)`
+              : "rgba(255, 0, 0, 0.35)",
+            border: `2px solid ${region.color ?? "#ff0000"}`,
             pointerEvents: "none",
           }}
-        />
+        >
+          <button
+            type="button"
+            className="redaction-overlay__region-delete"
+            data-testid={`redaction-remove-${idx}`}
+            aria-label={`删除第 ${idx + 1} 个矩形`}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRemoveRegion(idx);
+            }}
+          >
+            ×
+          </button>
+        </div>
       ))}
       {draftRect ? (
         <div
@@ -165,8 +224,12 @@ export function RedactionOverlay(props: RedactionOverlayProps): ReactElement | n
             top: draftRect.y,
             width: draftRect.width,
             height: draftRect.height,
-            border: "2px dashed #ff0000",
-            background: "rgba(255, 0, 0, 0.1)",
+            border: `2px dashed ${nextColor}`,
+            background: nextColor === "#000000"
+              ? "rgba(255, 0, 0, 0.1)"
+              : nextColor === "#ffffff"
+                ? "rgba(200, 200, 200, 0.2)"
+                : "rgba(128, 128, 128, 0.15)",
             pointerEvents: "none",
           }}
         />
