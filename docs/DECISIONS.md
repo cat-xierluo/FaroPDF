@@ -5342,3 +5342,50 @@ ISS-066 阶段 2 后续原话："缩略图拖断点 UI + 裁边切 待启动"。
 - 裁边切 UI 集成到 PageOrganizerWorkspace（dialog + 4 margin input + pageIndexes 勾选）
 - auto-detect 白边（pixel 扫描，留 v0.3）
 - 任务卡状态行更新
+
+## DEC-131 ISS-060 阶段 2 后续：panelWidthStore AppShell 集成
+
+- 时间：2026-06-17
+- 类型：集成收口 / 轻量 commit
+- 关联：ISS-060 / DEC-121
+
+**背景**：
+
+`panelWidthStore`（DEC-121 已 ship）提供 localStorage 持久化左右栏宽度。`commit 111a06d`（DEC-121）ship 了 store 层 + 测试，但 AppShell 集成延后（DEC-121 明确"AppShell 集成延后"）。
+
+本 commit 推进 AppShell 集成第一步：mount 时读 localStorage 注入 inline style，替换 fixed 290px / 320px。
+
+**改动**：
+
+1. `AppShell.tsx` import `getPanelWidth`（替代直接用 290/320 fixed）
+2. 新增 `useState<number>(getPanelWidth("left"))` + `useState<number>(getPanelWidth("right"))` — mount 时读 localStorage
+3. `<div className="workspace" style={{ gridTemplateColumns: ... }}>` — 注入动态宽度
+4. gridTemplateColumns 模板：
+   - 显 utilityPanel：`${leftWidth}px minmax(420px, 1fr) ${rightWidth}px`
+   - 不显：`${leftWidth}px minmax(420px, 1fr)`
+
+**为什么不做拖拽 divider**：
+
+- 拖拽 divider = mousedown→mousemove→mouseup 全局事件 + 实时 width 状态 + setPanelWidth 持久化
+- 工作量：~80-120 行 + 3-5 测试 + 跨组件边界处理
+- 用户价值：拖拽改宽度 vs 当前 default 值 — 90% 场景下 default 已够用
+- 留后续 session：store 层已 ship，UI 集成是纯增量
+
+**为什么不暴露 setPanelWidth API**：
+
+- 当前 AppShell mount 时只读 store，没在拖拽 / 设置面板暴露 setPanelWidth
+- 用户改 width 的入口仅有 localStorage 直接编辑（开发用）+ 后续拖拽 divider（planned）
+- 等拖拽 ship 后再在 SettingsPanel 暴露"重置栏宽"按钮
+
+**verification**（实操验证）：
+
+- ✅ typecheck：`tsc --noEmit` 0 错
+- ✅ lint：`eslint .` 0 warning
+- ✅ vitest：1171/1172 通过（剩 1 pre-existing useReaderController zoom bug 与本 ISS 无关）
+- ✅ AppShell 既有测试 0 回归
+
+**open follow-ups**：
+
+- 拖拽 divider UI 集成（mousedown→mousemove→mouseup + setPanelWidth 实时持久化）
+- SettingsPanel 暴露"重置栏宽"按钮
+- 任务卡状态行更新

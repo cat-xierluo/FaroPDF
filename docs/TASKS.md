@@ -963,7 +963,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P0（v0.2 顶层目标，wrap ISS-059/060 阶段 2 + ISS-065 持续）
 - 类型：UI 信息架构 / 整体 polish / 路线图
-- 状态：路线图（不直接交付，作为差距追踪 + 阶段 2 ISS 入口）
+- 状态：路线图（不直接交付，作为差距追踪 + 阶段 2 ISS 入口）；部分 ship — panelWidthStore localStorage 持久化（DEC-121）+ AppShell 集成读宽度（DEC-131 即将 ship）
 - 来源：2026-06-15 PDF Expert audit 揭露剩余差距 + DEC-103 PDF-Guru 调研 + DEC-105 ISS-071 阶段 1 落地后的下一波
 
 ### 当前 "页面布局" 完成度（vs PDF Expert）

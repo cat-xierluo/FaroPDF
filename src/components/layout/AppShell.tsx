@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getPanelWidth } from "../../shared/panelWidthStore";
 import type { AnnotationSidecar, PdfAnnotation } from "../../shared";
 import type { ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
@@ -158,6 +159,11 @@ export function AppShell({
   useEffect(() => {
     setRightPanelOverride(null);
   }, [activeMode]);
+
+  // ISS-060 阶段 2 后续：左右栏宽度持久化（panelWidthStore 提供 localStorage 读写）。
+  // 当前 ship：mount 时读 localStorage 注入 inline style；用户拖拽 divider 留后续 session。
+  const [leftWidth] = useState<number>(() => getPanelWidth("left"));
+  const [rightWidth] = useState<number>(() => getPanelWidth("right"));
   // ISS-060：右栏驱动 — 默认按 mode 派生；用户 tab override 优先。
   // P2-6 修复：之前用 useState(() => initial) 只在 mount 时算一次，read→annotate
   // 切换后 rightPanel 永远 stuck 在 mount 时的 "none"，导致右栏永不显示。
@@ -592,7 +598,14 @@ export function AppShell({
           formController={formController}
         />
       ) : null}
-      <div className={showUtilityPanel ? "workspace" : "workspace workspace--full"}>
+      <div
+        className={showUtilityPanel ? "workspace" : "workspace workspace--full"}
+        style={{
+          gridTemplateColumns: showUtilityPanel
+            ? `${leftWidth}px minmax(420px, 1fr) ${rightWidth}px`
+            : `${leftWidth}px minmax(420px, 1fr)`,
+        }}
+      >
         {showUtilityPanel ? (
           <UtilityPanel
             activeAnnotationId={activeAnnotationId}
