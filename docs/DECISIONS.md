@@ -5003,3 +5003,82 @@ DEC-112 把 CustomStampPanel 接到 RightPanel 验证了"Wave A 模块 → Wave 
 **临时可用方案**（已 ship）：用 ISS-067 的 `applyRedaction` 在水印位置涂白矩形——视觉上消除但 PDF 内容流仍有水印。律师场景下「看起来没了」可接受但严格 PDF 编辑需求会暴露。
 
 **open follow-ups**：Task #7 实操验证（Playwright）支持后，本 ISS 可正式推进。
+
+## DEC-124 research/ 目录不入仓
+
+- 时间：2026-06-17
+- 类型：仓库卫生 / 调研材料管理
+- 关联：DEC-058（personal-site 跨仓 cleanup）/ DEC-099（0.1.2 updater 撤回 + research/pdf-expert 上下文接续）
+
+**背景**：
+
+`git status` 长期显示 `?? research/` untracked。`research/pdf-expert/` 含 v0.1.2 封箱期间（2026-06-14 ~ 2026-06-15）2 批 PDF Expert 调研材料：
+
+- 第一批 30 张截图 + 主 README（7 KB）+ `FEATURE_CATALOG.md`（8.8 KB）
+- 第二批（`batch-2026-06-15/`）41 张截图 + 3 个 fixture PDF + 子 README（80 MB）
+- **总计 89 MB**
+
+`research/pdf-expert/README.md` 原表述"项目内持久化"，但 89 MB 体积会显著增加仓库负担。
+
+**决定**：
+
+`.gitignore` 加 `research/` 整目录排除，**不删除**本机调研材料。理由：
+
+1. **流程已沉淀**：调研流程在 2026-06-14 同步沉淀到 `.claude/skills/computer-use/SKILL.md`（"Computer Use Skill — macOS 应用截图采集"），独立于截图本身存在。
+2. **洞察已沉淀**：关键观察进入 `docs/DESIGN.md` §18 "PDF Expert UI 探索素材池"，是产品知识的一部分。
+3. **与同类本机产物同等处理**：`.claude/skills/`、`.playwright-mcp/`、`tests/fixtures/ocr/*.pdf`、`tmp/audit-screenshots/`、`src-tauri/target/` 都是本机工作产出，统一不入仓。
+4. **不污染主仓**：FaroPDF 仓聚焦 PDF 阅读器代码，调研材料按需本机访问；如需团队共享，可单独打包或迁到 personal-site 仓。
+5. **不覆盖用户工作产出**：SOP 5 安全边界要求不删除本机文件，仅做 git 跟踪决策。
+
+**验证**：
+
+- `git check-ignore -v research/pdf-expert/README.md` → `.gitignore:64:research/`
+- `git status` 不再显示 `?? research/`，只显示 `.gitignore` modified
+- 本机 `research/pdf-expert/` 内容完整保留，可继续作为下一阶段"仍待截"清单的产出目录
+
+**open follow-ups**：
+
+- 若后续 `docs/DESIGN.md` §18 需要更新参考基线，本机 `research/pdf-expert/` 仍可直接访问
+- 若团队需要共享，按 personal-site 跨仓 cleanup（DEC-058）模式迁到独立调研仓或打包 release attachment
+- `cliclick` 装好后 retry "仍待截" 清单（README 第四段"仍待截"），产出继续落在本机 `research/pdf-expert/batch-2026-06-15/`，不入仓
+
+## DEC-125 ISS-069 阶段 1 算法层 + pdf-lib outline 写入落地
+
+- 时间：2026-06-17
+- 类型：PM 单 session TDD / 新功能
+- 关联：ISS-069 / DEC-103（PDF-Guru 调研）/ DEC-124
+
+**为什么这一版只做算法层 + 写入层**：
+
+PM 单 session TDD 风险可控范围明确：
+
+1. **算法纯函数层**（`src/modules/ocr/autoToc.ts`）：4 个无副作用函数 + 22 项单元测试覆盖中文章节模式（`第X章/节/条/款/项/编` / 阿拉伯 `X.Y` / `证据X` / `附件X` / 中文括号 `(一)`）+ 树构建（栈式 1pt 跃迁 / 兄弟同级 / 跳跃中间层补齐）。
+2. **写入层**（`src/modules/ocr/writePdfOutline.ts`）：pdf-lib 1.17.1 无公开 `addOutline` API，按 PDF 1.7 spec §12.3.3 直接用 `PDFDict` / `PDFRef` / `PDFName` / `PDFArray` / `PDFNumber` / `PDFString` 构造 outline 树（Catalog.Outlines → root → items 链式链接 + First/Last/Count 收尾）。9 项测试覆盖：空树 / 单层 / 多层 / 越界 clamp / 负数 clamp / maxItems / round-trip / 加密 PDF / 页数保留。
+3. **导出 + 命名**：`src/modules/ocr/index.ts` 加 5 个 export + `src/shared/naming.ts` 加 `"auto-toc"` 后缀（`{stem}-auto-toc.pdf`）。
+
+**算法关键设计**：
+
+- **字号归并精度 2pt**（替代 1pt 精度）：OCR 扫描件字号常浮动 0.3-0.7pt，1pt 误切；2pt 容忍噪声。
+- **章节匹配靠正则不靠字号聚类**：中文章节模式（`第X章` 等）自身已能定位标题，字号聚类只用于后续 UI 视觉排序，避免 OCR 错误字号误杀章节。
+- **栈式树构建**：`while (stack[top].level >= heading.level) pop` + `parent = stack[top]` + `push`。覆盖首条非 H1 / 兄弟 / 父级回退 / 跳跃补中间层 / 单条 / 空。
+- **outline Count 折叠**：每层 item 的 `/Count` = 自身 + 所有后代总展开数；PDF 阅读器用此决定 outline 默认展开深度。
+- **越界 pageIndex clamp**：`Math.max(0, Math.min(pages.length-1, pageIndex))`，不抛错，避免单页错误让整段 outline 失败。
+
+**为什么不本版做 OCR 衔接 / UI 二次编辑**：
+
+- **OCR 衔接**（阶段 3）：Rust `extract_ocr_text` 已有页面文本字符串 → 前端解析回 textItem 数组（lossy），最好直接在 Rust 端做 outline 写入。**待阶段 3 评估** Rust 端写 outline vs 前端写。
+- **UI 二次编辑**（阶段 2）：用户要勾选/重命名/删除/新增 — UI 工作量大，独立 session 推进更可控。
+
+**verification**（实操验证）：
+
+- ✅ typecheck：`tsc --noEmit --project config/tsconfig.json` 0 错
+- ✅ lint：`eslint .` 0 warning
+- ✅ vitest：`autoToc.test.ts` 22 通过 / `writePdfOutline.test.ts` 9 通过 = **31/31 通过**（pre-existing `useReaderController` zoom 失败与本 ISS 无关，记录但不修）
+- ✅ round-trip：写入 → 重新加载 → 再写入不报错
+- ⏳ 真实 fixture 验证（5 章 + 10 证据 + 3 附件 ≥ 90% 召回）— 待阶段 2/3 真实 PDF 生成
+
+**open follow-ups**：
+
+- 阶段 2：UI 二次编辑（AutoTocDialog）+ commands.ts 入口 + AppShell 集成
+- 阶段 3：OCR 衔接（Rust 端 vs 前端写 outline 决策）+ Playwright 实操验证
+- 任务卡状态更新：`docs/TASKS.md` ISS-069「阶段 1 已完成（2026-06-17）」
