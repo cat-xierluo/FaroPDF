@@ -16,3 +16,4 @@ export type {
   RotateOrganizerPagesInput,
 } from "./pageOrganizer";
 export { createImagePackPlan, suggestImagePackOutputPath } from "./imagePack";
+export { trimPageMargins, type TrimMarginsOptions } from "./trimMargins";

@@ -795,7 +795,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：扫描预处理 / 页面整理 / 律师场景刚需
-- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，splitPagesByGrid + splitPagesByBreakpoints + 11 测试）；阶段 2 PageOrganizerWorkspace 集成已完成（2026-06-16，SplitPagesDialog + 「扫描拆页」按钮 + handleConfirmSplit，DEC-115）；缩略图拖断点 UI + 裁边切 待启动
+- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，splitPagesByGrid + splitPagesByBreakpoints + 11 测试）；阶段 2 PageOrganizerWorkspace 集成已完成（2026-06-16，SplitPagesDialog + 「扫描拆页」按钮 + handleConfirmSplit，DEC-115）；阶段 2 后续 部分完成（2026-06-17，trimPageMargins 裁边切算法 + 10 测试，commit 即将 ship DEC-130）；缩略图拖断点 UI 待后续（splitPagesByBreakpoints 算法已 ship，UI 拖断点留 v0.3）。
 - 来源：DEC-103 / ROADMAP §5 v0.1 缺口"扫描清洁校正"+ PDF-Guru `cut.go` + `thirdparty/cut.py:15-79`
 - 律师场景：扫描卷宗常见双页合一（A3 扫成 A4 两页粘一起）/ 多面 A4 拼图扫成单页 / 需要按断点切单页为多页
 - 目标：

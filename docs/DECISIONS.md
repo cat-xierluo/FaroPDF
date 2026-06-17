@@ -5296,3 +5296,49 @@ Rust `extract_ocr_text` 输出的 `OcrTextExtractionPage` 只有 `pageIndex + te
 - 任务卡状态行已更新为"阶段 3 已完成"
 - CHANGELOG Unreleased 段待补充 DEC-122 内容（本 session 完成）
 - 不为"可选入口"加 commands.ts 命令（PDF Expert 范式不需要）
+
+## DEC-130 ISS-066 阶段 2 后续：裁边切算法（trimPageMargins）
+
+- 时间：2026-06-17
+- 类型：PM 单 session TDD / 新功能
+- 关联：ISS-066 / DEC-115
+
+**为什么只做算法不做 UI 集成**：
+
+ISS-066 阶段 2 后续原话："缩略图拖断点 UI + 裁边切 待启动"。本 commit 推进"裁边切"算法部分（trimPageMargins）；"缩略图拖断点 UI"留后续（splitPagesByBreakpoints 算法已 ship，UI 拖断点是大工作量独立 session）。
+
+**算法设计**：
+
+- 用户传入 4 个 margin（top/right/bottom/left in pt） + 可选 pageIndexes
+- pdf-lib `page.setCropBox(x, y, width, height)` + `page.setMediaBox(...)` 同步
+- 同时改 MediaBox 让某些 reader（如 Chrome PDF viewer）显示正确（DEC-108 已知 pdf-lib MediaBox force override 问题在此场景不影响 — setMediaBox 是显式设置，不被 override）
+- **不做 auto-detect 白边**（需要 pixel 级别扫描，超出 PM 单 session TDD 范围）— 用户传入明确 margin 值是 v0.2 实用版本，auto-detect 留 v0.3
+
+**为什么不接 PageOrganizerWorkspace UI**：
+
+- PageOrganizerWorkspace 已有「扫描拆页」按钮（DEC-115）+ 撤销 / 重排 / 旋转 / 删除
+- 加「裁边切」按钮需要在 PageOrganizerWorkspace 加 dialog + 4 input + pageIndexes 勾选
+- 工作量：dialog（参考 PropertiesDialog / SplitPagesDialog）+ integration test
+- 本 commit 先 ship 算法（10 测试覆盖），UI 集成留 ISS-066 阶段 2 后续第三波
+- 用户路径：v0.2 通过 `pdfOperationEngine` + `trimPageMargins` 直接调用（编程接口），不阻塞法律工程师场景
+
+**verification**（实操验证）：
+
+- ✅ typecheck：0 错
+- ✅ lint：0 warning
+- ✅ vitest：**10/10 通过**（trimMargins 4 边 / pageIndexes 限定 / 越界 / 负数 / NaN / identity 0 margin / round-trip / CropBox 存在）
+- ⚠️ pre-existing `useReaderController` zoom 失败（与本 ISS 无关）
+
+**ISS-066 阶段 1+2 累计**：
+
+- 阶段 1（DEC-110）：splitPagesByGrid + splitPagesByBreakpoints + 11 测试
+- 阶段 2 集成（DEC-115）：SplitPagesDialog + PageOrganizerWorkspace「扫描拆页」按钮
+- 阶段 2 后续（本 commit）：trimPageMargins 裁边切算法 + 10 测试
+- **总计 21 测试 / 3 commit**
+
+**open follow-ups**：
+
+- 缩略图拖断点 UI（splitPagesByBreakpoints 算法已就绪，UI 大工作量）
+- 裁边切 UI 集成到 PageOrganizerWorkspace（dialog + 4 margin input + pageIndexes 勾选）
+- auto-detect 白边（pixel 扫描，留 v0.3）
+- 任务卡状态行更新
