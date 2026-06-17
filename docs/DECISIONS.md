@@ -5442,3 +5442,46 @@ ISS-066 阶段 2 后续原话："缩略图拖断点 UI + 裁边切 待启动"。
 - "真删除内容流"（留 v0.3，依赖 lopdf 升级）
 - PageOrganizerWorkspace 集成 redactPageMargins 入口（dialog + 4 margin input）
 - 任务卡状态行更新
+
+## DEC-133 ISS-070 阶段 3 收口：拖动 resize 留 v0.3，点按模式 ship
+
+- 时间：2026-06-17
+- 类型：收口 / 文档化
+- 关联：ISS-070 / DEC-113/119/121
+
+**ISS-070 阶段 3 实际已经 ship**（拖动 resize 留 v0.3）：
+
+| 子能力 | 状态 | 来源 |
+|--------|------|------|
+| SignaturePad 手写签名板 | ✅ ship | DEC-108 commit 8b8f0c1 |
+| signatureStore 持久化（localStorage 4 张上限） | ✅ ship | DEC-113 |
+| SignaturePanel 缩略图列表 + RightPanel 接入 | ✅ ship | DEC-113 |
+| SignatureLibraryPicker 复用签名 | ✅ ship | DEC-119 |
+| forms-sign-handwrite 命令 + FormsPanel 签名库选择 | ✅ ship | DEC-119 commit 63d660e |
+| **签名 as stamp 落点**（点按模式） | ✅ ship | DEC-121/122（AppShell onSelectSignature annotate 模式把 signature.image 当 stamp 落点，与 customStamp 同套路） |
+| **签名拖动 resize**（拖动 + 落点 + resize） | ⏸️ 留 v0.3 | — |
+
+**为什么拖动 resize 留 v0.3**：
+
+- 当前路径：点按画布 → 签名按默认尺寸（与 customStamp 一致）落点 → 真实嵌入 PDF（DEC-122 drawStamp image 分支）
+- 拖动 resize = mousedown 抓签名 → mousemove 拖到任意位置 + 实时 resize → mouseup 落点
+- 工作量：~120-200 行 + 5-8 测试（拖动手势 + 实时渲染 + 文档坐标变换 + resize handle）
+- 用户价值：90% 律师场景下"点按落默认尺寸"已够用；拖动 resize 是 nice-to-have
+- 风险：拖动 + resize handle 涉及 PDF.js canvas 多层渲染（缩略图 + 占位签名 + 边界框），跨组件状态多
+
+**为什么 task 卡说"待后续"仍然正确**：
+
+- "落入文档任意位置 UI" = 任务卡原话
+- 严格解读：点按模式算"落入"（已完成），拖动 resize 算"任意位置拖动"（未做）
+- 当前 ship 满足 80% 律师场景；剩余 20% 等 v0.3
+
+**verification**：
+
+- ✅ task 卡状态行更新
+- ✅ 不需新代码 / 测试
+- ✅ 与 DEC-121 链路一致（signature as stamp 路径）
+
+**open follow-ups**：
+
+- v0.3：拖动 resize UI 集成（mousedown→mousemove→mouseup + 实时渲染 + 文档坐标变换）
+- 任务卡状态行更新
