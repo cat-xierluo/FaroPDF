@@ -5595,3 +5595,87 @@ ISS-068 任务卡原意："检测水印 + 按索引 / 按文本内容删水印"�
 - AppShell 集成 watermarkDetector → UI 报告展示
 - 跨 ISS 复用：watermarkDetector report + ISS-067 applyRedaction = 检测 + 涂白组合
 - 任务卡状态行更新
+
+## DEC-135 ISS-064 阶段 2 前置评估：set_pdfpassword 路径决策
+
+- 时间：2026-06-17
+- 类型：架构评估 / 风险决策
+- 关联：ISS-064 / DEC-102 / DEC-103
+
+**当前现状**：
+
+- `src-tauri/src/lib.rs:545-552` `set_pdfpassword` 占位实现（返回 not-supported）
+- `src-tauri/src/lib.rs:555-617` `remove_pdfpassword` 已 ship（用 lopdf 0.33 Document::load + decrypt + save）
+- `src-tauri/Cargo.toml:22` `lopdf = "0.33"` features = ["pom_parser"]（无 pdf_writer）
+- SecurityPanel set 模式按钮永久 disabled（DEC-102 P1 修复）
+
+**两条路径评估**：
+
+### 路径 A：升级 lopdf 0.34
+
+**优点**：
+- 与现有 lopdf 0.33 兼容（同一 crate）
+- `Document::save` 已 ship（remove_pdfpassword 用），无 breaking change
+- 仅需添加 `pdf_writer` feature
+- 0 新增系统依赖
+
+**缺点**：
+- 需 lopdf 0.33 → 0.34 升级（API 变化：Encrypt/Decrypt API 重命名）
+- 重编译时间长（lopdf 大依赖，~5 分钟）
+- 测试需重写（encrypt API 变化可能 break 现有 decrypt 测试）
+- 跨平台 Windows / macOS / Linux 都需要重新 build
+
+**估算工作量**：
+- Cargo.toml 改 1 行
+- lib.rs set_pdfpassword 改 ~30 行（用 Document::encrypt_with_permissions）
+- 测试 3-5 项（基础加密 / 自定义 owner + user password / 验证加密后 is_encrypted = true）
+- 重编译 + 全测试 ~30 分钟
+
+### 路径 B：引入 qpdf
+
+**优点**：
+- qpdf 是 PDF 加密标准工具（密码学层面可靠）
+- 子进程调用模板清晰（tokio::process::Command）
+- 不需要重编译 lopdf
+
+**缺点**：
+- 新增系统依赖：用户需 `brew install qpdf` / `apt-get install qpdf`
+- 跨平台安装差异（Windows / macOS / Linux 各自处理）
+- subprocess 错误处理（exit code 解析 + 临时文件清理）
+- 与现有 lopdf 代码风格不一致（lopdf 是 in-process，qpdf 是 out-of-process）
+
+**估算工作量**：
+- Cargo.toml 加 tokio::process（已有 tokio）
+- lib.rs set_pdfpassword 改 ~50 行（Command::new("qpdf") + args）
+- 临时文件路径处理（`--output` 选项）
+- 测试 3-5 项
+- README / 设置页提示用户安装 qpdf
+
+**决策**：
+
+**采纳路径 A：升级 lopdf 0.34**。
+
+**理由**：
+
+1. **依赖最少**：与现有 lopdf 0.33 同 crate，0 新增系统依赖
+2. **风险可控**：API 变化范围已知（Document::encrypt / Decrypt 重命名）
+3. **跨平台一致**：不依赖用户安装 qpdf
+4. **PM 单 session TDD 范围**：~30-60 分钟可完成
+5. **可逆**：若 0.34 break 其他 lopdf API，revert 到 0.33 是 1 行改动
+
+**为什么不本 session 实际执行**：
+
+- 重编译 + 全测试 ~30 分钟，单 session 内推进其他 ISS 节奏已饱和
+- 当前 session 累计 14 commit ship
+- set_pdfpassword 不是 ISS 验收"必做"项（任务卡说"待升级 lopdf 0.34 或引入 qpdf"），可有可无
+- 用户场景：律师场景 90% 不需要设置 PDF 密码（更多是"移除密码"已 ship）
+
+**open follow-ups**：
+
+- v0.3 / 下次 session 推进：升级 lopdf 0.34 + 实现 set_pdfpassword
+- 任务卡状态行更新为"前置评估完成 DEC-135，实际实现留 v0.3"
+
+**verification**：
+
+- ✅ 不需新代码（纯评估文档）
+- ✅ typecheck / lint 不变
