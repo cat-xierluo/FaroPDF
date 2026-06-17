@@ -5,3 +5,13 @@
  */
 
 export { applyRedaction, type RedactionRegion } from "./redactionEngine";
+export { redactPageMargins, type RedactPageMarginsOptions } from "./redactPageMargins";
+export {
+  detectWatermarks,
+  formatWatermarkReport,
+  DEFAULT_WATERMARK_KEYWORDS,
+  type DetectWatermarksOptions,
+  type TextWatermarkHit,
+  type WatermarkCandidate,
+  type WatermarkReport,
+} from "./watermarkDetector";
