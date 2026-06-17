@@ -5747,3 +5747,64 @@ lopdf 0.33 默认 `XrefType::CrossReferenceStream`，save→load 往返触发 "I
 - 阶段 2 UI（DEC-116）：PropertiesDialog + commands.ts document-properties + 9 测试
 - 阶段 2 后续（本 commit）：set_pdf_producer Rust command + 5 测试
 - **总计 24 测试 / 3 commit**
+
+## DEC-137 ISS-072 阶段 2 后续 阶段 3：前端 PropertiesDialog 接 set_pdf_producer
+
+- 时间：2026-06-17
+- 类型：PM 单 session TDD / 前端集成
+- 关联：ISS-072 / DEC-109 / DEC-116 / DEC-136
+
+**背景**：
+
+DEC-136 把 `set_pdf_producer` Rust command 落定（lopdf 直接编辑 InfoDict.Producer，绕过 pdf-lib save() force override），并明确把"前端 AppShell 集成"留作 open follow-up，工作量 ~40 行 + 3 测试。本 commit 收口前端侧。
+
+**实现**：
+
+`src/modules/document/ui/PropertiesDialog.tsx`：
+
+- 新增 props：`inputFilePath: string | null` / `onProducerOverride?: (producer: string) => void | Promise<void>` / `producerOverrideInFlight?: boolean` / `producerOverrideMessage?: { type: "success" | "error"; text: string } | null`
+- 只读 fieldset 内 Producer 输入框下方新增按钮：「用 FaroPDF 真覆盖 Producer (Rust 后端)」
+- 按钮渲染条件：`canUseRustProducerOverride = inputFilePath !== null && typeof onProducerOverride === "function"`
+- in-flight 状态切换按钮文案 + disabled
+- success / error 反馈行分别用 `role="status"` / `role="alert"` 区分
+
+`src/components/layout/AppShell.tsx`：
+
+- `handleProducerOverride` 接 `document.path` → `invoke<{ path, producer, size_bytes }>("set_pdf_producer", { request: { input_path, producer } })` → 反馈回填到 dialog state
+- 错误用 dialog 顶部 alert + 命令反馈双通道（与 SecurityPanel handleRemovePassword 同模式，DEC-102）
+- `producerOverrideInFlight` state 在 invoke 前后切换
+- browser 拖拽场景（`document.path === ""`）Rust 后端无 input_path → 直接显示"真覆盖 Producer 需要通过 macOS 文件对话框打开的 PDF"错误，不发无效 IPC
+
+**为什么不把 writePdfMetadata + Rust 合成一个按钮**：
+
+- pdf-lib 写回生成 `*-metadata.pdf` 到下载文件夹（saveUpdatedBytes 走浏览器 `<a download>`）
+- Rust 写回生成 `*-metadata.pdf` 到源 PDF 同目录（与 remove_pdfpassword 同模式）
+- 两路径输出位置不同，合成会让用户困惑
+- 拆成两个独立动作更清晰：标准流改 Title/Author/...；Rust 改 Producer（隐私诉求）
+- 用户可在同一 dialog 内组合：先点「保存元数据」下载副本，再点「真覆盖 Producer」改源文件
+
+**为什么不把 dialog 的 confirm 按钮也联动 Rust 路径**：
+
+- Rust 路径的输出在源目录，pdf-lib 路径的输出在下载目录，UI 反馈路径不同
+- 联动需要"先 pdf-lib 写回 → 写临时文件到源目录 → 调 Rust → 下载最终副本"4 步链，复杂度爆炸
+- 拆成两个独立按钮更符合 v0.2 「拆分独立动作，不做流程串联」的简化原则
+
+**verification**（实操验证）：
+
+- ✅ `npm run typecheck` 0 error
+- ✅ `npm run lint` 0 warning
+- ✅ `npm test` **1198/1199 通过**（+6 新 PropertiesDialog 测试；唯一失败 `useReaderController zoomIn/zoomOut` 是 pre-existing，DEC-099 已知）
+- ✅ `cd src-tauri && cargo test --lib set_pdf_producer` **5/5 通过**（与 DEC-136 5 个测试无回归）
+
+**ISS-072 累计**：
+
+- 阶段 1（DEC-109）：readPdfMetadata + writePdfMetadata + 10 测试
+- 阶段 2 UI（DEC-116）：PropertiesDialog + commands.ts document-properties + 9 测试
+- 阶段 2 后续 Rust（DEC-136）：set_pdf_producer Tauri command + 5 测试
+- 阶段 2 后续 阶段 3（本 commit）：前端集成 + 6 UI 测试
+- **总计 30 测试 / 4 commit**
+
+**open follow-ups**：
+
+- v0.2 候选：pdf-lib 升级或 qpdf 引入后（DEC-135），同样用 Rust 后端模式实现 `set_pdfpassword` 真实加密（SecurityPanel 已 disabled 占位等 v0.2 激活）
+- v0.2 候选：PropertiesDialog 真覆盖 Producer 后自动 reload 文件，让用户看到更新后的 metadata（当前只显示反馈行）

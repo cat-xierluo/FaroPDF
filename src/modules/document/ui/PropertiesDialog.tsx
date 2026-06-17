@@ -2,15 +2,38 @@ import { useState, type ChangeEvent, type ReactElement } from "react";
 import { suggestOutputName } from "../../../shared/naming";
 import type { PdfMetadata } from "../properties";
 
+export interface ProducerOverrideMessage {
+  type: "success" | "error";
+  text: string;
+}
+
 export interface PropertiesDialogProps {
   metadata: PdfMetadata;
   defaultFileName: string;
+  /**
+   * 当前 PDF 在磁盘上的完整路径。Rust 后端 `set_pdf_producer` 需要此字段。
+   * 浏览器拖拽打开（无 path）时为 null，Producer 真覆盖按钮自动禁用。
+   * Ref: ISS-072 阶段 2 后续 / DEC-136
+   */
+  inputFilePath: string | null;
   onClose: () => void;
   onConfirm: (options: {
     updates: Partial<PdfMetadata>;
     outputName: string;
   }) => void;
+  /**
+   * 调用 Rust 后端 `set_pdf_producer` 真覆盖 Producer 字段。
+   * 当 `inputFilePath === null` 或未传此回调时，UI 不显示对应按钮。
+   * Ref: DEC-109 Producer pdf-lib 限制 / DEC-136 lopdf InfoDict 真覆盖
+   */
+  onProducerOverride?: (producer: string) => void | Promise<void>;
+  /** Rust 调用进行中；用于禁用按钮与反馈状态展示。 */
+  producerOverrideInFlight?: boolean;
+  /** 上一次 Producer 真覆盖的反馈；展示在按钮下方直至用户关闭对话框。 */
+  producerOverrideMessage?: ProducerOverrideMessage | null;
 }
+
+const DEFAULT_PRODUCER_NAME = "FaroPDF";
 
 function keywordsToString(keywords: string[] | undefined): string {
   return keywords ? keywords.join(", ") : "";
@@ -24,7 +47,16 @@ function parseKeywordsInput(value: string): string[] {
 }
 
 export function PropertiesDialog(props: PropertiesDialogProps): ReactElement {
-  const { metadata, defaultFileName, onClose, onConfirm } = props;
+  const {
+    metadata,
+    defaultFileName,
+    inputFilePath,
+    onClose,
+    onConfirm,
+    onProducerOverride,
+    producerOverrideInFlight = false,
+    producerOverrideMessage = null,
+  } = props;
   const [title, setTitle] = useState(metadata.title ?? "");
   const [author, setAuthor] = useState(metadata.author ?? "");
   const [subject, setSubject] = useState(metadata.subject ?? "");
@@ -32,6 +64,8 @@ export function PropertiesDialog(props: PropertiesDialogProps): ReactElement {
   const [creationDate, setCreationDate] = useState(metadata.creationDate ?? "");
   const [outputName, setOutputName] = useState(() => suggestOutputName(defaultFileName, "metadata"));
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const canUseRustProducerOverride = inputFilePath !== null && typeof onProducerOverride === "function";
 
   const handleConfirm = (): void => {
     setLocalError(null);
@@ -48,6 +82,13 @@ export function PropertiesDialog(props: PropertiesDialogProps): ReactElement {
       creationDate,
     };
     onConfirm({ updates, outputName: trimmed });
+  };
+
+  const handleProducerOverride = (): void => {
+    if (!canUseRustProducerOverride || !onProducerOverride || !inputFilePath) {
+      return;
+    }
+    void onProducerOverride(DEFAULT_PRODUCER_NAME);
   };
 
   return (
@@ -114,6 +155,27 @@ export function PropertiesDialog(props: PropertiesDialogProps): ReactElement {
               disabled
             />
           </div>
+          {canUseRustProducerOverride ? (
+            <div className="dialog-card__field dialog-card__field--inline">
+              <button
+                type="button"
+                className="context-tool"
+                onClick={handleProducerOverride}
+                disabled={producerOverrideInFlight}
+                data-testid="props-producer-override"
+              >
+                {producerOverrideInFlight ? "正在真覆盖..." : `用 ${DEFAULT_PRODUCER_NAME} 真覆盖 Producer (Rust 后端)`}
+              </button>
+            </div>
+          ) : null}
+          {producerOverrideMessage ? (
+            <p
+              className={producerOverrideMessage.type === "error" ? "dialog-card__error" : "dialog-card__readonly-tag"}
+              role={producerOverrideMessage.type === "error" ? "alert" : "status"}
+            >
+              {producerOverrideMessage.text}
+            </p>
+          ) : null}
           <div className="dialog-card__field">
             <label htmlFor="props-creator">创建者</label>
             <input

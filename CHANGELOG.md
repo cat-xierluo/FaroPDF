@@ -149,6 +149,14 @@ UI 信息架构：
 - **测试覆盖**：新增 `SecurityPanel.test.tsx` 7 个测试（vi.mock @tauri-apps/api/core 覆盖 invoke 边界）+ `RightPanel.test.tsx` 2 个边界（read+stamps / pages+ocr-queue 强折叠）。
 - **polish**：CSS 命名 BEM 一致（`security_panel*` → `security-panel*`）；`RightPanel` 删除让用户困惑的 v0.1 skeleton placeholder 文案。
 
+文档属性 Producer 真覆盖（ISS-072 阶段 2 后续 阶段 3，DEC-137）：
+
+- `PropertiesDialog` 只读 fieldset 内新增「用 FaroPDF 真覆盖 Producer (Rust 后端)」按钮 + 成功 / 错误反馈行；`inputFilePath` 缺失（浏览器拖拽场景）或未传 `onProducerOverride` 回调时按钮不渲染。
+- `AppShell.handleProducerOverride` 接 `document.path` → `invoke('set_pdf_producer', { request: { input_path, producer } })` → 反馈回填到 dialog；in-flight 时按钮禁用 + 文案切「正在真覆盖...」；错误用 dialog 顶部 alert role + 命令反馈双通道。
+- 复用 DEC-136 Rust 端 `set_pdf_producer`（lopdf InfoDict 真覆盖）+ DEC-102 P0-3 输出副本碰撞保护 + DEC-109 pdf-lib Producer 限制绕道。
+- **6 项 UI 测试**（`PropertiesDialog.test.tsx`）：inputFilePath 缺失隐藏按钮 / 有路径 + 回调渲染按钮并 fire 回调 / producerOverrideInFlight 禁用 / 错误 alert / 成功 status / 无回调隐藏按钮。
+- ISS-072 累计 30 测试 / 4 commit（阶段 1 DEC-109 10 + 阶段 2 DEC-116 9 + 阶段 2 后续 Rust DEC-136 5 + 阶段 2 后续 阶段 3 本 commit 6）；前端 AppShell 集成收口。
+
 ---
 
 ## 0.1.2 - 2026-06-14

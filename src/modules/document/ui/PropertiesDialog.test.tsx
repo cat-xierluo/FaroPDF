@@ -20,6 +20,7 @@ describe("PropertiesDialog (ISS-072 阶段 2)", () => {
   const baseProps = {
     metadata: SAMPLE_METADATA,
     defaultFileName: "contract.pdf",
+    inputFilePath: "/case/contract.pdf",
     onClose: vi.fn(),
     onConfirm: vi.fn(),
   };
@@ -94,5 +95,97 @@ describe("PropertiesDialog (ISS-072 阶段 2)", () => {
       />,
     );
     expect((screen.getByLabelText(/创建日期/) as HTMLInputElement).value).toBe("");
+  });
+});
+
+describe("PropertiesDialog Producer 真覆盖 (ISS-072 阶段 2 后续 / DEC-136)", () => {
+  const baseProps = {
+    metadata: SAMPLE_METADATA,
+    defaultFileName: "contract.pdf",
+    onClose: vi.fn(),
+    onConfirm: vi.fn(),
+  };
+
+  test("inputFilePath 缺失 → 不显示真覆盖按钮（浏览器拖拽场景）", () => {
+    const onProducerOverride = vi.fn();
+    render(
+      <PropertiesDialog
+        {...baseProps}
+        inputFilePath={null}
+        onProducerOverride={onProducerOverride}
+      />,
+    );
+    expect(screen.queryByTestId("props-producer-override")).toBeNull();
+    expect(onProducerOverride).not.toHaveBeenCalled();
+  });
+
+  test("inputFilePath 有值 + 提供回调 → 显示按钮，点击调用回调并传入 FaroPDF", () => {
+    const onProducerOverride = vi.fn();
+    render(
+      <PropertiesDialog
+        {...baseProps}
+        inputFilePath="/case/contract.pdf"
+        onProducerOverride={onProducerOverride}
+      />,
+    );
+    const button = screen.getByTestId("props-producer-override");
+    expect(button.textContent).toContain("用 FaroPDF 真覆盖 Producer");
+    fireEvent.click(button);
+    expect(onProducerOverride).toHaveBeenCalledTimes(1);
+    expect(onProducerOverride).toHaveBeenCalledWith("FaroPDF");
+  });
+
+  test("producerOverrideInFlight=true → 按钮文本切换为「正在真覆盖...」并禁用", () => {
+    const onProducerOverride = vi.fn();
+    render(
+      <PropertiesDialog
+        {...baseProps}
+        inputFilePath="/case/contract.pdf"
+        onProducerOverride={onProducerOverride}
+        producerOverrideInFlight
+      />,
+    );
+    const button = screen.getByTestId("props-producer-override") as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.textContent).toContain("正在真覆盖");
+  });
+
+  test("producerOverrideMessage=error → 显示红色 alert 文本", () => {
+    render(
+      <PropertiesDialog
+        {...baseProps}
+        inputFilePath="/case/contract.pdf"
+        onProducerOverride={vi.fn()}
+        producerOverrideMessage={{ type: "error", text: "文件不存在: contract.pdf" }}
+      />,
+    );
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("文件不存在");
+  });
+
+  test("producerOverrideMessage=success → 显示 status 文本", () => {
+    render(
+      <PropertiesDialog
+        {...baseProps}
+        inputFilePath="/case/contract.pdf"
+        onProducerOverride={vi.fn()}
+        producerOverrideMessage={{
+          type: "success",
+          text: "已真覆盖 Producer 为「FaroPDF」，另存为 /case/contract-metadata.pdf。",
+        }}
+      />,
+    );
+    const status = screen.getByRole("status");
+    expect(status.textContent).toContain("已真覆盖");
+  });
+
+  test("未提供 onProducerOverride 回调 + inputFilePath 有值 → 不显示按钮", () => {
+    render(
+      <PropertiesDialog
+        {...baseProps}
+        inputFilePath="/case/contract.pdf"
+      />,
+    );
+    expect(screen.queryByTestId("props-producer-override")).toBeNull();
   });
 });

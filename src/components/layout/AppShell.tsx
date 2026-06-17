@@ -179,6 +179,10 @@ export function AppShell({
   // ISS-072 阶段 2：文档属性对话框 state
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [propertiesMetadata, setPropertiesMetadata] = useState<PdfMetadata | null>(null);
+  // ISS-072 阶段 2 后续 / DEC-136：Rust 后端 Producer 真覆盖 UI 状态
+  const [producerOverrideInFlight, setProducerOverrideInFlight] = useState(false);
+  const [producerOverrideMessage, setProducerOverrideMessage] =
+    useState<import("../../modules/document/ui/PropertiesDialog").ProducerOverrideMessage | null>(null);
   // ISS-061 阶段 2：真接选区——usePdfTextSelection 监听 workspace__main 内的文本选择。
   // P1-3 修复：toolbarHidden 在每次 selectionBounds 变化时无条件重置（不是只在 null 时），
   // 让用户主动关掉 toolbar 后，下次重新选区可以再次浮出。
@@ -392,6 +396,46 @@ export function AppShell({
       }
     },
     [document, reader],
+  );
+
+  // ISS-072 阶段 2 后续 / DEC-136：调 Rust `set_pdf_producer` 真覆盖 Producer 字段。
+  // 写一份 `<stem>-metadata.pdf` 到源 PDF 同目录（与 remove_pdfpassword 同模式，DEC-102 P0-3
+  // 拒绝静默覆盖）。Producer = "FaroPDF" 覆盖后通过 lopdf 直接编辑 InfoDict 持久化，
+  // 绕开 pdf-lib `save()` 的 force override（DEC-109 已知限制）。
+  const handleProducerOverride = useCallback(
+    async (producer: string): Promise<void> => {
+      if (!document) {
+        setProducerOverrideMessage({ type: "error", text: "请先打开 PDF 文档。" });
+        return;
+      }
+      const inputPath = document.path;
+      if (!inputPath) {
+        // 浏览器拖拽打开的 PDF 没有真实磁盘路径，Rust 后端无法定位文件。
+        setProducerOverrideMessage({
+          type: "error",
+          text: "真覆盖 Producer 需要通过 macOS 文件对话框打开的 PDF（拖拽打开的 PDF 没有磁盘路径）。",
+        });
+        return;
+      }
+      setProducerOverrideInFlight(true);
+      setProducerOverrideMessage(null);
+      try {
+        const result = await invoke<{ path: string; producer: string; size_bytes: number }>(
+          "set_pdf_producer",
+          { request: { input_path: inputPath, producer } },
+        );
+        setProducerOverrideMessage({
+          type: "success",
+          text: `已真覆盖 Producer 为「${result.producer}」，另存为 ${result.path}。`,
+        });
+      } catch (error) {
+        const message = typeof error === "string" ? error : (error as Error).message;
+        setProducerOverrideMessage({ type: "error", text: message });
+      } finally {
+        setProducerOverrideInFlight(false);
+      }
+    },
+    [document],
   );
 
   // ISS-069 阶段 2：自动生成目录状态
@@ -757,10 +801,16 @@ export function AppShell({
         <PropertiesDialog
           metadata={propertiesMetadata}
           defaultFileName={reader.getCurrentFileName() ?? document.name}
+          inputFilePath={document.path || null}
           onClose={() => setPropertiesOpen(false)}
           onConfirm={(opts) => {
             void handleApplyProperties(opts);
           }}
+          onProducerOverride={(producer) => {
+            void handleProducerOverride(producer);
+          }}
+          producerOverrideInFlight={producerOverrideInFlight}
+          producerOverrideMessage={producerOverrideMessage}
         />
       ) : null}
       {autoTocOpen ? (
