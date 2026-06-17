@@ -1,6 +1,15 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~119。
+> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~125。
+
+OCR 后自动生成目录（ISS-069 阶段 1，DEC-125）：
+
+- 新增 `src/modules/ocr/autoToc.ts`：4 个纯函数 `extractTextItems`（PDF.js textContent 标准化）/ `clusterBySizeAndFont`（2pt 精度归并）/ `detectChapterHeadings`（10 个中文章节正则：第X章/节/条/款/项/编 + 阿拉伯 X.Y + 证据X + 附件X + 中文括号）/ `buildOutlineTree`（栈式树构建）+ 便捷入口 `buildOutlineTreeFromPages`。
+- 新增 `src/modules/ocr/writePdfOutline.ts`：pdf-lib 1.17.1 无公开 addOutline API，按 PDF 1.7 spec §12.3.3 直接用 `PDFDict` / `PDFRef` / `PDFName` / `PDFArray` / `PDFNumber` / `PDFString` 构造 outline 树（Catalog.Outlines → root → items 链式 First/Last/Count 收尾）。
+- `src/shared/naming.ts` 加 `"auto-toc"` OutputSuffix（输出 `{stem}-auto-toc.pdf`）。
+- `src/modules/ocr/index.ts` 导出 5 个类型 + 4 个函数 + writePdfOutline。
+- **31 项单元测试**：`autoToc.test.ts` 22（正则 / 聚类 / 树构建 5 边界）/ `writePdfOutline.test.ts` 9（空树 / 单层 / 多层 / 越界 / 负数 / maxItems / round-trip / 加密 PDF / 页数保留）。
+- 阶段 2 UI 二次编辑（AutoTocDialog）待启动；阶段 3 OCR 衔接 + Playwright 实操验证待启动。
 
 涂黑矩形遮蔽（ISS-067 阶段 2，DEC-114）：
 

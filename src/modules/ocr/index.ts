@@ -40,3 +40,20 @@ export type {
 
 export { createOcrQualityCheckService } from "./quality/qualityCheckService";
 export type { OcrQualityCheckService } from "./quality/qualityCheckService";
+
+// ISS-069 阶段 1：OCR 后自动生成目录（纯函数 + pdf-lib 写 outline）
+export {
+  buildOutlineTree,
+  buildOutlineTreeFromPages,
+  clusterBySizeAndFont,
+  detectChapterHeadings,
+  extractTextItems,
+  type ChapterHeading,
+  type ChapterHeadingNode,
+  type ExtractTextItemsOptions,
+  type PdfJsTextContentLike,
+  type TextItemCluster,
+  type TextItemFeature,
+} from "./autoToc";
+
+export { writePdfOutline, type WriteOutlineOptions } from "./writePdfOutline";
