@@ -820,7 +820,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：**P0**
 - 类型：导出 / 律师证据遮蔽 / 律师场景刚需
-- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，applyRedaction 算法 + 10 测试）；阶段 2 RedactionOverlay 拖矩形 UI + commands.ts redact-region 入口 + AppShell 集成已完成（2026-06-16，DEC-114）；去页眉页脚 + 多矩形拖拽（已支持多矩形，批量应用）的 UI 细化 待启动
+- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，applyRedaction 算法 + 10 测试）；阶段 2 RedactionOverlay 拖矩形 UI + commands.ts redact-region 入口 + AppShell 集成已完成（2026-06-16，DEC-114）；阶段 2 后续 部分完成（2026-06-17，redactPageMargins 去页眉页脚算法 + 9 测试，DEC-132 即将 ship）；多矩形拖拽 UI 细化 待启动
 - 来源：DEC-103 / PDF-Guru `mask.go` + `thirdparty/mask.py:18-60` + `header_and_footer.go:60-83`
 - 律师场景：
   - **证据遮蔽**：身份证号 / 隐私电话 / 商业秘密在出具材料时必须涂黑，是律师工作高频操作
