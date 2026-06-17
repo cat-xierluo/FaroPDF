@@ -229,10 +229,10 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
             <section aria-label="设置密码表单" className="security-panel__form">
               <p className="security-panel__hint">
                 为当前 PDF 副本重加密（lopdf 0.41 + AES-128），输出 <code>&lt;原名&gt;-secured.pdf</code>。
-                拥有者密码必填；用户密码可空（允许空密码打开但不能修改）。
+                拥有者密码必填；用户密码可空（留空则副本打开时不需要密码，但仍受 owner 权限限制）。
               </p>
               <label className="security-panel__input-row" htmlFor={userPwdId}>
-                <span>用户密码（留空 = 沿用旧用户密码，仅设置 owner）</span>
+                <span>用户密码（留空 = 无需密码即可打开副本）</span>
                 <input
                   autoComplete="new-password"
                   data-1p-ignore=""

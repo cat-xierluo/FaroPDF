@@ -107,6 +107,19 @@ describe("SecurityPanel (ISS-064 阶段 1 + DEC-102 P1-4)", () => {
     expect(ownerInput).toHaveAttribute("autocomplete", "new-password");
   });
 
+  test("set 模式用户密码文案不暗示可沿用旧密码", () => {
+    render(
+      <SecurityPanel
+        currentPdfPath="/tmp/sample.pdf"
+        onClose={() => undefined}
+        onFeedback={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("用户密码（留空 = 无需密码即可打开副本）")).toBeInTheDocument();
+    expect(screen.queryByText(/沿用旧用户密码/)).toBeNull();
+  });
+
   test("remove 模式输入框启用了 current-password autoComplete（P2-5）", () => {
     render(
       <SecurityPanel
