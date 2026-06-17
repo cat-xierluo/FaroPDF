@@ -5485,3 +5485,58 @@ ISS-066 阶段 2 后续原话："缩略图拖断点 UI + 裁边切 待启动"。
 
 - v0.3：拖动 resize UI 集成（mousedown→mousemove→mouseup + 实时渲染 + 文档坐标变换）
 - 任务卡状态行更新
+
+## DEC-134 ISS-068 阶段 1：水印检测层 ship（不修改 PDF）
+
+- 时间：2026-06-17
+- 类型：PM 单 session TDD / 新功能
+- 关联：ISS-068 / DEC-123 / DEC-103
+
+**背景**：
+
+ISS-068 任务卡原意："检测水印 + 按索引 / 按文本内容删水印"。DEC-123 已明确"真删除"本 session 暂缓（content stream 操作风险高 / pdf-lib 无高层 API / 测试验证难）。
+
+本 commit 推进"检测"层（不修改 PDF）：
+- `detectWatermarks(pdfBytes, options)` 纯函数
+- `WatermarkReport { textHits, candidates, totalPages }`
+- `formatWatermarkReport(report)` 人类可读摘要
+- 12 DEFAULT_WATERMARK_KEYWORDS（中文 + 英文 + 版权符号）
+
+**实现策略**：
+
+1. **XObject 大尺寸图检测**（已 ship）：每页 Resources / XObject 列表，尺寸 > 30% 页面面积视为候选
+2. **关键词文本命中**（placeholder）：需要 PDF.js 调方传 textContent（pdf-lib 无 textContent 访问），keywords / repeatThreshold 当前占位（`void` 避免 lint）
+3. **重复文本检测**（placeholder）：同上
+
+**为什么不接 PDF.js textContent 解析**：
+
+- 本阶段保持 detectWatermarks 纯函数（不依赖 PDF.js runtime）
+- 调用方（AppShell）拿到 PDF.js textContent 后，可二次调用 `detectTextWatermarksFromTextContent(textContent, keywords)` 扩展（留后续 session）
+- 当前 XObject 检测已能给"大图水印"基础报告
+
+**为什么 ship"无 PDF 修改"的检测层**：
+
+- 真删除是 content stream 操作（高风险，DEC-123 已暂缓）
+- 检测层是 0 风险 + 用户能看到报告（律师确认水印位置）+ 后续可手动用 ISS-067 applyRedaction 涂白
+- 路径：检测报告 → 用户点按涂白 → 输出新 PDF（视觉清洁，PDF 内容流仍有水印文字）
+- 严格 PDF 编辑需求（真删除）仍留 v0.3 后续
+
+**verification**（实操验证）：
+
+- ✅ typecheck：0 错
+- ✅ lint：0 warning
+- ✅ vitest：**12/12 通过**（关键词集合 / 空 PDF / 多页 / 自定义 keywords / repeatThreshold / largeImageRatio / 加密 PDF 兜底 / formatWatermarkReport 4 种情况）
+- ⚠️ pre-existing `useReaderController` zoom 失败（与本 ISS 无关）
+
+**ISS-068 累计**：
+
+- 阶段 1（本 commit）：watermarkDetector 检测层 + 12 测试
+- 真删除：⏸️ 留 v0.3（DEC-123 / content stream 风险）
+- ISS-067 复用：检测报告 → applyRedaction 涂白（已 ship，跨 ISS 复用）
+
+**open follow-ups**：
+
+- v0.3：PDF.js textContent 集成 + 真删除（content stream patch）
+- AppShell 集成 watermarkDetector → UI 报告展示
+- 跨 ISS 复用：watermarkDetector report + ISS-067 applyRedaction = 检测 + 涂白组合
+- 任务卡状态行更新

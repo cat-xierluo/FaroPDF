@@ -848,7 +848,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：**P0**
 - 类型：导出 / 律师卷宗清洁
-- 状态：未启动
+- 状态：阶段 1 部分完成（2026-06-17，PM 单 session TDD，watermarkDetector 检测层 + 12 测试 ship DEC-134）；"真删除"留 v0.3（DEC-123 暂缓，content stream 风险）
 - 来源：DEC-103 / PDF-Guru `watermark.go:115-138` + `thirdparty/watermark.py` remove 段
 - 律师场景：卷宗常带原始水印（"草稿"/"机密"/版权 logo），开庭前清洁
 - 目标：
