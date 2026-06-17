@@ -92,10 +92,8 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
     setSuccessMessage(null);
   }
 
-  // P1-1：v0.1 stub 阶段「设置密码」按钮已 disabled（避免无意义 IPC + 密码回显）。
-  // handleSetPassword 保留为 v0.2 阶段 2 lopdf 0.34 / qpdf 引入后激活时直接 wire 即可。
-  // 用 `_` 前缀让 tsc noUnusedLocals + ESLint @typescript-eslint/no-unused-vars 放过。
-  async function _handleSetPassword() {
+  // ISS-064 阶段 2：v0.1 阶段 stub 已激活，lopdf 0.41 + Aes128CryptFilter 真实加密（V4 128-bit AES）。
+  async function handleSetPassword() {
     if (!currentPdfPath) {
       setErrMessage("请先打开一个 PDF 文档。");
       return;
@@ -111,7 +109,7 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
       const result = await invoke<SecurityFeedback>("set_pdfpassword", {
         request: {
           input_path: currentPdfPath,
-          user_password: userPwd || null,
+          user_password: userPwd,
           owner_password: ownerPwd,
         },
       });
@@ -119,7 +117,9 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
       setSuccessMessage(message);
       onFeedback(message, false);
     } catch (error) {
-      const message = typeof error === "string" ? error : (error as Error).message;
+      // ISS-071 阶段 3 复用：按 AppError code 走友好文案
+      const appErr: AppError = normalizeError(error);
+      const message = friendlyMessageForCode(appErr);
       setErrMessage(message);
       onFeedback(message, true);
     } finally {
@@ -160,11 +160,6 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
       setLoading(false);
     }
   }
-  // P1-1：v0.1 阶段「设置密码」按钮已 disabled（避免无意义 IPC + 用户密码回显）。
-  // _handleSetPassword 作为 v0.2 阶段 2 lopdf 0.34 / qpdf 引入后激活时直接 wire 的占位。
-  // 用 void 强引用，让 tsc noUnusedLocals 不报；v0.2 阶段 2 把 button 改回 disabled={loading||!ownerPwd}
-  // + onClick={_handleSetPassword} 即可。
-  void _handleSetPassword;
 
   return (
     <aside
@@ -232,13 +227,9 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
 
           {mode === "set" ? (
             <section aria-label="设置密码表单" className="security-panel__form">
-              <p className="security-panel__hint" data-testid="security-panel-stub-hint">
-                ⚠️ ISS-064 阶段 1 仅完成 UI 骨架；
-                <strong>设置密码命令待 v0.2 升级 lopdf 到 0.34 或引入 qpdf 后激活</strong>。
-                按钮已禁用以避免无意义的 IPC 调用与密码输入回显。
-              </p>
               <p className="security-panel__hint">
-                激活后将为当前 PDF 副本重加密，输出 <code>&lt;原名&gt;-secured.pdf</code>。
+                为当前 PDF 副本重加密（lopdf 0.41 + AES-128），输出 <code>&lt;原名&gt;-secured.pdf</code>。
+                拥有者密码必填；用户密码可空（允许空密码打开但不能修改）。
               </p>
               <label className="security-panel__input-row" htmlFor={userPwdId}>
                 <span>用户密码（留空 = 沿用旧用户密码，仅设置 owner）</span>
@@ -265,11 +256,11 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
               </label>
               <button
                 className="context-tool context-tool--primary"
-                disabled
-                title="ISS-064 阶段 2 激活：lopdf 升级或 qpdf 引入后开启。"
+                disabled={loading || !ownerPwd}
+                onClick={handleSetPassword}
                 type="button"
               >
-                设置密码并导出（v0.2 候选）
+                {loading ? "正在加密..." : "设置密码并导出"}
               </button>
             </section>
           ) : (

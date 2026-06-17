@@ -21,7 +21,7 @@ describe("SecurityPanel (ISS-064 阶段 1 + DEC-102 P1-4)", () => {
     expect(screen.queryByRole("tab", { name: "设置密码" })).toBeNull();
   });
 
-  test("set 模式 → 渲染 stub 警示 + 按钮 disabled（P1-1）", () => {
+  test("set 模式 → 渲染密码表单 + 按钮 enabled (ISS-064 阶段 2 激活)", () => {
     render(
       <SecurityPanel
         currentPdfPath="/tmp/sample.pdf"
@@ -29,13 +29,67 @@ describe("SecurityPanel (ISS-064 阶段 1 + DEC-102 P1-4)", () => {
         onFeedback={() => undefined}
       />,
     );
-    // 默认 set 模式
-    expect(screen.getByTestId("security-panel-stub-hint")).toBeInTheDocument();
+    // 默认 set 模式 + 真实表单
+    expect(screen.getByLabelText(/^用户密码/)).toBeInTheDocument();
+    expect(screen.getByLabelText("拥有者密码")).toBeInTheDocument();
     const setButton = screen.getByRole("button", { name: /设置密码并导出/ });
+    // 按钮初始 disabled（无 owner 密码），有 owner 密码后 enabled
     expect(setButton).toBeDisabled();
-    // 按钮不应触发 invoke 即便点击
-    fireEvent.click(setButton);
-    expect(invokeMock).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("拥有者密码"), { target: { value: "owner-pwd" } });
+    expect((setButton as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  test("set 模式成功路径：invoke 收到 owner_password + onFeedback 收到成功消息", async () => {
+    invokeMock.mockResolvedValueOnce({ path: "/tmp/sample-secured.pdf", size_bytes: 54321 });
+    const onFeedback = vi.fn();
+    render(
+      <SecurityPanel
+        currentPdfPath="/tmp/sample.pdf"
+        onClose={() => undefined}
+        onFeedback={onFeedback}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/^用户密码/), { target: { value: "user-pwd" } });
+    fireEvent.change(screen.getByLabelText("拥有者密码"), { target: { value: "owner-pwd" } });
+    fireEvent.click(screen.getByRole("button", { name: /设置密码并导出/ }));
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith("set_pdfpassword", {
+        request: {
+          input_path: "/tmp/sample.pdf",
+          user_password: "user-pwd",
+          owner_password: "owner-pwd",
+        },
+      });
+    });
+    await waitFor(() => {
+      expect(onFeedback).toHaveBeenCalledWith(
+        expect.stringContaining("/tmp/sample-secured.pdf"),
+        false,
+      );
+    });
+  });
+
+  test("set 模式失败路径：EncryptionError 错误 → 显示友好文案", async () => {
+    invokeMock.mockRejectedValueOnce({
+      code: "EncryptionError",
+      message: "PDF 加密失败：some internal error",
+    });
+    const onFeedback = vi.fn();
+    render(
+      <SecurityPanel
+        currentPdfPath="/tmp/sample.pdf"
+        onClose={() => undefined}
+        onFeedback={onFeedback}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("拥有者密码"), { target: { value: "owner-pwd" } });
+    fireEvent.click(screen.getByRole("button", { name: /设置密码并导出/ }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("PDF 加密失败");
+    });
+    expect(onFeedback).toHaveBeenCalledWith(expect.stringContaining("PDF 加密失败"), true);
   });
 
   test("set 模式输入框启用了 password manager 兼容 autoComplete（P2-5）", () => {

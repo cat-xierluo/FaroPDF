@@ -544,16 +544,144 @@ fn extract_ocr_text(pdf_path: String) -> Result<OcrTextExtractionResponse, Strin
 
 /// ISS-071 阶段 3：把密码相关 Tauri command 改返回 `Result<_, AppError>` 替代 `Result<_, String>`，
 /// 让前端按 `code` 触发 i18n / UI 分支（DEC-105 m4 + DEC-138）。
+///
+/// ISS-064 阶段 2：升级 lopdf 到 0.41 后，调用 `Document::encrypt(&EncryptionState)`
+/// 真实加密（V4 128-bit AES）。输出 `<stem>-secured.pdf` 新副本，不静默覆盖。
 #[tauri::command]
 fn set_pdfpassword(request: serde_json::Value) -> Result<serde_json::Value, AppError> {
-    // v0.1：依赖的 encrypt API 暂不在默认 lopdf features 中（需 pdf_writer feature）。
-    // 等 v0.2 升级到 0.34 或引入 qpdf；本阶段先返回 NotSupported 让 UI 走备用通道。
-    let _ = request;
-    Err(AppError::new(
-        ErrCode::NotSupported,
-        "设置密码（PDF 加密）暂未启用：v0.2 升级 lopdf 到 0.34 或引入 qpdf。",
-    )
-    .with_context("operation", "set_pdfpassword"))
+    use lopdf::{EncryptionState, EncryptionVersion, Object, Permissions};
+
+    let input_path = request
+        .get("input_path")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let user_pwd = request
+        .get("user_password")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let owner_pwd = request
+        .get("owner_password")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let raw_source_path = PathBuf::from(input_path.trim());
+    if owner_pwd.is_empty() {
+        return Err(AppError::new(
+            ErrCode::InvalidInput,
+            "请提供拥有者密码。",
+        ));
+    }
+    if !raw_source_path.exists() {
+        let path_label = redact_path_for_error(&raw_source_path);
+        return Err(AppError::new(
+            ErrCode::FileNotFound,
+            format!("文件不存在: {path_label}"),
+        )
+        .with_context("path", path_label));
+    }
+    let source_path = raw_source_path
+        .canonicalize()
+        .unwrap_or_else(|_| raw_source_path.clone());
+    let mut doc = Document::load(&source_path).map_err(|e| {
+        eprintln!("set_pdfpassword load error: {e}");
+        let path_label = redact_path_for_error(&source_path);
+        AppError::new(ErrCode::PdfParseError, format!("解析 PDF 失败：{path_label}"))
+            .with_context("path", path_label)
+    })?;
+    if doc.is_encrypted() {
+        return Err(AppError::new(
+            ErrCode::InvalidInput,
+            "PDF 已经设置过密码，请先用「移除密码」解密后再设置新密码。",
+        ));
+    }
+    // lopdf 0.41 加密算法要求 trailer 有 /ID 数组（PDF 1.7 spec §14.4）。某些工具导出的 PDF
+    // 可能缺失。补一个随机 16 字节 ID（首次保存 PDF 时的标准做法）。
+    if doc.trailer.get(b"ID").is_err() {
+        let id_bytes: [u8; 16] = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| {
+                let nanos = d.as_nanos();
+                let mut buf = [0u8; 16];
+                for i in 0..16 {
+                    buf[i] = ((nanos >> (i * 8)) as u8).wrapping_add(i as u8);
+                }
+                buf
+            })
+            .unwrap_or([0u8; 16]);
+        let id_hex = format!(
+            "<{}>",
+            id_bytes
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>()
+        );
+        doc.trailer.set(
+            "ID",
+            vec![
+                Object::string_literal(id_hex.clone()),
+                Object::string_literal(id_hex),
+            ],
+        );
+    }
+    // 权限：可打印 + 可复制 + 可注释 + 可填写表单 + 可组装（保留 Acrobat 通用权限组合）。
+    let permissions = Permissions::PRINTABLE
+        | Permissions::COPYABLE
+        | Permissions::ANNOTABLE
+        | Permissions::FILLABLE
+        | Permissions::ASSEMBLABLE;
+    // lopdf 0.41 V4 需要显式指定 crypt_filter（AES-128）+ stream/string filter name。
+    let crypt_filter: std::sync::Arc<dyn lopdf::encryption::crypt_filters::CryptFilter> =
+        std::sync::Arc::new(lopdf::encryption::crypt_filters::Aes128CryptFilter);
+    let version = EncryptionVersion::V4 {
+        document: &doc,
+        encrypt_metadata: true,
+        crypt_filters: std::collections::BTreeMap::from([(b"StdCF".to_vec(), crypt_filter)]),
+        stream_filter: b"StdCF".to_vec(),
+        string_filter: b"StdCF".to_vec(),
+        owner_password: &owner_pwd,
+        user_password: &user_pwd,
+        permissions,
+    };
+    let state = EncryptionState::try_from(version).map_err(|e| {
+        eprintln!("set_pdfpassword encryption state error: {e}");
+        AppError::new(
+            ErrCode::EncryptionError,
+            "构造加密参数失败。",
+        )
+    })?;
+    doc.encrypt(&state).map_err(|e| {
+        eprintln!("set_pdfpassword encrypt error: {e}");
+        AppError::new(
+            ErrCode::EncryptionError,
+            format!("PDF 加密失败：{e}"),
+        )
+    })?;
+    let stem = source_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("document");
+    let parent = source_path.parent().unwrap_or(Path::new("."));
+    let output_path = parent.join(format!("{stem}-secured.pdf"));
+    if output_path.exists() {
+        let path_label = redact_path_for_error(&output_path);
+        return Err(AppError::new(
+            ErrCode::IoError,
+            format!("输出副本 {path_label} 已存在，请先删除或重命名后重试。"),
+        )
+        .with_context("path", path_label));
+    }
+    doc.save(&output_path).map_err(|e| {
+        eprintln!("set_pdfpassword save error: {e}");
+        let path_label = redact_path_for_error(&output_path);
+        AppError::new(ErrCode::IoError, format!("保存副本失败：{path_label}"))
+            .with_context("path", path_label)
+    })?;
+    Ok(serde_json::json!({
+        "path": output_path.to_string_lossy(),
+        "size_bytes": std::fs::metadata(&output_path).map(|m| m.len()).unwrap_or(0),
+    }))
 }
 
 #[tauri::command]
@@ -2468,13 +2596,71 @@ mod password_command_error_tests {
     use super::*;
 
     #[test]
-    fn set_pdfpassword_returns_not_supported_app_error() {
-        let result = set_pdfpassword(serde_json::json!({}));
+    fn set_pdfpassword_empty_owner_password_invalid_input() {
+        let result = set_pdfpassword(serde_json::json!({
+            "input_path": "/tmp/whatever.pdf",
+            "user_password": "x",
+            "owner_password": "",
+        }));
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert_eq!(err.code, ErrCode::NotSupported);
-        assert!(err.message.contains("设置密码"));
-        assert_eq!(err.context.get("operation").map(|s| s.as_str()), Some("set_pdfpassword"));
+        assert_eq!(err.code, ErrCode::InvalidInput);
+        assert!(err.message.contains("拥有者密码"));
+    }
+
+    #[test]
+    fn set_pdfpassword_real_encryption_writes_secured_pdf() {
+        // ISS-064 阶段 2：构造未加密 PDF → set 密码 → 验证输出 is_encrypted=true
+        // → decrypt 验证 user_password 正确。
+        use lopdf::{dictionary, Object};
+        let mut path = std::env::temp_dir();
+        path.push(format!("faropdf-set-pwd-{}.pdf", ocr_queue::current_iso_timestamp()));
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![Object::Integer(0), Object::Integer(0), Object::Integer(595), Object::Integer(842)],
+        });
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![Object::Reference(page_id)],
+            "Count" => 1,
+            "MediaBox" => vec![Object::Integer(0), Object::Integer(0), Object::Integer(595), Object::Integer(842)],
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+        // 补 /ID（lopdf 默认不写，encrypt 算法要求存在）
+        doc.trailer.set("ID", vec![Object::string_literal("<01234567890abcdef>".to_string()), Object::string_literal("<01234567890abcdef>".to_string())]);
+        doc.reference_table.cross_reference_type = lopdf::xref::XrefType::CrossReferenceTable;
+        doc.save(&path).expect("save source should succeed");
+
+        let result = set_pdfpassword(serde_json::json!({
+            "input_path": path.to_string_lossy(),
+            "user_password": "user-secret",
+            "owner_password": "owner-secret",
+        }));
+        let out_path = match &result {
+            Ok(v) => v.get("path").unwrap().as_str().unwrap().to_string(),
+            Err(e) => panic!("set_pdfpassword 失败: {:?}", e),
+        };
+        let _ = std::fs::remove_file(&path);
+
+        // 验证输出文件已加密
+        let out_doc = Document::load(&out_path).expect("load output should succeed");
+        assert!(out_doc.is_encrypted(), "output 应该是已加密 PDF");
+
+        // 验证 user_password 可以解密
+        let mut decrypted = out_doc.clone();
+        assert!(
+            decrypted.decrypt("user-secret").is_ok(),
+            "user_password 应该能解密"
+        );
+        let _ = std::fs::remove_file(&out_path);
     }
 
     #[test]
@@ -2519,10 +2705,58 @@ mod password_command_error_tests {
 
     #[test]
     fn remove_pdfpassword_wrong_password_decryption_error() {
-        // v0.1：构造加密 PDF 需要 lopdf `pdf_writer` feature（暂未启用，与 set_pdfpassword
-        // 的 NotSupported 同源）。该测试在 ISS-064 阶段 2 lopdf 升级 0.34 后补回：
-        // 构造加密 PDF → 错误密码 → 断言 code = DecryptionError。
-        // 现在仅保留 not-encrypted 与 file-not-found 两条主路径。
+        // ISS-064 阶段 2：lopdf 0.41 + Aes128CryptFilter 真实加密可用，构造加密 PDF → 错误密码 → DecryptionError。
+        use lopdf::{dictionary, Object};
+        let mut path = std::env::temp_dir();
+        path.push(format!("faropdf-rm-pwd-{}.pdf", ocr_queue::current_iso_timestamp()));
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![Object::Integer(0), Object::Integer(0), Object::Integer(595), Object::Integer(842)],
+        });
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![Object::Reference(page_id)],
+            "Count" => 1,
+            "MediaBox" => vec![Object::Integer(0), Object::Integer(0), Object::Integer(595), Object::Integer(842)],
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+        // 补 /ID
+        doc.trailer.set("ID", vec![Object::string_literal("<01234567890abcdef>".to_string()), Object::string_literal("<01234567890abcdef>".to_string())]);
+        // 用 lopdf 0.41 真实加密
+        let crypt_filter: std::sync::Arc<dyn lopdf::encryption::crypt_filters::CryptFilter> =
+            std::sync::Arc::new(lopdf::encryption::crypt_filters::Aes128CryptFilter);
+        let version = lopdf::EncryptionVersion::V4 {
+            document: &doc,
+            encrypt_metadata: true,
+            crypt_filters: std::collections::BTreeMap::from([(b"StdCF".to_vec(), crypt_filter)]),
+            stream_filter: b"StdCF".to_vec(),
+            string_filter: b"StdCF".to_vec(),
+            owner_password: "correct-owner",
+            user_password: "correct-user",
+            permissions: lopdf::Permissions::all(),
+        };
+        let state = lopdf::EncryptionState::try_from(version).unwrap();
+        doc.encrypt(&state).expect("encrypt should succeed");
+        doc.reference_table.cross_reference_type = lopdf::xref::XrefType::CrossReferenceTable;
+        doc.save(&path).expect("save should succeed");
+
+        let result = remove_pdfpassword(serde_json::json!({
+            "input_path": path.to_string_lossy(),
+            "user_password": "wrong-pwd",
+        }));
+        let _ = std::fs::remove_file(&path);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrCode::DecryptionError);
+        assert!(err.message.contains("密码错误"));
     }
 
     #[test]
