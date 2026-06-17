@@ -5230,3 +5230,69 @@ Rust `extract_ocr_text` 输出的 `OcrTextExtractionPage` 只有 `pageIndex + te
 - ISS-071 阶段 3：error.ts → SecurityPanel 大范围改造（Rust 18+ commands 升级 AppError，前端 catch 路径重写）
 - units.ts 真实使用场景（等水印 / 裁边 UI 需求浮出）
 - 任务卡状态更新：`docs/TASKS.md` ISS-071「阶段 2 已完成（2026-06-17）」
+
+## DEC-129 ISS-062 阶段 3 集成收口（纯文档化，无新代码）
+
+- 时间：2026-06-17
+- 类型：集成收口 / 文档同步
+- 关联：ISS-062 / DEC-111/112/122
+
+**ISS-062 阶段 3 实际已经 ship（2026-06-17，commit 71f13c7）**：
+
+之前 AppShell `onSelectCustomStamp` 把 stampImage 写到 `annotationArmed.stampImage`，但 `annotationPdfWriter.drawStamp` 不读 image 字段，只画文字矩形 + 边框——customStamp 图片从未嵌入 PDF（bug）。DEC-122 修复：
+
+1. `annotationPdfWriter.drawStamp` 加 `image` 分支：
+   - `tryEmbedStampImage` helper 解析 `data:image/png|jpeg` base64 → `embedPng/Jpg` → `page.drawImage`
+   - 嵌入成功直接 `return drawn=true`（不画文字矩形）
+   - 非 `data:` 前缀 / base64 损坏 → fallback 文字 stamp（保留边框，不计入 skipped）
+2. `AnnotationOverlay` 新 prop `activeStampImage`，`buildClickDraft` 透传 `stamp.image` 字段
+3. AppShell 接 `activeStampImage={annotationState.stampImage}`
+4. **3 测试**（annotationPdfWriter.customStamp image）：
+   - PNG dataURL → drawn=true + PDF bytes 含 `/Subtype/Image`（断言真嵌入图，非 fallback 文字）
+   - 非法 base64 → 不抛错，drawn=true（fallback）
+   - 非 image/ 前缀 → 忽略 image，按文字 stamp 处理
+
+加上前期 commit `2c492c2`（DEC-112）：RightPanel 从 skeleton placeholder → 真渲染 CustomStampPanel（annotate + stamps 模式）+ AppShell 接 onSelectCustomStamp → annotationArmed。
+
+**为什么"集成收口"是纯文档化**：
+
+按任务卡 ISS-062 状态行原话："阶段 3 集成到 RightPanel + AnnotationOverlay 用 customStamp 渲染 + commands.ts 可选入口"。
+
+| 子项 | 状态 |
+|------|------|
+| RightPanel 真实渲染 CustomStampPanel | ✅ DEC-112 commit 2c492c2 |
+| AnnotationOverlay 用 customStamp 渲染 | ✅ DEC-122 commit 71f13c7（drawStamp image 分支） |
+| commands.ts 可选入口 | ⏸️ 暂不做 |
+
+**为什么暂不做 commands.ts 可选入口**：
+
+- PDF Expert 范式：图章触发是工具条 stamp 按钮（已 ship），不是命令面板
+- 用户流程：选 stamp 图标 → 画布点按落点（最直接）
+- 强行加 `annotation-stamp-from-library` 命令会让用户多走一步（命令面板 → 选 → 激活），UX 倒退
+- 任务卡原话"可选入口"含义是"如果未来需要命令面板入口可加"，不是"必做"
+
+**为什么不删除任务卡状态行的"待启动"标记**：
+
+任务卡历史 line 743 一直说"阶段 3 待启动"，本次收口更新为"已完成"，避免后续 session 误以为 ISS-062 还有未做的工作。
+
+**verification**（实操验证）：
+
+- ✅ typecheck：0 错
+- ✅ lint：0 warning
+- ✅ vitest：1 pre-existing `useReaderController` zoom 失败（与本 ISS 无关）
+- ✅ ISS-062 累计测试：customStamp 19（DEC-111）+ RightPanel +2（DEC-112）+ annotationPdfWriter +3（DEC-122）= 24 测试
+- ✅ 端到端：CustomStampPanel → onSelectCustomStamp → annotationArmed.stampImage → AnnotationOverlay activeStampImage → annotationPdfWriter.drawStamp image 分支 → 真 PNG/JPG 嵌入 PDF
+
+**ISS-062 阶段 1+2+3 累计**：
+
+- 阶段 1（8776461）：内置 5→9 + diagonal
+- 阶段 2（a568e9e）：customStamp 上传 + 持久化（DEC-111）
+- 阶段 3 集成（2c492c2）：RightPanel 真渲染 + onSelectCustomStamp（DEC-112）
+- 阶段 3 真实嵌入（71f13c7）：drawStamp image 分支（DEC-122）
+- **总计 4 commit / 24 测试 / 跨 3 个 stage 阶段**
+
+**open follow-ups**：
+
+- 任务卡状态行已更新为"阶段 3 已完成"
+- CHANGELOG Unreleased 段待补充 DEC-122 内容（本 session 完成）
+- 不为"可选入口"加 commands.ts 命令（PDF Expert 范式不需要）

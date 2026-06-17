@@ -740,7 +740,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：批注
-- 状态：阶段 1 已完成（2026-06-15，内置 5→9 + diagonal 形态）；阶段 2 已完成（2026-06-16，customStampStore + CustomStampPanel + 19 测试，DEC-111）；阶段 3 集成到 RightPanel + AnnotationOverlay 用 customStamp 渲染 + commands.ts 可选入口 待启动。
+- 状态：阶段 1 已完成（2026-06-15，内置 5→9 + diagonal 形态，commit 8776461）；阶段 2 已完成（2026-06-16，customStampStore + CustomStampPanel + 19 测试，DEC-111 commit a568e9e）；阶段 3 已完成（2026-06-17，RightPanel 真渲染 CustomStampPanel + AnnotationOverlay activeStampImage + annotationPdfWriter.drawStamp image 分支 + 3 测试，DEC-112/122 commits 2c492c2 + 71f13c7，DEC-129 收口）。
 - 来源：截图 55（图章面板：标准 2×2 = 4 个 + 自定义 8 个）
 - 目标：
   1. 现状 `stamps.ts` 已有 5 个内置模板（APPROVED / DRAFT / CONFIDENTIAL / FINAL / DRAFT COPY）。需扩展至 ≥ 8 个内置（新增 FOR REVIEW / NOT FOR DISTRIBUTION / INTERNAL ONLY / PROPRIETARY 等常用印章）。

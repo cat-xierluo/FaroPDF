@@ -70,6 +70,16 @@ PDF Expert 风格右栏（ISS-060 阶段 2 + ISS-062 阶段 3，DEC-112）：
 - 选中提示通过 `commandFeedback` 反馈到顶部 toast：「已选中图章「<name>」，请在画布点按落点」。
 - RightPanel 测试 +2（annotate+stamps 真渲染 CustomStampPanel / 非 annotate 不渲染）。
 
+自定义图章真实嵌入 PDF（ISS-062 阶段 3 收口，DEC-122 + DEC-129）：
+
+- 修复 bug：之前 `annotationPdfWriter.drawStamp` 不读 `stamp.image` 字段，customStamp 实际只画文字矩形 + 边框，图片从未嵌入 PDF。
+- `drawStamp` 新增 `image` 分支：`tryEmbedStampImage` 解析 `data:image/png|jpeg` base64 → `embedPng/Jpg` → `page.drawImage`，嵌入成功直接 `drawn=true`（不画文字）。
+- 非 data: 前缀 / base64 损坏 → fallback 文字 stamp（保留边框，不计入 skipped）。
+- `AnnotationOverlay` 新 prop `activeStampImage` + `buildClickDraft` 透传 `annotation.stamp.image`。
+- AppShell 接 `activeStampImage={annotationState.stampImage}`。
+- 3 测试（annotationPdfWriter.customStamp image）：PNG dataURL 真嵌入（断言 PDF bytes 含 `/Subtype/Image`）/ 非法 base64 fallback / 非 image/ 前缀按文字 stamp。
+- 端到端链路：CustomStampPanel → onSelectCustomStamp → annotationArmed.stampImage → AnnotationOverlay activeStampImage → drawStamp image 分支 → PNG/JPG 真实嵌入 PDF。
+
 自定义图章（ISS-062 阶段 2，DEC-111）：
 
 - 新增 `src/modules/annotation/customStampStore.ts` localStorage 持久化层：`saveCustomStamp(name, base64Image)` / `listCustomStamps()` / `deleteCustomStamp(id)` / `MAX_CUSTOM_STAMPS = 4` 上限 + 损坏数据兜底过滤 + 跨 tab `storage` event 同步。
