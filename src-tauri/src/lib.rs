@@ -28,6 +28,7 @@ use ocr_queue::{
     current_iso_timestamp, empty_path_summary, redact_path, OcrJobQueue, OcrJobQueueState,
     OcrStoredJob, OcrStoredProgress, OcrStoredQualityCheck, OcrStoredQualitySummary,
 };
+use error::{AppError, ErrCode};
 use ocr_text_extract::{extract_pdf_text, file_size_or_zero, summarize_extracted_pages};
 use scan_preprocess::{
     run_scan_preprocess_job, redact_path as scan_preprocess_redact_path, ScanPreprocessJobQueue,
@@ -541,18 +542,22 @@ fn extract_ocr_text(pdf_path: String) -> Result<OcrTextExtractionResponse, Strin
     })
 }
 
+/// ISS-071 阶段 3：把密码相关 Tauri command 改返回 `Result<_, AppError>` 替代 `Result<_, String>`，
+/// 让前端按 `code` 触发 i18n / UI 分支（DEC-105 m4 + DEC-138）。
 #[tauri::command]
-fn set_pdfpassword(request: serde_json::Value) -> Result<serde_json::Value, String> {
+fn set_pdfpassword(request: serde_json::Value) -> Result<serde_json::Value, AppError> {
     // v0.1：依赖的 encrypt API 暂不在默认 lopdf features 中（需 pdf_writer feature）。
-    // 等 v0.2 升级到 0.34 或引入 qpdf；本阶段先返回 not-supported 让 UI 走备用通道。
-    // 注意：UI 端 (SecurityPanel) 应当 disable「设置密码」按钮、避免用户在本阶段意外
-    // 把 owner_password 作为 IPC payload 发出。
+    // 等 v0.2 升级到 0.34 或引入 qpdf；本阶段先返回 NotSupported 让 UI 走备用通道。
     let _ = request;
-    Err("设置密码（PDF 加密）暂未启用：v0.2 升级 lopdf 到 0.34 或引入 qpdf。".to_string())
+    Err(AppError::new(
+        ErrCode::NotSupported,
+        "设置密码（PDF 加密）暂未启用：v0.2 升级 lopdf 到 0.34 或引入 qpdf。",
+    )
+    .with_context("operation", "set_pdfpassword"))
 }
 
 #[tauri::command]
-fn remove_pdfpassword(request: serde_json::Value) -> Result<serde_json::Value, String> {
+fn remove_pdfpassword(request: serde_json::Value) -> Result<serde_json::Value, AppError> {
     let input_path = request
         .get("input_path")
         .and_then(|v| v.as_str())
@@ -564,34 +569,43 @@ fn remove_pdfpassword(request: serde_json::Value) -> Result<serde_json::Value, S
         .unwrap_or("")
         .to_string();
     let raw_source_path = PathBuf::from(input_path.trim());
+    // 顺序：先校验用户输入（密码非空）→ 再校验文件存在 → 最后才 load PDF。
+    // 这样空密码 / 不存在文件能给清晰的细分错误，不被 FileNotFound 抢先返回。
+    if user_pwd.is_empty() {
+        return Err(AppError::new(
+            ErrCode::InvalidInput,
+            "请提供用户密码。",
+        ));
+    }
     if !raw_source_path.exists() {
         // 不回显完整路径（DEC-102 P0-1）：仅给 basename + 提示。
-        return Err(format!(
-            "文件不存在: {}",
-            redact_path_for_error(&raw_source_path)
-        ));
+        let path_label = redact_path_for_error(&raw_source_path);
+        return Err(AppError::new(ErrCode::FileNotFound, format!("文件不存在: {path_label}"))
+            .with_context("path", path_label));
     }
     // canonicalize 防 path traversal（DEC-102 P0-3）。如果 canonicalize 失败（例如
     // symlink loop、权限不足），按原 trimmed 路径继续，但仍走 basename 脱敏。
     let source_path = raw_source_path
         .canonicalize()
         .unwrap_or_else(|_| raw_source_path.clone());
-    if user_pwd.is_empty() {
-        return Err("请提供用户密码。".to_string());
-    }
     // lopdf 错误不直接 format 进 Err（DEC-102 P0-2）：只 eprintln 内部细节，
     // 用户看到的错误是固定文案 + 脱敏路径 basename。
     let mut doc = Document::load(&source_path).map_err(|e| {
         eprintln!("remove_pdfpassword load error: {e}");
-        format!("解析 PDF 失败：{}", redact_path_for_error(&source_path))
+        let path_label = redact_path_for_error(&source_path);
+        AppError::new(ErrCode::PdfParseError, format!("解析 PDF 失败：{path_label}"))
+            .with_context("path", path_label)
     })?;
     if !doc.is_encrypted() {
-        return Err("PDF 没有设置密码，无需移除。".to_string());
+        return Err(AppError::new(
+            ErrCode::InvalidInput,
+            "PDF 没有设置密码，无需移除。",
+        ));
     }
     doc.decrypt(&user_pwd).map_err(|e| {
         eprintln!("remove_pdfpassword decrypt error: {e}");
         // 密码错误不区分具体 lopdf 失败原因（避免反向诱导用户试密码字典）。
-        "密码错误或解密失败。".to_string()
+        AppError::new(ErrCode::DecryptionError, "密码错误或解密失败。")
     })?;
     let stem = source_path
         .file_stem()
@@ -601,14 +615,18 @@ fn remove_pdfpassword(request: serde_json::Value) -> Result<serde_json::Value, S
     let output_path = parent.join(format!("{stem}-unsecured.pdf"));
     // 不静默覆盖已有副本（DEC-102 P0-3）：若存在则报错，用户先手动处理。
     if output_path.exists() {
-        return Err(format!(
-            "输出副本 {} 已存在，请先删除或重命名后重试。",
-            redact_path_for_error(&output_path)
-        ));
+        let path_label = redact_path_for_error(&output_path);
+        return Err(AppError::new(
+            ErrCode::IoError,
+            format!("输出副本 {path_label} 已存在，请先删除或重命名后重试。"),
+        )
+        .with_context("path", path_label));
     }
     doc.save(&output_path).map_err(|e| {
         eprintln!("remove_pdfpassword save error: {e}");
-        format!("保存副本失败：{}", redact_path_for_error(&output_path))
+        let path_label = redact_path_for_error(&output_path);
+        AppError::new(ErrCode::IoError, format!("保存副本失败：{path_label}"))
+            .with_context("path", path_label)
     })?;
     Ok(serde_json::json!({
         "path": output_path.to_string_lossy(),
@@ -2440,5 +2458,109 @@ mod ocr_e2e_tests {
         assert!(!loaded.input_path_summary.fingerprint.is_empty());
         assert_eq!(loaded.progress.completed_pages, 2);
         assert_eq!(loaded.progress.total_pages, 2);
+    }
+}
+
+#[cfg(test)]
+mod password_command_error_tests {
+    //! ISS-071 阶段 3：set/remove password 改返 `Result<_, AppError>` 后，
+    //! 校验错误结构包含 `code` 字段，前端 `normalizeError` 能正确分类。
+    use super::*;
+
+    #[test]
+    fn set_pdfpassword_returns_not_supported_app_error() {
+        let result = set_pdfpassword(serde_json::json!({}));
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrCode::NotSupported);
+        assert!(err.message.contains("设置密码"));
+        assert_eq!(err.context.get("operation").map(|s| s.as_str()), Some("set_pdfpassword"));
+    }
+
+    #[test]
+    fn remove_pdfpassword_file_not_found_app_error() {
+        let result = remove_pdfpassword(serde_json::json!({
+            "input_path": "/nonexistent/path/file.pdf",
+            "user_password": "anything",
+        }));
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrCode::FileNotFound);
+        assert!(err.message.contains("文件不存在"));
+        // basename 脱敏（DEC-102 P0-1）：context.path 形如 [path:file.pdf]
+        let path = err.context.get("path").expect("context.path 必填");
+        assert!(path.starts_with("[path:"));
+        assert!(!path.contains("/nonexistent"));
+    }
+
+    #[test]
+    fn remove_pdfpassword_empty_password_invalid_input() {
+        let result = remove_pdfpassword(serde_json::json!({
+            "input_path": "/tmp/whatever.pdf",
+            "user_password": "",
+        }));
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrCode::InvalidInput);
+        assert!(err.message.contains("用户密码"));
+    }
+
+    #[test]
+    fn remove_pdfpassword_empty_input_path_file_not_found() {
+        // input_path 为空 → 路径不存在 → FileNotFound（"文件不存在: [path:unknown]"）
+        let result = remove_pdfpassword(serde_json::json!({
+            "input_path": "",
+            "user_password": "x",
+        }));
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrCode::FileNotFound);
+    }
+
+    #[test]
+    fn remove_pdfpassword_wrong_password_decryption_error() {
+        // v0.1：构造加密 PDF 需要 lopdf `pdf_writer` feature（暂未启用，与 set_pdfpassword
+        // 的 NotSupported 同源）。该测试在 ISS-064 阶段 2 lopdf 升级 0.34 后补回：
+        // 构造加密 PDF → 错误密码 → 断言 code = DecryptionError。
+        // 现在仅保留 not-encrypted 与 file-not-found 两条主路径。
+    }
+
+    #[test]
+    fn remove_pdfpassword_not_encrypted_invalid_input() {
+        // 构造未加密 PDF → "PDF 没有设置密码，无需移除。"
+        use lopdf::{dictionary, Object};
+        let mut path = std::env::temp_dir();
+        path.push(format!("faropdf-rm-pwd-ne-{}.pdf", ocr_queue::current_iso_timestamp()));
+        let mut doc = Document::with_version("1.5");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![Object::Integer(0), Object::Integer(0), Object::Integer(595), Object::Integer(842)],
+        });
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![Object::Reference(page_id)],
+            "Count" => 1,
+            "MediaBox" => vec![Object::Integer(0), Object::Integer(0), Object::Integer(595), Object::Integer(842)],
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+        let catalog_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", catalog_id);
+        doc.reference_table.cross_reference_type = lopdf::xref::XrefType::CrossReferenceTable;
+        doc.save(&path).expect("save should succeed");
+
+        let result = remove_pdfpassword(serde_json::json!({
+            "input_path": path.to_string_lossy(),
+            "user_password": "anything",
+        }));
+        let _ = std::fs::remove_file(&path);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrCode::InvalidInput);
+        assert!(err.message.contains("没有设置密码"));
     }
 }

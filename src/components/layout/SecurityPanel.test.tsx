@@ -95,7 +95,11 @@ describe("SecurityPanel (ISS-064 阶段 1 + DEC-102 P1-4)", () => {
   });
 
   test("remove 模式失败路径：invoke 抛错 → errMessage 显示 + onFeedback(msg, true)", async () => {
-    invokeMock.mockRejectedValueOnce("密码错误或解密失败。");
+    // ISS-071 阶段 3：Rust 现在返回 AppError { code, message }，前端按 code 走友好文案。
+    invokeMock.mockRejectedValueOnce({
+      code: "DecryptionError",
+      message: "密码错误或解密失败。",
+    });
     const onFeedback = vi.fn();
     render(
       <SecurityPanel
@@ -109,10 +113,76 @@ describe("SecurityPanel (ISS-064 阶段 1 + DEC-102 P1-4)", () => {
     fireEvent.click(screen.getByRole("button", { name: "移除密码并导出" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent("密码错误或解密失败。");
+      // 友好文案覆盖了 Rust 原始 message（用户视角更清晰）
+      expect(screen.getByRole("alert")).toHaveTextContent("密码错误或解密失败，请检查原密码后重试。");
     });
-    expect(onFeedback).toHaveBeenCalledWith("密码错误或解密失败。", true);
-    // errMessage 也应在 isError 通道上送达
+    expect(onFeedback).toHaveBeenCalledWith(
+      expect.stringContaining("密码错误或解密失败"),
+      true,
+    );
+  });
+
+  test("remove 模式：FileNotFound 错误 → 显示「文件不存在」友好文案", async () => {
+    invokeMock.mockRejectedValueOnce({
+      code: "FileNotFound",
+      message: "文件不存在: [path:missing.pdf]",
+      context: { path: "[path:missing.pdf]" },
+    });
+    render(
+      <SecurityPanel
+        currentPdfPath="/tmp/missing.pdf"
+        onClose={() => undefined}
+        onFeedback={() => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "移除密码" }));
+    fireEvent.change(screen.getByLabelText("原密码"), { target: { value: "any" } });
+    fireEvent.click(screen.getByRole("button", { name: "移除密码并导出" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("文件不存在或路径已变更");
+    });
+  });
+
+  test("remove 模式：Unknown 错误 → fallback 到原始 message", async () => {
+    invokeMock.mockRejectedValueOnce({
+      code: "Unknown",
+      message: "Something weird happened",
+    });
+    render(
+      <SecurityPanel
+        currentPdfPath="/tmp/sample.pdf"
+        onClose={() => undefined}
+        onFeedback={() => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "移除密码" }));
+    fireEvent.change(screen.getByLabelText("原密码"), { target: { value: "any" } });
+    fireEvent.click(screen.getByRole("button", { name: "移除密码并导出" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Something weird happened");
+    });
+  });
+
+  test("remove 模式：旧版 string 错误仍能 fallback（向后兼容）", async () => {
+    // 历史 Rust 命令（未迁移的）可能仍返回字符串；normalizeError 应兜底。
+    invokeMock.mockRejectedValueOnce("plain string error from legacy command");
+    render(
+      <SecurityPanel
+        currentPdfPath="/tmp/sample.pdf"
+        onClose={() => undefined}
+        onFeedback={() => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "移除密码" }));
+    fireEvent.change(screen.getByLabelText("原密码"), { target: { value: "any" } });
+    fireEvent.click(screen.getByRole("button", { name: "移除密码并导出" }));
+
+    await waitFor(() => {
+      // 字符串错误 → normalizeError → code=Unknown, message=原字符串 → 透传
+      expect(screen.getByRole("alert")).toHaveTextContent("plain string error from legacy command");
+    });
   });
 
   test("remove 模式：未输入原密码点按钮 → 走客户端校验，不发起 invoke", () => {
