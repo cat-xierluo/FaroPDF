@@ -763,7 +763,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：安全 / 导出
-- 状态：阶段 1 已完成（2026-06-15，`SecurityPanel` UI + `export-set-password / export-remove-password` 命令接入工具启动器和原生菜单 + `remove_pdfpassword` Rust 命令用 lopdf 真实解密生成 `-unsecured.pdf` 新副本）；阶段 2 前置评估完成（2026-06-17，DEC-135 路径 A 升级 lopdf 0.34 采纳，实际实现留 v0.3）。
+- 状态：阶段 1 已完成（2026-06-15，`SecurityPanel` UI + `export-set-password / export-remove-password` 命令接入工具启动器和原生菜单 + `remove_pdfpassword` Rust 命令用 lopdf 真实解密生成 `-unsecured.pdf` 新副本）；阶段 2 已完成（2026-06-17，升级 lopdf 0.33→0.41 含完整 V4 128-bit AES 加密 API + `set_pdfpassword` 真实实现生成 `-secured.pdf` 新副本 + SecurityPanel set 模式激活 + 3 Rust + 3 前端测试，DEC-139；DEC-135 决策纠偏：实际跳到 0.41 而非 0.34，0.34 仍无 encrypt API + pom_parser 自带编译 bug）。
 - 来源：截图 52（设置密码 modal：密码输入 + 确认输入 + 取消/确定）
 - 目标：
   1. 在工具启动器「导出」分组中加 `设置密码 / 移除密码` 命令。
@@ -820,7 +820,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：**P0**
 - 类型：导出 / 律师证据遮蔽 / 律师场景刚需
-- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，applyRedaction 算法 + 10 测试）；阶段 2 RedactionOverlay 拖矩形 UI + commands.ts redact-region 入口 + AppShell 集成已完成（2026-06-16，DEC-114）；阶段 2 后续 部分完成（2026-06-17，redactPageMargins 去页眉页脚算法 + 9 测试，DEC-132 即将 ship）；多矩形拖拽 UI 细化 待启动
+- 状态：阶段 1 已完成（2026-06-16，PM 单 session TDD，applyRedaction 算法 + 10 测试）；阶段 2 RedactionOverlay 拖矩形 UI + commands.ts redact-region 入口 + AppShell 集成已完成（2026-06-16，DEC-114）；阶段 2 后续 部分完成（2026-06-17，redactPageMargins 去页眉页脚算法 + 9 测试，DEC-132 即将 ship）；阶段 2 后续 UI 细化 已完成（2026-06-17，RedactionOverlay 多矩形拖拽：3 颜色芯片 / 撤销按钮 / 单 X 删除按钮 + 5 UI 测试）。
 - 来源：DEC-103 / PDF-Guru `mask.go` + `thirdparty/mask.py:18-60` + `header_and_footer.go:60-83`
 - 律师场景：
   - **证据遮蔽**：身份证号 / 隐私电话 / 商业秘密在出具材料时必须涂黑，是律师工作高频操作
@@ -915,7 +915,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：工程基础设施 / 重构 / 复用
-- 状态：阶段 1 已完成（2026-06-15，4 个抽象 + 双侧测试 + AppShell 迁移示范 1 处）；阶段 2 已完成（2026-06-17，3 模块迁移：AppShell naming inline / OCR bridge pageRange 校验 / formatBytes 共享，DEC-128）；阶段 3 error.ts → SecurityPanel 大范围改造 留 open follow-up
+- 状态：阶段 1 已完成（2026-06-15，4 个抽象 + 双侧测试 + AppShell 迁移示范 1 处）；阶段 2 已完成（2026-06-17，3 模块迁移：AppShell naming inline / OCR bridge pageRange 校验 / formatBytes 共享，DEC-128）；阶段 3 已完成（2026-06-17，set/remove_pdfpassword Rust 改返 AppError + SecurityPanel friendlyMessageForCode + 6 Rust + 4 前端测试，DEC-138）。
 - 来源：DEC-103 §架构亮点借鉴 / DEC-104 Wave 1 失败后 PM 直推
 - 目标：一次性受益所有 ISS 的 4 个基础抽象
   1. **页码范围 DSL**（`src/modules/pages/pageRange.ts`）
@@ -1090,6 +1090,9 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
+- 2026-06-17：完成 ISS-067 阶段 2 后续 RedactionOverlay UI 细化。nextColor state + 3 颜色芯片（黑/白/灰，律师场景：黑色涂黑 / 白色擦除 / 灰色模糊），颜色仅作用于后续 commit 的 region（已 commit 不变）。新增撤销按钮 + 单 X 删除按钮（X 按钮 pointerEvents:auto 不冒泡触发 overlay 拖动）。**全量 1206/1207 通过**（+5 新测试）。复用 DEC-107 applyRedaction 算法 + DEC-132 redactPageMargins 算法，零算法层变更。
+- 2026-06-17：完成 ISS-071 阶段 3 error.ts → SecurityPanel AppError 端到端迁移（DEC-138）。Rust set/remove_pdfpassword 改返 `Result<_, AppError>` 替代 `Result<_, String>`，错误码映射：NotSupported / FileNotFound / InvalidInput / PdfParseError / DecryptionError / IoError，context 携带脱敏 path（DEC-102 P0-1）。调整 remove_pdfpassword 校验顺序：空密码 → 文件存在 → canonicalize → load（用户友好）。前端 SecurityPanel `friendlyMessageForCode(err: AppError)` helper，9 个 ErrCode 各有中文兜底文案（i18n 后续可按 code 切英文）。`normalizeError` 兼容旧 string 错误（code=Unknown, message=原串）。**全量 1206/1207 通过**（+4 新前端测试）。ISS-071 累计 75 测试 / 3 commit 全部 ship。
+- 2026-06-17：完成 ISS-064 阶段 2 真实 PDF 加密（DEC-139 + DEC-135 决策更新）。**DEC-135 决策纠偏**：原计划升级 lopdf 0.34 不可行（0.34 仍无 encrypt API + 0.34.0 pom_parser 自带编译 bug + 0.33 没 pdf_writer feature），实际升级到 lopdf 0.41（含完整 V4 128-bit AES 加密 API）。`set_pdfpassword` 真实实现：`EncryptionState::try_from(EncryptionVersion::V4 { ... })` + `Aes128CryptFilter` + `doc.encrypt(&state)`，输出 `<stem>-secured.pdf` 新副本；自动补缺失的 `/ID`（某些工具导出 PDF 缺 /ID，lopdf 加密算法强制要求）。权限组合：PRINTABLE | COPYABLE | ANNOTABLE | FILLABLE | ASSEMBLABLE。SecurityPanel set 模式激活（按钮 disabled={loading || !ownerPwd}），复用 DEC-138 normalizeError。**真实 AES 加密 round-trip 测试**：构造 PDF → set 密码 → decrypt 验证 user_password 正确。**cargo test 97/97**（+1 新测试；原 90 → 96 → 97 累加）+ **npm test 1208/1209**（+5 累计，pre-existing zoom 唯一失败 DEC-099 已知）。
 - 2026-06-17：完成 ISS-072 阶段 2 后续 阶段 3 前端 PropertiesDialog 集成 set_pdf_producer（DEC-137）。PropertiesDialog 只读 fieldset 内新增「用 FaroPDF 真覆盖 Producer (Rust 后端)」按钮 + 成功 / 错误反馈行；inputFilePath 缺失（浏览器拖拽场景）或未传 onProducerOverride 回调时按钮不渲染。AppShell.handleProducerOverride 接 document.path → invoke set_pdf_producer → 反馈回填到 dialog，错误用 alert role + 命令反馈双通道（与 SecurityPanel handleRemovePassword 同模式）。**全量 1198/1199 通过**（+6 UI 测试；唯一失败 useReaderController zoomIn/zoomOut 是 pre-existing，DEC-099 已知）。**ISS-072 累计 30 测试 / 4 commit** 全部 ship（DEC-109 10 + DEC-116 9 + DEC-136 5 + DEC-137 6）。设计决策：把 Rust 路径拆为独立按钮，不和 pdf-lib「保存元数据」confirm 联动，理由是输出位置不同（Rust 写源目录、pdf-lib 走浏览器下载）合成会让用户困惑。复用 DEC-136 Rust set_pdf_producer（lopdf InfoDict 真覆盖）+ DEC-102 P0-3 输出副本碰撞保护 + DEC-109 pdf-lib Producer 限制绕道。CHANGELOG / DECISIONS / TASKS 三处同步。
 - 2026-06-16：完成 ISS-070 阶段 2 + ISS-060 阶段 2 第二步签名持久化（DEC-113）。新增 `signatureStore.ts` localStorage 持久化（save/list/delete + 上限 4 + 损坏数据兜底 + 9 测试）+ `SignaturePanel.tsx`（缩略图列表 + 「+ 新画签名」按钮弹 SignaturePad + 删除 + 错误提示 + 9 测试）。`RightPanel` 扩 signatures panel 接入 SignaturePanel（annotate/forms 模式可用），同时 stamps panel 扩到 forms/export 模式让律师表单签字时也能盖业务章。AppShell 注入 `onSelectSignature` 回调：annotate 模式把 signature.image 当 custom stamp 落点；forms 模式反馈提示。**全量 1028 通过**（+20 新测试）+ typecheck/lint 全绿。阶段 3 FormsPanel 真集成 + commands.ts 入口 + 落入文档任意位置 UI 待启动。
 - 2026-06-16：完成 ISS-060 阶段 2 第一步 + ISS-062 阶段 3 集成（DEC-112）。RightPanel 从 skeleton placeholder → **真实渲染 CustomStampPanel**（annotate + stamps 模式）。AppShell 接 `onSelectCustomStamp` → `annotationArmed`：用户从右栏选自定义图章立即 set `activeToolType="stamp"` + `stampName="custom"` + `stampLabel` + `stampImage` → 画布可点按落点。`AnnotationToolState` 加 `stampImage?: string` 字段（base64 data URL）。RightPanel 测试 +2（annotate+stamps 真渲染 / 非 annotate 不渲染）。**全量 1008 通过**（+1 测试，CustomStampPanel 与 RightPanel 共用 test-id 测试稳定）。这是 PDF Expert 风格右栏的首次真实内容接入；后续 ISS-060 阶段 2 第二/三/四步接 SignaturePad（forms+signatures）/ 标准图章 grid 增强 / OCR 队列简版 / 导出预览简版。

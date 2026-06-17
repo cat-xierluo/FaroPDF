@@ -5808,3 +5808,81 @@ DEC-136 把 `set_pdf_producer` Rust command 落定（lopdf 直接编辑 InfoDict
 
 - v0.2 候选：pdf-lib 升级或 qpdf 引入后（DEC-135），同样用 Rust 后端模式实现 `set_pdfpassword` 真实加密（SecurityPanel 已 disabled 占位等 v0.2 激活）
 - v0.2 候选：PropertiesDialog 真覆盖 Producer 后自动 reload 文件，让用户看到更新后的 metadata（当前只显示反馈行）
+
+## DEC-139 ISS-064 阶段 2：升级 lopdf 0.41 + 真实加密 + DEC-135 决策更新
+
+- 时间：2026-06-17
+- 类型：PM 单 session TDD / Rust + 前端集成 / 决策纠偏
+- 关联：ISS-064 / DEC-135 / DEC-138 / DEC-101 / DEC-102
+
+**DEC-135 决策纠偏**：
+
+DEC-135 当时假设「升级 lopdf 0.34 即可获得 `Document::encrypt` API」。本次实际推进发现：
+- **0.34 仍无 encrypt API**：CHANGELOG (0.33.0→0.34.0) 只加了 ASCII85 解码 / ToUnicode cmap text extraction / reference cycle detection / encoding/decoding 改进，**没有加密 API**。
+- **0.34.0 自带 pom_parser 编译 bug**：`reader.rs::get_object` 需要 `&mut HashSet` 但 `parser.rs::indirect_object` 不收这个参数（`reader.rs:423` 调用了已不存在的 5 参数版本）。
+- **0.33 没有 `pdf_writer` feature**（原 v0.1 set_pdfpassword 注释里说的）。
+
+实际可行的方案：
+- **0.41（含完整加密 API）**：升级到 0.41 后才有 `EncryptionVersion::V4` + `EncryptionState` + `Aes128CryptFilter` + `Document::encrypt(&state)`。跳过 0.34 直接升 0.41 是风险最低的路径（API 跳过大版本，文档化更清晰）。
+
+**实现**：
+
+`src-tauri/Cargo.toml`：
+
+```
+- lopdf = { version = "0.33", default-features = false, features = ["pom_parser"] }
++ lopdf = { version = "0.41", default-features = false }
+```
+
+`src-tauri/src/lib.rs::set_pdfpassword`：
+
+- 真实 V4 128-bit AES 加密（PDF 1.5+ 主流，Acrobat / PDF Expert 默认兼容）
+- 关键 API：`EncryptionState::try_from(EncryptionVersion::V4 { ... })` + `doc.encrypt(&state)`
+- `Aes128CryptFilter` 走 `lopdf::encryption::crypt_filters::Aes128CryptFilter`（0.41 未导出到 crate root）
+- 权限组合：PRINTABLE | COPYABLE | ANNOTABLE | FILLABLE | ASSEMBLABLE
+- `/ID` 自动补：某些工具导出的 PDF 缺 /ID，lopdf 加密算法强制要求；自动补随机 16 字节 hex
+- 输出 `<stem>-secured.pdf` 新副本，不静默覆盖（与 remove_pdfpassword 同模式 DEC-102 P0-3）
+
+错误码（与 DEC-138 一致）：
+
+- `InvalidInput`：空 owner_password / PDF 已加密
+- `FileNotFound`：文件不存在（脱敏 path）
+- `PdfParseError`：lopdf load 失败
+- `EncryptionError`：EncryptionState::try_from / doc.encrypt 失败
+- `IoError`：输出副本已存在 / doc.save 失败
+
+**前端**：
+
+`src/components/layout/SecurityPanel.tsx`：
+
+- 删除 `_handleSetPassword` stub + `void _handleSetPassword;` 强引用
+- 新增 `handleSetPassword` 真实路径：调 `set_pdfpassword` + 复用 `normalizeError` + `friendlyMessageForCode`（DEC-138 错误处理统一）
+- 按钮：disabled → `disabled={loading || !ownerPwd}`，文案 "（v0.2 候选）" → "{loading ? 正在加密... : 设置密码并导出}"
+- 删除 stub 警示段落
+
+**verification**（实操验证）：
+
+- ✅ `npm run typecheck` 0 error
+- ✅ `npm run lint` 0 warning
+- ✅ `cargo test --lib` **97/97 通过**（+1 新加密 round-trip 测试；原 90 → 96 → 97 累加）
+  - `set_pdfpassword_real_encryption_writes_secured_pdf` **真加密后 decrypt 验证 user_password 正确**（首个真实加密端到端测试）
+  - `remove_pdfpassword_wrong_password_decryption_error` **错误密码 → DecryptionError**（DEC-102 P0-2 之前因 0.33 无加密无法写，现在补回）
+- ✅ `npm test` **1208/1209 通过**（+5 累计：3 新 ISS-067 阶段 2 后续 + 1 新 ISS-071 阶段 3 + 3 新 ISS-064 阶段 2 - 旧失败测试替换；唯一失败 `useReaderController zoomIn/zoomOut` 是 pre-existing DEC-099 已知）
+- ✅ `SecurityPanel.test.tsx` 13/13（10 旧 + 3 新）
+- ✅ 真实加密 → lopdf 自家 `Document::decrypt("user-secret")` 能解密（自验证）
+
+**ISS-064 累计**：
+
+- 阶段 1（DEC-101）：SecurityPanel UI + remove_pdfpassword lopdf 解密
+- 阶段 2（本 commit）：真实 V4 128-bit AES 加密 + SecurityPanel set 模式激活
+- 阶段 3 候选：PDF 加密后 metadata 清理 / 文件大小限制 / 加密 + OCR 衔接 / qpdf 路径作为更广兼容备选
+
+**ISS-071 阶段 3 复用**：
+
+本 commit 复用 DEC-138 的 `normalizeError` + `friendlyMessageForCode`，set 模式错误也走结构化错误处理（不再 try-catch 字符串）。这是 ISS-071 阶段 3 设计的「按 code 触发 UI 分支」目标兑现。
+
+**open follow-ups**：
+
+- v0.2 候选：qpdf 作为 lopdf 加密的备选路径（更广兼容性 + 独立验证），但 lopdf 0.41 AES-128 已足够律师场景，不再阻塞
+- v0.2 候选：加密 PDF 的 metadata 清理（标题/作者/创建者应清空避免泄露），需要 set_pdfpassword 后置处理
+- v0.3 候选：密码强度校验（最小长度 / 字符复杂度），现在只校验非空

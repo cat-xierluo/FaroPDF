@@ -157,6 +157,36 @@ UI 信息架构：
 - **6 项 UI 测试**（`PropertiesDialog.test.tsx`）：inputFilePath 缺失隐藏按钮 / 有路径 + 回调渲染按钮并 fire 回调 / producerOverrideInFlight 禁用 / 错误 alert / 成功 status / 无回调隐藏按钮。
 - ISS-072 累计 30 测试 / 4 commit（阶段 1 DEC-109 10 + 阶段 2 DEC-116 9 + 阶段 2 后续 Rust DEC-136 5 + 阶段 2 后续 阶段 3 本 commit 6）；前端 AppShell 集成收口。
 
+RedactionOverlay 多矩形 UI 细化（ISS-067 阶段 2 后续）：
+
+- `RedactionOverlay` 新增 nextColor state（默认 #000000）+ 3 颜色芯片（黑/白/灰）于 panel 顶部，颜色仅作用于后续 commit 的 region（已 commit 的不变）。
+- 新增「撤销」按钮（data-testid=redaction-undo-last）：移除最后一个 region，空列表 disabled。
+- 每 region 增加 X 删除按钮（data-testid=redaction-remove-{idx}）：单删不影响其他，absolute 定位右上角 + `pointerEvents: auto` 不冒泡。
+- region 背景色根据 `color` 字段动态渲染 rgba；CSS `.redaction-overlay__color-row` / `__color-chip` / `__region-delete` 新增。
+- **5 项 UI 测试**（`RedactionOverlay.test.tsx`）：默认黑 chip aria-checked / 切白 + 新 region 带 #ffffff / 撤销多 region + 边界 disabled / 单 X 删一个 / 颜色独立于已 commit region。
+- 复用 `applyRedaction` 算法（DEC-107）+ `redactPageMargins` 算法（DEC-132），不改算法层。
+
+错误 schema 端到端迁移（ISS-071 阶段 3，DEC-138）：
+
+- Rust：`set_pdfpassword` / `remove_pdfpassword` 返回类型 `Result<_, String>` → `Result<_, AppError>`，错误码映射：`NotSupported` (set 暂未启用) / `FileNotFound` / `InvalidInput` / `PdfParseError` / `DecryptionError` / `IoError`，context 携带脱敏 path（DEC-102 P0-1）。
+- 调整 `remove_pdfpassword` 校验顺序：空密码 → 文件存在 → canonicalize → load（用户友好，客户端校验不让 FileNotFound 抢先生效）。
+- 前端：SecurityPanel 新增 `friendlyMessageForCode(err: AppError)` helper，9 个 ErrCode 各有中文兜底文案（i18n 后续可按 code 切英文）。`normalizeError` 兼容旧 string 错误（code=Unknown, message=原串）。
+- **10 项新测试**：6 Rust 单元测试（password_command_error_tests） + 4 前端测试（FileNotFound 友好文案 / Unknown code fallback / 旧 string 向后兼容 / 错误路径友好文案）。
+- ISS-071 累计 75 测试 / 3 commit（阶段 1 51 + 阶段 2 10 迁移 + 阶段 3 14 端到端）。
+
+真实 PDF 加密（ISS-064 阶段 2 + DEC-135 决策更新，DEC-139）：
+
+- **DEC-135 路径纠偏**：原计划升级 lopdf 0.34 不可行（0.34 仍无 encrypt API + 0.34.0 pom_parser 自带编译 bug + 0.33 没 pdf_writer feature）。实际升级到 lopdf 0.41（含完整 V4 128-bit AES 加密 API）。
+- `Cargo.toml`: `lopdf = "0.33" + pom_parser` → `lopdf = "0.41" + default-features = false`。
+- Rust `set_pdfpassword` 真实实现：`EncryptionState::try_from(EncryptionVersion::V4 { ... })` + `Aes128CryptFilter` + `doc.encrypt(&state)`，输出 `<stem>-secured.pdf` 新副本；自动补缺失的 `/ID`（某些工具导出 PDF 缺 /ID，lopdf 加密算法强制要求）。
+- 权限组合：PRINTABLE | COPYABLE | ANNOTABLE | FILLABLE | ASSEMBLABLE。
+- SecurityPanel `handleSetPassword` 真实路径：调 `set_pdfpassword` + 复用 DEC-138 `normalizeError` + `friendlyMessageForCode`；按钮 `disabled={loading || !ownerPwd}`，文案 `{loading ? 正在加密... : 设置密码并导出}`；删除 stub 警示。
+- **3 项新 Rust 测试 + 3 项新前端测试**：
+  - `set_pdfpassword_real_encryption_writes_secured_pdf` 真实 AES 加密 + decrypt 验证 user_password
+  - `remove_pdfpassword_wrong_password_decryption_error` 错误密码 → DecryptionError（DEC-102 P0-2 之前因 0.33 无加密无法写）
+  - `set_pdfpassword_empty_owner_password_invalid_input` / set 真实表单 / set 成功路径 / set EncryptionError 友好文案
+- ISS-064 累计 2 commit（阶段 1 DEC-101 + 阶段 2 本 commit），lOpdf 0.33 → 0.41 升级无回归。
+
 ---
 
 ## 0.1.2 - 2026-06-14
