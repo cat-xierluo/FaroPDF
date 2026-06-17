@@ -891,7 +891,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：表单签名 / 律师材料签字
-- 状态：阶段 1 已完成（2026-06-16，SignaturePad 组件 + 8 测试）；阶段 2 已完成（2026-06-16，signatureStore localStorage 持久化 + SignaturePanel 缩略图列表 + RightPanel 接入 + 18 测试，DEC-113）；阶段 3 部分完成（2026-06-16，PM 全 TDD 接管 Wave 7 W1：SignatureLibraryPicker + FormsPanel 签名库选择 + commands.ts forms-sign-handwrite + AppShell openPanel("sign")，DEC-119）；落入文档任意位置 UI（拖动定位）待后续。
+- 状态：阶段 1 已完成（2026-06-16，SignaturePad 组件 + 8 测试）；阶段 2 已完成（2026-06-16，signatureStore localStorage 持久化 + SignaturePanel 缩略图列表 + RightPanel 接入 + 18 测试，DEC-113）；阶段 3 部分完成（2026-06-16，PM 全 TDD 接管 Wave 7 W1：SignatureLibraryPicker + FormsPanel 签名库选择 + commands.ts forms-sign-handwrite + AppShell openPanel("sign")，DEC-119）+ 阶段 3 落点 ship（2026-06-17，DEC-121 signature as stamp 落点路径，AppShell onSelectSignature annotate 模式把 signature.image 当 stamp 落点与 customStamp 同套路）。拖动 resize UI 留 v0.3。
 - 来源：DEC-103 / PDF-Guru `sign.go` + `sign.py:8-38` + `v-perfect-signature` Vue 库
 - 律师场景：律师在客户文件、和解协议、授权委托书上签字，弥补 v0.1 表单签名只支持上传 PNG/JPG 的缺口
 - 目标：
