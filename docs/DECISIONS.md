@@ -5389,3 +5389,56 @@ ISS-066 阶段 2 后续原话："缩略图拖断点 UI + 裁边切 待启动"。
 - 拖拽 divider UI 集成（mousedown→mousemove→mouseup + setPanelWidth 实时持久化）
 - SettingsPanel 暴露"重置栏宽"按钮
 - 任务卡状态行更新
+
+## DEC-132 ISS-067 阶段 2 后续：去页眉页脚（涂白 margin 算法）
+
+- 时间：2026-06-17
+- 类型：PM 单 session TDD / 新功能
+- 关联：ISS-067 / DEC-114 / DEC-130
+
+**算法设计**：
+
+律师卷宗常带"页眉（页码 / 案件编号）"和"页脚（签字栏 / 备注）"，提交法院前需要清洁。本 commit 提供"涂白 margin"算法（redactPageMargins）：
+
+- 用户传入 4 个 margin（top/bottom/left/right in pt） + 可选 pageIndexes + 可选 color
+- pdf-lib `page.drawRectangle` 在 4 个 margin 区域绘制不透明矩形
+- 默认白色（rgb(1,1,1)），可选自定义颜色
+- **真不可恢复**（content stream 直接绘制，与 ISS-067 applyRedaction 同套路）
+
+**与 ISS-066 阶段 2 后续 `trimPageMargins` 的关键区别**：
+
+| 函数 | 行为 | 页面尺寸 |
+|------|------|----------|
+| `trimPageMargins` | 缩小 MediaBox / CropBox | 改变 |
+| `redactPageMargins` | 涂白 margin 区域 | 保持 |
+
+用户按场景选择：保留原尺寸选涂白；缩小页面选 trim。
+
+**为什么不做"真删除内容流"**：
+
+- "真删除" = 在 PDF content stream 中移除 margin 区域的所有绘制操作
+- 需要：解析 content stream → 识别受 margin 影响的操作符 → 重写 stream + 重算 xref
+- pdf-lib 无高层 API，需要 lopdf 升级到 0.34+ 或引入 qpdf
+- 风险与 ISS-068 去水印类似（DEC-103 PDF-Guru 调研结论：content stream 是雷区）
+- **当前 ship** = 涂白遮蔽（视觉清洁）；**真删除** 留 v0.3 后续
+
+**verification**（实操验证）：
+
+- ✅ typecheck：0 错
+- ✅ lint：0 warning
+- ✅ vitest：**9/9 通过**（4 边涂白 / 0 margin identity / pageIndexes 限定 / 负数 / NaN / 越界 / 自定义颜色 / 页面尺寸保持 / round-trip）
+- ⚠️ pre-existing `useReaderController` zoom 失败（与本 ISS 无关）
+
+**ISS-067 阶段 1+2 累计**：
+
+- 阶段 1（DEC-107）：applyRedaction 算法 + 10 测试
+- 阶段 2（DEC-114）：RedactionOverlay 拖矩形 UI + commands.ts 入口
+- 阶段 2 后续（本 commit）：redactPageMargins 去页眉页脚算法 + 9 测试
+- **总计 19 测试 / 3 commit**
+
+**open follow-ups**：
+
+- 多矩形拖拽 UI 细化（DEC-114 已支持多矩形批量应用，UI 细节打磨）
+- "真删除内容流"（留 v0.3，依赖 lopdf 升级）
+- PageOrganizerWorkspace 集成 redactPageMargins 入口（dialog + 4 margin input）
+- 任务卡状态行更新
