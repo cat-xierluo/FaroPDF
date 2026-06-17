@@ -763,7 +763,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P1
 - 类型：安全 / 导出
-- 状态：阶段 1 已完成（2026-06-15，`SecurityPanel` UI + `export-set-password / export-remove-password` 命令接入工具启动器和原生菜单 + `remove_pdfpassword` Rust 命令用 lopdf 真实解密生成 `-unsecured.pdf` 新副本）；阶段 2 `set_pdfpassword` 真实加密待 lopdf 升级到 0.34 或引入 qpdf。
+- 状态：阶段 1 已完成（2026-06-15，`SecurityPanel` UI + `export-set-password / export-remove-password` 命令接入工具启动器和原生菜单 + `remove_pdfpassword` Rust 命令用 lopdf 真实解密生成 `-unsecured.pdf` 新副本）；阶段 2 前置评估完成（2026-06-17，DEC-135 路径 A 升级 lopdf 0.34 采纳，实际实现留 v0.3）。
 - 来源：截图 52（设置密码 modal：密码输入 + 确认输入 + 取消/确定）
 - 目标：
   1. 在工具启动器「导出」分组中加 `设置密码 / 移除密码` 命令。
