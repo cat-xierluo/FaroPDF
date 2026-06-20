@@ -10,6 +10,7 @@ import type { TextSearchController } from "../../modules/search";
 import type { OcrCommandJob } from "../../shared/ocr/jobQueue";
 import { createInitialAnnotationToolState } from "../../modules/annotation";
 import { AppShell } from "./AppShell";
+import { TabProvider } from "../../state/tabStore";
 import type { AnnotationArmedStateBundle, AppModeId, UtilityPanelId } from "./types";
 import type { OcrWorkspaceController } from "../../modules/ocr";
 import type { AppCommandSignal } from "../../shared/app/commands";
@@ -132,19 +133,21 @@ function renderAppShell(args: RenderArgs = {}) {
   const onModeChange = args.onModeChange ?? vi.fn();
   const onUtilityPanelChange = args.onUtilityPanelChange ?? vi.fn();
   return render(
-    <AppShell
-      activeMode={args.activeMode ?? "read"}
-      annotationArmed={args.annotationArmed}
-      annotations={args.annotations}
-      commandSignal={args.commandSignal}
-      onModeChange={onModeChange}
-      onUtilityPanelChange={onUtilityPanelChange}
-      reader={args.reader ?? makeReader()}
-      search={args.search ?? makeSearch()}
-      settings={args.settings ?? makeSettings()}
-      utilityPanel={args.utilityPanel ?? "summary"}
-      ocr={makeOcrController()}
-    />,
+    <TabProvider>
+      <AppShell
+        activeMode={args.activeMode ?? "read"}
+        annotationArmed={args.annotationArmed}
+        annotations={args.annotations}
+        commandSignal={args.commandSignal}
+        onModeChange={onModeChange}
+        onUtilityPanelChange={onUtilityPanelChange}
+        reader={args.reader ?? makeReader()}
+        search={args.search ?? makeSearch()}
+        settings={args.settings ?? makeSettings()}
+        utilityPanel={args.utilityPanel ?? "summary"}
+        ocr={makeOcrController()}
+      />
+    </TabProvider>,
   );
 }
 
@@ -157,16 +160,18 @@ function renderShell(
 ) {
   const settings = options.settings ?? createDefaultAppSettings();
   return render(
-    <AppShell
-      activeMode={activeMode}
-      ocr={options.ocr}
-      onModeChange={() => undefined}
-      onUtilityPanelChange={() => undefined}
-      reader={makeReader()}
-      search={makeSearch()}
-      settings={settings}
-      utilityPanel="summary"
-    />,
+    <TabProvider>
+      <AppShell
+        activeMode={activeMode}
+        ocr={options.ocr}
+        onModeChange={() => undefined}
+        onUtilityPanelChange={() => undefined}
+        reader={makeReader()}
+        search={makeSearch()}
+        settings={settings}
+        utilityPanel="summary"
+      />
+    </TabProvider>,
   );
 }
 
@@ -1052,18 +1057,20 @@ describe("AppShell AnnotationOverlay ↔ AnnotationSidebar active 联动 (ISS-02
 
     // 模拟 mode 切到 read（rerender）
     rerender(
-      <AppShell
-        activeMode="read"
-        annotationArmed={undefined}
-        annotations={annotations}
-        onModeChange={onModeChange}
-        onUtilityPanelChange={vi.fn()}
-        reader={reader}
-        search={makeSearch()}
-        settings={createDefaultAppSettings()}
-        utilityPanel="summary"
-        ocr={makeOcrController()}
-      />,
+      <TabProvider>
+        <AppShell
+          activeMode="read"
+          annotationArmed={undefined}
+          annotations={annotations}
+          onModeChange={onModeChange}
+          onUtilityPanelChange={vi.fn()}
+          reader={reader}
+          search={makeSearch()}
+          settings={createDefaultAppSettings()}
+          utilityPanel="summary"
+          ocr={makeOcrController()}
+        />
+      </TabProvider>,
     );
 
     // 切到 read 后，AnnotationOverlay 不再渲染
@@ -1071,18 +1078,20 @@ describe("AppShell AnnotationOverlay ↔ AnnotationSidebar active 联动 (ISS-02
 
     // 切回 annotate + utilityPanel=annotation → active 状态应已清空
     rerender(
-      <AppShell
-        activeMode="annotate"
-        annotationArmed={undefined}
-        annotations={annotations}
-        onModeChange={onModeChange}
-        onUtilityPanelChange={vi.fn()}
-        reader={reader}
-        search={makeSearch()}
-        settings={createDefaultAppSettings()}
-        utilityPanel="annotation"
-        ocr={makeOcrController()}
-      />,
+      <TabProvider>
+        <AppShell
+          activeMode="annotate"
+          annotationArmed={undefined}
+          annotations={annotations}
+          onModeChange={onModeChange}
+          onUtilityPanelChange={vi.fn()}
+          reader={reader}
+          search={makeSearch()}
+          settings={createDefaultAppSettings()}
+          utilityPanel="annotation"
+          ocr={makeOcrController()}
+        />
+      </TabProvider>,
     );
 
     const sidebarAfterReturn = document.querySelector('[data-annotation-row-id="ann-page1"]') as HTMLElement;

@@ -19,6 +19,7 @@ import { subscribeNativeMenuCommands } from "./shared/app/nativeMenuBridge";
 import type { AppSettings } from "./shared/settings/types";
 import { createDefaultAppSettings } from "./shared/settings/defaults";
 import "./styles/app.css";
+import { TabProvider } from "./state/tabStore";
 
 /** 在应用启动时一次性注册阅读模式工具集（旋转 + 适合页面）。 */
 registerReadModeTools();
@@ -204,22 +205,24 @@ function App() {
   );
 
   return (
-    <AppShell
-      activeMode={activeMode}
-      annotationArmed={{ state: annotationToolState, onStateChange: setAnnotationToolState }}
-      annotations={loadedAnnotations}
-      commandSignal={commandSignal}
-      ocr={ocrController}
-      onAnnotationDraft={handleAnnotationDraft}
-      onModeChange={handleModeChange}
-      onRequestOcr={() => setActiveMode("ocr")}
-      onSettingsChange={handleSettingsChange}
-      onUtilityPanelChange={handleUtilityPanelChange}
-      reader={reader}
+    <TabProvider>
+      <AppShell
+        activeMode={activeMode}
+        annotationArmed={{ state: annotationToolState, onStateChange: setAnnotationToolState }}
+        annotations={loadedAnnotations}
+        commandSignal={commandSignal}
+        ocr={ocrController}
+        onAnnotationDraft={handleAnnotationDraft}
+        onModeChange={handleModeChange}
+        onRequestOcr={() => setActiveMode("ocr")}
+        onSettingsChange={handleSettingsChange}
+        onUtilityPanelChange={handleUtilityPanelChange}
+        reader={reader}
       search={search}
       settings={settings}
       utilityPanel={utilityPanel}
     />
+    </TabProvider>
   );
 }
 

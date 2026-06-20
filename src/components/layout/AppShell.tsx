@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getPanelWidth } from "../../shared/panelWidthStore";
 import type { AnnotationSidecar, PdfAnnotation } from "../../shared";
@@ -36,6 +36,8 @@ import {
 } from "./TextSelectionToolbar";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
+import { TitlebarTabs } from "./TitlebarTabs";
+import { useTabStore } from "../../state/tabStore";
 import { SettingsPanel } from "../../modules/settings/SettingsPanel";
 import type { SectionId } from "../../modules/settings/sections";
 import { AnnotationOverlay, type AnnotationDraftInput, type AnnotationOverlayViewport } from "./AnnotationOverlay";
@@ -127,7 +129,22 @@ export function AppShell({
   search,
   settings,
   utilityPanel,
-}: AppShellProps) {
+}: AppShellProps): ReactElement {
+  // ISS-059 Phase 1：Tab bar 集成。文件打开时 openTab 派发，关闭时由 TitlebarTabs 内部处理。
+  const tabStore = useTabStore();
+  useEffect(() => {
+    const doc = reader.state.document;
+    if (!doc) {
+      return;
+    }
+    // 用 filePath 或 fingerprint 判断 tab 是否已存在；首次打开时新建 tab
+    const exists = tabStore.state.tabs.some(
+      (t) => t.filePath === (doc.path ?? "") || t.id.startsWith(`${doc.name}::`),
+    );
+    if (!exists) {
+      tabStore.openTab(doc.path ?? "", doc.name);
+    }
+  }, [reader.state.document, tabStore]);
   const showContextToolbar = activeMode !== "read" && activeMode !== "pages";
   // ISS-067 阶段 2：涂黑模式开关（先声明，再写 useEffect 依赖）
   const [redactActive, setRedactActive] = useState(false);
@@ -629,6 +646,17 @@ export function AppShell({
         reader={reader}
         search={search}
         utilityPanel={utilityPanel}
+      />
+      <TitlebarTabs
+        onRequestNewTab={() => {
+          // + 号：触发 Toolbar 的隐藏 file input，复用"打开"按钮
+          if (typeof globalThis.document !== "undefined") {
+            const fileInput = globalThis.document.querySelector<HTMLInputElement>(
+              'input[type="file"][aria-label="选择本地 PDF 文件"]',
+            );
+            fileInput?.click();
+          }
+        }}
       />
       {showContextToolbar ? (
         <ContextToolbar

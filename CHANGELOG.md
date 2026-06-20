@@ -1,6 +1,15 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~125。
+> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~142。
+
+多 Tab 顶部 bar（ISS-059 Phase 1，DEC-142）：
+
+- 新增 `src/state/tabStore.tsx`：React Context + useReducer 实现的 tab 状态管理（openTab / activateTab / closeTab / closeOtherTabs / closeAllTabs / renameTab / markDirty / reorderTabs）。`PdfTab { id, title, filePath, customTitle, isDirty }` 模型；关闭当前 tab 自动激活相邻 tab（PDF Expert 行为）；不持久化（关闭应用即清空）。13 项单元测试。
+- 新增 `src/components/layout/TitlebarTabs.tsx` + `TitlebarTabs.css`：1:1 复刻 PDF Expert 顶部 tab 行（X 关闭按钮 + 文件名 + 右侧 + 号新建）。支持双击 inline rename（Enter 提交 / Esc 取消 / 空字符串清除 customTitle 回 null）；HTML5 drag-and-drop 拖动重排；空态不渲染。7 项 UI 测试。
+- `App.tsx` 包外层 `<TabProvider>`。
+- `AppShell.tsx` 集成：`useEffect` 监听 `reader.state.document` 自动 openTab；新增 `<TitlebarTabs>` 在 toolbar 与 main 之间；`onRequestNewTab` 复用 toolbar 的隐藏 file input（保持现有"打开"按钮行为）。
+- `AppShell.test.tsx` 加 `<TabProvider>` wrapper，48 项既有测试全部通过。
+- **Phase 1 范围**：tab UI + state + tab 切换；未实现 per-PDF reader state / 窗口标题同步 / 最近文件同步 / 跨窗口剥离（Phase 2+ 收口）。
 
 Review 修复（DEC-140）：
 

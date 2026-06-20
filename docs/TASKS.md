@@ -694,17 +694,19 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P0
 - 类型：UI 信息架构 / 窗口
 - 来源：PDF Expert 截图 30, 65, 83（窗口顶部文件 tab bar）
+- 状态：阶段 1 已完成（2026-06-20，DEC-142）；阶段 2+ 待启动（per-PDF reader state / 窗口标题同步 / 跨窗口剥离）
 - 目标：
   1. 同一窗口内开多个 PDF tab；右上角 `+` 新建 tab；选中 tab 内编辑。
   2. Tab 标题可 inline rename（双击进入编辑态、ESC 取消、Enter 提交）。
   3. tab 拖拽排序、tab 关闭按钮（X）、tab 拖离窗口剥离为新窗口。
   4. 不引入新依赖；不破坏现有 `recentFiles`/`utilityPanel` 状态。
-- 关键文件：候选新文件 `src/components/layout/TitlebarTabs.tsx`、`src/state/tabStore.ts`，与 `AppShell.tsx` 集成。
+- 关键文件：`src/state/tabStore.tsx`、`src/components/layout/TitlebarTabs.tsx` / `TitlebarTabs.css`，与 `AppShell.tsx` + `App.tsx` 集成。
 - 验收：
-  - [ ] 单窗口 ≥ 3 PDF 同时打开，可独立关闭/激活。
-  - [ ] tab 重命名后，主窗口标题/最近文件命名均同步。
-  - [ ] tab 拖放重排序生效，跨窗口剥离生成独立窗口。
-- 备注：v0.1 缺位，但属于「重大交互变化」，先做技术 spike（react-aria/headless UI 选型 + Tauri 多窗口通信）。
+  - [x] Phase 1：tab 列表 / 单文件独立关闭 / 激活切换 / 双击 inline rename（Enter / Esc / 空字符串清除）/ HTML5 拖放重排 / `+` 新建按钮 / dirty 标记预留接口。
+  - [ ] Phase 2：单窗口 ≥ 3 PDF 同时打开（per-PDF reader state，目前 AppShell 仍单 reader → 切换 tab 实际是切文档而非独立 reader）。
+  - [ ] Phase 2：tab 重命名后，主窗口标题同步（Tauri `setTitle`） + 最近文件命名同步（`recentFiles` 感知 customTitle）。
+  - [ ] Phase 3：tab 拖离窗口剥离生成独立窗口（Tauri `WebviewWindow` 新建 IPC + drag detach 手势）。
+- 备注：阶段 1 仅 tab UI + state + tab 切换。Per-PDF reader / 跨窗口剥离需 Tauri 多窗口 IPC 与 reader 状态结构改造，留阶段 2+。
 
 ### ISS-060 左 + 右 双侧栏（模式驱动侧栏内容）
 

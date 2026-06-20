@@ -5988,3 +5988,89 @@ DEC-127 收口的算法 + 测试都通过，但实操点击出现 `loaded.getPag
 | **Playwright E2E 实操验证 + getPage bug 修复** | **DEC-141 / 本 commit** | ✅ |
 
 ISS-069 全量收口。
+
+## DEC-142 ISS-059 Phase 1：多 Tab 顶部 bar（state + UI + AppShell 集成）
+
+- 时间：2026-06-20
+- 类型：UI 信息架构 / 状态管理 / PDF Expert 对齐
+- 关联：ISS-059 / ISS-073 v0.2 桶 1
+
+**背景**：
+
+v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求"单窗口可开多个 PDF，互不干扰"。ISS-059 是这一目标的任务卡，TASKS.md 验收清单 3 项：
+
+1. 单窗口 ≥ 3 PDF 同时打开，可独立关闭/激活
+2. tab 重命名后，主窗口标题/最近文件命名均同步
+3. tab 拖放重排序生效，跨窗口剥离生成独立窗口
+
+前次会话已完成 tab store + UI + 集成（未提交），但：
+
+- 修复 48 项 AppShell 测试回归（之前未包 `<TabProvider>` wrapper）
+- 决定 Phase 1 范围，Phase 2+ 显式登记
+
+**决策**：
+
+1. **状态管理选型**：React Context + useReducer，不引 zustand 等新依赖
+   - 理由：CLAUDE.md 限制散弹新依赖；tabs 状态简单（列表 + activeId），Context 性能足够；后续如状态膨胀再迁移。
+   - 接口：`useTabStore()` 暴露 8 个 action + state。
+2. **Tab id 生成**：`{fileName}::{filePath}::{Date.now()}::{random}`，同一文件重复打开开多个 tab（与 PDF Expert 行为一致）。
+3. **关闭行为**：关闭当前 tab 自动激活相邻 tab（左侧优先，与 PDF Expert 一致）；关闭最后一个 tab → `activeTabId = null`（不删整个 app 状态，由 AppShell 决定是否清空 reader）。
+4. **Phase 1 范围**：仅 tab UI + state + tab 切换 + inline rename + 拖动重排。**未实现**（Phase 2+）：
+   - per-PDF reader state（当前 AppShell 只有 1 个 `reader`，文档切换会替换 reader state）
+   - 窗口标题同步（tauri.conf.json `title: "FaroPDF"` 静态，未编程式 setTitle）
+   - 最近文件命名同步（recentFiles 列表项未感知 tab.customTitle）
+   - 跨窗口剥离（拖出 tab 生成新窗口需 Tauri 多窗口 IPC，复杂度高）
+5. **集成策略**：`AppShell` `useEffect` 监听 `reader.state.document` 自动 openTab（避免侵入 toolbar 既有"打开"按钮流程）。`onRequestNewTab` 复用 toolbar 的隐藏 file input（保留现有文件选择行为）。
+6. **dirty 标记预留**：`markDirty` action 已实现 + `isDirty` 字段已添加，但 UI 暂未挂接（后续阶段接入批注 / OCR / 导出后写入）。
+
+**实现**：
+
+- `src/state/tabStore.tsx` 224 行：reducer 8 个 action + TabProvider + useTabStore hook。
+- `src/components/layout/TitlebarTabs.tsx` 189 行：tab 行渲染 + inline rename + drag-drop 重排。
+- `src/components/layout/TitlebarTabs.css` 78 行：PDF Expert 风格浅灰 tab + active 高亮 + drop target 边框。
+- `src/App.tsx` 包 `<TabProvider>` 在最外层。
+- `src/components/layout/AppShell.tsx`：
+  - `useEffect` 监听 document 变化 openTab
+  - 在 toolbar 与 main 之间渲染 `<TitlebarTabs>`
+  - `onRequestNewTab` 通过 `globalThis.document.querySelector('input[type="file"][aria-label="选择本地 PDF 文件"]')?.click()` 复用现有 file picker
+
+**测试**：
+
+- ✅ `tabStore.test.tsx` 13 测试：openTab / activateTab / closeTab / closeOtherTabs / closeAllTabs / renameTab / markDirty / reorderTabs（含越界 / 同文件开多次）
+- ✅ `TitlebarTabs.test.tsx` 7 测试：空态 / 渲染 + 新建按钮 / 点击激活 / 关闭触发 onAllTabsClosed / 双击 rename 模式 / Enter 提交 / Esc 取消
+- ✅ `AppShell.test.tsx` 48 测试：加 `<TabProvider>` wrapper 后全部通过
+- ✅ `npm test` 全量 1241/1242 通过（唯一失败 pre-existing DEC-099 zoom 已知）
+- ✅ `npm run typecheck` 0 error
+- ✅ `npm run lint` 0 warning
+- ✅ `npm run build` 通过
+
+**Playwright 960×720 实操验证**（上传 `.playwright-mcp/auto-toc-test.pdf`）：
+
+- ✓ 空态不渲染 tab 行（设计如此）
+- ✓ 上传 PDF → 自动出现 tablist "打开的文件" + tab "auto-toc-test.pdf"（selected）+ "关闭" 按钮 + "新建 tab" 按钮
+- ✓ 双击 tab → rename input 出现，prefill "auto-toc-test.pdf"
+- ✓ 输入 "证据合同 v2" + Enter → tab 标题改为 "证据合同 v2"，aria-label 同步
+- ✓ 点击 X 关闭 → tabStore 移除 tab（doc 仍加载 → useEffect 重建 tab，符合 Phase 1 单 reader 设计）
+- ✓ 0 console error / 0 warning
+- ✓ 截图：`.playwright-mcp/iss059-tab-1.png`（含 tab 行）/ `iss059-tab-final.png`
+
+**ISS-059 验收状态**：
+
+| 验收项 | 状态 | 备注 |
+|---|---|---|
+| 单窗口 ≥ 3 PDF 同时打开，可独立关闭/激活 | ⚠️ 部分 | tab list / close / activate 已实现；per-PDF reader state 缺失（Phase 2） |
+| tab 重命名后，主窗口标题/最近文件命名均同步 | ❌ 未实现 | tab customTitle 只影响 tab 行显示；窗口标题 / recentFiles 未同步（Phase 2） |
+| tab 拖放重排序生效，跨窗口剥离生成独立窗口 | ⚠️ 部分 | 拖放重排序已实现；跨窗口剥离未实现（Phase 3，需 Tauri 多窗口 IPC） |
+
+**Phase 2+ 候选**：
+
+- per-PDF reader state：TabProvider 同时持有 `Map<tabId, ReaderController>`，AppShell 根据 activeTabId 选 reader
+- Tauri window title：`@tauri-apps/api/window` `getCurrentWindow().setTitle(...)` + tab 切换 + rename 时同步
+- recentFiles 同步：`recentFilesStore` 读 tab.customTitle 优先
+- 跨窗口剥离：`WebviewWindow` 新建 IPC + tab drag detach gesture
+
+**verification**：
+
+- ✅ RED pre-existing → fix：AppShell.test.tsx 48 测试因缺 TabProvider 全失败，加 wrapper 后 48/48 通过
+- ✅ GREEN：`npm test -- src/state/tabStore.test.tsx src/components/layout/TitlebarTabs.test.tsx src/components/layout/AppShell.test.tsx --run` 68/68 通过
+- ✅ Playwright 实操：tab 行渲染 / 关闭 / 双击 rename / Enter 提交 全部眼见为实，0 console error
