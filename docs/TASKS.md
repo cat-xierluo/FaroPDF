@@ -1392,3 +1392,31 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [x] S4 pass 1 返回 31 issues，已分流到 §14.3 / §14.4 / §15.1
   - [x] skill 与 `computer-use` 边界明确（capture 阶段前者 / extract 阶段本 skill）
 - 备注：本 skill 是「catalog 自动化生成器」，下游 `frontend-design` skill 用 catalog 作为 spec 重建 UI。
+
+### ISS-NEW-L feature-extract-from-screenshots skill v0.2.0 修复 + v0.3.0 计划
+
+- 优先级：P2（v0.2 工具链）
+- 类型：Skill 修复
+- 来源：2026-06-21 用户对话「再简单排查一下」+ 5 个修复
+- 状态：**部分完成**（v0.2.0 修复 done，v0.3.0 重构待启动）
+- v0.2.0 修复（已落地）：
+  1. S2 加 B 类 cross-interaction 10 问（hover / drag / drop / double-click / right-click / long-press / shortcut / focus / gesture）
+  2. S2 加 C 类 cross-state-transition 5 问（时序 / 中断 / error / loading / empty）
+  3. S3 抽 meta-checklist 框架（参数化 platform_profile）
+  4. computer-use 加 state coverage matrix（capture 阶段 coverage guarantee）
+  5. PDF Expert 4 个 missing state 重判（forms mode / annotation popover 仍 missing v0.3；history panel / new-tab wizard 仍 YAGNI）
+- v0.3.0 重构（计划）：
+  - 6-layer spine → 8+3 meta-layer（M1-M8 + H1-H3）
+  - position + 职责解耦（top/left/right/bottom/floating）
+  - platform_profile TypeScript 类型
+  - Pages / Sketch / iOS 3 个 E2E 跑通
+  - 现有 PDF Expert catalog 迁移
+  - 详见 `research/pdf-expert/FEATURE_CATALOG.md` §14 + `.claude/skills/feature-extract-from-screenshots/DECISIONS.md` DEC-008
+- 验收：
+  - [x] S2 反推问题从 10 个 → 25 个（A/B/C 三类）
+  - [x] S3 checklist 抽 meta 框架
+  - [x] computer-use state coverage matrix
+  - [x] PDF Expert E2E 重判（4 个 state 维持判定）
+  - [x] Pages 通用性验证
+  - [ ] v0.3.0 8+3 meta-layer 实施
+- 备注：v0.3.0 是架构重构，会破坏现有 catalog 引用，需大版本 bump。触发时机：v0.2 收口后。

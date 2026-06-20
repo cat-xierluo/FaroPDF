@@ -14,6 +14,14 @@
 - `computer-use`：补 frontmatter（version / license / author / homepage）+ 依赖章节（cliclick 5.0.1 安装）+ 3 docs（CHANGELOG / TASKS / DECISIONS）
 - `feature-extract-from-screenshots`：补依赖章节（MCP 工具 / Agent / 上游 skill 依赖矩阵）+ 3 docs（CHANGELOG / TASKS / DECISIONS）
 
+`feature-extract-from-screenshots` skill v0.2.0 修复（ISS-NEW-L）：
+
+- S2 加 B 类 cross-interaction 10 问（hover / drag / drop / double-click / right-click / long-press / shortcut / focus / gesture）+ C 类 cross-state-transition 5 问（时序 / 中断 / error / loading / empty）—— 反推问题从 10 个扩到 25 个
+- S3 抽 meta-checklist 框架（参数化 platform_profile，按 macos / web / ios / android / windows / linux 6 平台动态展开）—— 13 项从写死变为 build_checklist(profile) 函数
+- `computer-use` 加 state coverage matrix（capture 阶段 coverage guarantee，7 类 state × N 模式预定义）—— 解决 4 轮审漏的根因（capture 漏 state）
+- PDF Expert E2E 重判：forms mode / annotation popover 仍 missing（v0.3 ISS-NEW-J），history panel / new-tab wizard 仍 YAGNI
+- macOS Pages 适配验证：6-layer spine 80% 通用，**触发 v0.3.0 架构重构需求**（8+3 meta-layer + platform_profile）
+
 多 Tab 顶部 bar（ISS-059 Phase 1，DEC-142）：
 
 多 Tab 顶部 bar（ISS-059 Phase 1，DEC-142）：
