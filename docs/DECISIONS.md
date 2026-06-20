@@ -6177,3 +6177,57 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - ISS-059 位置修正（`adcd8f0` → `5b2b285` 路径下由 ISS-NEW-A 阶段 1 一并修）
 - ISS-073 v0.2 桶 1（页面布局最显眼缺口）
 - skill 侧：multi-agent-orchestration §2.1 防逃逸门禁 + §7.1 主动等待 + §8.1 收口标准
+
+## DEC-145 AGENTS.md 多 Agent 并行与 PR 收口纪律章落地
+
+- 时间：2026-06-21
+- 类型：项目协作规范 / 多 Agent 编排 / PR 收口纪律
+- 关联：DEC-142 / DEC-144 / Wave 1 W1 (ISS-NEW-A 阶段 1) 协议违反
+
+**背景**：
+
+2026-06-21 Wave 1 W1 worker 成功 ship ISS-NEW-A 阶段 1（commit `5b2b285`），但 PM 在收口时违反 `multi-agent-orchestration` skill §8.0「worker 完成后通过 PR 回流」纪律，直接 `git merge --ff-only` 到 main 本地 + commit 4 文档文件，绕过 PR 流程。后续用 `git revert` 链修复（生成 2 个 revert commit `548529a` + `44a2022`），但 history 已不漂亮。
+
+**根因**：
+
+对照 legal-ai-skill-book 项目 AGENTS.md（256 行书稿协作规范），FaroPDF AGENTS.md 缺关键硬约束，导致 PM 自行判断时无明确协议可循：
+
+1. 缺 §"双层监测"（sentinel + 定时巡检）——本次 W1 撞 pre-existing vitest 环境问题时仅靠 sentinel 事件驱动，延迟发现
+2. 缺 §"PR 第一动作"硬约束——PM 自行判断"FF merge 快"违反 worker → PR → merge 标准路径
+3. 缺 §"范围控制"明文——PM 自己 docs 改动游离 worker PR 之外直接 commit 到 main
+4. 缺 §"收窄 envelope 不 lean"——worker spawn 默认带完整上下文无明文
+
+**决策**：
+
+在 `FaroPDF/AGENTS.md` Skill 强制调用章和完成标准章之间新增「多 Agent 并行与 PR 收口纪律」整章，4 条硬约束：
+
+1. **双层监测**（防 silent done）：sentinel + 定时巡检 ~15 min，缺一不可
+2. **收窄 envelope 不默认 lean**：worker spawn 默认带 AGENTS.md / DESIGN.md / Issue / 必读素材；lean 仅在 autocompact thrash 时临时用
+3. **PR 第一动作**：worker 提交后 PM 第一动作是 `gh pr create`（带 Issue ID / 变更摘要 / 验证 / 来源 / 文档 / Agent Attribution / 风险 7 段），不是 FF merge / 直接 commit
+4. **范围控制**：worker 不超 allowed files 范围，PM 自身 docs 改动也走 TASKS / DECISIONS / CHANGELOG 闭环，不游离 worker PR 之外直接 commit 到 main
+
+**不采纳**：
+
+- 全量借鉴 legal-ai-skill-book AGENTS.md 全部 256 行（含书稿特定的三线并行 A/B/C、写作门禁预判卡、引用格式）：FaroPDF 是代码项目不是书稿，借鉴范围过宽会引入不适配条款
+- 拆 §"任务类型与写作门禁"（5 类 + 作者意图预判卡）：FaroPDF 不需要"作者意图"层，spawn prompt 已含足够任务边界；保留 §"任务影响预判卡"思路到 §4 范围控制
+- 新建独立 `docs/MULTI-AGENT-WORKFLOW.md`：FaroPDF AGENTS.md 是项目级唯一协作规范入口；分文件会导致触达不到；融合进 AGENTS.md 更稳
+
+**实现**：
+
+- `AGENTS.md` Skill 强制调用表后插入 `## 多 Agent 并行与 PR 收口纪律` 整章（~50 行）
+- 4 条硬约束标题 + 触发条件 + 操作规则 + 关联 DEC 编号
+- 不修改其他章节
+
+**已知限制**：
+
+- 本章不覆盖 `subagent` / `Agent Teams` / `ACP adapter` 等其他执行模式（仅针对 `tmux + worktree` + 未来可能跨工具扩展）
+- 本章不覆盖 cross-agent-coordination（跨平台任务归属，由 `cross-agent-coordination` skill 自身负责）
+- 本章与 `multi-agent-orchestration` skill §2/§3/§7/§8 是「项目级硬约束」与「编排工具」关系：skill 给方法，AGENTS.md 给红线
+
+**关联**：
+
+- `multi-agent-orchestration` skill §2.1 防逃逸门禁 / §3 标准流程 / §7 巡检与介入 / §8 收口
+- DEC-142 ISS-059 Phase 1（多 Tab 顶部 bar）— Wave 1 W1 commit
+- DEC-144 ISS-NEW-A 阶段 1（Toolbar 5 段骨架）— Wave 1 W1 commit，本章落地的导火索
+- `project_multi_agent_state` memory（4 次 multi-agent 失败教训 + PM 单 session TDD 路径）
+- legal-ai-skill-book 项目 AGENTS.md（参考来源，非 git submodule）

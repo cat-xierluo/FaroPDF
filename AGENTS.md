@@ -78,6 +78,51 @@ FaroPDF 的协作依赖 `.claude/skills/` 下的 Skill 统一协议、门禁和�
 - Skill 加载后必须按其清单和门禁执行，不允许「看个大概就跳过」。
 - 触发表随项目 Skill 增删同步更新；新增 Skill 时必须在本节追加触发场景。
 
+## 多 Agent 并行与 PR 收口纪律
+
+开多 Agent session / worker 并行时，PM 必须按以下硬约束执行。违反任一条都视为协议违反，需 git revert 链或开 maintenance PR 修复，**不能直接 commit 修复**。
+
+### 1. 双层监测（防 silent done）
+
+worker spawn 后 PM **必须同时挂两层监测**，不能只挂 sentinel：
+
+- **① sentinel**（`multi-agent-orchestration` skill `scripts/sentinel.sh`，`run_in_background=true`）：worker 写 STATUS `done` 时 exit → harness 唤醒 PM。事件驱动的快路径。
+- **② 定时巡检**（`scripts/pm-monitor.sh --log-file` 或 PM 主动 `bash` 循环 ~15 min 一次）：检测 **silent done**——判据：tmux pane 回到 `❯` 就绪态 + worktree 已有 commit + 无 STATUS.json（或 STATUS 无 `done`）→ worker 完成了业务但跳过 STATUS / RESULT 协议，PM 主动收口（读 diff + pane 自述 + 验证 + 合并）。
+
+**原因**：worker 进程在不同 provider / 负载下指令遵循会波动——同 prompt 下有的写 STATUS、有的跳过（实测 2026-06-21 W1 ISS-NEW-A 撞 pre-existing vitest 环境问题时 STATUS 延迟更新）。只挂 sentinel 会漏掉 silent done，直到用户来问才发现。
+
+### 2. 收窄 envelope 不默认 lean
+
+worker spawn 默认带完整上下文（AGENTS.md / DESIGN.md / `docs/TASKS.md` 对应 Issue / `docs/DECISIONS.md` 已关闭 DEC 摘要 / 必读素材），不默认 `disableBundledSkills + 空 MCP` 的 lean 配方。lean 仅在 worker 真 autocompact thrash 时临时用，用完恢复完整上下文。
+
+### 3. PR 第一动作（worker 完成后 PM 第一动作 = 建 PR）
+
+worker 提交 commit 后，PM 第一动作是 **`gh pr create`**，**不是** `git merge --ff-only` 到 main、不是直接 commit docs 到 main、不是先推 local main 再 cherry-pick。任何形式的"绕过 PR 收口"都视为协议违反。
+
+PR 正文必须列：
+
+- 覆盖的 Issue ID（`ISS-NEW-A` 等）
+- 变更摘要（files / +/- 行数）
+- 验证方式（typecheck / test / lint / build / cargo check 实际结果）
+- 来源材料（`docs/TASKS.md` 对应章节、`docs/DECISIONS.md` 引用 DEC 编号）
+- 已更新的协作文档（CHANGELOG / DECISIONS / TASKS / ROADMAP）
+- Agent Attribution（Worker backend + provider slot + commit SHA）
+- 仍需人工确认的风险（pre-existing test 失败 / 类型约束变更 / 共享契约 race 等）
+
+PM 跑 `gh pr view --json mergeable,mergeStateStatus,baseRefOid,headRefOid` 做收口检查；merge 由用户 review 后执行。
+
+### 4. 范围控制（worker 不顺手扩大改动）
+
+Worker 只处理分配给自己的 Issue / 分组。执行中发现新缺陷、依赖或技术债时：
+
+- 先记到 `docs/TASKS.md` 新 Issue 卡（不在本 PR 范围）
+- 除非阻塞当前任务或用户明确要求，**不**顺手扩大本 PR 改动范围
+- 范围扩大判定：commit 修改文件超出 spawn prompt 列出的 allowed files 列表时，PM 应在 commit 后 review 阶段发现并要求 worker 拆 PR
+
+PM 自己也要遵守：本会话内新增文件 / 改 docs / 修 build 脚本等"顺手动作"也要走文档闭环（TASKS / DECISIONS / CHANGELOG），不能游离在 worker PR 之外直接 commit 到 main。
+
+**关联**：本节由 DEC-145 落地，2026-06-21 Wave 1 W1 (ISS-NEW-A 阶段 1) 协议违反后补强。
+
 ## 完成标准
 
 1. 功能或文档变更已完整落地。
