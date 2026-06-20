@@ -1188,6 +1188,28 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [ ] 编辑模式跨 tab 拖页：拖到目标 tab 的 drop zone 触发移动/复制
   - [ ] 多窗口共享 recentFiles / annotations
 
+### ISS-NEW-G Welcome 屏 + 状态栏语言切换 + Preferences 字段对齐
+
+- 优先级：P2
+- 类型：UI 信息架构 / 空态 / i18n / 设置
+- 来源：FEATURE_CATALOG §5.3 / §5.4 / §5.5；截图 13-preferences / 50 / 53 / 61-multi-tab-opened-2nd / 63-tab-bar-zoomed
+- 状态：未启动；可与 ISS-NEW-A / ISS-NEW-C 并行
+- 范围：
+  1. **Welcome 屏**（无 PDF 时）：3 段布局
+     - 顶部「转换」区：2 张卡片「图片转 PDF」「Word 转 PDF」
+     - 中部「打开 PDF 文档」：大蓝色「选择文件」按钮
+     - 底部「最近」区：4 张最近文件缩略图网格 + 右上「清除最近」链接
+  2. **状态栏语言切换**：底部 toggle（English / 简体中文），与 `appSettings.language` 联动
+  3. **OCR 模式底部状态**：光标位置 + 状态文字
+  4. **Preferences 字段对齐**：默认 PDF 查看应用 / PDF Expert 打开方式 / 关闭文档时的保存方式 / 作者 / 回到页面 / 页码指示符
+- 验收：
+  - [ ] Welcome 屏 3 段布局（截图 63 对齐）
+  - [ ] 「图片转 PDF」「Word 转 PDF」入口可点击（依赖 OCR pipeline / merge engine）
+  - [ ] 「最近」网格渲染最近 4 个文件缩略图
+  - [ ] 「清除最近」按钮一键清空 recentFiles
+  - [ ] 状态栏语言 toggle 切换后所有 UI 文字立即更新
+  - [ ] Preferences 字段 6 项与 PDF Expert 对齐
+
 
 
 ## 归档任务索引
