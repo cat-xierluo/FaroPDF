@@ -9,6 +9,11 @@
 - 与 `.claude/skills/computer-use`（capture 阶段）形成 pipeline 串联。
 - S4 反向验证：subagent 读新 catalog 返回 31 issues，已分流处理到 §14.3 派生规则 / §14.4 数据流 / §15.1 coverage gap。
 
+按 legal-skills AGENTS.md 规范补两个 skill 级别文档（仅本地，.claude/skills/ 在 .gitignore）：
+
+- `computer-use`：补 frontmatter（version / license / author / homepage）+ 依赖章节（cliclick 5.0.1 安装）+ 3 docs（CHANGELOG / TASKS / DECISIONS）
+- `feature-extract-from-screenshots`：补依赖章节（MCP 工具 / Agent / 上游 skill 依赖矩阵）+ 3 docs（CHANGELOG / TASKS / DECISIONS）
+
 多 Tab 顶部 bar（ISS-059 Phase 1，DEC-142）：
 
 多 Tab 顶部 bar（ISS-059 Phase 1，DEC-142）：
