@@ -33,6 +33,20 @@ interface PdfJsDocumentLike {
   getPage(pageNumber: number): Promise<PdfJsPageLike>;
 }
 
+/** ISS-069 端到端发现：auto-toc 算法需要 PDF.js 原始 TextContent（带 items 位置/字号）。
+ * LoadedPdfDocument.getPageText 返回扁平 string，丢失字号 / 位置，算法无法聚类。
+ * 暴露 raw TextContent 给 OCR 路径专用。 */
+export interface PdfRawTextContent {
+  items: ReadonlyArray<{
+    str?: string;
+    width?: number;
+    height?: number;
+    transform?: ReadonlyArray<number>;
+    fontName?: string;
+    hasEOL?: boolean;
+  }>;
+}
+
 interface PdfJsLoadingTaskLike {
   promise: Promise<PdfJsDocumentLike>;
   destroy?: () => Promise<void>;
@@ -47,6 +61,8 @@ export interface LoadedPdfDocument {
   metadata: ReaderLoadedMetadata;
   getPageViewport: (pageIndex: number, scale?: number) => Promise<PdfPageViewport>;
   getPageText: (pageIndex: number) => Promise<PdfPageText>;
+  /** 暴露 PDF.js 原始 TextContent（含 items / 字号 / transform）。auto-toc 等需要位置感知的算法使用。 */
+  getRawTextContent: (pageIndex: number) => Promise<PdfRawTextContent | null>;
   /** 将指定页渲染到 canvas 上 */
   renderPageToCanvas: (
     pageIndex: number,
@@ -326,6 +342,13 @@ export async function loadPdfFromBytes(
     },
     getPageViewport: (pageIndex, scale = 1) => readPageViewport(document, pageIndex, scale),
     getPageText: (pageIndex) => readPageText(document, pageIndex),
+    getRawTextContent: async (pageIndex) => {
+      const page = await document.getPage(pageIndex + 1);
+      if (!page.getTextContent) {
+        return null;
+      }
+      return (await page.getTextContent()) as PdfRawTextContent;
+    },
     renderPageToCanvas: (pageIndex, canvas, zoom, options) => renderPageToCanvas(document, pageIndex, canvas, zoom, options),
     renderThumbnail: (pageIndex, canvas, maxWidth) => renderThumbnail(document, pageIndex, canvas, maxWidth),
     destroy: () => loadingTask.destroy?.() ?? Promise.resolve(),

@@ -5919,3 +5919,72 @@ DEC-135 当时假设「升级 lopdf 0.34 即可获得 `Document::encrypt` API」
 - ✅ `npm run build` 通过（保留现有 Vite 大 chunk / node:* browser externalized warning）。
 - ✅ `cd src-tauri && cargo check` 通过（保留既有 unused warning）。
 - ✅ Vite dev 实操烟测：`http://127.0.0.1:5173/` 渲染 `[role="application"][aria-label="FaroPDF PDF 工作台"]`，console/page error = 0，截图 `/tmp/faropdf-review-fix-smoke.png`。
+
+## DEC-141 ISS-069 Playwright 端到端实操验证 + auto-toc getPage bug 修复
+
+- 时间：2026-06-19
+- 类型：Playwright E2E 实操 / 真 bug 修复 / 文档同步
+- 关联：ISS-069 / DEC-125 / DEC-126 / DEC-127
+
+**背景**：
+
+ISS-069 阶段 1+2+3 全 ship 后留 open follow-up：Playwright 端到端实操验证。本 session 用 Playwright MCP 起 vite dev server + 上传 6 页章节测试 PDF（auto-toc-test.pdf，含 6 个章节标题：Chapter 1/2 + 1.1/1.2/2.1/2.2）→ 工具菜单 → 「自动生成目录」。
+
+**真 bug 发现**：
+
+DEC-127 收口的算法 + 测试都通过，但实操点击出现 `loaded.getPage is not a function` 报错。根因：
+
+- `loadPdfFromBytes` 返回 `LoadedPdfDocument`（高阶抽象），不是 PDF.js 原始 `PdfJsDocumentLike`
+- `LoadedPdfDocument.getPageText` 返回扁平 string（丢失字号/位置/transform 信息）
+- auto-toc 算法需要原始 `TextContent`（含 items 的 transform 数组）做字号聚类 + 位置推断
+- AppShell.openAutoTocDialog 用 `(loaded as unknown as { getPage }).getPage(i + 1)` 是错误的 cast：`LoadedPdfDocument` 上根本没 `getPage` 方法，cast 后调用立即 throw
+
+**修复**：
+
+`src/modules/reader/pdfReaderService.ts`：
+
+- 新增 `PdfRawTextContent` 接口 + `LoadedPdfDocument.getRawTextContent(pageIndex): Promise<PdfRawTextContent | null>` 方法
+- 暴露 PDF.js 原始 TextContent 给 auto-toc 等需要位置感知的算法专用
+
+`src/components/layout/AppShell.tsx`：
+
+- openAutoTocDialog 用 `loaded.getRawTextContent(i)` 替代错误的 cast
+- 移除对 `loaded as unknown as ...` 的 hack
+
+测试 mock 同步更新（3 处）：
+
+- `src/modules/search/searchUi.test.tsx`（2 个 mock impl）
+- `src/modules/reader/useReaderController.test.tsx`
+
+**Playwright E2E 实操验证**（上传 auto-toc-test.pdf）：
+
+- ✓ 文字层可用
+- ✓ 「工具 > 自动生成目录」点击后正常加载，无 `getPage` 报错
+- ✓ 自动识别 4 个章节标题（1.1 Scope P2 / 1.2 Definitions P3 / 2.1 Attorney Standards P5 / 2.2 Client Communication P6）
+- ✓ 全部 default checked + 显示删除按钮 + 页码标记
+- ✓ 输出文件名 `auto-toc-test-auto-toc.pdf`（suggestOutputName + autoToc suffix）
+
+**已知限制**（v0.3 改进点）：
+
+- 纯英文 `Chapter N General Provisions` (P1) / `Chapter 2 Practice Rules` (P4) 未识别
+- 原因：`detectChapterHeadings` 的中文正则（第X章/节/条/款/项/编）只覆盖中文模式，英文 `Chapter N` 是另一套文本
+- 阿拉伯数字章节（1.1/1.2/2.1/2.2）已通过 `^(\d+(?:\.\d+)+)` 正则正确识别
+- 后续 v0.3 候选：扩展 detectChapterHeadings 加英文 `^Chapter\s+\d+` + `^Section\s+\d+` 正则
+
+**verification**：
+
+- ✅ `npm run typecheck` 0 error
+- ✅ `npm run lint` 0 warning
+- ✅ `npm test` 1221/1222 通过（唯一失败 pre-existing zoom DEC-099 已知）
+- ✅ Playwright 实操：bug 修复后对话框正常渲染 4 个章节，0 console error
+
+**ISS-069 全部 ship**：
+
+| 阶段 | commit / DEC | 状态 |
+|---|---|---|
+| 阶段 1：autoToc 算法 + 22 测试 | DEC-125 / commit 7788d0c | ✅ |
+| 阶段 2：AutoTocDialog UI + 15 测试 | DEC-126 / commit 8c2b11d | ✅ |
+| 阶段 3：OCR 衔接 fallback + AppShell 集成 | DEC-127 / commit 3c82c4a | ✅ |
+| **Playwright E2E 实操验证 + getPage bug 修复** | **DEC-141 / 本 commit** | ✅ |
+
+ISS-069 全量收口。

@@ -467,11 +467,12 @@ export function AppShell({
         const pages: import("../../modules/ocr/autoToc").PdfJsTextContentLike[] = [];
         let hasTextLayer = false;
         for (let i = 0; i < loaded.metadata.pageCount; i += 1) {
-          const page = await (loaded as unknown as {
-            getPage: (n: number) => Promise<{ getTextContent: () => Promise<import("../../modules/ocr/autoToc").PdfJsTextContentLike> }>;
-          }).getPage(i + 1);
-          const textContent = await page.getTextContent();
-          pages.push(textContent);
+          // DEC-141 Playwright E2E 修复：用 LoadedPdfDocument.getRawTextContent 替代错误的 cast
+          const textContent = await loaded.getRawTextContent(i);
+          if (!textContent) {
+            continue;
+          }
+          pages.push(textContent as unknown as import("../../modules/ocr/autoToc").PdfJsTextContentLike);
           const items = (textContent.items ?? []) as Array<Record<string, unknown>>;
           if (items.some((it) => typeof it.str === "string" && it.str.length > 0)) {
             hasTextLayer = true;

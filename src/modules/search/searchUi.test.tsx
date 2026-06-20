@@ -47,6 +47,7 @@ function mockLoadedPdf({
     },
     getPageViewport: vi.fn(),
     getPageText,
+    getRawTextContent: vi.fn(async () => null),
     renderPageToCanvas: vi.fn(async () => undefined),
     renderThumbnail: vi.fn(async () => undefined),
     destroy: vi.fn(async () => undefined),
@@ -127,20 +128,27 @@ describe("search UI integration", () => {
         fingerprint: undefined,
         pageCount: 1,
         initialViewport: {
-          pageIndex: 0,
-          width: 612,
-          height: 792,
-          rotation: 0,
-          scale: 1,
-        },
-        textLayerStatus: "available",
+        pageIndex: 0,
+        width: 612,
+        height: 792,
+        rotation: 0,
+        scale: 1,
       },
-      getPageViewport: vi.fn(),
-      getPageText: file.name === "first.pdf" ? firstGetPageText : secondGetPageText,
-      renderPageToCanvas: vi.fn(async () => undefined),
-      renderThumbnail: vi.fn(async () => undefined),
-      destroy: vi.fn(async () => undefined),
-    }));
+      textLayerStatus: "available" as const,
+    },
+    getPageViewport: vi.fn(async () => ({
+      pageIndex: 0,
+      width: 612,
+      height: 792,
+      rotation: 0 as const,
+      scale: 1,
+    })),
+    getPageText: firstGetPageText,
+    getRawTextContent: vi.fn(async () => null),
+    renderPageToCanvas: vi.fn(async () => undefined),
+    renderThumbnail: vi.fn(async () => undefined),
+    destroy: vi.fn(async () => undefined),
+  }));
     render(<App />);
 
     const fileInput = screen.getByLabelText("选择本地 PDF 文件");
