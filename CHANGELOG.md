@@ -1,6 +1,18 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~143。
+> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~144。
+
+Toolbar 5 段布局重构 + L2 tab 上移（ISS-NEW-A 阶段 1，DEC-144）：
+
+- `src/components/layout/types.ts` 新增 `AppToolbarSectionId = "sidebar-toggles" | "file" | "reading" | "mode" | "right"`：与 PDF Expert L3 5 段一一对应。
+- `src/components/layout/Toolbar.tsx` +171/-35：DOM 严格 5 段（`data-section` 标识），「A 批注」「T 编辑」按钮在 L3 第 4 段（mode 段，按 `activeMode` 切 `aria-pressed`），视图模式 `<select>` combobox → `role="radiogroup"` 4-icon toggle（单页 / 连续 / 双页 / 适合宽度，lucide 图标 Maximize2 / Rows3 / Columns2 / LayoutGrid）。
+- `src/components/layout/Toolbar.css` +86 新建：5 段 grid + 视图模式 toggle 样式（独立文件，不动全局 `src/styles/app.css`）。
+- `src/components/layout/AppShell.tsx` +18：集成 L2 tab 上移，`<TitlebarTabs>` 从 `<Toolbar>` 下方移到上方独立行（修复 ISS-059 Phase 1 / DEC-142 位置错误）。
+- `src/components/layout/AppShell.test.tsx` +105：5 段结构 + TitlebarTabs 位置断言。
+- `src/components/layout/Toolbar.test.tsx` +306 新建：5 段渲染 / A/T 切换 / 4-icon toggle 覆盖。
+- 关联：commit `5b2b285`（Wave 1 W1 worker ship 后 rebase FF merge 到 main），不修改 `package.json` / `pnpm-lock.yaml` / `src-tauri/**` / `src/shared/**` / `src/App.tsx` / 全局样式 / 其他模块。
+- 验证：`npm run typecheck` 过（rebase 后二次验证仍过）；`npm test -- --run` / `npm run lint` / `npm run build` / `cargo check` 未运行（pre-existing vitest 4.x + `html-encoding-sniffer`/`@exodus/bytes` ESM 冲突，main 仓库根也复现，与本次改动无关，详见 DEC-144 §Verification）。
+- Multi-agent 收口：Wave 1 W1 worker（minimax-1 slot）独立 worktree TDD 完成，W2 worker（ISS-NEW-G）14 min 0 commit 按 memory contingency graceful kill 释放配额；W2 任务留 PM 单 session 后续推进。
 
 `feature-extract-from-screenshots` skill 落地（ISS-NEW-K，DEC-143）：
 
