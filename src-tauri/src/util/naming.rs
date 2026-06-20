@@ -24,6 +24,7 @@ pub enum OutputSuffix {
     NoWatermark,
     Metadata,
     Cut,
+    Trimmed,
     Signed,
 }
 
@@ -47,6 +48,7 @@ impl OutputSuffix {
             OutputSuffix::NoWatermark => "no-watermark",
             OutputSuffix::Metadata => "metadata",
             OutputSuffix::Cut => "cut",
+            OutputSuffix::Trimmed => "trimmed",
             OutputSuffix::Signed => "signed",
         }
     }
@@ -182,6 +184,7 @@ mod tests {
             (OutputSuffix::PageNumbered, "a-page-numbered.pdf"),
             (OutputSuffix::Metadata, "a-metadata.pdf"),
             (OutputSuffix::Cut, "a-cut.pdf"),
+            (OutputSuffix::Trimmed, "a-trimmed.pdf"),
             (OutputSuffix::NoWatermark, "a-no-watermark.pdf"),
         ];
         for (suffix, expected) in cases {

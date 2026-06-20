@@ -26,6 +26,7 @@ export type OutputSuffix =
   | "no-watermark"            // 去水印（ISS-068）
   | "metadata"                // 文档属性写回（ISS-072）
   | "cut"                     // 拆双页 / 网格切（ISS-066）
+  | "trimmed"                 // 裁边切（ISS-066 阶段 2 后续）
   | "signed"                  // 手写签名（ISS-070）
   | "auto-toc";               // OCR 后自动生成目录（ISS-069）
 

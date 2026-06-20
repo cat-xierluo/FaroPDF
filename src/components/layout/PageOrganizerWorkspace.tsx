@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import type { ReaderController } from "../../modules/reader";
 import { createPdfOperationEngine } from "../../modules/export";
 import { splitPagesByGrid } from "../../modules/pages/scanSplit";
+import { trimPageMargins } from "../../modules/pages/trimMargins";
 import { SplitPagesDialog } from "./SplitPagesDialog";
+import { TrimMarginsDialog } from "./TrimMarginsDialog";
 import "./PageOrganizerWorkspace.css";
 
 /**
@@ -39,6 +41,7 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [extractDialogOpen, setExtractDialogOpen] = useState(false);
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
+  const [trimDialogOpen, setTrimDialogOpen] = useState(false);
   const lastClickedPageRef = useRef<number | null>(null);
   // 引擎单例：与 useFormController 同模式（每次渲染创建浪费，但 createPdfOperationEngine 轻量）
   const engineRef = useRef(createPdfOperationEngine());
@@ -155,6 +158,51 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
     setSplitDialogOpen(false);
   }, []);
 
+  const openTrimDialog = useCallback(() => {
+    setRewriteError(null);
+    setTrimDialogOpen(true);
+  }, []);
+
+  const closeTrimDialog = useCallback(() => {
+    setTrimDialogOpen(false);
+  }, []);
+
+  const handleConfirmTrim = useCallback(
+    async (options: {
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+      pageIndexes?: number[];
+      outputName: string;
+    }): Promise<boolean> => {
+      setRewriteBusy(true);
+      setRewriteError(null);
+      try {
+        const sourceBytes = await reader.getFileBytes();
+        if (!sourceBytes) {
+          throw new Error("未找到当前 PDF 的源文件字节。");
+        }
+        const newBytes = await trimPageMargins(new Uint8Array(sourceBytes), {
+          top: options.top,
+          right: options.right,
+          bottom: options.bottom,
+          left: options.left,
+          ...(options.pageIndexes ? { pageIndexes: options.pageIndexes } : {}),
+        });
+        await reader.saveUpdatedBytes(newBytes, options.outputName);
+        setTrimDialogOpen(false);
+        return true;
+      } catch (error) {
+        setRewriteError(error instanceof Error ? error.message : "裁边失败。");
+        return false;
+      } finally {
+        setRewriteBusy(false);
+      }
+    },
+    [reader],
+  );
+
   const handleConfirmSplit = useCallback(
     async (options: { rows: number; cols: number; pageIndexes?: number[]; outputName: string }): Promise<boolean> => {
       setRewriteBusy(true);
@@ -268,6 +316,15 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
             扫描拆页
           </button>
           <button
+            className="context-tool"
+            data-testid="page-organizer-trim-margins"
+            disabled={rewriteBusy}
+            onClick={openTrimDialog}
+            type="button"
+          >
+            裁边切
+          </button>
+          <button
             className="context-tool context-tool--primary"
             onClick={handleSaveAs}
             type="button"
@@ -363,6 +420,20 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
             // DEC-115 review P1-1：用 handleConfirmSplit 返回的 boolean 判断成败，
             // 不再读闭包里的 rewriteError（那是渲染时旧值，setRewriteError 要等下次渲染才反映）。
             void handleConfirmSplit(opts).then((ok) => {
+              if (ok) {
+                setAppliedActionCount((count) => count + 1);
+              }
+            });
+          }}
+        />
+      ) : null}
+      {trimDialogOpen ? (
+        <TrimMarginsDialog
+          defaultFileName={reader.state.document?.name ?? ""}
+          selectedPageNumbers={selectedPageNumbers.size > 0 ? Array.from(selectedPageNumbers).sort((a, b) => a - b) : undefined}
+          onClose={closeTrimDialog}
+          onConfirm={(opts) => {
+            void handleConfirmTrim(opts).then((ok) => {
               if (ok) {
                 setAppliedActionCount((count) => count + 1);
               }
