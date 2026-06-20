@@ -1072,40 +1072,33 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P0（v0.2 阻塞）
 - 类型：UI 信息架构 / Toolbar
 - 来源：FEATURE_CATALOG §0 / §1.2 / §1.3；截图 01 / 20 / 30 / 61 / 63 / 80
-- 状态：**阶段 1 已完成（2026-06-21，commit `5b2b285` / DEC-144 / Wave 1 W1 worker ship + rebase FF merge）；阶段 2 待启动**
+- 状态：待启动；依赖 ISS-055（已有 4 段 toolbar）+ ISS-059 (adcd8f0)（待校正位置）
 - 范围：
-  1. **L2 行 1**：`<TitlebarTabs>` 上移到 `<Toolbar>` **上方**作为独立行（修复 ISS-059 位置错误）— ✅ 阶段 1 完成
-  2. **L3 行 2**：`<Toolbar>` 重构为 5 段（sidebar toggles / file / reading / mode / right）— ✅ 阶段 1 完成
-  3. **左区**：4 个 sidebar toggle 图标（缩略图 / 大纲 / 批注 / 书签），对齐 PDF Expert L3 左区 — ⏳ 阶段 2（侧栏按钮已有 3 个，缺「书签」）
-  4. **文件区**：打开按钮保持（已是 icon-only）— ✅ 阶段 1 完成
-  5. **阅读区**：**瘦身到 4 元素** — 页码跳转 + 视图模式 4-icon toggle + 缩放% + -/+（**当前 10 元素超载**）— ⏳ 阶段 2（视图模式 toggle 已切，旋转/适合页面 6 个按钮还在 L3 段，留 ISS-NEW-B）
-  6. **模式切换区**：恢复「A 批注」「T 编辑」按钮（**当前缺失**，被 `工具` 启动器吸收）— ✅ 阶段 1 完成
-  7. **右区**：搜索 / 工具 / 设置保持 — ✅ 阶段 1 完成
-  8. **视图模式呈现**：combobox → 4-icon toggle（保持 viewMode 算法不变）— ✅ 阶段 1 完成
-  9. **`工具` 启动器仍保留**：作为 macOS 系统菜单 + 深层功能入口（ISS-055 不撤销），但**主模式入口**回到 L3 模式按钮 — ✅ 阶段 1 完成
+  1. **L2 行 1**：`<TitlebarTabs>` 上移到 `<Toolbar>` **上方**作为独立行（修复 ISS-059 位置错误）
+  2. **L3 行 2**：`<Toolbar>` 重构为 5 段（sidebar toggles / file / reading / mode / right）
+  3. **左区**：4 个 sidebar toggle 图标（缩略图 / 大纲 / 批注 / 书签），对齐 PDF Expert L3 左区
+  4. **文件区**：打开按钮保持（已是 icon-only）
+  5. **阅读区**：**瘦身到 4 元素** — 页码跳转 + 视图模式 4-icon toggle + 缩放% + -/+（**当前 10 元素超载**）
+  6. **模式切换区**：恢复「A 批注」「T 编辑」按钮（**当前缺失**，被 `工具` 启动器吸收）
+  7. **右区**：搜索 / 工具 / 设置保持
+  8. **视图模式呈现**：combobox → 4-icon toggle（保持 viewMode 算法不变）
+  9. **`工具` 启动器仍保留**：作为 macOS 系统菜单 + 深层功能入口（ISS-055 不撤销），但**主模式入口**回到 L3 模式按钮
 - 关键文件：
-  - `src/components/layout/Toolbar.tsx`（重构 5 段 + A/T 按钮 + 视图模式 4-icon toggle）— ✅ 阶段 1
-  - `src/components/layout/TitlebarTabs.tsx`（位置修正 — 已在 AppShell 集成中移至 Toolbar 上方）— ✅ 阶段 1
-  - `src/components/layout/AppShell.tsx`（集成 L2 上移 + Toolbar 5 段）— ✅ 阶段 1
-  - `src/components/layout/types.ts`（新增 `AppToolbarSectionId`）— ✅ 阶段 1
-  - `src/components/layout/Toolbar.css`（新建 — 5 段 grid + 视图模式 toggle 样式）— ✅ 阶段 1
-  - `src/components/layout/Toolbar.test.tsx`（新建 5 段 / A/T / 4-icon toggle 测试）— ✅ 阶段 1
-  - `src/components/layout/AppShell.test.tsx`（5 段结构 + TitlebarTabs 位置断言）— ✅ 阶段 1
+  - `src/components/layout/Toolbar.tsx`（重构 5 段）
+  - `src/components/layout/TitlebarTabs.tsx`（位置修正 — 当前已有，移到 Toolbar 上方）
+  - `src/components/layout/AppShell.tsx`（集成新布局）
+  - `src/components/layout/types.ts`（如需新增 `AppToolbarSection` 类型）
+  - `src/components/layout/Toolbar.test.tsx`（如不存在新建；如有扩展）
+  - `src/components/layout/AppShell.test.tsx`（更新 layout snapshot 测试）
 - 验收：
-  - [x] L2 tab bar 在 toolbar 上方独立行 — 阶段 1 验证
-  - [x] L3 toolbar 严格 5 段（DOM 结构 / data-section 属性）— 阶段 1 验证
-  - [ ] 阅读区只有 4 元素（页码 + 视图模式 4 图标 + 缩放% + -/+）— 阶段 2 + ISS-NEW-B
-  - [x] 视图模式 4 图标 toggle（不是 combobox）— 阶段 1 验证
-  - [x] 「A 批注」「T 编辑」按钮在 L3 第 4 段（点击切换 activeMode）— 阶段 1 验证
-  - [x] `工具` 启动器仍然存在（ISS-055 不动）— 阶段 1 验证
-  - [ ] 960×720 Playwright 实操：上传 PDF → tab 上方显示 / toolbar 5 段对齐 / 视图模式 4 图标可见 / A/T 模式按钮可见 — 阶段 2 验证（pre-existing vitest 环境问题修复后跑）
-  - [x] 全部既有测试通过 + 新增 5 段结构测试 — 阶段 1 验证（typecheck pass，vitest 待 pre-existing 环境修复后跑）
-
-- 阶段 1 收口（2026-06-21 / DEC-144）：
-  - 6 files / +664 / -36 / 1 commit
-  - Wave 1 W1 worker ship（独立 worktree `feat/iss-new-a-l2-tabbar`）→ rebase onto `e296211` → FF merge 到 main
-  - W2 worker（ISS-NEW-G）按 memory contingency graceful kill 释放 MiniMax 配额
-  - 已知限制：`npm test -- --run` / `npm run lint` / `npm run build` / `cargo check` 未运行（pre-existing vitest 4.x + `html-encoding-sniffer`/`@exodus/bytes` ESM 冲突，main 仓库根也复现，与本次改动无关）
+  - [ ] L2 tab bar 在 toolbar 上方独立行（用 Playwright 截图比对 30-multi-tab.png）
+  - [ ] L3 toolbar 严格 5 段（DOM 结构 / data-section 属性）
+  - [ ] 阅读区只有 4 元素（页码 + 视图模式 4 图标 + 缩放% + -/+）
+  - [ ] 视图模式 4 图标 toggle（不是 combobox）
+  - [ ] 「A 批注」「T 编辑」按钮在 L3 第 4 段（点击切换 activeMode）
+  - [ ] `工具` 启动器仍然存在（ISS-055 不动）
+  - [ ] 960×720 Playwright 实操：上传 PDF → tab 上方显示 / toolbar 5 段对齐 / 视图模式 4 图标可见 / A/T 模式按钮可见
+  - [ ] 全部既有测试通过 + 新增 5 段结构测试
 
 ### ISS-NEW-B 阅读辅助按钮下移 L4 二级工具条
 
