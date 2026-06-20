@@ -1282,6 +1282,35 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [ ] L3 模式附加按钮就位
   - [ ] 全部组件 Playwright 960×720 实操验证
 
+### ISS-NEW-J 残留 PDF Expert 细节（v0.3 候选，不阻塞 v0.2 收口）
+
+- 优先级：P3（v0.2 收口后）
+- 类型：UI 信息架构 / 表单 / 注释 / 全局拖入
+- 来源：FEATURE_CATALOG §5.6 / §5.8 / §5.9 / §5.10 四审补全（2026-06-21）
+- 状态：未启动；非 v0.2 阻塞项
+- 范围：
+  1. **表单填写 T mode 完整化**（§5.6）：
+     - 表单字段（text / checkbox / radio / listbox / combobox / button / signature）激活/输入 UI
+     - 表单字段 tooltip / 验证 / 必填提示
+     - 表单字段填充后自动保存到 PDF
+     - 表单 L4 工具条（按表单 mode）
+  2. **注释弹层**（§5.9）：
+     - 点击已存在批注弹评论 popover
+     - hover tooltip 显示批注作者 / 时间
+     - 批注 replies 列表
+  3. **全局 drop indicator**（§5.8）：
+     - 从 Finder 拖入 app 窗口时全局 drop 高亮
+     - 区别于 modal 内 drop zone 与跨 tab 拖页
+  4. **「新建指南」空 tab**（§5.10，YAGNI 不做）
+- 验收：
+  - [ ] 表单字段激活 / 输入 / 自动保存完整流程
+  - [ ] 点击批注弹评论 popover
+  - [ ] 全局 drop indicator 与现有 modal drop zone 区分清晰
+
+**不做**：
+- 撤销/重做 history 独立面板（YAGNI，L4 ↶↷ 按钮足够）
+- 「新建指南」向导（YAGNI，v0.2 律师场景 = 打开本地文件即可）
+
 
 
 ## 归档任务索引
