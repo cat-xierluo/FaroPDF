@@ -694,7 +694,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P0
 - 类型：UI 信息架构 / 窗口
 - 来源：PDF Expert 截图 30, 65, 83（窗口顶部文件 tab bar）
-- 状态：阶段 1 已完成（2026-06-20，DEC-142）；阶段 2+ 待启动（per-PDF reader state / 窗口标题同步 / 跨窗口剥离）
+- 状态：**需修正（2026-06-20）** — 阶段 1 (DEC-142 / adcd8f0) 已实现 tab store + UI 但**位置错误**（放在 toolbar 下面而非 toolbar 上面独立行 L2）。整个 toolbar 架构偏离 PDF Expert，需合并进 ISS-NEW-A 全量重做。Phase 2+ 验收项保留。
 - 目标：
   1. 同一窗口内开多个 PDF tab；右上角 `+` 新建 tab；选中 tab 内编辑。
   2. Tab 标题可 inline rename（双击进入编辑态、ESC 取消、Enter 提交）。
@@ -702,11 +702,11 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   4. 不引入新依赖；不破坏现有 `recentFiles`/`utilityPanel` 状态。
 - 关键文件：`src/state/tabStore.tsx`、`src/components/layout/TitlebarTabs.tsx` / `TitlebarTabs.css`，与 `AppShell.tsx` + `App.tsx` 集成。
 - 验收：
-  - [x] Phase 1：tab 列表 / 单文件独立关闭 / 激活切换 / 双击 inline rename（Enter / Esc / 空字符串清除）/ HTML5 拖放重排 / `+` 新建按钮 / dirty 标记预留接口。
+  - [x] Phase 1：tab 列表 / 单文件独立关闭 / 激活切换 / 双击 inline rename（Enter / Esc / 空字符串清除）/ HTML5 拖放重排 / `+` 新建按钮 / dirty 标记预留接口。**位置错误**，需随 ISS-NEW-A 校正为 L2 独立行。
   - [ ] Phase 2：单窗口 ≥ 3 PDF 同时打开（per-PDF reader state，目前 AppShell 仍单 reader → 切换 tab 实际是切文档而非独立 reader）。
   - [ ] Phase 2：tab 重命名后，主窗口标题同步（Tauri `setTitle`） + 最近文件命名同步（`recentFiles` 感知 customTitle）。
   - [ ] Phase 3：tab 拖离窗口剥离生成独立窗口（Tauri `WebviewWindow` 新建 IPC + drag detach 手势）。
-- 备注：阶段 1 仅 tab UI + state + tab 切换。Per-PDF reader / 跨窗口剥离需 Tauri 多窗口 IPC 与 reader 状态结构改造，留阶段 2+。
+- 备注：阶段 1 仅 tab UI + state + tab 切换，但**位置违反 PDF Expert L2 行 1 架构**（参考 §1.2）。完整位置校正见 ISS-NEW-A。
 
 ### ISS-060 左 + 右 双侧栏（模式驱动侧栏内容）
 
@@ -1062,6 +1062,131 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - DEC-104（Wave 1 multi-agent 失败教训 + 单 session 替代路径）
 - DEC-105（ISS-071 阶段 1 工程基础设施落地）
 - skill 侧 v1.16.2（multi-agent 启动注意事项警示）
+
+## ISS-NEW-A ~ F：v0.2 PDF Expert 工具栏 + tab 全量对齐（基于 2026-06-20 截图复核）
+
+> 立项依据：研究 `research/pdf-expert/FEATURE_CATALOG.md`（含 §0 顶层架构 5 层分层 + §1.2 tab 位置 + §1.3 toolbar 5 段 + §2 L4 二级工具条 + §3 L5b 右栏 + §4 菜单栏 + §7.1/7.2 批注工具 + §9 多 tab）后，发现 ISS-059 (DEC-142 / adcd8f0) 的 tab bar 位置错误 + 整个 Toolbar 偏离 PDF Expert 5 段布局，需要从 PDF Expert 视角重新拆分 v0.2 收口工作。
+
+### ISS-NEW-A Toolbar 5 段布局重构（L2 + L3 一票否决）
+
+- 优先级：P0（v0.2 阻塞）
+- 类型：UI 信息架构 / Toolbar
+- 来源：FEATURE_CATALOG §0 / §1.2 / §1.3；截图 01 / 20 / 30 / 61 / 63 / 80
+- 状态：待启动；依赖 ISS-055（已有 4 段 toolbar）+ ISS-059 (adcd8f0)（待校正位置）
+- 范围：
+  1. **L2 行 1**：`<TitlebarTabs>` 上移到 `<Toolbar>` **上方**作为独立行（修复 ISS-059 位置错误）
+  2. **L3 行 2**：`<Toolbar>` 重构为 5 段（sidebar toggles / file / reading / mode / right）
+  3. **左区**：4 个 sidebar toggle 图标（缩略图 / 大纲 / 批注 / 书签），对齐 PDF Expert L3 左区
+  4. **文件区**：打开按钮保持（已是 icon-only）
+  5. **阅读区**：**瘦身到 4 元素** — 页码跳转 + 视图模式 4-icon toggle + 缩放% + -/+（**当前 10 元素超载**）
+  6. **模式切换区**：恢复「A 批注」「T 编辑」按钮（**当前缺失**，被 `工具` 启动器吸收）
+  7. **右区**：搜索 / 工具 / 设置保持
+  8. **视图模式呈现**：combobox → 4-icon toggle（保持 viewMode 算法不变）
+  9. **`工具` 启动器仍保留**：作为 macOS 系统菜单 + 深层功能入口（ISS-055 不撤销），但**主模式入口**回到 L3 模式按钮
+- 关键文件：
+  - `src/components/layout/Toolbar.tsx`（重构 5 段）
+  - `src/components/layout/TitlebarTabs.tsx`（位置修正 — 当前已有，移到 Toolbar 上方）
+  - `src/components/layout/AppShell.tsx`（集成新布局）
+  - `src/components/layout/types.ts`（如需新增 `AppToolbarSection` 类型）
+  - `src/components/layout/Toolbar.test.tsx`（如不存在新建；如有扩展）
+  - `src/components/layout/AppShell.test.tsx`（更新 layout snapshot 测试）
+- 验收：
+  - [ ] L2 tab bar 在 toolbar 上方独立行（用 Playwright 截图比对 30-multi-tab.png）
+  - [ ] L3 toolbar 严格 5 段（DOM 结构 / data-section 属性）
+  - [ ] 阅读区只有 4 元素（页码 + 视图模式 4 图标 + 缩放% + -/+）
+  - [ ] 视图模式 4 图标 toggle（不是 combobox）
+  - [ ] 「A 批注」「T 编辑」按钮在 L3 第 4 段（点击切换 activeMode）
+  - [ ] `工具` 启动器仍然存在（ISS-055 不动）
+  - [ ] 960×720 Playwright 实操：上传 PDF → tab 上方显示 / toolbar 5 段对齐 / 视图模式 4 图标可见 / A/T 模式按钮可见
+  - [ ] 全部既有测试通过 + 新增 5 段结构测试
+
+### ISS-NEW-B 阅读辅助按钮下移 L4 二级工具条
+
+- 优先级：P1
+- 类型：UI 信息架构 / Toolbar
+- 来源：FEATURE_CATALOG §1.3 + §2；截图 04 / 05 / 06
+- 状态：待启动；依赖 ISS-NEW-A
+- 范围：
+  1. 把当前 L3 阅读控制区的 6 个额外按钮（逆时针 / 顺时针 / 适合页面）下移到 L4 二级工具条
+  2. 「适合页面」/「实际大小」也可走 macOS 视图菜单（FEATURE_CATALOG §4 视图菜单）
+  3. Toolbar 阅读区瘦身到 4 元素（详见 ISS-NEW-A 第 5 项）
+- 验收：
+  - [ ] L3 阅读区无旋转 / 适合页面按钮
+  - [ ] L4 二级工具条出现旋转（逆 / 顺）+ 适合页面（在「适合宽度」模式下隐藏）
+  - [ ] macOS 视图菜单「实际大小」「适合页面」可用
+
+### ISS-NEW-C 右侧 mode-driven panel 体系（L5b）
+
+- 优先级：P0（v0.2 阻塞）
+- 类型：UI 信息架构 / 侧栏
+- 来源：FEATURE_CATALOG §3；截图 20 / 36 / 50 / 53 / 55 / 57-60 / 61-multi-tab-opened-2nd
+- 状态：部分已实现（ISS-060 阶段 2 部分 ship）；依赖 ISS-NEW-A
+- 范围：完整 `<RightPanel>` 组件 + `rightPanelMode` 状态，按触发切换内容：
+  | 触发 | 内容 | 状态 |
+  | --- | --- | --- |
+  | 阅读默认 | 折叠 | ✅ 等价 |
+  | 批注 / 形状 | 颜色选择 + 工具切换 + 形状选择（矩形/椭圆/箭头/双向/直线/铅笔）+ 线条宽度 + 透明度 + 边框/填充色 | ❌ 缺 |
+  | 签名 | 手写签名缩略图列表 | ✅ ISS-070 |
+  | 图章 | 标准 2×2 + 自定义 tab | ✅ ISS-062 |
+  | OCR / 扫描 | 状态 + 页码范围 + 开始按钮 | ⚠️ 模式 toolbar 有，右栏缺 |
+  | 搜索 | 命中列表 + 上下导航 + 回到第 1 项 | ❌ 当前是 popover，需迁 L5b |
+  | 文档摘要 | 文件信息缩略图 + 元数据 | ❌ 缺（截图 61 显示 PDF Expert 双 tab 时右栏是文档摘要） |
+- 验收：
+  - [ ] 形状工具右栏：6 形状选择 + 宽度滑块 + 透明度滑块 + 边框/填充色块（对齐截图 57-60）
+  - [ ] 搜索右栏：命中列表 + 上下导航 + 回到第 1 项（对齐截图 36）
+  - [ ] 文档摘要右栏：文件信息 + 元数据（对齐截图 61）
+  - [ ] OCR 模式右栏：状态 + 页码范围 + 开始按钮（对齐截图 53）
+  - [ ] 旧 popover / utilityPanel 平滑迁移
+
+### ISS-NEW-D macOS 菜单栏中文化补齐
+
+- 优先级：P2
+- 类型：菜单栏 / i18n
+- 来源：FEATURE_CATALOG §4；截图 37 / 38 / 39 / 40
+- 状态：部分已建（ISS-032）；依赖现有 nativeMenuBridge
+- 范围：补齐「批注」「编辑 PDF」「扫描」「前往」4 个菜单的中文化 + Tauri 桥接
+  - 批注：高亮 / 下划线 / 删除线 / 文本 / 笔 / 橡皮擦 / 便签 / 形状 / 链接 / 内容表
+  - 编辑 PDF：编辑 / 添加图像 / 添加链接 / 添加文字 / 隐藏
+  - 扫描：增强扫描 / 扫描至可搜索 / OCR 文字 / 调整为可搜索
+  - 前往：首页 / 末页 / 上一页 / 下一页 / 历史记录 / 返回
+- 验收：
+  - [ ] 4 个菜单的中文 label 与快捷键正确
+  - [ ] 菜单触发后调起对应 action（批注/扫描需对应 ISS-NEW-A / ISS-NEW-C）
+  - [ ] 全部命令在 `commands.ts` 注册
+
+### ISS-NEW-E L4 模式二级工具条统一抽象
+
+- 优先级：P1
+- 类型：UI 信息架构 / Toolbar
+- 来源：FEATURE_CATALOG §2；截图 20 / 21 / 53 / 56 / 80 / 81
+- 状态：部分已实现（OcrModeToolbar / TextSelectionToolbar）；依赖 ISS-NEW-A
+- 范围：`<ModeSecondaryToolbar>` 组件按 `activeMode` 切换内容：
+  - 阅读：空
+  - 批注：高亮 / 下划线 / 删除线 / 文本 / 笔 / 橡皮擦 / 便签 / 形状 + 颜色选择
+  - 编辑：插入页（5 子菜单：占位 / 来自文件 / 来自扫描 / 空白页 / 位置选择）+ 删除 + 提取 + 旋转（逆 / 顺）+ 撤销 / 重做 + 移动 / 复制
+  - 扫描：扫描切边 / 增强扫描 + 页码范围 + 开始按钮
+- 验收：
+  - [ ] L4 二级工具条按 activeMode 切换内容
+  - [ ] 阅读模式不渲染 L4
+  - [ ] 编辑模式 L4 显示「插入页」下拉 + 删除/提取/旋转 + 撤销/重做 + 页数
+  - [ ] OCR 模式 L4 显示扫描切边/增强扫描 + 页码范围 + 开始
+
+### ISS-NEW-F tab 拖离窗口剥离 + 跨窗口状态共享
+
+- 优先级：P3（v0.2 收尾）
+- 类型：UI 信息架构 / Tauri IPC
+- 来源：FEATURE_CATALOG §9；截图 30 / 80-83
+- 状态：未启动；依赖 ISS-NEW-A + ISS-NEW-E
+- 范围：
+  1. tab drag detach 手势（拖到窗口外 → 创建新窗口）
+  2. Tauri `WebviewWindow` 新建 IPC
+  3. 文档句柄表（多窗口共享同一文档状态）
+  4. 跨 tab 拖页（截图 81）：编辑模式下从 tab A 拖页到 tab B
+- 验收：
+  - [ ] tab 拖离窗口外 → 新窗口创建并接管该 tab
+  - [ ] 新窗口能继续读取文档
+  - [ ] 编辑模式跨 tab 拖页：拖到目标 tab 的 drop zone 触发移动/复制
+  - [ ] 多窗口共享 recentFiles / annotations
 
 
 
