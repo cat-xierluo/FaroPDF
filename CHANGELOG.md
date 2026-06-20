@@ -785,3 +785,14 @@ v0.3 follow-ups（已在 `docs/RELEASE.md §4` 文档化，不阻塞 beta.1）�
 - 验证：75 个测试文件 / 692 个测试全部通过（19 项新测试：ReaderCanvas 4 + 1 / PageOrganizerWorkspace 8 / OcrWorkspaceHeader 7 — 同步 searchUi 文本断言调整 3 处）；`npm run typecheck` 干净；`npm run build` 成功；`cargo check --manifest-path src-tauri/Cargo.toml --offline` 干净。
 - 已知限制：页面管理 Undo 是占位 UI（仅计数 + 视觉 enabled 切换，未接 pageOrganizer service 真实 history/undo）；OCR 参数区是只读展示，改 provider / qualityCheck / networkConsent 仍需走「设置 → OCR provider」面板（后续 ISS-022 浮层收口时可让 OcrWorkspaceHeader 各项点击直接打开对应 section）；`/tmp/faropdf-ui-sample.pdf` 在本会话期间不存在，视觉验证以 dev server + 浏览器打开 `/` 即可，无须 fixture PDF 即可观察空态 + 模式切换。
 - 4 个 milestone commit + 1 个文档 commit = 5 commit。
+
+按 Wave 1 协议违反教训强化 AGENTS.md（DEC-145）：
+
+- `AGENTS.md` 新增「多 Agent 并行与 PR 收口纪律」整章（4 条硬约束）：
+  - **双层监测**（防 silent done）：sentinel + 定时巡检 ~15 min
+  - **收窄 envelope 不默认 lean**：worker spawn 默认带 AGENTS.md / DESIGN.md / Issue / 必读素材
+  - **PR 第一动作**：worker 提交后 PM 立即 `gh pr create`（7 段 PR 正文：Issue ID / 变更摘要 / 验证 / 来源 / 文档 / Agent Attribution / 风险）
+  - **范围控制**：worker 不超 allowed files；PM 自身 docs 改动也走 TASKS / DECISIONS / CHANGELOG 闭环
+- 导火索：Wave 1 W1 (ISS-NEW-A 阶段 1) ship 后 PM 直接 `git merge --ff-only` 跳 PR 流程，违反 `multi-agent-orchestration` §8.0；git revert 链修复后落地本章
+- 不覆盖 subagent / Agent Teams / ACP 等其他执行模式（仅针对 `tmux + worktree`）
+
