@@ -1,0 +1,86 @@
+/**
+ * ISS-NEW-A 阶段 1：Toolbar 5 段骨架 + 视图模式 4-icon toggle
+ *
+ * 5 段（与 data-section 一一对应）：
+ *   sidebar-toggles | file | reading | mode | right
+ *
+ * 与全局 .toolbar (src/styles/app.css) 协作：保留原来的 4 列 grid，把
+ * .toolbar__section 映射到对应的 grid column；不动其他模块的样式。
+ */
+
+.toolbar {
+  display: grid;
+  /* 5 段：sidebar-toggles / file / reading / mode / right */
+  grid-template-columns: max-content max-content minmax(326px, 1fr) max-content minmax(240px, 360px);
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.toolbar__section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.toolbar__section--right {
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.toolbar__section--sidebar-toggles {
+  gap: 2px;
+}
+
+/* 视图模式 4-icon toggle：4 个 radio 风格按钮排成一行 */
+.toolbar-viewmode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  height: 32px;
+  padding: 0 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-strong);
+  color: var(--muted);
+}
+
+.toolbar-viewmode__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.toolbar-viewmode__option:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.toolbar-viewmode__option[aria-checked="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.toolbar-viewmode__option:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.toolbar-viewmode__option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
