@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useEffect } from "react";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, test, vi } from "vitest";
 import type { PdfAnnotation } from "../../shared/pdf/annotation";
@@ -10,7 +11,7 @@ import type { TextSearchController } from "../../modules/search";
 import type { OcrCommandJob } from "../../shared/ocr/jobQueue";
 import { createInitialAnnotationToolState } from "../../modules/annotation";
 import { AppShell } from "./AppShell";
-import { TabProvider } from "../../state/tabStore";
+import { TabProvider, useTabStore } from "../../state/tabStore";
 import type { AnnotationArmedStateBundle, AppModeId, UtilityPanelId } from "./types";
 import type { OcrWorkspaceController } from "../../modules/ocr";
 import type { AppCommandSignal } from "../../shared/app/commands";
@@ -1097,5 +1098,107 @@ describe("AppShell AnnotationOverlay ↔ AnnotationSidebar active 联动 (ISS-02
     const sidebarAfterReturn = document.querySelector('[data-annotation-row-id="ann-page1"]') as HTMLElement;
     expect(sidebarAfterReturn).not.toHaveClass("annotation-sidebar__row-button--active");
     expect(sidebarAfterReturn.getAttribute("aria-current")).not.toBe("true");
+  });
+});
+
+describe("AppShell ISS-NEW-A 阶段 1：Toolbar 5 段骨架 + L2 tab 上移", () => {
+  test("Toolbar 包含 5 段（data-section=sidebar-toggles|file|reading|mode|right）且 DOM 严格 5 段", () => {
+    const { container } = renderAppShell({ utilityPanel: "none" });
+
+    const toolbar = container.querySelector('[data-testid="app-toolbar"]');
+    expect(toolbar).not.toBeNull();
+
+    const sections = toolbar ? Array.from(toolbar.querySelectorAll<HTMLElement>("[data-section]")) : [];
+    expect(sections).toHaveLength(5);
+
+    const sectionIds = sections.map((el) => el.dataset.section);
+    expect(sectionIds).toEqual([
+      "sidebar-toggles",
+      "file",
+      "reading",
+      "mode",
+      "right",
+    ]);
+
+    // DOM 顺序与 contract 一致；任何插入 / 调换 / 缺段会让测试红。
+    expect(sections[0]).toHaveAttribute("aria-label", "侧栏切换");
+    expect(sections[1]).toHaveAttribute("aria-label", "文件操作");
+    expect(sections[2]).toHaveAttribute("aria-label", "阅读控制");
+    expect(sections[3]).toHaveAttribute("aria-label", "模式切换");
+    expect(sections[4]).toHaveAttribute("aria-label", "搜索和设置");
+  });
+
+  test("TitlebarTabs 渲染在 Toolbar 上方（独立行，不嵌在 Toolbar 内）", () => {
+    const { container } = renderAppShell({ utilityPanel: "none" });
+
+    const appShell = container.querySelector(".app-shell");
+    expect(appShell).not.toBeNull();
+    if (!appShell) return;
+
+    const children = Array.from(appShell.children);
+    // 第一个可视子节点是 TitlebarTabs；第二个才是 Toolbar（5 段骨架）
+    expect(children[0]?.classList.contains("titlebar-tabs")).toBe(true);
+    expect(children[1]?.classList.contains("toolbar")).toBe(true);
+
+    const toolbar = container.querySelector('[data-testid="app-toolbar"]');
+    // TitlebarTabs 不允许嵌在 Toolbar 内（修复 ISS-059 / DEC-142 的位置错误）
+    expect(toolbar?.querySelector(".titlebar-tabs")).toBeNull();
+  });
+
+  test("L2 tab 上移：TitlebarTabs 在有 tab 时先于 Toolbar 渲染", async () => {
+    // 通过 OpenTabHarness 让 tabStore 有一条 tab → TitlebarTabs 才会渲染
+    function OpenTabsHarness(): import("react").ReactElement {
+      const store = useTabStore();
+      useEffect(() => {
+        store.openTab("/case/a.pdf", "a.pdf");
+      }, [store]);
+      return <></>;
+    }
+
+    const { container } = render(
+      <TabProvider>
+        <OpenTabsHarness />
+        <AppShell
+          activeMode="read"
+          onModeChange={() => undefined}
+          onUtilityPanelChange={() => undefined}
+          reader={makeReader()}
+          search={makeSearch()}
+          settings={makeSettings()}
+          utilityPanel="none"
+        />
+      </TabProvider>,
+    );
+
+    // 等 TitlebarTabs 出现
+    await waitFor(() => {
+      expect(container.querySelector(".titlebar-tabs")).not.toBeNull();
+    });
+
+    const appShell = container.querySelector(".app-shell");
+    expect(appShell).not.toBeNull();
+    if (!appShell) return;
+
+    const titlebar = appShell.querySelector(".titlebar-tabs") as HTMLElement | null;
+    const toolbar = appShell.querySelector('[data-testid="app-toolbar"]') as HTMLElement | null;
+    expect(titlebar).not.toBeNull();
+    expect(toolbar).not.toBeNull();
+    if (!titlebar || !toolbar) return;
+
+    // 用 compareDocumentPosition 断言 titlebar 在 toolbar 之前
+    const relation = titlebar.compareDocumentPosition(toolbar);
+    // DOCUMENT_POSITION_FOLLOWING (4) 表示 toolbar 在 titlebar 之后
+    expect(relation & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test("5 段中每个段至少含一个可访问按钮（contract sanity）", () => {
+    const { container } = renderAppShell({ utilityPanel: "none" });
+    const toolbar = container.querySelector('[data-testid="app-toolbar"]');
+    const sections = Array.from(toolbar?.querySelectorAll<HTMLElement>("[data-section]") ?? []);
+
+    for (const section of sections) {
+      const buttons = section.querySelectorAll("button");
+      expect(buttons.length).toBeGreaterThan(0);
+    }
   });
 });

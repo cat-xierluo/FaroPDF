@@ -1,5 +1,19 @@
 export type AppModeId = "read" | "annotate" | "export" | "forms" | "ocr" | "pages";
 
+/** ISS-NEW-A 阶段 1：Toolbar 5 段 id（与 Toolbar.tsx data-section 一一对应）。
+ *  - sidebar-toggles: 侧栏切换 3 个按钮（摘要 / 页面 / 视图设置）
+ *  - file:           打开按钮（隐藏 file input）
+ *  - reading:        页码导航 + 缩放 +/- + 视图模式 4-icon toggle
+ *  - mode:           A 批注 / T 编辑 按钮
+ *  - right:          搜索框 + 工具 launcher + 设置
+ */
+export type AppToolbarSectionId =
+  | "sidebar-toggles"
+  | "file"
+  | "reading"
+  | "mode"
+  | "right";
+
 export type UtilityPanelId =
   | "summary"
   | "view"
