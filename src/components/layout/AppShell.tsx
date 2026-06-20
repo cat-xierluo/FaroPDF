@@ -638,6 +638,15 @@ export function AppShell({
 
   return (
     <div className="app-shell" role="application" aria-label="FaroPDF PDF 工作台">
+      <Toolbar
+        activeMode={activeMode}
+        onCommand={executeCommand}
+        onModeChange={onModeChange}
+        onUtilityPanelChange={onUtilityPanelChange}
+        reader={reader}
+        search={search}
+        utilityPanel={utilityPanel}
+      />
       <TitlebarTabs
         onRequestNewTab={() => {
           // + 号：触发 Toolbar 的隐藏 file input，复用"打开"按钮
@@ -648,15 +657,6 @@ export function AppShell({
             fileInput?.click();
           }
         }}
-      />
-      <Toolbar
-        activeMode={activeMode}
-        onCommand={executeCommand}
-        onModeChange={onModeChange}
-        onUtilityPanelChange={onUtilityPanelChange}
-        reader={reader}
-        search={search}
-        utilityPanel={utilityPanel}
       />
       {showContextToolbar ? (
         <ContextToolbar

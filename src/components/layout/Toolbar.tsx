@@ -1,30 +1,24 @@
 import {
   ChevronLeft,
   ChevronRight,
-  Columns2,
   FileUp,
   LayoutGrid,
-  Maximize2,
   Minus,
   PanelLeft,
   PanelTop,
-  PencilLine,
   Plus,
-  Rows3,
   Search,
   Settings,
-  StickyNote,
   Wrench,
 } from "lucide-react";
-import "./Toolbar.css";
 import { useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
-import { formatZoom } from "../../modules/reader/readerLabels";
+import { formatZoom, viewModeLabels } from "../../modules/reader/readerLabels";
 import type { PdfViewMode } from "../../shared/pdf/types";
 import { getToolLauncherSections, type AppCommandId } from "../../shared/app/commands";
 import { getModeTools, type ToolbarState } from "./toolbarRegistry";
-import type { AppModeId, AppToolbarSectionId, UtilityPanelId } from "./types";
+import type { AppModeId, UtilityPanelId } from "./types";
 
 interface ToolbarProps {
   activeMode: AppModeId;
@@ -42,19 +36,6 @@ const fileInputStyle: CSSProperties = {
   height: 1,
   opacity: 0,
 };
-
-interface ViewModeOption {
-  id: PdfViewMode;
-  label: string;
-  icon: typeof Rows3;
-}
-
-const VIEW_MODE_OPTIONS: ReadonlyArray<ViewModeOption> = [
-  { id: "single", label: "单页", icon: Maximize2 },
-  { id: "continuous", label: "连续", icon: Rows3 },
-  { id: "double", label: "双页", icon: Columns2 },
-  { id: "fit-width", label: "适合宽度", icon: LayoutGrid },
-];
 
 export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelChange, reader, search, utilityPanel }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,11 +56,8 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
     }
   }
 
-  function handleViewModeChange(next: PdfViewMode) {
-    if (next === viewMode) {
-      return;
-    }
-    reader.setViewMode(next);
+  function handleViewModeChange(event: ChangeEvent<HTMLSelectElement>) {
+    reader.setViewMode(event.target.value as PdfViewMode);
   }
 
   function openUtilityPanel(panel: UtilityPanelId) {
@@ -87,26 +65,13 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
     onUtilityPanelChange(utilityPanel === panel ? "none" : panel);
   }
 
-  function enterMode(mode: AppModeId) {
-    // 「A 批注」「T 编辑」按钮：复用现有 onModeChange；重复点击 toggle 回 read。
-    // 不新建 mode 注册 —— 现有 AppModeId 已含 "annotate"，edit mode 与 read 共用一组
-    //（v0.2 ISS-NEW-A 阶段 1 仅占位入口，详细行为交由后续阶段）。
-    onModeChange(activeMode === mode ? "read" : mode);
-  }
-
   return (
-    <header className="toolbar" data-testid="app-toolbar">
-      <div
-        className="toolbar__section toolbar__section--sidebar-toggles"
-        data-section="sidebar-toggles"
-        role="group"
-        aria-label="侧栏切换"
-      >
+    <header className="toolbar">
+      <div className="toolbar__group toolbar__group--layout" aria-label="页面布局">
         <button
           aria-label="文档摘要"
           aria-pressed={utilityPanel === "summary" && activeMode !== "pages"}
           className="tool-button tool-button--icon tool-button--compact"
-          data-toolbar-section="sidebar-toggles"
           onClick={() => openUtilityPanel("summary")}
           title="文档摘要"
           type="button"
@@ -117,7 +82,6 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
           aria-label="页面管理"
           aria-pressed={activeMode === "pages"}
           className="tool-button tool-button--icon tool-button--compact"
-          data-toolbar-section="sidebar-toggles"
           onClick={() => onModeChange(activeMode === "pages" ? "read" : "pages")}
           title="页面管理"
           type="button"
@@ -128,7 +92,6 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
           aria-label="视图设置"
           aria-pressed={utilityPanel === "view" && activeMode !== "pages"}
           className="tool-button tool-button--icon tool-button--compact"
-          data-toolbar-section="sidebar-toggles"
           onClick={() => openUtilityPanel("view")}
           title="视图设置"
           type="button"
@@ -136,12 +99,7 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
           <PanelTop size={16} />
         </button>
       </div>
-      <div
-        className="toolbar__section toolbar__section--file"
-        data-section="file"
-        role="group"
-        aria-label="文件操作"
-      >
+      <div className="toolbar__group" aria-label="文件操作">
         <input
           accept="application/pdf,.pdf"
           aria-label="选择本地 PDF 文件"
@@ -150,39 +108,25 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
           style={fileInputStyle}
           type="file"
         />
-        <button
-          className="tool-button tool-button--primary"
-          data-toolbar-section="file"
-          onClick={() => fileInputRef.current?.click()}
-          type="button"
-        >
+        <button className="tool-button tool-button--primary" onClick={() => fileInputRef.current?.click()} type="button">
           <FileUp size={16} />
           <span>打开</span>
         </button>
       </div>
-      <div
-        className="toolbar__section toolbar__section--reading"
-        data-section="reading"
-        role="group"
-        aria-label="阅读控制"
-      >
+      <div className="toolbar__pager" aria-label="阅读控制">
         <button
           aria-label="上一页"
           className="compact-button"
-          data-toolbar-section="reading"
           disabled={!document || currentPage <= 1}
           onClick={() => reader.setCurrentPage(currentPage - 1)}
           type="button"
         >
           <ChevronLeft size={16} />
         </button>
-        <span className="page-control" data-toolbar-section="reading">
-          {pageControlLabel}
-        </span>
+        <span className="page-control">{pageControlLabel}</span>
         <button
           aria-label="下一页"
           className="compact-button"
-          data-toolbar-section="reading"
           disabled={!document || currentPage >= pageCount}
           onClick={() => reader.setCurrentPage(currentPage + 1)}
           type="button"
@@ -192,101 +136,43 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
         <button
           aria-label="缩小"
           className="compact-button"
-          data-toolbar-section="reading"
           disabled={!document}
           onClick={() => reader.setZoom(Math.max(0.25, zoom - 0.1))}
           type="button"
         >
           <Minus size={14} />
         </button>
-        <span className="zoom-control" data-toolbar-section="reading">
-          {formatZoom(zoom)}
-        </span>
+        <span className="zoom-control">{formatZoom(zoom)}</span>
         <button
           aria-label="放大"
           className="compact-button"
-          data-toolbar-section="reading"
           disabled={!document}
           onClick={() => reader.setZoom(Math.min(4, zoom + 0.1))}
           type="button"
         >
           <Plus size={14} />
         </button>
-        <div
+        <select
           aria-label="视图模式"
-          className="toolbar-viewmode"
-          data-toolbar-section="reading"
-          role="radiogroup"
+          className="zoom-control"
+          disabled={!document}
+          onChange={handleViewModeChange}
+          value={viewMode}
         >
-          {VIEW_MODE_OPTIONS.map((option) => {
-            const Icon = option.icon;
-            const selected = option.id === viewMode;
-            return (
-              <button
-                aria-checked={selected}
-                aria-label={option.label}
-                className="toolbar-viewmode__option"
-                data-toolbar-section="reading"
-                data-viewmode={option.id}
-                disabled={!document}
-                key={option.id}
-                onClick={() => handleViewModeChange(option.id)}
-                role="radio"
-                title={option.label}
-                type="button"
-              >
-                <Icon size={15} />
-              </button>
-            );
-          })}
-        </div>
+          {Object.entries(viewModeLabels).map(([mode, label]) => (
+            <option key={mode} value={mode}>
+              {label}
+            </option>
+          ))}
+        </select>
         <ModeActiveTools
           activeMode={activeMode}
           reader={reader}
           search={search}
-          sectionId="reading"
         />
       </div>
-      <div
-        className="toolbar__section toolbar__section--mode"
-        data-section="mode"
-        role="group"
-        aria-label="模式切换"
-      >
-        <button
-          aria-label="A 批注"
-          aria-pressed={activeMode === "annotate"}
-          className="tool-button tool-button--icon"
-          data-toolbar-section="mode"
-          data-mode-shortcut="A"
-          onClick={() => enterMode("annotate")}
-          title="A 批注"
-          type="button"
-        >
-          <StickyNote size={16} />
-          <span>A 批注</span>
-        </button>
-        <button
-          aria-label="T 编辑"
-          aria-pressed={activeMode === "forms"}
-          className="tool-button tool-button--icon"
-          data-toolbar-section="mode"
-          data-mode-shortcut="T"
-          onClick={() => enterMode("forms")}
-          title="T 编辑"
-          type="button"
-        >
-          <PencilLine size={16} />
-          <span>T 编辑</span>
-        </button>
-      </div>
-      <div
-        className="toolbar__section toolbar__section--right"
-        data-section="right"
-        role="group"
-        aria-label="搜索和设置"
-      >
-        <div className="toolbar-search-wrap" data-toolbar-section="right">
+      <div className="toolbar__group toolbar__group--right" aria-label="搜索和设置">
+        <div className="toolbar-search-wrap">
           <label className="toolbar-search">
             <Search size={15} />
             <input
@@ -300,12 +186,11 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
           </label>
           <SearchResultsPopover search={search} />
         </div>
-        <div className="tool-launcher-wrap" data-toolbar-section="right">
+        <div className="tool-launcher-wrap">
           <button
             aria-expanded={toolsMenuOpen}
             aria-haspopup="menu"
             className="tool-button tool-button--icon"
-            data-toolbar-section="right"
             onClick={() => setToolsMenuOpen((open) => !open)}
             title="工具"
             type="button"
@@ -326,7 +211,6 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
         <button
           aria-pressed={utilityPanel === "settings"}
           className="tool-button tool-button--icon"
-          data-toolbar-section="right"
           onClick={() => openUtilityPanel("settings")}
           title="设置"
           type="button"
@@ -386,12 +270,10 @@ function ModeActiveTools({
   activeMode,
   reader,
   search,
-  sectionId,
 }: {
   activeMode: AppModeId;
   reader: ReaderController;
   search: TextSearchController;
-  sectionId: AppToolbarSectionId;
 }) {
   const state: ToolbarState = { activeMode, reader, search };
   const hasDocument = reader.state.document !== null;
@@ -406,7 +288,6 @@ function ModeActiveTools({
         <button
           aria-pressed={item.isActive(state)}
           className="tool-button tool-button--icon tool-button--reader"
-          data-toolbar-section={sectionId}
           disabled={item.isDisabled?.(state) ?? false}
           key={item.id}
           onClick={() => item.onClick(state)}
