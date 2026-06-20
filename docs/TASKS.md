@@ -1369,3 +1369,26 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 2026-06-09：完成 ISS-051。`页眉页脚` 继续保持工具启动器 / 原生菜单深层入口，不进入导出二级工具条；右侧交付设置面板新增 `全部页面 / 奇数页 / 偶数页` 应用范围，奇偶页通过 `PdfWatermarkOperation.pageIndexes` 传给导出引擎，无匹配页面时阻止导出并提示。
 
 较早进度日志已迁移到 `docs/DECISIONS.md` 的 DEC-083。
+
+### ISS-NEW-K `feature-extract-from-screenshots` skill 落地
+
+- 优先级：P2（v0.2 工具链）
+- 类型：Skill 沉淀
+- 来源：2026-06-21 用户对话「整个功能抽取流程沉淀成 skill」+ 4 轮审漏复盘
+- 状态：**已完成**（2026-06-21，commit adcd8f0 / DEC-143）
+- 范围：
+  1. `.claude/skills/feature-extract-from-screenshots/SKILL.md` — skill manifest（4 阶段入口 + 边界 + 终止条件）
+  2. `references/s1-screenshot-analyzer.md` — S1 6-Layer Spine 自动分类 SOP
+  3. `references/state-matrix-template.md` — S2 State Machine 反向工程模板
+  4. `references/completeness-checklist.md` — S3 13 项强制 checklist
+  5. `references/rebuild-agent-prompt.md` — S4 reverse verification subagent prompt
+- 配套升级：
+  - `research/pdf-expert/FEATURE_CATALOG.md` 增 §12 mode×state 矩阵 / §13 13 项 checklist / §14 rebuild guide / §15 coverage gap
+  - 修复 §3 重复（lines 105/131）
+  - `research/pdf-expert/s4-verification-report.md` 记录 S4 pass 1+2
+- 验收：
+  - [x] 5 个文件创建完成
+  - [x] PDF Expert catalog 从 557 行扩展到 ~1100 行（新增 4 节）
+  - [x] S4 pass 1 返回 31 issues，已分流到 §14.3 / §14.4 / §15.1
+  - [x] skill 与 `computer-use` 边界明确（capture 阶段前者 / extract 阶段本 skill）
+- 备注：本 skill 是「catalog 自动化生成器」，下游 `frontend-design` skill 用 catalog 作为 spec 重建 UI。

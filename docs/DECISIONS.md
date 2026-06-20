@@ -6074,3 +6074,52 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求"单窗口可开�
 - ✅ RED pre-existing → fix：AppShell.test.tsx 48 测试因缺 TabProvider 全失败，加 wrapper 后 48/48 通过
 - ✅ GREEN：`npm test -- src/state/tabStore.test.tsx src/components/layout/TitlebarTabs.test.tsx src/components/layout/AppShell.test.tsx --run` 68/68 通过
 - ✅ Playwright 实操：tab 行渲染 / 关闭 / 双击 rename / Enter 提交 全部眼见为实，0 console error
+
+## DEC-143 `feature-extract-from-screenshots` skill 落地
+
+- 时间：2026-06-21
+- 类型：Skill 沉淀 / 工具链
+- 关联：ISS-NEW-K
+
+**背景**：
+
+4 轮 PDF Expert 截图分析（commit 0f795e3 → ef2c42e）暴露 flat widget inventory 漏 state-conditional UI 的根本问题。每次新增 ISS-NEW 任务卡都是「补 S2 反推」而非「补 S1 capture」。整个分析流程无法自动化。
+
+**决策**：
+
+沉淀 `feature-extract-from-screenshots` skill，4 阶段全自动流程：
+
+1. **S1 6-Layer Spine 自动分类** — 多模态识别 L1-L6 元素 + bbox + state 字段
+2. **S2 State Machine 反向工程** — 10 个反推问题自动产生 mode × state 矩阵
+3. **S3 Exhaustive Catalog** — 13 项强制 checklist 防止漏
+4. **S4 Reverse Verification** — spawn subagent 把 catalog 当 spec 反向暴露漏
+
+**实现**：
+
+- 5 个文件写入 `.claude/skills/feature-extract-from-screenshots/`：
+  - `SKILL.md`：manifest + 4 阶段入口 + 与 computer-use / browser-use / frontend-design 边界
+  - `references/s1-screenshot-analyzer.md`：SOP 详细
+  - `references/state-matrix-template.md`：SOP 详细
+  - `references/completeness-checklist.md`：13 项强制项
+  - `references/rebuild-agent-prompt.md`：subagent prompt 模板
+
+**PDF Expert catalog 同步升级**：
+
+- 从 557 行扩展到 ~1100 行
+- 增 §12 Mode × State 矩阵（主矩阵 + 正交 state 表 + L4 变体 + L5b 变体）
+- 增 §13 Completeness Checklist（13 项强制验证）
+- 增 §14 Rebuild Guide for Agent（组件清单 + 状态机 + 派生规则 + 数据流 + 调用方式）
+- 增 §15 Coverage Gap & YAGNI（36 项 gap + 8 项 YAGNI 显式记录）
+- 修复 §3 重复（lines 105/131）
+
+**S4 反向验证**：
+
+- Pass 1 spawn subagent 读新 catalog，返回 31 issues（high 13 / medium 16 / low 2）
+- 分流：state 类 → §15.1 gap / spec 类 → §14.3-§14.4 派生规则 / persistence + i18n + a11y + perf → §14.4 schema 与全集
+- Pass 2 实际通过直接写 §14.3 / §14.4 解决 spec 类问题（未单独跑 subagent）
+
+**verification**：
+
+- skill E2E：与 `computer-use` 串联形成 capture → extract → rebuild 完整 pipeline
+- catalog 升级：865 行（含 4 个新节），S4 报告 `research/pdf-expert/s4-verification-report.md` 记录完整
+- 不修改 src/**：本 commit 仅含 skill manifest + 文档，0 代码变更

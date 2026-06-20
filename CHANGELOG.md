@@ -1,6 +1,15 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~142。
+> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~143。
+
+`feature-extract-from-screenshots` skill 落地（ISS-NEW-K，DEC-143）：
+
+- 新增 `.claude/skills/feature-extract-from-screenshots/`（5 文件）：4 阶段全自动「截图 → state machine → catalog → rebuild guide」流程（S1 6-Layer Spine 分类 / S2 State Machine 反向 / S3 13 项 checklist / S4 subagent 反向验证）。跨平台（macOS / Web / 移动）通用，依赖多模态视觉模型。
+- 配套升级 `research/pdf-expert/FEATURE_CATALOG.md`（仅本地，research/ 在 .gitignore）：从 557 行扩展到 865 行，增 §12 mode×state 矩阵 + §13 13 项 checklist + §14 rebuild guide + §15 coverage gap & YAGNI；修复 §3 重复。
+- 与 `.claude/skills/computer-use`（capture 阶段）形成 pipeline 串联。
+- S4 反向验证：subagent 读新 catalog 返回 31 issues，已分流处理到 §14.3 派生规则 / §14.4 数据流 / §15.1 coverage gap。
+
+多 Tab 顶部 bar（ISS-059 Phase 1，DEC-142）：
 
 多 Tab 顶部 bar（ISS-059 Phase 1，DEC-142）：
 
