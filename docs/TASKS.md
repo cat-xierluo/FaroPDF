@@ -1200,7 +1200,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P2
 - 类型：UI 信息架构 / 空态 / i18n / 设置
 - 来源：FEATURE_CATALOG §5.3 / §5.4 / §5.5；截图 13-preferences / 50 / 53 / 61-multi-tab-opened-2nd / 63-tab-bar-zoomed
-- 状态：**部分完成**（Wave 3 W1 / DEC-149 / PR #69）：Welcome 屏 3 段落地（转换卡片占位 + 打开按钮 + 最近网格 + 清除最近）；语言切换 / Preferences 字段 / OCR 状态栏 defer（GLM 配额耗尽 + 拆子集降风险，留 G 后续）。
+- 状态：**部分完成**（DEC-149 Welcome 屏 + DEC-151 状态栏语言切换已落地）；Preferences 字段 / OCR 状态栏 / 全量字符串 i18n / languageEvent emit defer（PM 单 session 推进，provider 不稳不开 worker）。
 - 范围：
   1. **Welcome 屏**（无 PDF 时）：3 段布局
      - 顶部「转换」区：2 张卡片「图片转 PDF」「Word 转 PDF」

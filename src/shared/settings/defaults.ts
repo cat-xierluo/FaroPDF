@@ -67,6 +67,7 @@ export function createDefaultAppSettings(): AppSettings {
     requireNetworkOcrConfirmation: true,
     ocrProviders: createDefaultOcrProviders(),
     autoUpdateCheck: true,
+    language: "zh-CN",
   };
 }
 
@@ -149,6 +150,8 @@ export function normalizeAppSettings(input: unknown): AppSettings {
         : defaults.requireNetworkOcrConfirmation,
     autoUpdateCheck:
       typeof input.autoUpdateCheck === "boolean" ? input.autoUpdateCheck : defaults.autoUpdateCheck,
+    language:
+      input.language === "en" || input.language === "zh-CN" ? input.language : defaults.language,
   };
 }
 

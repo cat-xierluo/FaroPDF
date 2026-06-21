@@ -3,6 +3,8 @@ import type { PdfViewMode } from "../pdf/types";
 
 export type DefaultSavePolicy = "always-export-copy" | "ask-each-time" | "allow-overwrite-with-confirmation";
 export type AppThemePreference = "light" | "dark";
+/** ISS-NEW-G：界面语言（状态栏 toggle 切换 + appSettings 持久化）。全量字符串 i18n 留后续。 */
+export type AppLanguage = "en" | "zh-CN";
 
 export interface RecentPdfFile {
   path: string;
@@ -28,4 +30,6 @@ export interface AppSettings {
    * 自动检查在 mount 时跳过；切换实时经 `onChange` 路径持久化。
    */
   autoUpdateCheck: boolean;
+  /** ISS-NEW-G：界面语言（状态栏 toggle 切换）。默认 "zh-CN"。全量字符串 i18n 留后续。 */
+  language: AppLanguage;
 }

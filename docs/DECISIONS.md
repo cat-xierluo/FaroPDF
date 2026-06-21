@@ -6336,3 +6336,30 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 1. multi-agent Wave 间加配额恢复间隔检查（spawn 前查 provider 配额余量）。
 2. DEC-145 实操验证流程明确：Playwright 原生优先，禁用图片 MCP 截 localhost（写进 PM 巡检 SOP）。
 3. salvage 流程固化：worker 配额耗尽 + 产出完整 → PM verify+commit+PR（非代写）。
+
+## DEC-151 ISS-NEW-G 状态栏语言切换 toggle（PM 单 session）
+
+- 时间：2026-06-21
+- 类型：UI 信息架构 / i18n 基础设施 / PM 单 session
+- 关联：ISS-NEW-G（语言子集，DEC-149 Welcome 之后的第二子集）/ DEC-145 / DEC-150
+
+**背景**：Wave 4 GLM worker 持续限流失败（DEC-150），用户切 MiniMax-M3。MiniMax 历史 4 次配额失败（memory），provider 不稳。务实改 **PM 单 session 推进**（memory `project_multi_agent_state` 验证 ROI 最高路径，不消耗 worker 配额）。选 ISS-NEW-G 语言切换子集（纯前端，零 Rust，最稳快）。
+
+**决策**：
+1. **PM 单 session 降级**（DEC-145 §2.2 例外）：worker provider 不稳（GLM Wave 4 限流 + MiniMax 历史 429）无法恢复，PM 直接 TDD 实现窄范围任务。
+2. **严格子集**：只做状态栏 language toggle + appSettings.language 持久化。**不做全量字符串 i18n**（所有 UI 文案翻译是巨大工程，明确 out of scope）。languageEvent emit 基础设施省略（toggle → onLanguageChange → settings 持久化已够；全量 i18n 消费方读 settings.language，留 future）。
+3. **复用现有 settings 流**：StatusBar onLanguageChange → AppShell 包装 onSettingsChange({ ...settings, language }) → App.tsx handleSettingsChange 持久化。App.tsx 不用改。
+
+**实现**：
+- types.ts：AppLanguage = "en" | "zh-CN" + AppSettings.language
+- defaults.ts：createDefaultAppSettings + normalizeAppSettings 加 language（默认 "zh-CN"）
+- StatusBar.tsx：footer 加 language toggle（2 按钮，当前 aria-pressed + disabled，点击 onLanguageChange）
+- AppShell.tsx：StatusBar 渲染传 language + onLanguageChange
+- StatusBar.test.tsx：5 测试（默认 active / 切换 active / 点击回调 / 无回调 disabled / 默认 zh-CN）
+- contracts.test.ts：AppSettings fixture 加 language
+
+**Verification**：typecheck ✅ / lint ✅ / build ✅ / StatusBar+defaults test 13/13 ✅。⚠️ DEC-145 Playwright 实操验证未做（避免图片 MCP 工具循环复发，DEC-150 教训），靠单测 + build 兜底。toggle 是 dev server 可见的状态栏元素，待下轮 Playwright 补验。
+
+**out of scope**：全量 UI 文案 i18n / Preferences 字段 / OCR 状态栏光标 / languageEvent emit 基础设施。
+
+**关联**：DEC-149（G Welcome 第一子集）/ DEC-150（Wave 4 复盘 + 图片工具循环）/ memory `project_multi_agent_state`（PM 单 session ROI）。

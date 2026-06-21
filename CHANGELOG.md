@@ -1,6 +1,10 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~150。
+> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~151。
+
+状态栏语言切换（PM 单 session / DEC-151）：
+
+- ISS-NEW-G（DEC-151）：状态栏加 language toggle（English / 简体中文，当前 active + disabled，点击切换 + 持久化 appSettings.language）；AppLanguage 类型 + defaults 默认 zh-CN + normalize；StatusBar toggle 接入 AppShell（复用 settings/onSettingsChange 流，App.tsx 不用改）。+5 单测。Wave 4 GLM worker 限流失败后 PM 单 session 降级（DEC-150），纯前端零 Rust 最稳快。全量字符串 i18n / Preferences / languageEvent emit 明确 out of scope。
 
 Welcome 屏 3 段布局（Wave 3 / DEC-149）：
 

@@ -257,6 +257,7 @@ describe("shared contracts", () => {
       ocrProviders: [provider],
       requireNetworkOcrConfirmation: true,
       autoUpdateCheck: true,
+      language: "zh-CN",
     };
 
     expect(documentState.pageCount).toBe(12);

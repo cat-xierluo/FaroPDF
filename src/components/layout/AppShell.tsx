@@ -879,7 +879,11 @@ export function AppShell({
         onClose={handleSelectionClose}
         onToast={(message) => setCommandFeedback(message)}
       />
-      <StatusBar readerState={reader.state} />
+      <StatusBar
+        language={settings.language}
+        onLanguageChange={(next) => onSettingsChange?.({ ...settings, language: next })}
+        readerState={reader.state}
+      />
       {commandFeedback ? (
         <div className="command-feedback" role="status" aria-live="polite">
           <span>{commandFeedback}</span>
