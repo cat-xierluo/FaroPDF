@@ -1,0 +1,160 @@
+/* ISS-NEW-I（W2 worker）：搜索结果右栏 4 段（PDF Expert 截图 41）
+ * 独立 CSS 文件，遵循 W2 worker 边界：不改 src/styles/app.css。 */
+
+.search-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+  height: 100%;
+}
+
+.search-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.search-panel__count {
+  color: var(--accent, #2a8df0);
+  font-weight: 700;
+}
+
+.search-panel__query {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.search-panel__query-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  background: transparent;
+  color: var(--fg);
+}
+
+.search-panel__query-input::placeholder {
+  color: var(--muted);
+}
+
+.search-panel__query-close {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.search-panel__query-close:hover {
+  background: var(--surface-strong);
+  color: var(--fg);
+}
+
+.search-panel__hits {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  flex: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.search-panel__hit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.search-panel__hit:hover {
+  border-color: var(--accent);
+}
+
+.search-panel__hit--active {
+  border-color: var(--accent, #2a8df0);
+  background: var(--accent-soft, rgba(42, 141, 240, 0.08));
+}
+
+.search-panel__hit-line {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.search-panel__hit-snippet {
+  font-size: 12px;
+  color: var(--fg);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.search-panel__hit-mark {
+  background: rgba(240, 195, 60, 0.55);
+  color: inherit;
+  font-weight: 600;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.search-panel__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.search-panel__footer-button {
+  padding: 4px 10px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--fg);
+}
+
+.search-panel__footer-button:hover {
+  border-color: var(--accent);
+}
+
+.search-panel__footer-button--primary {
+  border-color: var(--accent, #2a8df0);
+  color: var(--accent, #2a8df0);
+}
+
+.search-panel__empty {
+  padding: 20px 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
