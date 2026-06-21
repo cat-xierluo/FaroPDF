@@ -1,10 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
 import { textLayerStatusLabels } from "../../modules/reader/readerLabels";
 import { getSearchHighlightsForPage, type TextSearchState } from "../../modules/search";
 import type { ReaderState } from "../../modules/reader/readerState";
 import { useReaderKeyboard } from "../../modules/reader/useReaderKeyboard";
 import { resolveEffectiveZoom } from "../../modules/reader/viewMode";
 import type { TextLayerStatus } from "../../shared/pdf/types";
+import type { RecentPdfFile } from "../../shared/settings/types";
+import { WelcomeScreen } from "./WelcomeScreen";
 
 /** 将 PDF 页面渲染到 canvas 的函数签名 */
 export type RenderPageToCanvasFn = (
@@ -26,17 +28,35 @@ interface ReaderCanvasProps {
   onPageNavigate?: (nextPage: number) => void;
   /** OCR-needed 状态下点击"前往 OCR 模式"的回调；可选，未提供时按钮禁用 */
   onRequestOcr?: () => void;
+  /**
+   * ISS-NEW-G（Wave 3 W1）：最近文件列表，传给 WelcomeScreen 渲染缩略图网格。
+   * 未传时退化为空数组（不渲染「最近」段）。
+   */
+  recentFiles?: RecentPdfFile[];
+  /**
+   * ISS-NEW-G（Wave 3 W1）：用户点击 Welcome 屏「清除最近」时回调。
+   * 由 AppShell / App 注入，连接到 settings.onSettingsChange（清空 recentFiles 字段）。
+   */
+  onClearRecent?: () => void;
+  /**
+   * ISS-NEW-G（Wave 3 W1）：用户点击 Welcome 屏最近缩略图时回调。
+   * 当前 stage 占位 — 真实路径打开（reader.openFile + 路径寻址）由后续 worker 接入。
+   */
+  onOpenRecent?: (entry: RecentPdfFile) => void;
 }
 
-const fileInputStyle: CSSProperties = {
-  height: 1,
-  opacity: 0,
-  position: "absolute",
-  width: 1,
-};
-
-export function ReaderCanvas({ onOpenFile, onPageNavigate, onPageVisible, onRequestOcr, readerState, searchState, renderPageToCanvas }: ReaderCanvasProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+export function ReaderCanvas({
+  onOpenFile,
+  onPageNavigate,
+  onPageVisible,
+  onRequestOcr,
+  readerState,
+  searchState,
+  renderPageToCanvas,
+  recentFiles,
+  onClearRecent,
+  onOpenRecent,
+}: ReaderCanvasProps) {
   const document = readerState.document;
 
   useReaderKeyboard({
@@ -48,51 +68,16 @@ export function ReaderCanvas({ onOpenFile, onPageNavigate, onPageVisible, onRequ
   });
 
   if (!document) {
-    function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-      const file = event.target.files?.[0];
-
-      if (file) {
-        void onOpenFile?.(file);
-        event.target.value = "";
-      }
-    }
-
-    function handleDrop(event: DragEvent<HTMLElement>) {
-      event.preventDefault();
-      const file = Array.from(event.dataTransfer.files).find(
-        (droppedFile) => droppedFile.type === "application/pdf" || droppedFile.name.toLowerCase().endsWith(".pdf"),
-      );
-
-      if (file) {
-        void onOpenFile?.(file);
-      }
-    }
-
+    // ISS-NEW-G（Wave 3 W1）：空态用 WelcomeScreen 替换旧 open-dropzone。
+    // 3 段：转换卡片 / drop zone + 选择文件 / 最近文件网格。
     return (
       <main className="reader" aria-label="PDF 阅读区">
-        <div className="reader__start">
-          <section
-            className="open-dropzone"
-            aria-label="打开 PDF 文档"
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={handleDrop}
-          >
-            <input
-              accept="application/pdf,.pdf"
-              aria-label="选择空态 PDF 文件"
-              onChange={handleFileChange}
-              ref={fileInputRef}
-              style={fileInputStyle}
-              type="file"
-            />
-            <div className="open-dropzone__sheet" aria-hidden="true" />
-            <h2>{readerState.status === "loading" ? "正在打开 PDF" : "打开 PDF 文档"}</h2>
-            <p>{readerState.status === "error" ? readerState.errorMessage : "或将文件拖至此处"}</p>
-            <button className="tool-button tool-button--primary" onClick={() => fileInputRef.current?.click()} type="button">
-              选择文件
-            </button>
-          </section>
-        </div>
+        <WelcomeScreen
+          onClearRecent={onClearRecent}
+          onOpenFile={onOpenFile}
+          onOpenRecent={onOpenRecent}
+          recentFiles={recentFiles ?? []}
+        />
       </main>
     );
   }
