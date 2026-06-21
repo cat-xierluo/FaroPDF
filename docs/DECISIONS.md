@@ -6290,3 +6290,49 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 4. sed 批量解冲突标记需配合 typecheck 验证纯追加假设（body 渲染块非纯追加会重复，需手动）。
 
 **结论**：glm-5.2 + DEC-145 纪律组合下，多 Agent 并行在 FaroPDF 首次成功（vs memory 记录的 MiniMax 4 次失败）。后续 Wave 可继续此模式，注意 checkpoint 落盘 + tmux 投递两个改进点。
+
+## DEC-149 ISS-NEW-G Welcome 屏 3 段布局（Wave 3 W1）
+
+- 时间：2026-06-21
+- 类型：UI 信息架构 / 空态 / 多 Agent Wave 3
+- 关联：ISS-NEW-G（Welcome 子集）/ PR #69 / DEC-145 / DEC-150
+
+**背景**：v0.2 PDF Expert 对齐，Welcome 屏（无 PDF 时空态）是 FEATURE_CATALOG §5.4 要求（3 段：转换卡片/打开按钮/最近网格）。Wave 3 W1 承接。
+
+**决策**：
+1. **严格子集**：Wave 3 只做 Welcome 屏 3 段；语言切换/Preferences/OCR 状态栏明确 out of scope（worker 任务大易超 context，拆子集降风险）。
+2. **PM salvage 收尾**（DEC-145 §2.2 例外）：W1 worker 写完 WelcomeScreen.tsx + .css + 接入 AppShell/ReaderCanvas 后撞 GLM 配额耗尽（2056，卡在 verify 阶段，5/7 todo done）。产出已完整且在 worktree 未 commit，PM 接管 verify（typecheck/lint/build/9 单测全过）+ commit + PR #69 + merge。非代写——产出是 worker 写的，PM 只收口。
+3. **recentFiles UI 集成**：从 settings.recentFiles 渲染最近文件网格 + 「清除最近」按钮；图片转 PDF/Word 转 PDF 卡片点击接 placeholder（真实转换 out of scope）。
+
+**实现**：WelcomeScreen.tsx + .css + .test.tsx（9 单测）+ AppShell.tsx/ReaderCanvas.tsx hasDocument=false 空态接入。
+
+**Verification**：typecheck/lint/build 干净；WelcomeScreen.test 9/9。⚠️ DEC-145 Playwright 实操验证未完成（PM 陷入图片 MCP 工具循环，详见 DEC-150 + memory `feedback_image_mcp_localhost`），靠单测 + build 兜底。
+
+## DEC-150 Wave 3 多 Agent 复盘（glm-5.2 配额耗尽 + 图片工具循环教训）
+
+- 时间：2026-06-21
+- 类型：多 Agent 编排复盘 / provider 配额 / PM 工具纪律
+- 关联：DEC-145 / DEC-148 / DEC-149 / memory `project_multi_agent_state` / `feedback_image_mcp_localhost`
+
+**Wave 3 执行**：W1（ISS-NEW-G Welcome）+ W2（ISS-NEW-D 菜单栏）并行。DEC-148 两改进点应用（checkpoint 强化 + paste-buffer 投递）。
+
+**结果**：
+- ✅ **DEC-148 改进点1 部分生效**：W1 STATUS updated_at 非 null（vs Wave 2 W2 全 null），PM 能看到 W1 状态。但 W2 仍未建 STATUS（worker 收到 prompt 撞配额前没来得及建）。改进点1 让 PM 巡检有信号，有价值。
+- ✅ **DEC-148 改进点2 生效**：paste-buffer 投递成功，两 worker 都收到 prompt（vs Wave 2 send-keys -l 进不去 TUI）。
+- ❌ **glm-5.2 配额耗尽（2056）**：Wave 2（2 worker）+ Wave 3（2 worker）短时间内累积消耗，撞 GLM Token Plan 硬配额。W1 撞在 verify 阶段（产出已完整，可 salvage）；W2 撞在启动前（0% context，无产出，kill + defer）。
+- ✅ **salvage 有效**：W1 产出完整（5/7 todo done，WelcomeScreen 已写），PM verify+commit+PR+merge 收口，不浪费 worker 产出（DEC-117 Wave 7 先例验证的 salvage 策略再次有效）。
+
+**关键修正**（更新 memory `project_multi_agent_state`）：
+- glm-5.2 **不是无限配额**。单 Wave（2 worker）OK，但**连续多 Wave 短时间累积会耗尽**。provider 配额仍是多 Agent 的硬约束，glm-5.2 推迟了耗尽点但未消除。
+- 多 Wave 之间需要配额恢复间隔，或换 provider slot 分流。
+
+**PM 工具纪律教训**（更新 memory `feedback_image_mcp_localhost`）：
+- Wave 3 收尾时 PM 再次陷入图片 MCP（analyze_image）工具循环（auto 模式复发），尽管 memory 已记录教训。图片 MCP 不能截 localhost（网络隔离），DEC-145 实操验证应**一律用 Playwright 原生 take_screenshot/evaluate**。
+- 本次 DEC-145 Playwright 实操验证**未完成**（被工具循环占用），靠单测 + build 兜底——这是验证缺口，W1 Welcome 屏的真实渲染待下轮 Playwright 补验。
+
+**Wave 3 收口**：W1 PR #69 merged（DEC-149），W2 defer（GLM 配额耗尽未启动，ISS-NEW-D 留下一 Wave）。worktree/tmux/cron 全清理。
+
+**改进（回写 skill + 流程）**：
+1. multi-agent Wave 间加配额恢复间隔检查（spawn 前查 provider 配额余量）。
+2. DEC-145 实操验证流程明确：Playwright 原生优先，禁用图片 MCP 截 localhost（写进 PM 巡检 SOP）。
+3. salvage 流程固化：worker 配额耗尽 + 产出完整 → PM verify+commit+PR（非代写）。

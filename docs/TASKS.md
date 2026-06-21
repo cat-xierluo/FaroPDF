@@ -1150,7 +1150,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P2
 - 类型：菜单栏 / i18n
 - 来源：FEATURE_CATALOG §4；截图 37 / 38 / 39 / 40
-- 状态：部分已建（ISS-032）；依赖现有 nativeMenuBridge
+- 状态：**defer**（Wave 3 W2 撞 GLM 配额耗尽 2056 未启动，留下一 Wave）；部分已建（ISS-032 文件/编辑/视图/窗口/帮助菜单）；依赖现有 nativeMenuBridge
 - 范围：补齐「批注」「编辑 PDF」「扫描」「前往」4 个菜单的中文化 + Tauri 桥接
   - 批注：高亮 / 下划线 / 删除线 / 文本 / 笔 / 橡皮擦 / 便签 / 形状 / 链接 / 内容表
   - 编辑 PDF：编辑 / 添加图像 / 添加链接 / 添加文字 / 隐藏
@@ -1200,7 +1200,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P2
 - 类型：UI 信息架构 / 空态 / i18n / 设置
 - 来源：FEATURE_CATALOG §5.3 / §5.4 / §5.5；截图 13-preferences / 50 / 53 / 61-multi-tab-opened-2nd / 63-tab-bar-zoomed
-- 状态：未启动；可与 ISS-NEW-A / ISS-NEW-C 并行
+- 状态：**部分完成**（Wave 3 W1 / DEC-149 / PR #69）：Welcome 屏 3 段落地（转换卡片占位 + 打开按钮 + 最近网格 + 清除最近）；语言切换 / Preferences 字段 / OCR 状态栏 defer（GLM 配额耗尽 + 拆子集降风险，留 G 后续）。
 - 范围：
   1. **Welcome 屏**（无 PDF 时）：3 段布局
      - 顶部「转换」区：2 张卡片「图片转 PDF」「Word 转 PDF」

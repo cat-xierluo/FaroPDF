@@ -1,6 +1,11 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~147。
+> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~150。
+
+Welcome 屏 3 段布局（Wave 3 / DEC-149）：
+
+- ISS-NEW-G（W1 / DEC-149 / PR #69）：新增 `WelcomeScreen`（无 PDF 空态 3 段：转换卡片占位 + 大蓝打开按钮 + 最近文件网格 + 清除最近，对齐截图 63）；AppShell/ReaderCanvas hasDocument=false 空态接入；recentFiles 网格读取。+9 单测。PM salvage 收尾（worker 写完后撞 GLM 配额耗尽 2056，详见 DEC-150）。
+- Wave 3 复盘（DEC-150）：glm-5.2 连续 2 Wave 累积耗尽配额（W1 卡 verify 可 salvage → merged；W2 启动前撞配额 kill + defer）；DEC-148 改进点部分生效（W1 STATUS updated_at 非 null / paste-buffer 投递成功）；PM 陷入图片 MCP 工具循环致 Playwright 实操验证未完成（靠单测+build 兜底，待补验）。
 
 右栏 mode-driven panel 体系 + 编辑网格（Wave 2 / DEC-146 + DEC-147）：
 
