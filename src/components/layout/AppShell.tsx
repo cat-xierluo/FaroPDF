@@ -698,6 +698,11 @@ export function AppShell({
         <RightPanel
           activeMode={activeMode}
           rightPanel={rightPanel}
+          // ISS-NEW-C：文档摘要 + OCR 状态面板输入。来源在 Reader 派生，
+          // 当前实现给空（null / idle）。W2 / 后续 PM 收口时把 App.tsx 真值接进来。
+          docSummary={null}
+          ocrStatus={{ state: "idle", message: "尚未开始 OCR", progress: 0 }}
+          onStartOcr={() => undefined}
           onPanelChange={setRightPanelOverride}
           onSelectCustomStamp={(stamp) => {
             // DEC-112 ISS-060 阶段 2 + ISS-062 阶段 3：用户从右栏选自定义图章 →

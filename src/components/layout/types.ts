@@ -28,7 +28,16 @@ export type UtilityPanelId =
  *  - 由 AppShell 通过 activeMode 推导 + 显式 rightPanel 覆盖
  *  - 「none」= 右栏折叠
  */
-export type RightPanelId = "stamps" | "signatures" | "export-preview" | "ocr-queue" | "none";
+export type RightPanelId =
+  | "stamps"
+  | "signatures"
+  | "export-preview"
+  | "ocr-queue"
+  /** ISS-NEW-C：右栏文档摘要面板（截图 61 对齐）。 */
+  | "summary"
+  /** ISS-NEW-C：右栏 OCR 状态面板（截图 53 对齐）。 */
+  | "ocr-status"
+  | "none";
 
 /** 批注 overlay 停靠位置。
  *  当前 stage 4 只实现 "workspace-main"（覆盖 ReaderCanvas 的主区域）；
