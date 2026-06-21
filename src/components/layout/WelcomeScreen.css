@@ -1,0 +1,210 @@
+/* ISS-NEW-G（Wave 3 W1）：Welcome 屏样式。
+ * 独立 CSS 文件，不影响 app.css。3 段垂直布局：转换 / drop zone / 最近。 */
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  padding: 48px 32px;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--surface);
+  color: var(--fg);
+  box-sizing: border-box;
+}
+
+/* 段 1：转换卡片 */
+.welcome__convert {
+  width: 100%;
+  max-width: 720px;
+}
+
+.welcome__convert-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.welcome-convert-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-strong);
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 80ms ease;
+}
+
+.welcome-convert-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.welcome-convert-card:active {
+  transform: translateY(1px);
+}
+
+.welcome-convert-card__icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.welcome-convert-card__title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.welcome-convert-card__subtitle {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* 段 2：drop zone + 选择文件按钮 */
+.welcome__dropzone {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 36px 24px;
+  border: 2px dashed var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.welcome__dropzone-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.welcome__primary-button {
+  appearance: none;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #ffffff;
+  padding: 12px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 80ms ease;
+}
+
+.welcome__primary-button:hover {
+  background: color-mix(in srgb, var(--accent) 88%, black 12%);
+}
+
+.welcome__primary-button:active {
+  transform: translateY(1px);
+}
+
+/* 段 3：最近 */
+.welcome__recent {
+  width: 100%;
+  max-width: 720px;
+}
+
+.welcome__recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.welcome__recent-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.welcome__recent-clear {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.welcome__recent-clear:hover {
+  text-decoration: underline;
+}
+
+.welcome__recent-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.welcome-recent-tile {
+  display: block;
+}
+
+.welcome-recent-tile__button {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--fg);
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.welcome-recent-tile__button:hover {
+  border-color: var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.welcome-recent-tile__thumb {
+  width: 56px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.welcome-recent-tile__name {
+  font-size: 12px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+@media (max-width: 520px) {
+  .welcome__convert-grid {
+    grid-template-columns: 1fr;
+  }
+  .welcome__recent-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

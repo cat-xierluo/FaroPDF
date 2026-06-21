@@ -810,11 +810,23 @@ export function AppShell({
             )
           ) : (
             <ReaderCanvas
+              onClearRecent={() => {
+                // ISS-NEW-G（Wave 3 W1）：清空最近文件，触发 settings 持久化。
+                if (onSettingsChange) {
+                  onSettingsChange({ ...settings, recentFiles: [] });
+                }
+              }}
               onOpenFile={reader.openFile}
+              onOpenRecent={(entry) => {
+                // ISS-NEW-G（Wave 3 W1）：点击最近缩略图 — 当前 stage 占位反馈。
+                // 真实路径打开（reader.openFile + 路径寻址）由后续 worker 接入。
+                setCommandFeedback(`已选择最近文件「${entry.name}」，等待真实打开链路接入。`);
+              }}
               onPageNavigate={reader.setCurrentPage}
               onPageVisible={reader.setCurrentPage}
               onRequestOcr={onRequestOcr}
               readerState={reader.state}
+              recentFiles={settings.recentFiles}
               renderPageToCanvas={reader.renderPageToCanvas}
               searchState={search.state}
             />
