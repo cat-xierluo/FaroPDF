@@ -6363,3 +6363,22 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 **out of scope**：全量 UI 文案 i18n / Preferences 字段 / OCR 状态栏光标 / languageEvent emit 基础设施。
 
 **关联**：DEC-149（G Welcome 第一子集）/ DEC-150（Wave 4 复盘 + 图片工具循环）/ memory `project_multi_agent_state`（PM 单 session ROI）。
+
+## DEC-152 恢复 L3 旋转入口（修正 DEC-144 回归，PM 单 session）
+
+- 时间：2026-06-21
+- 类型：bug-fix / UI 信息架构 / PM 单 session
+- 关联：DEC-144（ISS-NEW-A 阶段 1 回归）/ ISS-NEW-A 阶段 2 / ISS-NEW-B
+
+**背景**：DEC-144（ISS-NEW-A 阶段 1）Toolbar 5 段重构时，worker 移除了 L3 阅读区的旋转按钮（逆时针/顺时针），但**没补替代入口**（L4/视图菜单/工具启动器均无）。后果：`reader.setRotation` 引擎在（readerState reducer），但 UI 无触发路径，**用户丢失页面旋转功能**。律师扫描件（横向扫描需竖读）旋转是刚需，这是真回归。
+
+**决策**：
+1. **L3 reading section 加回旋转按钮**（RotateCcw/RotateCcw，compact-button，viewmode 4-icon 后）。恢复 DEC-144 前的高频入口。
+2. **engine 复用 reader.setRotation**：handleRotate(direction) → `reader.setRotation((((rotation + direction*90) % 360) + 360) % 360 as PageRotation)`。不新建 command，直接 reader 调用（最小改动）。
+3. **PDF Expert L3 对齐妥协**：PDF Expert L3 严格 4 元素（页码/viewmode/zoom/-+），FaroPDF 加旋转后 L3 多 2 按钮。决策：**律师可用性 > 视觉纯粹**（旋转高频刚需，藏工具菜单多步不便）。L4 统一抽象（ISS-NEW-E）若后续做，可再评估旋转归位。
+
+**实现**：Toolbar.tsx +import RotateCcw/RotateCw + PageRotation；+handleRotate；reading section viewmode 后加 2 按钮（disabled !document）。
+
+**Verification**：typecheck ✅ / lint ✅ / build ✅ / Toolbar test 19/19 ✅。⚠️ Playwright 实操未做（避免图片 MCP 循环 DEC-150），靠单测 + build 兜底；旋转按钮 dev 可见，待补验。
+
+**关联**：DEC-144（回归源）/ DEC-150（PM 单 session + 图片循环）/ memory `project_multi_agent_state`。

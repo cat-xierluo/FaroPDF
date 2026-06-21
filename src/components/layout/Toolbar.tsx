@@ -12,6 +12,8 @@ import {
   PencilLine,
   Plus,
   Rows3,
+  RotateCcw,
+  RotateCw,
   ScanLine,
   Search,
   Settings,
@@ -23,7 +25,7 @@ import { useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
 import { formatZoom } from "../../modules/reader/readerLabels";
-import type { PdfViewMode } from "../../shared/pdf/types";
+import type { PdfViewMode, PageRotation } from "../../shared/pdf/types";
 import { getToolLauncherSections, type AppCommandId } from "../../shared/app/commands";
 import { getModeTools, type ToolbarState } from "./toolbarRegistry";
 import type { AppModeId, AppToolbarSectionId, UtilityPanelId } from "./types";
@@ -94,6 +96,13 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
     // 不新建 mode 注册 —— 现有 AppModeId 已含 "annotate"，edit mode 与 read 共用一组
     //（v0.2 ISS-NEW-A 阶段 1 仅占位入口，详细行为交由后续阶段）。
     onModeChange(activeMode === mode ? "read" : mode);
+  }
+
+  function handleRotate(direction: 1 | -1) {
+    // ISS-NEW-A 阶段 2 / 修正 DEC-144 回归：阶段 1 重构移除 L3 旋转按钮后
+    // 用户丢失页面旋转入口（律师扫描件刚需）。此处恢复，engine 复用 reader.setRotation。
+    const current = document?.rotation ?? 0;
+    reader.setRotation(((((current + direction * 90) % 360) + 360) % 360) as PageRotation);
   }
 
   return (
@@ -242,6 +251,30 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
             );
           })}
         </div>
+        <button
+          aria-label="逆时针旋转"
+          className="compact-button"
+          data-toolbar-section="reading"
+          data-rotate="ccw"
+          disabled={!document}
+          onClick={() => handleRotate(-1)}
+          title="逆时针旋转 90°"
+          type="button"
+        >
+          <RotateCcw size={15} />
+        </button>
+        <button
+          aria-label="顺时针旋转"
+          className="compact-button"
+          data-toolbar-section="reading"
+          data-rotate="cw"
+          disabled={!document}
+          onClick={() => handleRotate(1)}
+          title="顺时针旋转 90°"
+          type="button"
+        >
+          <RotateCw size={15} />
+        </button>
         <ModeActiveTools
           activeMode={activeMode}
           reader={reader}
