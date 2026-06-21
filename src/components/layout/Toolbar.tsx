@@ -3,6 +3,7 @@ import {
   ChevronRight,
   Columns2,
   FileUp,
+  FileText,
   LayoutGrid,
   Maximize2,
   Minus,
@@ -11,6 +12,7 @@ import {
   PencilLine,
   Plus,
   Rows3,
+  ScanLine,
   Search,
   Settings,
   StickyNote,
@@ -279,6 +281,12 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
           <PencilLine size={16} />
           <span>T 编辑</span>
         </button>
+        <ModeSecondaryToolbar
+          activeMode={activeMode}
+          hasDocument={document !== null}
+          onCommand={onCommand}
+          sectionId="mode"
+        />
       </div>
       <div
         className="toolbar__section toolbar__section--right"
@@ -417,6 +425,76 @@ function ModeActiveTools({
           <span>{item.label}</span>
         </button>
       ))}
+    </>
+  );
+}
+
+interface ModeSecondaryToolbarProps {
+  activeMode: AppModeId;
+  hasDocument: boolean;
+  onCommand: (commandId: AppCommandId) => void;
+  sectionId: AppToolbarSectionId;
+}
+
+interface SecondaryToolbarButton {
+  commandId: AppCommandId;
+  label: string;
+  icon: typeof ScanLine;
+  /** 至少在什么 mode 显示 — L3 段4 模式附加按钮 */
+  visibleIn: ReadonlyArray<AppModeId>;
+}
+
+const SECONDARY_BUTTONS: ReadonlyArray<SecondaryToolbarButton> = [
+  // 批注模式：涂黑 / 导出批注摘要
+  { commandId: "redact-region", label: "涂黑", icon: ScanLine, visibleIn: ["annotate"] },
+  { commandId: "export-annotation-summary", label: "批注摘要", icon: FileText, visibleIn: ["annotate"] },
+  // 表单模式：签名 / 扁平化（与 ContextToolbar 表单工具同语义，提供 L3 段4 入口）
+  { commandId: "forms-sign-handwrite", label: "签名", icon: PencilLine, visibleIn: ["forms"] },
+  { commandId: "forms-flatten", label: "扁平化", icon: FileText, visibleIn: ["forms"] },
+  // 页面管理：进入页面管理模式（与现有侧栏切换按钮同语义，提供 L3 段4 入口）
+  { commandId: "view-pages", label: "页面", icon: LayoutGrid, visibleIn: ["pages"] },
+];
+
+/** ISS-NEW-I（W2 worker）：L3 段4 模式附加按钮 + L4 命令补全。
+ *
+ *  - 仅在 toolbar 的 mode 段（A 批注 / T 编辑按钮之后）按 activeMode 渲染当前
+ *    模式相关的二级命令按钮。
+ *  - 命令本身经 onCommand 走 AppShell.executeCommand，复用既有的 dispatch 路径，
+ *    不引入新的状态/事件总线。
+ *  - 真实按钮启用条件由 AppShell.executeCommand 处理（requiresDocument 等）。
+ *    这里只在 hasDocument=false 时整体 disable 即可。
+ *  - 占位说明：OCR 模式「开始 OCR」、扫描模式「增强扫描」、forms「读取字段」
+ *    不暴露为 AppCommandId（ContextToolbar 直接调 ocr.startOcr / formController.refreshFormState），
+ *    因此本层只暴露已注册的 commandId，避免破坏 commands.ts 类型。
+ *    后续 W 阶段把 OCR / forms 启动命令注册到 commands.ts 后再补按钮。
+ */
+function ModeSecondaryToolbar({ activeMode, hasDocument, onCommand, sectionId }: ModeSecondaryToolbarProps) {
+  const buttons = SECONDARY_BUTTONS.filter((button) => button.visibleIn.includes(activeMode));
+  if (buttons.length === 0) {
+    return null;
+  }
+  return (
+    <>
+      {buttons.map((button) => {
+        const Icon = button.icon;
+        return (
+          <button
+            aria-label={button.label}
+            className="tool-button tool-button--icon tool-button--mode-secondary"
+            data-command-id={button.commandId}
+            data-testid={`mode-secondary-${button.commandId}`}
+            data-toolbar-section={sectionId}
+            disabled={!hasDocument}
+            key={button.commandId}
+            onClick={() => onCommand(button.commandId)}
+            title={button.label}
+            type="button"
+          >
+            <Icon size={14} />
+            <span>{button.label}</span>
+          </button>
+        );
+      })}
     </>
   );
 }

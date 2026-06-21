@@ -25,9 +25,11 @@ import { ReaderCanvas } from "./ReaderCanvas";
 import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
 import { AnnotationSidebar, type AnnotationFlattenResult } from "./AnnotationSidebar";
 import { AnnotationToolbar } from "./AnnotationToolbar";
-import { PageOrganizerWorkspace } from "./PageOrganizerWorkspace";
+import { EditModeGridView } from "./EditModeGridView";
 import { RightPanel } from "./RightPanel";
 import { SecurityPanel } from "./SecurityPanel";
+import type { ShapeToolValue } from "./panels/ShapeToolPanel";
+import type { SearchHitItem } from "./panels/SearchResultsPanel";
 import {
   TextSelectionToolbar,
   usePdfTextSelection,
@@ -170,6 +172,16 @@ export function AppShell({
     nonce: 0,
   });
   const [settingsInitialSection, setSettingsInitialSection] = useState<SectionId>("general");
+  // ISS-NEW-I（W2 worker）：形状工具受控 state — 真实绘制引擎由后续 worker 接入；
+  // 当前 stage 仅 UI 状态持久化 + 右栏渲染 shape panel。
+  const [shapeToolValue, setShapeToolValue] = useState<ShapeToolValue>({
+    shape: "rectangle",
+    strokeStyle: "solid",
+    strokeWidth: 2,
+    opacity: 100,
+    strokeColor: "#000000",
+    fillColor: "transparent",
+  });
   // ISS-060 阶段 2 后续：用户显式 tab 切换的 override。annotate/forms 模式下用户可
   // 在 [图章][签名] 间切换；切 mode 时 reset override 回 null（让默认派生接管）。
   const [rightPanelOverride, setRightPanelOverride] = useState<RightPanelId | null>(null);
@@ -192,6 +204,12 @@ export function AppShell({
   }, [activeMode]);
   // override 优先（用户 tab 显式切换），否则用 mode 默认派生
   const rightPanel: RightPanelId = rightPanelOverride ?? defaultRightPanel;
+  // ISS-NEW-I（W2 worker）：L3 联动 — T 编辑模式（activeMode === "forms"）下，
+  // 用户从 Toolbar L3 段4「形状/搜索」二级按钮进入时应自动打开右栏 shape / search
+  // panel。当前实现：进入 forms 模式且 rightPanel === "none" 时，派生为 "shape"。
+  // annotate 模式默认走 stamps（保持原派生），不动既有行为。
+  const rightPanelWithEditFallback: RightPanelId =
+    rightPanel === "none" && activeMode === "forms" ? "shape" : rightPanel;
   const [commandFeedback, setCommandFeedback] = useState<string | null>(null);
   // ISS-072 阶段 2：文档属性对话框 state
   const [propertiesOpen, setPropertiesOpen] = useState(false);
@@ -259,6 +277,20 @@ export function AppShell({
     setActiveFormController(formController);
     return () => setActiveFormController(null);
   }, [formController]);
+  // ISS-NEW-I（W2 worker）：搜索右栏数据 — 从 TextSearchController 派生
+  // TextSearchHit → SearchResultsPanel.SearchHitItem。
+  // lineNumber 字段在 search service 没有，用 matchIndex + 1 占位（snippet 来自
+  // 实际搜索结果，仍是真实上下文）。
+  const searchHits: SearchHitItem[] = useMemo(
+    () =>
+      search.state.hits.map((hit) => ({
+        id: hit.id,
+        pageNumber: hit.pageNumber,
+        lineNumber: hit.matchIndex + 1,
+        snippet: hit.snippet,
+      })),
+    [search.state.hits],
+  );
   const document = reader.state.document;
   const hasDocument = document !== null;
   useEffect(() => {
@@ -697,13 +729,23 @@ export function AppShell({
         ) : null}
         <RightPanel
           activeMode={activeMode}
-          rightPanel={rightPanel}
+          rightPanel={rightPanelWithEditFallback}
           // ISS-NEW-C：文档摘要 + OCR 状态面板输入。来源在 Reader 派生，
           // 当前实现给空（null / idle）。W2 / 后续 PM 收口时把 App.tsx 真值接进来。
           docSummary={null}
           ocrStatus={{ state: "idle", message: "尚未开始 OCR", progress: 0 }}
           onStartOcr={() => undefined}
           onPanelChange={setRightPanelOverride}
+          shapeToolValue={shapeToolValue}
+          onShapeToolChange={setShapeToolValue}
+          searchQuery={search.state.query}
+          searchHits={searchHits}
+          searchActiveHitId={search.state.activeHitId ?? null}
+          onSearchQueryChange={search.setQuery}
+          onSearchSelectHit={search.selectHit}
+          onSearchJumpPrevious={search.selectPreviousHit}
+          onSearchJumpNext={search.selectNextHit}
+          onSearchClose={() => onUtilityPanelChange("none")}
           onSelectCustomStamp={(stamp) => {
             // DEC-112 ISS-060 阶段 2 + ISS-062 阶段 3：用户从右栏选自定义图章 →
             // 把 stamp.image (base64) 写到 annotationArmed 让画布 stamp 工具立刻可用。
@@ -746,7 +788,15 @@ export function AppShell({
         />
         <div ref={workspaceMainRef} className="workspace__main" style={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, position: "relative" }}>
           {activeMode === "pages" ? (
-            <PageOrganizerWorkspace reader={reader} />
+            <EditModeGridView
+              reader={reader}
+              onSelectPage={(pageNumber) => reader.setCurrentPage(pageNumber)}
+              onReorder={() => {
+                // TODO：真实重排（reader.reorderPages）由后续 worker 接入；
+                // 当前 stage 只占位反馈，避免静默吞掉用户操作意图。
+                setCommandFeedback("编辑模式重排已触发，等待后续 worker 接入真实重排。");
+              }}
+            />
           ) : isOcrMode ? (
             ocr ? (
               <OcrWorkspace

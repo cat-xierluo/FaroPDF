@@ -27,6 +27,10 @@ export type UtilityPanelId =
 /** 右侧模式驱动栏 id（v0.2 候选）。
  *  - 由 AppShell 通过 activeMode 推导 + 显式 rightPanel 覆盖
  *  - 「none」= 右栏折叠
+ *  ISS-NEW-I（W2 worker）：
+ *  - "shape" 形状工具右栏（截图 59，6 段：形状/线条/线宽/不透明度/边框色/填充色）
+ *  - "search" 搜索结果右栏（截图 41，4 段：header/输入/命中列表/footer）
+ *  注意：summary / ocr-status 由 W1 worker（ISS-NEW-C）独占，本文件不要追加。
  */
 export type RightPanelId =
   | "stamps"
@@ -37,6 +41,10 @@ export type RightPanelId =
   | "summary"
   /** ISS-NEW-C：右栏 OCR 状态面板（截图 53 对齐）。 */
   | "ocr-status"
+  /** ISS-NEW-I：右栏形状工具面板（6 段，截图 59 对齐）。 */
+  | "shape"
+  /** ISS-NEW-I：右栏搜索结果面板（4 段，截图 41 对齐）。 */
+  | "search"
   | "none";
 
 /** 批注 overlay 停靠位置。

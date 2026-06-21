@@ -1,0 +1,183 @@
+/* ISS-NEW-I：T 编辑模式页面网格视图（PDF Expert 5 列 + 蓝边框选中 + drop indicator）
+ * 独立 CSS 文件，遵循 W2 worker 边界：不改 src/styles/app.css。 */
+
+.edit-mode-grid {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  background: var(--surface);
+}
+
+.edit-mode-grid__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.edit-mode-grid__toolbar-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: 0.5px;
+}
+
+.edit-mode-grid__toolbar-spacer {
+  flex: 1;
+}
+
+.edit-mode-grid__hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* 5 列 PDF Expert 网格：minmax 让小屏自适应收缩；gap 宽，匹配截图 80/81 间距 */
+.edit-mode-grid__list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 22px 18px;
+  padding: 24px 28px;
+  margin: 0;
+  list-style: none;
+  overflow: auto;
+  min-height: 0;
+}
+
+@media (max-width: 1180px) {
+  .edit-mode-grid__list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 880px) {
+  .edit-mode-grid__list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.edit-mode-grid__item {
+  list-style: none;
+  display: flex;
+}
+
+.edit-mode-grid__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.edit-mode-grid__card:hover {
+  border-color: var(--accent);
+}
+
+.edit-mode-grid__card--selected {
+  /* 蓝边框选中 — 截图 80/81/83 风格 */
+  border-color: var(--accent, #2a8df0);
+  border-width: 2px;
+  box-shadow: 0 0 0 2px rgba(42, 141, 240, 0.2);
+}
+
+.edit-mode-grid__card--dragging {
+  opacity: 0.4;
+  transform: scale(0.97);
+}
+
+.edit-mode-grid__card-drop-before {
+  border-left: 3px solid var(--accent, #2a8df0);
+}
+
+.edit-mode-grid__card-drop-after {
+  border-right: 3px solid var(--accent, #2a8df0);
+}
+
+.edit-mode-grid__thumbnail {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: linear-gradient(#ffffff, #f2f4f5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.edit-mode-grid__thumbnail img,
+.edit-mode-grid__thumbnail canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.edit-mode-grid__label {
+  font-size: 12px;
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.edit-mode-grid__size {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* 空态 */
+.edit-mode-grid__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 60px 24px;
+  color: var(--muted);
+  flex: 1;
+  text-align: center;
+}
+
+.edit-mode-grid__empty h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.edit-mode-grid__empty p {
+  font-size: 13px;
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+/* drop indicator 在两卡之间 */
+.edit-mode-grid__item--drop-before::before,
+.edit-mode-grid__item--drop-after::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  background: var(--accent, #2a8df0);
+  border-radius: 2px;
+}
+
+.edit-mode-grid__item {
+  position: relative;
+}
+
+.edit-mode-grid__item--drop-before::before {
+  left: -10px;
+}
+
+.edit-mode-grid__item--drop-after::after {
+  right: -10px;
+}

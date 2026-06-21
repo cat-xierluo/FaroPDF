@@ -1,0 +1,156 @@
+/* ISS-NEW-I（W2 worker）：形状工具右栏 6 段（PDF Expert 截图 59）
+ * 独立 CSS 文件，遵循 W2 worker 边界：不改 src/styles/app.css。 */
+
+.shape-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 0;
+}
+
+.shape-panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.shape-panel__section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.shape-panel__heading {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* 段 1：形状选择 2×3 网格 */
+.shape-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.shape-panel__shape {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--fg);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.shape-panel__shape:hover {
+  border-color: var(--accent);
+}
+
+.shape-panel__shape--active {
+  border-color: var(--accent, #2a8df0);
+  border-width: 2px;
+  background: var(--accent-soft, rgba(42, 141, 240, 0.08));
+}
+
+/* 段 2：线条工具 实线/虚线 二选一 */
+.shape-panel__stroke-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.shape-panel__stroke-option {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.shape-panel__stroke-option--active {
+  border-color: var(--accent, #2a8df0);
+  background: var(--accent-soft, rgba(42, 141, 240, 0.08));
+}
+
+.shape-panel__stroke-line {
+  width: 32px;
+  height: 0;
+  border-top: 2px solid currentColor;
+}
+
+.shape-panel__stroke-line--dashed {
+  border-top-style: dashed;
+}
+
+.shape-panel__stroke-line--solid {
+  border-top-style: solid;
+}
+
+/* 段 3：线条宽度 / 段 4：不透明度 — 共享 slider 样式 */
+.shape-panel__slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shape-panel__slider-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.shape-panel__slider {
+  width: 100%;
+  accent-color: var(--accent, #2a8df0);
+}
+
+/* 段 5：边框色 / 段 6：填充色 — 7 色块（含透明） */
+.shape-panel__swatches {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.shape-panel__swatch {
+  position: relative;
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.shape-panel__swatch--active {
+  border-color: var(--accent, #2a8df0);
+  border-width: 2px;
+  box-shadow: 0 0 0 1px var(--accent, #2a8df0);
+}
+
+.shape-panel__swatch-fill {
+  position: absolute;
+  inset: 4px;
+  border-radius: 2px;
+}
+
+.shape-panel__swatch-fill--transparent {
+  background:
+    linear-gradient(45deg, transparent 45%, var(--danger, #d04444) 45%, var(--danger, #d04444) 55%, transparent 55%);
+}

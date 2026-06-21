@@ -3,6 +3,8 @@ import { CustomStampPanel } from "../../modules/annotation/ui/CustomStampPanel";
 import type { CustomStamp } from "../../modules/annotation/customStampStore";
 import { SignaturePanel } from "../../modules/forms/ui/SignaturePanel";
 import type { SignatureRecord } from "../../modules/forms/signatureStore";
+import { ShapeToolPanel, type ShapeToolValue } from "./panels/ShapeToolPanel";
+import { SearchResultsPanel, type SearchHitItem } from "./panels/SearchResultsPanel";
 import type { AppModeId, RightPanelId } from "./types";
 import {
   DocSummaryPanelView,
@@ -39,6 +41,18 @@ export interface RightPanelProps {
   ocrStatus?: OcrJobStatus;
   /** ISS-NEW-C：用户点击 OCR 状态面板「开始」按钮（placeholder，真实 OCR 调用不在本任务）。 */
   onStartOcr?: (options: OcrStartOptions) => void;
+  /** ISS-NEW-I（W2 worker）：形状工具右栏当前值 + onChange（受控 placeholder） */
+  shapeToolValue?: ShapeToolValue;
+  onShapeToolChange?: (next: ShapeToolValue) => void;
+  /** ISS-NEW-I（W2 worker）：搜索右栏 query/hits + 回调 */
+  searchQuery?: string;
+  searchHits?: ReadonlyArray<SearchHitItem>;
+  searchActiveHitId?: string | null;
+  onSearchQueryChange?: (query: string) => void;
+  onSearchSelectHit?: (hitId: string) => void;
+  onSearchJumpPrevious?: () => void;
+  onSearchJumpNext?: () => void;
+  onSearchClose?: () => void;
 }
 
 interface PanelDescriptor {
@@ -55,6 +69,8 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
     // ISS-NEW-C（扩展不改写）：文档摘要 + OCR 状态
     summary: { title: "文档摘要", hint: "文件名 / 页数 / 大小 / 元数据，截图 61 对齐" },
     "ocr-status": { title: "OCR 状态", hint: "当前 OCR 任务状态 + 页码范围 + 开始按钮（placeholder）" },
+    shape: { title: "形状", hint: "批注时插入矩形/椭圆/箭头/直线/铅笔，含线宽/不透明度/边框/填充色。" },
+    search: { title: "搜索", hint: "批注文档的全文搜索命中导航与高亮。" },
   },
   export: {
     stamps: { title: "图章", hint: "在导出过程中复用已保存的图章模板" },
@@ -63,6 +79,8 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
     "ocr-queue": { title: "OCR 队列", hint: "导出模式下不需要 OCR 队列" },
     summary: { title: "文档摘要", hint: "导出目标文档元数据 + 文件大小" },
     "ocr-status": { title: "OCR 状态", hint: "导出前可对扫描件先跑 OCR" },
+    shape: { title: "形状", hint: "导出模式下形状工具不直接落点。" },
+    search: { title: "搜索", hint: "导出前用搜索定位需要处理的段落。" },
   },
   forms: {
     stamps: { title: "图章", hint: "在表单填充后加盖业务图章" },
@@ -71,6 +89,8 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
     "ocr-queue": { title: "OCR 队列", hint: "扫描表单可走 OCR 后再补填" },
     summary: { title: "文档摘要", hint: "表单 PDF 文件元数据" },
     "ocr-status": { title: "OCR 状态", hint: "扫描表单识别后补填字段" },
+    shape: { title: "形状", hint: "表单内可插入形状标注当前字段。" },
+    search: { title: "搜索", hint: "搜索表单字段标签快速跳转。" },
   },
   ocr: {
     stamps: { title: "图章", hint: "OCR 完成后可对识别结果盖戳" },
@@ -79,6 +99,8 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
     "ocr-queue": { title: "OCR 队列", hint: "v0.2 接入：显示任务列表 / 进度 / 报告跳转" },
     summary: { title: "文档摘要", hint: "OCR 源文档元数据" },
     "ocr-status": { title: "OCR 状态", hint: "当前任务进度 + 失败重试" },
+    shape: { title: "形状", hint: "OCR 模式下形状工具不直接落点。" },
+    search: { title: "搜索", hint: "OCR 文本层上跑搜索。" },
   },
   read: {
     stamps: { title: "图章", hint: "阅读态不活跃，右栏折叠" },
@@ -87,6 +109,8 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
     "ocr-queue": { title: "OCR 队列", hint: "阅读态不活跃" },
     summary: { title: "文档摘要", hint: "阅读时右栏折叠，summary 不可选" },
     "ocr-status": { title: "OCR 状态", hint: "阅读时右栏折叠，ocr-status 不可选" },
+    shape: { title: "形状", hint: "阅读态不活跃" },
+    search: { title: "搜索", hint: "阅读态不活跃" },
   },
   pages: {
     stamps: { title: "图章", hint: "页面管理态不显示右栏" },
@@ -95,6 +119,8 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
     "ocr-queue": { title: "OCR 队列", hint: "页面管理态不显示右栏" },
     summary: { title: "文档摘要", hint: "页面管理态不显示右栏" },
     "ocr-status": { title: "OCR 状态", hint: "页面管理态不显示右栏" },
+    shape: { title: "形状", hint: "页面管理态不显示右栏" },
+    search: { title: "搜索", hint: "页面管理态不显示右栏" },
   },
 };
 
@@ -105,6 +131,8 @@ const READ_INACTIVE_IDS: ReadonlyArray<RightPanelId> = [
   "ocr-queue",
   "summary",
   "ocr-status",
+  "shape",
+  "search",
 ];
 
 export function RightPanel({
@@ -116,6 +144,16 @@ export function RightPanel({
   docSummary,
   ocrStatus,
   onStartOcr,
+  shapeToolValue,
+  onShapeToolChange,
+  searchQuery,
+  searchHits,
+  searchActiveHitId,
+  onSearchQueryChange,
+  onSearchSelectHit,
+  onSearchJumpPrevious,
+  onSearchJumpNext,
+  onSearchClose,
 }: RightPanelProps) {
   const headingId = useId();
 
@@ -135,8 +173,16 @@ export function RightPanel({
   const showCustomStamp = rightPanel === "stamps" && (activeMode === "annotate" || activeMode === "forms" || activeMode === "export");
   const showSignaturePanel = rightPanel === "signatures" && (activeMode === "annotate" || activeMode === "forms");
 
+  // ISS-NEW-I（W2 worker）：shape / search panel 路由。
+  // shape: 主要在 annotate 模式（编辑模式下也在用），其余模式占位 hint。
+  // search: 全模式可用；空 query 时仍渲染（提供输入框入口），具体命中由 AppShell 注入。
+  const showShapePanel = rightPanel === "shape";
+  const showSearchPanel = rightPanel === "search";
+
   // ISS-060 阶段 2 后续：annotate / forms 模式有 2 个可选面板（图章/签名），渲染显式 tab
   // 让用户主动切换，不依赖 mode 派生。其他模式（ocr/export 单一面板）不显示 tab。
+  // ISS-NEW-I：annotate 模式下 shape 与 stamps/signatures 互为并列分支，由
+  // RightPanelId 决定渲染哪个分支，不通过 tab 切换。
   const showTabs = activeMode === "annotate" || activeMode === "forms";
 
   return (
@@ -168,22 +214,37 @@ export function RightPanel({
         </div>
       ) : null}
       <div className="right-pane__body" data-testid="right-pane-body">
-        <p className="right-pane__hint">{hint}</p>
-        {showCustomStamp ? (
-          <CustomStampPanel onSelectStamp={onSelectCustomStamp ?? (() => undefined)} />
-        ) : null}
-        {showSignaturePanel ? (
-          <SignaturePanel onSelectSignature={onSelectSignature ?? (() => undefined)} />
-        ) : null}
-        {rightPanel === "summary" ? (
+        {showShapePanel ? (
+          <ShapeToolPanel value={shapeToolValue} onChange={onShapeToolChange} />
+        ) : showSearchPanel ? (
+          <SearchResultsPanel
+            query={searchQuery}
+            results={searchHits}
+            activeHitId={searchActiveHitId}
+            onChangeQuery={onSearchQueryChange}
+            onSelectHit={onSearchSelectHit}
+            onJumpPrevious={onSearchJumpPrevious}
+            onJumpNext={onSearchJumpNext}
+            onClose={onSearchClose}
+          />
+        ) : rightPanel === "summary" ? (
           <DocSummaryPanelView summary={docSummary ?? null} />
-        ) : null}
-        {rightPanel === "ocr-status" ? (
+        ) : rightPanel === "ocr-status" ? (
           <OcrStatusPanelView
             status={ocrStatus ?? { state: "idle", message: "尚未开始 OCR", progress: 0 }}
             onStart={onStartOcr ?? (() => undefined)}
           />
-        ) : null}
+        ) : (
+          <>
+            <p className="right-pane__hint">{hint}</p>
+            {showCustomStamp ? (
+              <CustomStampPanel onSelectStamp={onSelectCustomStamp ?? (() => undefined)} />
+            ) : null}
+            {showSignaturePanel ? (
+              <SignaturePanel onSelectSignature={onSelectSignature ?? (() => undefined)} />
+            ) : null}
+          </>
+        )}
       </div>
     </aside>
   );
