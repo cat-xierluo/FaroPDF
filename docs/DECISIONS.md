@@ -6231,3 +6231,62 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - DEC-144 ISS-NEW-A 阶段 1（Toolbar 5 段骨架）— Wave 1 W1 commit，本章落地的导火索
 - `project_multi_agent_state` memory（4 次 multi-agent 失败教训 + PM 单 session TDD 路径）
 - legal-ai-skill-book 项目 AGENTS.md（参考来源，非 git submodule）
+
+## DEC-146 ISS-NEW-C 右栏文档摘要 + OCR 状态 panel（Wave 2 W1）
+
+- 时间：2026-06-21
+- 类型：UI 信息架构 / 右栏 panel / 多 Agent Wave 2
+- 关联：ISS-NEW-C / ISS-073 v0.2 桶 1 / PR #67 / DEC-145（多 Agent 纪律）
+
+**背景**：v0.2 PDF Expert 对齐 P0，右栏 mode-driven panel 体系（L5b）是最显眼缺口。ISS-NEW-C 任务卡要求按 rightPanelMode 切换 panel 内容。本 ISS 与 ISS-NEW-I（DEC-147）并行。
+
+**决策**：
+1. **范围拆分**：ISS-NEW-C 只做 文档摘要（summary）+ OCR 状态（ocr-status）2 个 panel；形状（shape）+ 搜索（search）归 ISS-NEW-I（DEC-147），消除 worker 间语义重叠。
+2. **扩展不改写**：RightPanel.tsx 的 PANELS_BY_MODE 每 mode 追加 summary/ocr-status 条目，不删现有 stamps/signatures/export-preview/ocr-queue；RightPanelId 联合类型追加成员。降低与 W2 的 merge 冲突。
+3. **AppShell 最小接入**：仅透传 docSummary/ocrStatus/onStartOcr 3 props（W1 给 null/idle/noop placeholder），真实数据接 App.tsx 留后续。
+4. **placeholder 策略**：OcrStatusPanelView 的「开始」按钮接 onStartOcr placeholder（真实 OCR 调用不在本任务）。
+
+**实现**：DocSummaryPanelView 99 行 + OcrStatusPanelView 91 行 + 各自单测（11 测试）+ RightPanel 扩展（57 行）+ AppShell（5 行）+ types（RightPanelId +2 成员）。
+
+**Verification**：typecheck/lint/build 干净；RightPanel.test 18/18；新 panel 单测 11/11；AppShell 全量 known-fail（DEC-144 vitest 环境）。PM Playwright 实操：上传 PDF + L2 tab + 阅读区 0 console error。
+
+## DEC-147 ISS-NEW-I 编辑网格 + 形状/搜索右栏 + L3 按钮（Wave 2 W2）
+
+- 时间：2026-06-21
+- 类型：UI 信息架构 / 编辑模式 / 右栏 / L3 / 多 Agent Wave 2
+- 关联：ISS-NEW-I / ISS-073 v0.2 桶 1 / PR #68 / DEC-145
+
+**决策**：
+1. **范围拆分**：ISS-NEW-I 做 编辑网格 + 形状右栏 + 搜索右栏 + L4 命令 + L3 模式按钮；文档摘要/OCR 状态归 ISS-NEW-C。
+2. **EditModeGridView 复用**：T 编辑模式 5 列网格复用 PageOrganizerWorkspace（ISS-046）的 grid 能力，不重写 page organizer。onReorder 接 placeholder（真实 IPC 留 ISS-NEW-F）。
+3. **ShapeToolPanel 6 段**：形状 2×3 / 线条工具 / 线宽 / 不透明度 / 边框色 / 填充色，对齐截图 59。受控 placeholder（value/onChange）。
+4. **SearchResultsPanel 4 段**：header / 输入 / 命中列表 / footer，对齐截图 41。从 popover 迁右栏（ISS-NEW-C §7.4 要求）。
+5. **L3 OCR 按钮降级**：OCR 模式「开始/增强扫描」按钮因 commands.ts 未暴露 ocr-start AppCommandId，避免破坏类型约束，暂缓（注释说明后续 worker 补 commands 注册）。合理范围控制。
+
+**实现**：EditModeGridView 199 行 + ShapeToolPanel 271 行 + SearchResultsPanel 203 行 + 各 CSS + 单测（33 测试）+ RightPanel 扩展（92 行 shape/search 路由）+ Toolbar L3（78 行）+ AppShell 接入（56 行）+ types（RightPanelId +2）。
+
+**Verification**：typecheck/lint/build 干净；EditModeGridView/ShapeToolPanel/SearchResultsPanel/RightPanel 单测 44/44；AppShell 全量 known-fail（DEC-144）。
+
+## DEC-148 Wave 2 多 Agent 编排复盘（DEC-145 纪律首次实战）
+
+- 时间：2026-06-21
+- 类型：多 Agent 编排复盘 / glm-5.2 provider 评估
+- 关联：DEC-145 / DEC-146 / DEC-147 / memory `project_multi_agent_state`
+
+**执行**：W1（ISS-NEW-C）+ W2（ISS-NEW-I）并行 worktree + tmux session，glm-5.2 provider（slot glm-1/glm-2）。PM 双层监测（sentinel + 15min cron）。
+
+**表现评估**：
+- ✅ **provider 配额**：glm-5.2 支撑 2 并行 worker 无限流（memory 记录的 MiniMax 配额瓶颈在 GLM 解决，用户预判正确）。
+- ✅ **产出质量**：两 worker 各自 TDD，W1 11 单测 + W2 33 单测全过，扩展不改写策略执行到位，范围严格（未碰 Forbidden）。
+- ✅ **DEC-145 纪律**：worker 自开 PR（PR 第一动作满足）；PM 收口解 3 处 rebase 冲突。
+- ⚠️ **checkpoint 落盘**：W2 STATUS/RESULT/PATCH_SUMMARY 未落盘（glm-5.2 worker 对 checkpoint 文件不够严格），sentinel 失效，靠 git/PR/cron 兜底发现 done。W1 STATUS 在但 updated_at=null。
+- ⚠️ **tmux 投递坑**：claude v2.1.175 启动 + GLM 首连 >3s，spawn-worker 默认 sleep 3 不够；`tmux send-keys -l` 长文本进不去 TUI 输入框，改 `tmux load-buffer + paste-buffer`（bracketed paste）成功。
+- ✅ **冲突处理**：用户接受 AppShell 共享冲突，PM rebase 解 types（RightPanelId 合并）+ RightPanel（body 渲染去重，sed 批量删标记副作用修复）+ AppShell（rightPanel 属性去重）。
+
+**改进点（回写 multi-agent-orchestration skill）**：
+1. spawn-worker.sh 启动后等待 claude 就绪的探测（不等固定 3s，等 ❯ 提示符出现）。
+2. prompt 投递默认用 paste-buffer 而非 send-keys -l。
+3. worker prompt 强化 checkpoint 落盘纪律（STATUS updated_at 必填 + RESULT/PATCH_SUMMARY 强制）。
+4. sed 批量解冲突标记需配合 typecheck 验证纯追加假设（body 渲染块非纯追加会重复，需手动）。
+
+**结论**：glm-5.2 + DEC-145 纪律组合下，多 Agent 并行在 FaroPDF 首次成功（vs memory 记录的 MiniMax 4 次失败）。后续 Wave 可继续此模式，注意 checkpoint 落盘 + tmux 投递两个改进点。

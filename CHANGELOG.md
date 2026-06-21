@@ -1,6 +1,13 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~144。
+> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~147。
+
+右栏 mode-driven panel 体系 + 编辑网格（Wave 2 / DEC-146 + DEC-147）：
+
+- ISS-NEW-C（W1 / DEC-146 / PR #67）：新增 `DocSummaryPanelView`（文件名/页数/大小/元数据，截图 61 对齐）+ `OcrStatusPanelView`（OCR 状态机 + 页码范围 + 开始按钮 placeholder，截图 53 对齐）；RightPanel 扩展不改写追加 summary/ocr-status 路由；AppShell 最小透传接入。+11 单测。
+- ISS-NEW-I（W2 / DEC-147 / PR #68）：新增 `EditModeGridView`（T 编辑 5 列缩略图网格，选中页蓝边框 + 尺寸 label + drop indicator，截图 80/81/83 对齐）+ `ShapeToolPanel`（6 段：形状 2×3 / 线条工具 / 线宽 / 不透明度 / 边框色 / 填充色，截图 59）+ `SearchResultsPanel`（4 段：header / 输入 / 命中列表 / footer，截图 41）；RightPanel 追加 shape/search 路由；Toolbar L3 模式附加按钮（OCR「开始/增强扫描」因 commands.ts 类型约束暂缓，合理降级）；真实形状绘制/跨 tab IPC 接 placeholder。+33 单测。
+- Wave 2 多 Agent 编排（DEC-145 纪律首次实战）：W1 + W2 并行 worktree（glm-5.2 provider），PM rebase 收口解 AppShell/types/RightPanel 三处冲突（rightPanel 属性去重 + RightPanel body 渲染去重 + types RightPanelId 合并），typecheck/lint/build/44 单测全过。
+- 派发踩坑：claude v2.1.175 TUI 启动 + GLM 首连需 >3s，`tmux send-keys -l` 长文本进不去输入框，改 `tmux load-buffer + paste-buffer`（bracketed paste）成功投递。W2 worker STATUS/RESULT/PATCH_SUMMARY checkpoint 未落盘（glm-5.2 行为，靠 git/PR/cron 兜底），记入复盘。
 
 Toolbar 5 段布局重构 + L2 tab 上移（ISS-NEW-A 阶段 1，DEC-144）：
 

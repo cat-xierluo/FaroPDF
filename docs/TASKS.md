@@ -1127,7 +1127,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P0（v0.2 阻塞）
 - 类型：UI 信息架构 / 侧栏
 - 来源：FEATURE_CATALOG §3；截图 20 / 36 / 50 / 53 / 55 / 57-60 / 61-multi-tab-opened-2nd
-- 状态：部分已实现（ISS-060 阶段 2 部分 ship）；依赖 ISS-NEW-A
+- 状态：**✅ 已完成**（Wave 2 W1 / DEC-146 / PR #67）。文档摘要 + OCR 状态 2 个 panel 落地；形状/搜索右栏归 ISS-NEW-I。
 - 范围：完整 `<RightPanel>` 组件 + `rightPanelMode` 状态，按触发切换内容：
   | 触发 | 内容 | 状态 |
   | --- | --- | --- |
@@ -1251,7 +1251,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P0（与 ISS-NEW-A / C 并行）
 - 类型：UI 信息架构 / 模式 / 右栏 / L3 toolbar
 - 来源：FEATURE_CATALOG §2.1 + §3 + §1.3.1 + §1.3.2 三审补全（2026-06-20）；截图 50 / 59 / 65 / 67 / 69 / 80 / 81 / 83
-- 状态：未启动；可与 ISS-NEW-A / C 并行
+- 状态：**✅ 已完成**（Wave 2 W2 / DEC-147 / PR #68）。EditModeGridView 5 列网格 + ShapeToolPanel 6 段 + SearchResultsPanel 4 段 + Toolbar L3 模式附加按钮落地；OCR L3「开始/增强扫描」按钮因 commands.ts 未暴露 AppCommandId 暂缓（合理降级，后续 worker 补）；真实形状绘制/跨 tab IPC 接 placeholder。
 - 范围：
   1. **T 编辑模式页面网格视图**：
      - PDF 内容区从单页流式改为 5 列缩略图网格
