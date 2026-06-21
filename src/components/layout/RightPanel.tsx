@@ -214,22 +214,6 @@ export function RightPanel({
         </div>
       ) : null}
       <div className="right-pane__body" data-testid="right-pane-body">
-        <p className="right-pane__hint">{hint}</p>
-        {showCustomStamp ? (
-          <CustomStampPanel onSelectStamp={onSelectCustomStamp ?? (() => undefined)} />
-        ) : null}
-        {showSignaturePanel ? (
-          <SignaturePanel onSelectSignature={onSelectSignature ?? (() => undefined)} />
-        ) : null}
-        {rightPanel === "summary" ? (
-          <DocSummaryPanelView summary={docSummary ?? null} />
-        ) : null}
-        {rightPanel === "ocr-status" ? (
-          <OcrStatusPanelView
-            status={ocrStatus ?? { state: "idle", message: "尚未开始 OCR", progress: 0 }}
-            onStart={onStartOcr ?? (() => undefined)}
-          />
-        ) : null}
         {showShapePanel ? (
           <ShapeToolPanel value={shapeToolValue} onChange={onShapeToolChange} />
         ) : showSearchPanel ? (
@@ -242,6 +226,13 @@ export function RightPanel({
             onJumpPrevious={onSearchJumpPrevious}
             onJumpNext={onSearchJumpNext}
             onClose={onSearchClose}
+          />
+        ) : rightPanel === "summary" ? (
+          <DocSummaryPanelView summary={docSummary ?? null} />
+        ) : rightPanel === "ocr-status" ? (
+          <OcrStatusPanelView
+            status={ocrStatus ?? { state: "idle", message: "尚未开始 OCR", progress: 0 }}
+            onStart={onStartOcr ?? (() => undefined)}
           />
         ) : (
           <>
