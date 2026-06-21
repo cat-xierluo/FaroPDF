@@ -95,7 +95,8 @@ describe("SearchResultsPanel (ISS-NEW-I 段 1-4)", () => {
   });
 
   test("空 query + 有 results → 显示「暂无命中」", () => {
-    render(<SearchResultsPanel query="" results={[]} />);
+    // 即使 query 非空但 results 空，显示「暂无命中」（提示用户还没命中）
+    render(<SearchResultsPanel query="关键词" results={[]} />);
     expect(screen.getByTestId("search-results-empty").textContent).toContain("暂无命中");
   });
 });

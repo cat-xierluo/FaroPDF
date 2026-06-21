@@ -59,24 +59,24 @@ const SHAPE_OPTIONS: ReadonlyArray<{ id: ShapeKind; label: string; icon: typeof 
   { id: "pencil", label: "铅笔", icon: PencilLine },
 ];
 
-const STROKE_COLORS: ReadonlyArray<{ id: string; value: string }> = [
-  { id: "black", value: "#000000" },
-  { id: "red", value: "#d04444" },
-  { id: "orange", value: "#e89234" },
-  { id: "yellow", value: "#f0c33c" },
-  { id: "green", value: "#3aa55a" },
-  { id: "blue", value: "#2a8df0" },
-  { id: "purple", value: "#8a4dba" },
+const STROKE_COLORS: ReadonlyArray<{ id: string; value: string; label: string }> = [
+  { id: "black", value: "#000000", label: "黑" },
+  { id: "red", value: "#d04444", label: "红" },
+  { id: "orange", value: "#e89234", label: "橙" },
+  { id: "yellow", value: "#f0c33c", label: "黄" },
+  { id: "green", value: "#3aa55a", label: "绿" },
+  { id: "blue", value: "#2a8df0", label: "蓝" },
+  { id: "purple", value: "#8a4dba", label: "紫" },
 ];
 
 const FILL_COLORS: ReadonlyArray<{ id: string; value: string; label: string }> = [
   { id: "transparent", value: "transparent", label: "透明" },
-  { id: "black-fill", value: "#000000" },
-  { id: "red-fill", value: "#d04444" },
-  { id: "orange-fill", value: "#e89234" },
-  { id: "yellow-fill", value: "#f0c33c" },
-  { id: "green-fill", value: "#3aa55a" },
-  { id: "blue-fill", value: "#2a8df0" },
+  { id: "black-fill", value: "#000000", label: "黑" },
+  { id: "red-fill", value: "#d04444", label: "红" },
+  { id: "orange-fill", value: "#e89234", label: "橙" },
+  { id: "yellow-fill", value: "#f0c33c", label: "黄" },
+  { id: "green-fill", value: "#3aa55a", label: "绿" },
+  { id: "blue-fill", value: "#2a8df0", label: "蓝" },
 ];
 
 export function ShapeToolPanel({ value, onChange }: ShapeToolPanelProps = {}): ReactElement {
