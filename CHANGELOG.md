@@ -1,7 +1,10 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~152。
+> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~153。
 
+Preferences 默认作者字段（PM 单 session / DEC-153）：
+
+- ISS-NEW-G：AppSettings 加 `documentAuthor?: string`（对齐 PDF Expert 截图 13「作者」）；GeneralSection 加 input（「默认作者（写 PDF 元数据时预填）」+ 持久化）；defaults normalize。PropertiesDialog（ISS-072）自动联动 settings.documentAuthor 留 TODO。typecheck/lint ✅ + GeneralSection 5/5。
 恢复 L3 旋转入口（PM 单 session / DEC-152，修正 DEC-144 回归）：
 
 - bug-fix：DEC-144（ISS-NEW-A 阶段 1）Toolbar 5 段重构时移除 L3 旋转按钮但**没补替代入口**，`reader.setRotation` 引擎在但 UI 无触发，**用户丢失页面旋转**（律师扫描件刚需）。本 commit 恢复：L3 reading section viewmode 后加 RotateCcw/RotateCw 2 按钮，engine 复用 reader.setRotation（handleRotate direction 计算）。PDF Expert L3 严格 4 元素的纯粹性妥协给律师可用性（旋转高频，藏工具菜单多步不便）。typecheck/lint/build ✅ + Toolbar 19/19。

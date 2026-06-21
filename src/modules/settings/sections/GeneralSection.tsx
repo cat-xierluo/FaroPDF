@@ -88,6 +88,17 @@ export function GeneralSection({ settings, onChange }: GeneralSectionProps) {
         />
       </label>
 
+      <label className="settings-field" htmlFor="default-document-author">
+        <span>默认作者（写 PDF 元数据时预填）</span>
+        <input
+          id="default-document-author"
+          onChange={(event) => onChange({ ...settings, documentAuthor: event.currentTarget.value })}
+          placeholder="留空不预填"
+          type="text"
+          value={settings.documentAuthor ?? ""}
+        />
+      </label>
+
       <section className="settings-recent" aria-label="最近文件">
         <h3>最近文件</h3>
         {settings.recentFiles.length === 0 ? (

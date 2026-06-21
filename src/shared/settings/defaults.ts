@@ -152,6 +152,8 @@ export function normalizeAppSettings(input: unknown): AppSettings {
       typeof input.autoUpdateCheck === "boolean" ? input.autoUpdateCheck : defaults.autoUpdateCheck,
     language:
       input.language === "en" || input.language === "zh-CN" ? input.language : defaults.language,
+    documentAuthor:
+      typeof input.documentAuthor === "string" ? input.documentAuthor : undefined,
   };
 }
 

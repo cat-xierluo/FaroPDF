@@ -32,4 +32,6 @@ export interface AppSettings {
   autoUpdateCheck: boolean;
   /** ISS-NEW-G：界面语言（状态栏 toggle 切换）。默认 "zh-CN"。全量字符串 i18n 留后续。 */
   language: AppLanguage;
+  /** ISS-NEW-G：默认作者名（写 PDF metadata 时预填，对齐 PDF Expert Preferences「作者」字段）。可选。 */
+  documentAuthor?: string;
 }

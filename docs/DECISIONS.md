@@ -6382,3 +6382,22 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 **Verification**：typecheck ✅ / lint ✅ / build ✅ / Toolbar test 19/19 ✅。⚠️ Playwright 实操未做（避免图片 MCP 循环 DEC-150），靠单测 + build 兜底；旋转按钮 dev 可见，待补验。
 
 **关联**：DEC-144（回归源）/ DEC-150（PM 单 session + 图片循环）/ memory `project_multi_agent_state`。
+
+## DEC-153 ISS-NEW-G Preferences documentAuthor 字段（PM 单 session）
+
+- 时间：2026-06-21
+- 类型：UI 信息架构 / Preferences / PM 单 session
+- 关联：ISS-NEW-G（Preferences 子集）/ FEATURE_CATALOG §5.5（PDF Expert 截图 13「作者」字段）
+
+**决策**：
+1. **documentAuthor?: string**（可选）加 AppSettings。对齐 PDF Expert Preferences「作者」字段。
+2. **GeneralSection 加 input**（「默认作者（写 PDF 元数据时预填）」），onChange 直接持久化 settings。
+3. **PropertiesDialog 自动联动留 TODO**：当前 PropertiesDialog（ISS-072）author 用 metadata.author，未自动读 settings.documentAuthor 作为默认。联动需 AppShell 传 documentAuthor 到 PropertiesDialog，留后续（字段已就绪 + 可配置，联动是增强）。
+
+**实现**：types.ts documentAuthor? + defaults.ts normalize + GeneralSection input。
+
+**Verification**：typecheck ✅ / lint ✅ / GeneralSection 5/5 ✅。
+
+**out of scope**：resumeLastPageOnOpen（重开回到上次页，reader 接线复杂留后续）/ PropertiesDialog 自动联动 / 其他 PDF Expert Preferences 字段（默认PDF查看应用等系统级不适用 FaroPDF）。
+
+**关联**：DEC-149（G Welcome）/ DEC-151（G 语言）/ DEC-152（旋转恢复）/ memory `project_multi_agent_state`（PM 单 session）。
