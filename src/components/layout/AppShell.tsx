@@ -5,8 +5,10 @@ import type { AnnotationSidecar, PdfAnnotation } from "../../shared";
 import type { ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
 import type { AppSettings } from "../../shared";
+import { setCurrentLanguage, useI18n } from "../../shared/i18n/useI18n";
 import { suggestOutputName } from "../../shared/naming";
 import { getCommandById, type AppCommandId, type AppCommandSignal } from "../../shared/app/commands";
+import { getModeTools } from "./toolbarRegistry";
 import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
 import {
@@ -108,7 +110,10 @@ const exportToolGroups = [
   },
 ] satisfies Array<{ label: string; tools: Array<{ commandId: AppCommandId; label: string }> }>;
 
-const contextualToolbarLabels: Record<Exclude<AppModeId, "read" | "pages">, string> = {
+// ISS-NEW-E（2026-06-22 收口）：read 模式也作为 L4 二级工具条的一员，
+// aria-label 与其他模式对齐为「阅读模式工具」。
+const contextualToolbarLabels: Record<Exclude<AppModeId, "pages">, string> = {
+  read: "阅读模式工具",
   annotate: "批注工具条",
   export: "导出工具条",
   forms: "填写和签名工具条",
@@ -132,6 +137,8 @@ export function AppShell({
   settings,
   utilityPanel,
 }: AppShellProps): ReactElement {
+  // ISS-NEW-G（2026-06-22 收口）：i18n 字典查表。
+  const i18n = useI18n();
   // ISS-059 Phase 1：Tab bar 集成。文件打开时 openTab 派发，关闭时由 TitlebarTabs 内部处理。
   const tabStore = useTabStore();
   useEffect(() => {
@@ -147,7 +154,9 @@ export function AppShell({
       tabStore.openTab(doc.path ?? "", doc.name);
     }
   }, [reader.state.document, tabStore]);
-  const showContextToolbar = activeMode !== "read" && activeMode !== "pages";
+  // ISS-NEW-E（2026-06-22 收口）：showContextToolbar 改为 `activeMode !== "pages"`，
+  // read 模式也显示 L4 二级工具条（由 ContextToolbar mode === "read" 分支统一渲染）。
+  const showContextToolbar = activeMode !== "pages";
   // ISS-067 阶段 2：涂黑模式开关（先声明，再写 useEffect 依赖）
   const [redactActive, setRedactActive] = useState(false);
   // 离开 annotate 模式自动退出涂黑状态，避免 overlay 卡在非文档页。
@@ -211,6 +220,11 @@ export function AppShell({
   const rightPanelWithEditFallback: RightPanelId =
     rightPanel === "none" && activeMode === "forms" ? "shape" : rightPanel;
   const [commandFeedback, setCommandFeedback] = useState<string | null>(null);
+  // ISS-NEW-G（2026-06-22 收口）：把 settings.language 同步到 i18n runtime。
+  // 任何 useI18n() 组件（StatusBar / WelcomeScreen / GeneralSection）均跟随重渲染。
+  useEffect(() => {
+    setCurrentLanguage(settings.language);
+  }, [settings.language]);
   // ISS-072 阶段 2：文档属性对话框 state
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [propertiesMetadata, setPropertiesMetadata] = useState<PdfMetadata | null>(null);
@@ -745,8 +759,13 @@ export function AppShell({
           onAnnotationStateChange={annotationArmed?.onStateChange ?? (() => undefined)}
           onUtilityPanelChange={onUtilityPanelChange}
           formController={formController}
+          reader={reader}
         />
       ) : null}
+      {/* ISS-NEW-A 阶段 2 / ISS-NEW-B 收口（2026-06-22）：L4 二级工具条接管 read-mode
+          工具（旋转 + 适合页面）。仅在 read 模式 + 有文档时显示，让 L3 reading 段
+          瘦身到 4 元素（页码 + 视图模式 4-icon toggle + 缩放% + -/+）。
+          ISS-NEW-E 收口（2026-06-22）：ReadModeToolbar 已并入 ContextToolbar（mode === "read" 分支），此独立 render 块删除。 */}
       <div
         className={showUtilityPanel ? "workspace" : "workspace workspace--full"}
         style={{
@@ -860,6 +879,16 @@ export function AppShell({
                   onSettingsChange({ ...settings, recentFiles: [] });
                 }
               }}
+              onConvertFromImages={() => {
+                // ISS-NEW-G（2026-06-22 收口）：图片转 PDF 转换卡占位反馈。
+                // 真实流程依赖 img2pdf / OCR pipeline，由后续 worker 接入。
+                setCommandFeedback(i18n.feedback.convertImagesPending);
+              }}
+              onConvertFromWord={() => {
+                // ISS-NEW-G（2026-06-22 收口）：Word 转 PDF 转换卡占位反馈。
+                // 真实流程依赖 Word → PDF merge engine，由后续 worker 接入。
+                setCommandFeedback(i18n.feedback.convertWordPending);
+              }}
               onOpenFile={reader.openFile}
               onOpenRecent={(entry) => {
                 // ISS-NEW-G（Wave 3 W1）：点击最近缩略图 — 当前 stage 占位反馈。
@@ -924,12 +953,29 @@ export function AppShell({
         onToast={(message) => setCommandFeedback(message)}
       />
       <StatusBar
+        activeMode={activeMode}
         language={settings.language}
-        onLanguageChange={(next) => onSettingsChange?.({ ...settings, language: next })}
+        ocrState={{
+          cursorPage: reader.state.document?.currentPage ?? null,
+          // ISS-NEW-G（2026-06-22 收口）：OcrCommandJob.status 是 string（非 OcrJobStatus），
+          // 此处 narrow 为 5 个有效枚举之一；不识别时退到 busy 派生（running）或 idle。
+          jobStatus: ((): "queued" | "running" | "completed" | "failed" | "cancelled" | "idle" => {
+            const raw = ocr?.currentJob?.status;
+            if (raw === "queued" || raw === "running" || raw === "completed" || raw === "failed" || raw === "cancelled") {
+              return raw;
+            }
+            return ocr?.busy ? "running" : "idle";
+          })(),
+        }}
+        onLanguageChange={(next) => {
+          // ISS-NEW-G（2026-06-22 收口）：同时同步到 i18n runtime，触发 useI18n() 组件重渲染。
+          setCurrentLanguage(next);
+          onSettingsChange?.({ ...settings, language: next });
+        }}
         readerState={reader.state}
       />
       {commandFeedback ? (
-        <div className="command-feedback" role="status" aria-live="polite">
+        <div className="command-feedback" data-testid="command-feedback" role="status" aria-live="polite">
           <span>{commandFeedback}</span>
           <button
             aria-label="关闭命令提示"
@@ -1081,6 +1127,12 @@ function UtilityPanel({
     );
   }
 
+  // ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏「书签」面板占位。
+  // 当前 stage 不接 PDF outline 解析 / 持久化 / 跳转，由后续 worker 接入。
+  if (panel === "bookmark") {
+    return <BookmarkPanelPlaceholder />;
+  }
+
   return (
     <DocumentSummaryPanel
       annotations={annotations}
@@ -1092,6 +1144,17 @@ function UtilityPanel({
       pagesWithHits={collectPagesWithSearchHits(search.state.hits)}
       renderThumbnail={reader.renderThumbnail}
     />
+  );
+}
+
+/** ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏书签面板占位。
+ *  真实能力（outline 解析 / 添加 / 跳转 / 持久化）留后续 worker。 */
+function BookmarkPanelPlaceholder() {
+  return (
+    <aside className="bookmark-panel" aria-label="书签面板" data-testid="bookmark-panel">
+      <h2 className="bookmark-panel__title">书签</h2>
+      <p className="bookmark-panel__empty">书签功能开发中，等待后续 worker 接入 PDF outline 解析与持久化。</p>
+    </aside>
   );
 }
 
@@ -1125,17 +1188,58 @@ function ContextToolbar({
   onCommand,
   onAnnotationStateChange,
   onUtilityPanelChange,
+  reader,
 }: {
   annotationDisabled: boolean;
   annotationState: AnnotationToolState;
   formController: import("../../modules/forms/useFormController").FormController;
   hasDocument: boolean;
-  mode: Exclude<AppModeId, "read" | "pages">;
+  // ISS-NEW-E（2026-06-22 收口）：read 模式也作为 L4 二级工具条的一员，
+  // 由 ContextToolbar mode === "read" 分支统一渲染（参见下方分支）。
+  mode: Exclude<AppModeId, "pages">;
   ocr?: OcrWorkspaceController;
   onCommand: (commandId: AppCommandId) => void;
   onAnnotationStateChange: (next: AnnotationToolState) => void;
   onUtilityPanelChange: (panel: UtilityPanelId) => void;
+  reader: ReaderController;
 }) {
+  // ISS-NEW-E（2026-06-22 收口）：read 模式 L4 二级工具条接管 read-mode 工具
+  // （旋转 + 适合页面，复用 registerReadModeTools 注册的 3 工具）。从原独立
+  // `<ReadModeToolbar>` 组件并入，让 ContextToolbar 真正按 activeMode 路由 5 模式。
+  if (mode === "read") {
+    const items = getModeTools("read")
+      .slice()
+      .sort((a, b) => a.order - b.order);
+    return (
+      <div
+        className="context-toolbar context-toolbar--read"
+        data-testid="read-mode-toolbar"
+        role="toolbar"
+        aria-label={contextualToolbarLabels[mode]}
+      >
+        {items.map((item) => {
+          const disabled =
+            item.isDisabled?.({ activeMode: "read", reader, search: undefined as never }) ?? false;
+          return (
+            <button
+              aria-pressed={item.isActive({ activeMode: "read", reader, search: undefined as never })}
+              className="tool-button tool-button--icon tool-button--reader"
+              data-toolbar-section="read-l4"
+              disabled={disabled}
+              key={item.id}
+              onClick={() => item.onClick({ activeMode: "read", reader, search: undefined as never })}
+              title={item.label}
+              type="button"
+            >
+              <item.icon size={16} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
   if (mode === "annotate") {
     // stage 4 milestone 2：annotate 模式用真正的 AnnotationToolbar（受控），
     // 取代 milestone 1 之前 hardcoded 9 工具 + 6 色板 + stamp 模板按钮。
