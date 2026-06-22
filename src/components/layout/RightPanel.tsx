@@ -15,6 +15,12 @@ import {
   type OcrJobStatus,
   type OcrStartOptions,
 } from "./panels/OcrStatusPanelView";
+import {
+  ExportPreviewPanelView,
+  type ExportPreviewSummary,
+} from "./panels/ExportPreviewPanelView";
+import { OcrQueuePanelView } from "./panels/OcrQueuePanelView";
+import type { OcrCommandJob } from "../../shared/ocr/jobQueue";
 
 /**
  * ISS-060：右栏模式驱动面板（v0.2）。
@@ -41,6 +47,17 @@ export interface RightPanelProps {
   ocrStatus?: OcrJobStatus;
   /** ISS-NEW-C：用户点击 OCR 状态面板「开始」按钮（placeholder，真实 OCR 调用不在本任务）。 */
   onStartOcr?: (options: OcrStartOptions) => void;
+  /**
+   * ISS-NEW-C 阶段 2 后续（2026-06-22 收口）：右栏「导出预览」面板输入。
+   * 仅当 rightPanel="export-preview" 生效。
+   */
+  exportPreview?: ExportPreviewSummary;
+  /**
+   * ISS-NEW-C 阶段 2 后续（2026-06-22 收口）：右栏「OCR 队列」面板输入。
+   * 仅当 rightPanel="ocr-queue" 生效。
+   */
+  ocrQueueJobs?: ReadonlyArray<OcrCommandJob>;
+  onCancelOcrJob?: (jobId: string) => void;
   /** ISS-NEW-I（W2 worker）：形状工具右栏当前值 + onChange（受控 placeholder） */
   shapeToolValue?: ShapeToolValue;
   onShapeToolChange?: (next: ShapeToolValue) => void;
@@ -144,6 +161,9 @@ export function RightPanel({
   docSummary,
   ocrStatus,
   onStartOcr,
+  exportPreview,
+  ocrQueueJobs,
+  onCancelOcrJob,
   shapeToolValue,
   onShapeToolChange,
   searchQuery,
@@ -234,6 +254,10 @@ export function RightPanel({
             status={ocrStatus ?? { state: "idle", message: "尚未开始 OCR", progress: 0 }}
             onStart={onStartOcr ?? (() => undefined)}
           />
+        ) : rightPanel === "export-preview" ? (
+          <ExportPreviewPanelView summary={exportPreview ?? { activeTool: null, fileName: null, pageCount: null }} />
+        ) : rightPanel === "ocr-queue" ? (
+          <OcrQueuePanelView jobs={ocrQueueJobs ?? []} onCancelJob={onCancelOcrJob} />
         ) : (
           <>
             <p className="right-pane__hint">{hint}</p>

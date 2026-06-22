@@ -1,6 +1,13 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~156。
+> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~157。
+
+ISS-NEW-C 阶段 2 后续（PM 单 session / DEC-158）：
+
+- **右栏「导出预览」面板真内容**（`src/components/layout/panels/ExportPreviewPanelView.tsx`）：export 模式激活时显示当前 active tool（6 种）+ 关键参数摘要（页数 / 源文件名 / 输出文件名按 tool 派生后缀 `-text-watermarked` / `-image-watermarked` / `-header-footer` / `-page-numbered` / `-bates` / `-compressed`）。无文档 / 无 activeTool 时显示明确提示。`AppShell.tsx` 传 `activeExportTool` + `reader.state.document?.name / pageCount` 给 RightPanel。+5 单元测。
+- **右栏「OCR 队列」面板真内容**（`src/components/layout/panels/OcrQueuePanelView.tsx`）：OCR 模式激活时显示任务列表（status dot + 短文件名 + `formatOcrStatusLabel` 文案 + cancel 按钮）。active 状态（queued/running）cancel 按钮 enabled，terminated 状态（completed/failed/cancelled）disabled。`AppShell.tsx` 传 `ocr?.jobs` + `onCancelOcrJob` 回调。+4 单元测。
+- **RightPanel 路由扩展**：增加 `rightPanel === "export-preview"` 和 `rightPanel === "ocr-queue"` 2 个分支；PANELS_BY_MODE descriptor 6 个 mode × 8 panel id 全覆盖。
+- 4 files / +340 / -0。typecheck ✅ + 9/9 单测通过。
 
 ISS-NEW-H 视图菜单 submenu 深度补全（Wave 4e minimax worker 端到端跑通，PM 收口 / DEC-157）：
 

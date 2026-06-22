@@ -6565,3 +6565,34 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - macOS 视图菜单 submenu 深度补全的全部 12+ 项
 
 **关联**：ISS-NEW-H 任务卡（状态 "defer" → 阶段 1 收口）/ DEC-104/106/150（4 次 multi-agent 失败教训）/ DEC-155/156（前置子 ship）。
+
+## DEC-158 ISS-NEW-C 阶段 2 后续：右栏 export-preview + ocr-queue 真内容 panel（PM 单 session，2026-06-22）
+
+- 时间：2026-06-22
+- 类型：UI 信息架构 / RightPanel 真实内容 / 律师场景闭环
+- 关联：ISS-NEW-C 阶段 2 后续（FEATURE_CATALOG §3 视图右栏）/ DEC-146（ISS-NEW-C W1 DocSummary + OcrStatus 2 panel）/ DEC-147（ISS-NEW-I W2 ShapeToolPanel + SearchResultsPanel）/ DEC-112（CustomStampPanel 接入）/ DEC-113（SignaturePanel 接入）
+
+**决策**：
+1. **ExportPreviewPanelView**（`src/components/layout/panels/ExportPreviewPanelView.tsx`）：右栏「导出预览」面板真内容。6 个 active tool 各自独立参数摘要行，输出文件名格式 `${stem}${TOOL_SUFFIXES[tool]}.pdf`（后缀与 tool 绑定：text-watermarked / image-watermarked / header-footer / page-numbered / bates / compressed）。无文档时显示「请先打开 PDF 文档」；无 activeTool 时显示「请选择导出工具」。
+2. **OcrQueuePanelView**（`src/components/layout/panels/OcrQueuePanelView.tsx`）：右栏「OCR 队列」面板真内容。任务列表（status dot + 短文件名 + `formatOcrStatusLabel` 文案 + cancel 按钮）。active 状态（queued/running）cancel 按钮 enabled，terminated 状态 disabled。无 jobs 时显示「无 OCR 任务」。与 OcrWorkspace 主区域任务列表不重复（OcrWorkspace 是 full-page 视图，本 panel 是 right-pane 简化版）。
+3. **RightPanel 路由扩展**：加 `rightPanel === "export-preview"` 和 `rightPanel === "ocr-queue"` 2 个分支；PANELS_BY_MODE descriptor 6 个 mode × 8 panel id 全覆盖。
+4. **AppShell 接线**：`exportPreview` props 接 `activeExportTool` + `reader.state.document?.name/pageCount`；`ocrQueueJobs` 接 `ocr?.jobs`；`onCancelOcrJob` 走 `ocr?.cancelJob(job)` 链。
+
+**设计取舍**：
+- **不实际渲染 PDF 缩略图**（v0.2 限制）：ExportPreviewPanelView 只展示参数摘要 + 输出文件名格式，与 PDF Expert 真实预览（缩略图网格）有差距。范围控制。
+- **OcrQueuePanelView 是 OcrWorkspace 的 right-pane 简化版**：不重复 full-page 列表。用户在 OCR 模式主区域已能看到 OcrWorkspace 任务，右栏简化版提供「不离开 OCR 工具条上下文也能看到任务进度」的快速入口。
+- **6 个 TOOL_SUFFIXES 与 `suggestOutputName`（shared/naming.ts）独立硬编码**：本面板只展示参数摘要，不触发实际导出命名；`shared/naming.ts` 是真实导出流程的单一真相源。两者后缀字符串一致（如需要统一为单一真相可后续重构）。
+- **`formatOcrStatusLabel` 仍硬编码中文（zh-CN）**：与现有 OcrWorkspace / OcrStatusPanelView 一致。i18n 字典扩展留后续（ISS-NEW-G 收口后 30+ 组件硬编码迁移范围）。
+
+**Verification**：
+- typecheck ✅
+- ExportPreviewPanelView 5/5 ✅（空文档 / 无工具 / text-watermark / compress / bates 5 个场景）
+- OcrQueuePanelView 4/4 ✅（空 jobs / 列表渲染 / active cancel enabled + 点击回调 / 无 onCancelJob 不渲染 cancel 按钮）
+
+**out of scope（明确留给后续）**：
+- ExportPreviewPanelView 实际渲染 PDF 缩略图（v0.2 polish）
+- OcrQueuePanelView 显示进度条 / ETA（OcrWorkspace 已 ship 进度，本 panel 简化版不重复）
+- 右栏 toolbar 显式切换按钮（ISS-NEW-E 后续）
+- 左右栏宽度持久化（panelWidthStore DEC-121 部分 ship）
+
+**关联**：ISS-NEW-C 任务卡（line 1151）状态"✅ 已完成（Wave 2 W1 / DEC-146 / PR #67）" — 后续 4 panel 实际已在 DEC-146/147/112/113 收口；本次 DEC-158 收口剩余 2 panel（export-preview / ocr-queue）真正接入。

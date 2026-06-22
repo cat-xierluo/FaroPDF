@@ -798,6 +798,19 @@ export function AppShell({
           docSummary={null}
           ocrStatus={{ state: "idle", message: "尚未开始 OCR", progress: 0 }}
           onStartOcr={() => undefined}
+          // ISS-NEW-C 阶段 2 后续（2026-06-22 收口）：导出预览 + OCR 队列。
+          exportPreview={{
+            activeTool: activeExportTool,
+            fileName: reader.state.document?.name ?? null,
+            pageCount: reader.state.document?.pageCount ?? null,
+          }}
+          ocrQueueJobs={ocr?.jobs ?? []}
+          onCancelOcrJob={(jobId) => {
+            const job = ocr?.jobs.find((j) => j.id === jobId);
+            if (job) {
+              void ocr?.cancelJob(job);
+            }
+          }}
           onPanelChange={setRightPanelOverride}
           shapeToolValue={shapeToolValue}
           onShapeToolChange={setShapeToolValue}
