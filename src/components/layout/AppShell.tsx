@@ -707,6 +707,27 @@ export function AppShell({
       return;
     }
 
+    // ISS-NEW-D 阶段 1（2026-06-22）：扫描菜单 4 档质量 + 4 顶层动作 v0.2 占位反馈。
+    // 真实 OCR 入口由 OcrWorkspace / OcrModeToolbar 提供（activeMode=ocr 走主区域）。
+    if (
+      command.id === "ocr-quality-original" ||
+      command.id === "ocr-quality-standard" ||
+      command.id === "ocr-quality-advanced" ||
+      command.id === "ocr-quality-custom"
+    ) {
+      setCommandFeedback(`OCR 质量档「${command.label}」待后续 worker 接入；当前可切到 OCR 模式在主区域选择。`);
+      return;
+    }
+    if (
+      command.id === "ocr-scan-to-searchable" ||
+      command.id === "ocr-recognize-text" ||
+      command.id === "ocr-make-searchable" ||
+      command.id === "ocr-enhance-all"
+    ) {
+      setCommandFeedback(`${command.label}功能待后续 worker 接入；当前可切到 OCR 模式在主区域操作。`);
+      return;
+    }
+
     // ISS-NEW-H：3 顶层占位命令（不 return，让末尾通用 fallback 设 feedback）。
     if (
       command.id === "view-go-current-page" ||

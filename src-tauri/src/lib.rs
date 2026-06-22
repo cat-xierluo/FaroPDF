@@ -918,6 +918,21 @@ pub fn run() {
                         .text("annotation-shape-pen", "铅笔")
                         .build()?)
                     .build()?)
+                // ISS-NEW-D 阶段 1（2026-06-22）：macOS 扫描菜单。
+                // 增强扫描 4 档质量 submenu（原始/标准/高级/自定义）+ 扫描至可搜索 + OCR 文字 + 调整为可搜索 + 增强所有扫描页。
+                .item(&SubmenuBuilder::new(app, "扫描")
+                    .item(&SubmenuBuilder::new(app, "增强扫描")
+                        .text("ocr-quality-original", "原始")
+                        .text("ocr-quality-standard", "标准")
+                        .text("ocr-quality-advanced", "高级")
+                        .text("ocr-quality-custom", "自定义")
+                        .build()?)
+                    .text("ocr-scan-to-searchable", "扫描至可搜索")
+                    .text("ocr-recognize-text", "OCR 文字")
+                    .text("ocr-make-searchable", "调整为可搜索")
+                    .separator()
+                    .text("ocr-enhance-all", "增强所有扫描页")
+                    .build()?)
                 .item(&SubmenuBuilder::new(app, "视图")
                     .text("view-summary", "文档摘要")
                     .text("view-pages", "页面管理")
@@ -1014,6 +1029,14 @@ pub fn run() {
                     | "annotation-shape-double-arrow"
                     | "annotation-shape-line"
                     | "annotation-shape-pen"
+                    | "ocr-quality-original"
+                    | "ocr-quality-standard"
+                    | "ocr-quality-advanced"
+                    | "ocr-quality-custom"
+                    | "ocr-scan-to-searchable"
+                    | "ocr-recognize-text"
+                    | "ocr-make-searchable"
+                    | "ocr-enhance-all"
                     | "export-page-number"
                     | "export-bates"
                     | "export-header-footer"

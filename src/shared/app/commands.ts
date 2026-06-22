@@ -9,6 +9,7 @@ export type AppCommandGroup =
   | "annotation"
   | "export"
   | "forms"
+  | "ocr"
   | "settings"
   | "help";
 
@@ -52,6 +53,14 @@ export type AppCommandId =
   | "annotation-shape-double-arrow"
   | "annotation-shape-line"
   | "annotation-shape-pen"
+  | "ocr-quality-original"
+  | "ocr-quality-standard"
+  | "ocr-quality-advanced"
+  | "ocr-quality-custom"
+  | "ocr-scan-to-searchable"
+  | "ocr-recognize-text"
+  | "ocr-make-searchable"
+  | "ocr-enhance-all"
   | "settings-open"
   | "mode-annotate"
   | "mode-export"
@@ -370,6 +379,80 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     description: "v0.2 占位：形状绘制由 AnnotationOverlay 接 armAnnotationTool。",
     layer: "tertiary",
     group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  // ISS-NEW-D 阶段 1（2026-06-22）：扫描菜单 4 档质量 submenu + 4 顶层动作。
+  // 全部 tertiary / native-menu / ocr group，menu event handler 走 ocr 模式 entry point。
+  {
+    id: "ocr-quality-original",
+    label: "原始",
+    description: "OCR 质量档：原始（保留原图）。",
+    layer: "tertiary",
+    group: "ocr",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "ocr-quality-standard",
+    label: "标准",
+    description: "OCR 质量档：标准。",
+    layer: "tertiary",
+    group: "ocr",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "ocr-quality-advanced",
+    label: "高级",
+    description: "OCR 质量档：高级。",
+    layer: "tertiary",
+    group: "ocr",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "ocr-quality-custom",
+    label: "自定义",
+    description: "OCR 质量档：自定义。",
+    layer: "tertiary",
+    group: "ocr",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "ocr-scan-to-searchable",
+    label: "扫描至可搜索",
+    description: "v0.2 占位：调用 ocr.scanToSearchable()，由 OCR 控制器实现。",
+    layer: "tertiary",
+    group: "ocr",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "ocr-recognize-text",
+    label: "OCR 文字",
+    description: "v0.2 占位：调用 ocr.recognizeText()，由 OCR 控制器实现。",
+    layer: "tertiary",
+    group: "ocr",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "ocr-make-searchable",
+    label: "调整为可搜索",
+    description: "v0.2 占位：调用 ocr.makeSearchable()，由 OCR 控制器实现。",
+    layer: "tertiary",
+    group: "ocr",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "ocr-enhance-all",
+    label: "增强所有扫描页",
+    description: "v0.2 占位：对当前 PDF 所有扫描页一次性跑增强 + OCR。",
+    layer: "tertiary",
+    group: "ocr",
     entryPoints: ["native-menu"],
     requiresDocument: true,
   },
