@@ -42,6 +42,8 @@
 
 > v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~158。
 
+ISS-NEW-D 阶段 2 收尾（PM 单 session / DEC-160）：批注菜单补 9 辅助 command（链接 / 内容表 / 删除 / 删除全部 / 跳到批注 / 上一项 / 下一项 / 全部折叠 / 全部展开），全部 v0.2 占位反馈（依赖未实装的 history 栈 / AnnotationSidebar 操作）。commit `0adc932`。
+
 ISS-NEW-D 阶段 1（PM 单 session / DEC-159，4 子菜单按顺序 ship）：
 
 - **批注菜单（commit `0c25006`）**：macOS 批注 SubmenuBuilder 加 8 工具（高亮/下划线/删除线/文本/笔/橡皮擦/便签）+ 形状 submenu（6 形状：矩形/椭圆/箭头/双向/直线/铅笔）。8 工具真实 arm（`armAnnotationTool` / `disarmAnnotationTool`），6 形状 submenu v0.2 占位反馈（PDF_ANNOTATION_TYPES 缺 ellipse/line/double-arrow，真实形状绘制由 AnnotationOverlay 接 armAnnotationTool，DEC-147 已 ship 6 段 ShapeToolPanel）。

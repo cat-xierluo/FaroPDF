@@ -1174,8 +1174,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P2
 - 类型：菜单栏 / i18n
 - 来源：FEATURE_CATALOG §4；截图 37 / 38 / 39 / 40
-- 状态：**阶段 1 收口（2026-06-22 / DEC-159）**；4 独立顶层菜单（批注 / 扫描 / 编辑 PDF / 前往）全部 ship（37 command id）。剩余：链接 / 内容表 / 删除 / 跳到批注 / 历史栈 / 真实 PDF 编辑链路 / 真实 OCR 入口 — 留后续。
-- 范围（阶段 1 收口）：
+- 状态：**阶段 1+2 收口（2026-06-22 / DEC-159 / DEC-160）**；4 独立顶层菜单（批注 / 扫描 / 编辑 PDF / 前往）全部 ship，批注菜单补 9 辅助 command，共 46 command id。剩余：批注 / 扫描 / 编辑 PDF 真实功能链路 / 前往浏览历史栈 / ⌘ 快捷键 / i18n 字典扩展 — 留后续。
+- 范围（阶段 1+2 收口）：
   - **批注菜单**（commit `0c25006`，✅）：8 工具（高亮/下划线/删除线/文本/笔/橡皮擦/便签）+ 形状 submenu（6 形状）
   - **扫描菜单**（commit `d5bfa10`，✅）：增强扫描 submenu（4 档质量）+ 4 顶层动作（扫描至可搜索 / OCR 文字 / 调整为可搜索 / 增强所有扫描页）
   - **编辑 PDF 菜单**（commit `3037e53`，✅）：5 动作（编辑 / 添加图像 / 添加链接 / 添加文字 / 隐藏）
@@ -1194,6 +1194,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [ ] 扫描 4 档质量 + 4 顶层动作真实 OCR 入口 — 留后续
   - [ ] 编辑 PDF 5 动作真实 PDF 内容编辑链路 — 留后续
   - [ ] 前往浏览历史栈（5 历史 + 1 返回）— 留后续
+  - [ ] 批注菜单 9 辅助 command 真实功能（链接 / 内容表 / 删除 / 跳到批注 / 折叠 / 展开）— 留后续
   - [ ] ⌘ 快捷键与 PDF Expert 对齐 — 留后续
 
 ### ISS-NEW-E L4 模式二级工具条统一抽象
@@ -1419,6 +1420,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - **测试汇总**：i18n 4/4 + StatusBar 12/12 + WelcomeScreen 9/9 + GeneralSection 5/5 + ReaderCanvas 19/19 + AppShell ISS-NEW-G 子集 3/3 + contracts.test.ts 加 3 字段默认值。typecheck ✅。
   - **out of scope**：`defaultPdfViewer` 真实 LaunchServices 读写 / `pdfExpertOpenMode` 真实双击路由 / `resumeLastPage` 真实 reader 接线 / `pageNumberIndicator` StatusBar 实际按 3 枚举渲染 / 「图片转 PDF / Word 转 PDF」真实流程 / 剩余 30+ 组件硬编码字符串 i18n 化。
   - **关联**：CHANGELOG.md Unreleased 顶部 / DEC-154 / ISS-NEW-G 任务卡勾选 [x] 9/10。
+- 2026-06-22：完成 ISS-NEW-D 阶段 2 收尾（DEC-160）：批注菜单补 9 辅助 command（链接 / 内容表 / 删除 / 删除全部 / 跳到批注 / 上一项 / 下一项 / 全部折叠 / 全部展开），全部 v0.2 占位反馈。ISS-NEW-D 阶段 1+2 共 4 commit + 46 command id 收口。commit `0adc932`。
 - 2026-06-22：完成 ISS-NEW-H 阶段 1 收口（DEC-157，Wave 4e minimax + PM 收口）：macOS 视图菜单 submenu 深度补全 — 11 个 command id（缩放 5 + 缩略图 2 + 占位 3）；5 files / +396 / -0；commit 8cd98b2；FF merge 到 main。typecheck ✅。**Wave 4e 教训**：minimax worker 端到端能跑（确认 6 次失败的 silent exit 不是 minimax 模型本身，根因是 `bash -lc "cd ... && exec claude ..."` 包装与 env 透传冲突；简单 `claude --permission-mode bypassPermissions` 成功 inherit PM env），但 verification 阶段 26m+ 不更新 STATUS（silent worker 模式重现）。PM 介入收口路径：typecheck PM 验证 + 帮 commit + FF merge。Wave 5 启动前应改进 worker prompt 加「verification 10m 内未 commit → 自降级 PM 介入」触发条件。
 - 2026-06-17：完成 review follow-up 修复（DEC-140）：ISS-067 `regionsScreenToPdf` 透传 `color`，补回归测试防止白 / 灰遮蔽最终回退为默认黑色；ISS-064 `SecurityPanel` 用户密码留空文案改成"无需密码即可打开副本"，不再暗示可沿用旧用户密码。
 - 2026-06-17：完成 ISS-067 阶段 2 后续 RedactionOverlay UI 细化。nextColor state + 3 颜色芯片（黑/白/灰，律师场景：黑色涂黑 / 白色擦除 / 灰色模糊），颜色仅作用于后续 commit 的 region（已 commit 不变）。新增撤销按钮 + 单 X 删除按钮（X 按钮 pointerEvents:auto 不冒泡触发 overlay 拖动）。**全量 1206/1207 通过**（+5 新测试）。复用 DEC-107 applyRedaction 算法 + DEC-132 redactPageMargins 算法，零算法层变更。

@@ -6642,3 +6642,32 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - i18n 字典扩展（菜单 label 仍用硬编码中文）
 
 **关联**：ISS-NEW-D 任务卡（line 1168+）状态 "defer" → 阶段 1 收口（4 菜单 + 37 command id）/ DEC-157（视图菜单 submenu 补全前置子 ship）/ DEC-158（右侧 export-preview + ocr-queue 真内容 panel）。
+
+## DEC-160 ISS-NEW-D 阶段 2 收尾：批注菜单补 9 辅助 command（PM 单 session，2026-06-22）
+
+- 时间：2026-06-22
+- 类型：UI 信息架构 / macOS 原生菜单 / ISS-NEW-D 收尾
+- 关联：ISS-NEW-D 任务卡（验收项 line 1175 批注菜单 10 项）/ DEC-159（阶段 1 4 菜单 ship）
+
+**决策**：
+1. **批注菜单补 9 辅助 command**（commit `0adc932`）：
+   - 链接（annotation-add-link）
+   - 内容表（annotation-outline）
+   - 删除 / 删除全部（annotation-delete / annotation-delete-all）
+   - 跳到批注 / 上一项 / 下一项（annotation-jump-to / annotation-previous / annotation-next）
+   - 全部折叠 / 全部展开（annotation-collapse-all / annotation-expand-all）
+2. **9 command 全部 v0.2 占位反馈**：依赖未实装的 history 栈（跳到批注 / 上一项 / 下一项）+ AnnotationSidebar 列表操作（折叠 / 展开）+ PDF outline 解析（内容表）+ 选中文本区域（链接）。真实功能后续 worker 接入。
+3. **总览**：ISS-NEW-D 阶段 1 + 2 共 4 commit，46 command id（批注 8+6+9 = 23 / 扫描 8 / 编辑 PDF 5 / 前往 10）。
+
+**Verification**：
+- typecheck ✅
+- `src/shared/app/commands.test.ts` 19/19 ✅（46 command 全部注册通过）
+- vitest 受 pre-existing 环境问题阻塞（与本次改动无关）
+
+**out of scope**：
+- 批注菜单 9 辅助 command 真实功能（history 栈 / AnnotationSidebar / outline / 选区）
+- 跨窗口同步的浏览历史（ISS-NEW-F tab 拖离窗口剥离）
+- macOS 菜单 ⌘ 快捷键与 PDF Expert 对齐
+- i18n 字典扩展
+
+**关联**：ISS-NEW-D 任务卡状态更新为「阶段 1+2 收口」/ DEC-159（阶段 1 4 commit）/ DEC-158（前置 ship）。
