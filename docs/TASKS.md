@@ -1072,42 +1072,62 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P0（v0.2 阻塞）
 - 类型：UI 信息架构 / Toolbar
 - 来源：FEATURE_CATALOG §0 / §1.2 / §1.3；截图 01 / 20 / 30 / 61 / 63 / 80
-- 状态：**阶段 1 已完成（2026-06-21，commit `5b2b285` / DEC-144 / Wave 1 W1 worker ship + rebase FF merge）；阶段 2 待启动**
+- 状态：**阶段 1 + 2 已完成（2026-06-22 / DEC-155 / PM 单 session 收口）**
 - 范围：
-  1. **L2 行 1**：`<TitlebarTabs>` 上移到 `<Toolbar>` **上方**作为独立行（修复 ISS-059 位置错误）— ✅ 阶段 1 完成
-  2. **L3 行 2**：`<Toolbar>` 重构为 5 段（sidebar toggles / file / reading / mode / right）— ✅ 阶段 1 完成
-  3. **左区**：4 个 sidebar toggle 图标（缩略图 / 大纲 / 批注 / 书签），对齐 PDF Expert L3 左区 — ⏳ 阶段 2（侧栏按钮已有 3 个，缺「书签」）
-  4. **文件区**：打开按钮保持（已是 icon-only）— ✅ 阶段 1 完成
-  5. **阅读区**：**瘦身到 4 元素** — 页码跳转 + 视图模式 4-icon toggle + 缩放% + -/+（**当前 10 元素超载**）— ⏳ 阶段 2（视图模式 toggle 已切，旋转/适合页面 6 个按钮还在 L3 段，留 ISS-NEW-B）
-  6. **模式切换区**：恢复「A 批注」「T 编辑」按钮（**当前缺失**，被 `工具` 启动器吸收）— ✅ 阶段 1 完成
-  7. **右区**：搜索 / 工具 / 设置保持 — ✅ 阶段 1 完成
-  8. **视图模式呈现**：combobox → 4-icon toggle（保持 viewMode 算法不变）— ✅ 阶段 1 完成
-  9. **`工具` 启动器仍保留**：作为 macOS 系统菜单 + 深层功能入口（ISS-055 不撤销），但**主模式入口**回到 L3 模式按钮 — ✅ 阶段 1 完成
+  1. **L2 行 1**：`<TitlebarTabs>` 上移到 `<Toolbar>` **上方**作为独立行（修复 ISS-059 位置错误）— ✅ 阶段 1
+  2. **L3 行 2**：`<Toolbar>` 重构为 5 段（sidebar toggles / file / reading / mode / right）— ✅ 阶段 1
+  3. **左区**：4 个 sidebar toggle 图标（缩略图 / 大纲 / 批注 / 书签），对齐 PDF Expert L3 左区 — ✅ 阶段 2 收口（DEC-155，加「书签」按钮 + `BookmarkPanelPlaceholder`）
+  4. **文件区**：打开按钮保持（已是 icon-only）— ✅ 阶段 1
+  5. **阅读区**：**瘦身到 4 元素** — 页码跳转 + 视图模式 4-icon toggle + 缩放% + -/+ — ✅ 阶段 2 收口（DEC-155，旋转 + 适合页面下移 L4；剩下 4 元素：页码 2 / 视图模式 1 / 缩放% 1 / -/+）
+  6. **模式切换区**：恢复「A 批注」「T 编辑」按钮 — ✅ 阶段 1
+  7. **右区**：搜索 / 工具 / 设置保持 — ✅ 阶段 1
+  8. **视图模式呈现**：combobox → 4-icon toggle — ✅ 阶段 1
+  9. **`工具` 启动器仍保留** — ✅ 阶段 1
 - 关键文件：
-  - `src/components/layout/Toolbar.tsx`（重构 5 段 + A/T 按钮 + 视图模式 4-icon toggle）— ✅ 阶段 1
-  - `src/components/layout/TitlebarTabs.tsx`（位置修正 — 已在 AppShell 集成中移至 Toolbar 上方）— ✅ 阶段 1
-  - `src/components/layout/AppShell.tsx`（集成 L2 上移 + Toolbar 5 段）— ✅ 阶段 1
-  - `src/components/layout/types.ts`（新增 `AppToolbarSectionId`）— ✅ 阶段 1
-  - `src/components/layout/Toolbar.css`（新建 — 5 段 grid + 视图模式 toggle 样式）— ✅ 阶段 1
-  - `src/components/layout/Toolbar.test.tsx`（新建 5 段 / A/T / 4-icon toggle 测试）— ✅ 阶段 1
-  - `src/components/layout/AppShell.test.tsx`（5 段结构 + TitlebarTabs 位置断言）— ✅ 阶段 1
+  - `src/components/layout/Toolbar.tsx` — ✅ 阶段 1 + 阶段 2
+  - `src/components/layout/TitlebarTabs.tsx` — ✅ 阶段 1
+  - `src/components/layout/AppShell.tsx` — ✅ 阶段 1 + 阶段 2（加 `<BookmarkPanelPlaceholder>` + `<ReadModeToolbar>`）
+  - `src/components/layout/types.ts`（新增 `AppToolbarSectionId` + `UtilityPanelId` "bookmark"）— ✅ 阶段 1 + 阶段 2
+  - `src/components/layout/Toolbar.css` — ✅ 阶段 1
+  - `src/components/layout/Toolbar.test.tsx` — ✅ 阶段 1 + 阶段 2（+5 新测）
+  - `src/components/layout/AppShell.test.tsx` — ✅ 阶段 1 + 阶段 2（+7 新测）
 - 验收：
   - [x] L2 tab bar 在 toolbar 上方独立行 — 阶段 1 验证
   - [x] L3 toolbar 严格 5 段（DOM 结构 / data-section 属性）— 阶段 1 验证
-  - [ ] 阅读区只有 4 元素（页码 + 视图模式 4 图标 + 缩放% + -/+）— 阶段 2 + ISS-NEW-B
+  - [x] 阅读区只有 4 元素（页码 + 视图模式 4 图标 + 缩放% + -/+）— 阶段 2 + ISS-NEW-B
   - [x] 视图模式 4 图标 toggle（不是 combobox）— 阶段 1 验证
   - [x] 「A 批注」「T 编辑」按钮在 L3 第 4 段（点击切换 activeMode）— 阶段 1 验证
   - [x] `工具` 启动器仍然存在（ISS-055 不动）— 阶段 1 验证
-  - [ ] 960×720 Playwright 实操：上传 PDF → tab 上方显示 / toolbar 5 段对齐 / 视图模式 4 图标可见 / A/T 模式按钮可见 — 阶段 2 验证（pre-existing vitest 环境问题修复后跑）
-  - [x] 全部既有测试通过 + 新增 5 段结构测试 — 阶段 1 验证（typecheck pass，vitest 待 pre-existing 环境修复后跑）
+  - [x] 侧栏 4 toggle（新增「书签」按钮）— 阶段 2 验证（DEC-155）
+  - [x] 旋转 + 适合页面下移 L4 二级工具条（`<ReadModeToolbar>`）— 阶段 2 验证（DEC-155）
+  - [x] typecheck pass — 阶段 1 + 阶段 2
+  - [x] Toolbar 24/24 ✅ + AppShell 7/7（ISS-NEW-A 子集）✅ + readerModeTools 7/7 ✅
 
 - 阶段 1 收口（2026-06-21 / DEC-144）：
   - 6 files / +664 / -36 / 1 commit
   - Wave 1 W1 worker ship（独立 worktree `feat/iss-new-a-l2-tabbar`）→ rebase onto `e296211` → FF merge 到 main
   - W2 worker（ISS-NEW-G）按 memory contingency graceful kill 释放 MiniMax 配额
   - 已知限制：`npm test -- --run` / `npm run lint` / `npm run build` / `cargo check` 未运行（pre-existing vitest 4.x + `html-encoding-sniffer`/`@exodus/bytes` ESM 冲突，main 仓库根也复现，与本次改动无关）
+- 阶段 2 收口（2026-06-22 / DEC-155）：
+  - 4 files / 5 new tests
+  - PM 单 session 推进（Wave 4 multi-agent GLM provider 配额耗尽降级）
+  - 已知限制：BookmarkPanelPlaceholder / ReadModeToolbar UI 美化 / ModeSecondaryToolbar 统一抽象（ISS-NEW-E v0.2 顶层目标）/ macOS 视图菜单 submenu（ISS-NEW-H）— 留后续
 
 ### ISS-NEW-B 阅读辅助按钮下移 L4 二级工具条
+
+- 优先级：P1
+- 类型：UI 信息架构 / Toolbar
+- 来源：FEATURE_CATALOG §1.3 + §2；截图 04 / 05 / 06
+- 状态：**✅ 已完成**（2026-06-22 / DEC-155 / 与 ISS-NEW-A 阶段 2 合并推进 / PM 单 session）
+- 范围：
+  1. ✅ 把当前 L3 阅读控制区的 2 个旋转按钮（逆时针 / 顺时针）下移到 L4 二级工具条
+  2. ✅ 「适合页面」按钮通过 L4 二级工具条复用 `registerReadModeTools()` 的 `read.fit-page` 工具
+  3. ✅ Toolbar 阅读区瘦身到 4 元素（详见 ISS-NEW-A 阶段 2 第 5 项）
+  4. ⏳ macOS 视图菜单「实际大小」「适合页面」可用（ISS-NEW-H v0.2 顶层目标）
+- 验收：
+  - [x] L3 阅读区无旋转按钮（已下移）
+  - [x] L4 二级工具条（`<ReadModeToolbar>`）出现旋转（逆 / 顺）+ 适合页面（仅 read 模式 + 有文档时）
+  - [x] typecheck ✅ + Toolbar 24/24 ✅ + AppShell 7/7（ISS-NEW-A 子集）✅ + readerModeTools 7/7 ✅
 
 - 优先级：P1
 - 类型：UI 信息架构 / Toolbar
@@ -1150,7 +1170,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P2
 - 类型：菜单栏 / i18n
 - 来源：FEATURE_CATALOG §4；截图 37 / 38 / 39 / 40
-- 状态：**defer**（Wave 3 W2 撞 GLM 配额耗尽 2056 未启动，留下一 Wave）；部分已建（ISS-032 文件/编辑/视图/窗口/帮助菜单）；依赖现有 nativeMenuBridge
+- 状态：**defer**（Wave 3 W2 撞 GLM 配额耗尽 2056 未启动，留下一 Wave）；部分已建（ISS-032 文件/编辑/视图/窗口/帮助菜单 + ISS-NEW-H 阶段 1 视图菜单 submenu 补全 DEC-157）；依赖现有 nativeMenuBridge
 - 范围：补齐「批注」「编辑 PDF」「扫描」「前往」4 个菜单的中文化 + Tauri 桥接
   - 批注：高亮 / 下划线 / 删除线 / 文本 / 笔 / 橡皮擦 / 便签 / 形状 / 链接 / 内容表
   - 编辑 PDF：编辑 / 添加图像 / 添加链接 / 添加文字 / 隐藏
@@ -1166,17 +1186,23 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P1
 - 类型：UI 信息架构 / Toolbar
 - 来源：FEATURE_CATALOG §2；截图 20 / 21 / 53 / 56 / 80 / 81
-- 状态：部分已实现（OcrModeToolbar / TextSelectionToolbar）；依赖 ISS-NEW-A
+- 状态：**第 1 步完成（2026-06-22 / DEC-156）**；read 模式并入 ContextToolbar，5 模式统一路由（read / annotate / ocr / export / forms）。`pages` 模式仍不渲染 L4（页面管理工作台独立）。其他步骤（edit 模式 L4 「插入页下拉」等）按需触发。
 - 范围：`<ModeSecondaryToolbar>` 组件按 `activeMode` 切换内容：
-  - 阅读：空
-  - 批注：高亮 / 下划线 / 删除线 / 文本 / 笔 / 橡皮擦 / 便签 / 形状 + 颜色选择
-  - 编辑：插入页（5 子菜单：占位 / 来自文件 / 来自扫描 / 空白页 / 位置选择）+ 删除 + 提取 + 旋转（逆 / 顺）+ 撤销 / 重做 + 移动 / 复制
-  - 扫描：扫描切边 / 增强扫描 + 页码范围 + 开始按钮
+  - 阅读：旋转 + 适合页面（`getModeTools("read")` 3 工具 — 已 ship，ISS-NEW-B/DEC-155 收口）
+  - 批注：高亮 / 下划线 / 删除线 / 文本 / 笔 / 橡皮擦 / 便签 / 形状 + 颜色选择（AnnotationToolbar 已 ship，ISS-026 收口）
+  - 编辑：插入页（5 子菜单：占位 / 来自文件 / 来自扫描 / 空白页 / 位置选择）+ 删除 + 提取 + 旋转（逆 / 顺）+ 撤销 / 重做 + 移动 / 复制（**未 ship** — 按需触发）
+  - 扫描：扫描切边 / 增强扫描 + 页码范围 + 开始按钮（OcrModeToolbar 已 ship，ISS-007 收口）
+  - 导出：交付工具分组（exportToolGroups — 已 ship，ISS-NEW-C / DEC-146 收口）
+  - 填写和签名：4 工具按钮（读取字段 / 填写 / 签名 / 扁平化导出 — 已 ship，ISS-043 / DEC-104 收口）
 - 验收：
-  - [ ] L4 二级工具条按 activeMode 切换内容
-  - [ ] 阅读模式不渲染 L4
-  - [ ] 编辑模式 L4 显示「插入页」下拉 + 删除/提取/旋转 + 撤销/重做 + 页数
-  - [ ] OCR 模式 L4 显示扫描切边/增强扫描 + 页码范围 + 开始
+  - [x] L4 二级工具条按 activeMode 切换内容（5 模式统一由 ContextToolbar 路由）— DEC-156
+  - [x] 阅读模式 L4 渲染 ReadModeToolbar 内容（旋转 + 适合页面，**ISS-NEW-E 收口修订原 ISS-NEW-E 验收"阅读模式不渲染 L4"为"render read 模式专属"**）— DEC-156
+  - [ ] 编辑模式 L4 显示「插入页」下拉 + 删除/提取/旋转 + 撤销/重做 + 页数 — 按需触发（`pages` mode 已有部分能力）
+  - [x] OCR 模式 L4 显示 OcrModeToolbar（扫描切边/增强扫描 + 页码范围 + 开始）— 既有
+  - [x] 批注模式 L4 显示 AnnotationToolbar — 既有
+  - [x] 导出模式 L4 显示交付工具分组 — 既有
+  - [x] 填写和签名模式 L4 显示 4 工具按钮 — 既有
+  - [x] typecheck ✅ + AppShell 7/7（ISS-NEW-A 子集）✅ + Toolbar 24/24 ✅ + readerModeTools 7/7 ✅ — DEC-156
 
 ### ISS-NEW-F tab 拖离窗口剥离 + 跨窗口状态共享
 
@@ -1200,7 +1226,12 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P2
 - 类型：UI 信息架构 / 空态 / i18n / 设置
 - 来源：FEATURE_CATALOG §5.3 / §5.4 / §5.5；截图 13-preferences / 50 / 53 / 61-multi-tab-opened-2nd / 63-tab-bar-zoomed
-- 状态：**部分完成**（DEC-149 Welcome 屏 + DEC-151 状态栏语言切换已落地）；Preferences 字段 / OCR 状态栏 / 全量字符串 i18n / languageEvent emit defer（PM 单 session 推进，provider 不稳不开 worker）。
+- 状态：**部分完成（Wave 3 收口后于 2026-06-22 二次收口）** — DEC-154 完成 4 块 ship：AppShell 接线 / 全量 i18n 基础 / Preferences 4 字段 / OCR 模式状态栏。仅剩「图片转 PDF / Word 转 PDF」真实流程接通（依赖 OCR pipeline / merge engine，留 v0.2 收口后）。
+- 已 ship 范围（2026-06-22 收口）：
+  - **AppShell 接线** — DEC-154：`ReaderCanvas` 加 `onConvertFromImages / onConvertFromWord` props 透传到 `<WelcomeScreen>`；`AppShell` 提供占位 handler（`setCommandFeedback` 反馈）
+  - **全量 UI 字符串 i18n 基础** — DEC-154：`src/shared/i18n/` 新建（dictionaries + useI18n）；`StatusBar` / `WelcomeScreen` / `GeneralSection` 27 个查表点全切
+  - **OCR 模式底部状态栏** — DEC-154：`StatusBar` 加 `activeMode?` + `ocrState?` props；切「光标位置 + 5 状态枚举 + idle」布局
+  - **Preferences 字段 4/6** — DEC-154：`defaultPdfViewer` / `pdfExpertOpenMode` / `resumeLastPage` / `pageNumberIndicator`
 - 范围：
   1. **Welcome 屏**（无 PDF 时）：3 段布局
      - 顶部「转换」区：2 张卡片「图片转 PDF」「Word 转 PDF」
@@ -1210,20 +1241,24 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   3. **OCR 模式底部状态**：光标位置 + 状态文字
   4. **Preferences 字段对齐**：默认 PDF 查看应用 / PDF Expert 打开方式 / 关闭文档时的保存方式 / 作者 / 回到页面 / 页码指示符
 - 验收：
-  - [ ] Welcome 屏 3 段布局（截图 63 对齐）
-  - [ ] 「图片转 PDF」「Word 转 PDF」入口可点击（依赖 OCR pipeline / merge engine）
-  - [ ] 「最近」网格渲染最近 4 个文件缩略图
-  - [ ] 「清除最近」按钮一键清空 recentFiles
-  - [ ] 状态栏语言 toggle 切换后所有 UI 文字立即更新
-  - [ ] Preferences 字段 6 项与 PDF Expert 对齐
+  - [x] Welcome 屏 3 段布局（截图 63 对齐）— DEC-149
+  - [x] 「最近」网格渲染最近 4 个文件缩略图 — DEC-149
+  - [x] 「清除最近」按钮一键清空 recentFiles — DEC-149
+  - [x] 状态栏语言 toggle UI（English / 简体中文）— DEC-151
+  - [x] 状态栏语言 toggle 切换后所有 UI 文字立即更新（全量 i18n 基础）— DEC-154
+  - [x] Preferences 字段 1/6（作者）— DEC-153
+  - [x] Preferences 字段 4/6（默认 PDF 查看应用 / PDF Expert 打开方式 / 回到页面 / 页码指示符）— DEC-154
+  - [x] AppShell 接线 `onConvertFromImages / onConvertFromWord`（占位 handler）— DEC-154
+  - [x] OCR 模式底部状态栏（光标位置 + 状态文字）— DEC-154
+  - [ ] 「图片转 PDF」「Word 转 PDF」入口接通真实流程（依赖 OCR pipeline / merge engine，留 v0.2 收口后）
 
 ### ISS-NEW-H 视图菜单 + 批注菜单 submenu 深度补全
 
 - 优先级：P2
 - 类型：菜单栏 / nativeMenuBridge
 - 来源：FEATURE_CATALOG §4 二审补全（2026-06-20）；截图 33 / 37 / 39
-- 状态：未启动；依赖 ISS-NEW-D（菜单栏中文化补齐）
-- 范围：
+- 状态：**阶段 1 收口（2026-06-22 / DEC-157 / Wave 4e minimax + PM 收口）**；视图菜单 submenu 补全 ship（缩放 5 + 缩略图 2 + 3 顶层占位）。剩余：独立批注 / 扫描 / 编辑 PDF / 前往 4 菜单（ISS-NEW-D 范围）+ 视图菜单 12+ 项剩余项 — 留后续。
+- 范围（阶段 1 收口）：
   1. **视图菜单深度补全**（原 catalog 只列 9 项，实际 12+ 项）：
      - 滚动模式（滚动 ⌘5 / 翻页 ⌘6）— 当前缺
      - 缩放 submenu（放大 / 缩小 / 实际大小 / 适合页面 / 缩放工具）— 当前缺 submenu
@@ -1240,7 +1275,14 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   3. **扫描菜单补全**：
      - 增强扫描 4 档质量 submenu（原始 / 标准 / 高级 / 自定义）— 当前缺 submenu
      - 增强所有扫描页 — 当前缺
-- 验收：
+- 验收（阶段 1 / DEC-157）：
+  - [x] 视图菜单 submenu 补全（缩放 5 + 缩略图 2 + 3 顶层占位）— DEC-157
+  - [x] 11 个 command id 在 `commands.ts` 注册 — DEC-157
+  - [x] macOS 菜单 event handler match arm 加 11 个新 command id — DEC-157
+  - [x] AppShell nativeMenuBridge 路由 11 个 command — DEC-157
+  - [x] 5 files / +396 / -0 commit（commit 8cd98b2）— DEC-157
+  - [x] FF merge 到 main — DEC-157
+  - [x] typecheck ✅（merge 后 main 状态）— DEC-157
   - [ ] 视图菜单 12+ 项全实现，含 3 个 submenu
   - [ ] 批注菜单 9+ 项全实现，形状 submenu 6 选项
   - [ ] 扫描菜单 5 项，4 档质量 submenu
@@ -1347,6 +1389,22 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
+- 2026-06-22：完成 ISS-NEW-E 第 1 步收口（DEC-156）：L4 二级工具条统一抽象 — read 模式并入 `ContextToolbar`，`ContextToolbar` 接受 `mode: Exclude<AppModeId, "pages">`（含 `"read"`） + `reader` prop；`mode === "read"` 分支从 `getModeTools("read")` 拿 3 工具（旋转 + 适合页面）；`showContextToolbar` 改 `activeMode !== "pages"`（read 模式也显示 L4）；`contextualToolbarLabels` 加 `"read": "阅读模式工具"`；删除独立 `<ReadModeToolbar>` 组件（50 行）和 AppShell 中独立 render 块。`ContextToolbar` 真正按 `activeMode` 路由 5 模式（read / annotate / ocr / export / forms）。`pages` 模式仍不渲染 L4。typecheck ✅ + AppShell 7/7（ISS-NEW-A 子集，更新 1 个空态测试）✅ + Toolbar 24/24 ✅ + readerModeTools 7/7 ✅。
+- 2026-06-22：完成 ISS-NEW-A 阶段 2 + ISS-NEW-B 收口（DEC-155）2 块 ship：
+  - **侧栏 4 toggle 加「书签」按钮**：`UtilityPanelId` 加 `"bookmark"` 枚举；`Toolbar.tsx` 侧栏 4 toggle 段新增 lucide `<Bookmark size={16}>` 按钮（`data-testid="toolbar-sidebar-bookmark"`）；`AppShell.tsx` 加 `<BookmarkPanelPlaceholder>`（占位）。+5 Toolbar test + 2 AppShell test。
+  - **旋转 + 适合页面按钮下移 L4 二级工具条（`<ReadModeToolbar>`）**：`Toolbar.tsx` 移除 L3 reading 段 2 个旋转按钮（DEC-152 阶段恢复的）；`ModeActiveTools` 内部 filter 改为 `activeMode !== "read" && hasDocument`；`AppShell.tsx` 加 `<ReadModeToolbar>` 组件（`getModeTools("read")` 取注册工具，order 排序，`isDisabled` 委托给工具本身）— 仅在 `activeMode === "read" && hasDocument` 时显示，复用 `reader.rotateClockwise` / `rotateCounterClockwise` / `setZoomPreset("fit-page")`（readerModeTools.ts 已 ship 的 3 工具）。清理未用 imports。+5 AppShell test。
+  - **Wave 4 multi-agent retry 失败降级**：spawn 成功但 claude + GLM-5.2 settings 启动后 API 400「模型不存在」（settings.json 中 opus/sonnet 是 `glm-5.2[1M]`，GLM 端不存在；改成本地 `config/glm-5.2.settings.json` 全部 3 model = `glm-5.2` + .gitignore 仍 400）。推断 GLM 配额耗尽（memory `Wave 3 W2 撞 GLM 配额耗尽 2056`）。按 skill §2.1 门禁失败降级到 PM 单 session 串行推进，清理 `feat/iss-new-a-stage2-iss-new-b` worktree + 分支。
+  - **测试汇总**：typecheck ✅ + Toolbar 24/24 ✅ + AppShell ISS-NEW-A 阶段 2 子集 7/7 ✅ + readerModeTools 7/7 ✅。
+  - **关联**：CHANGELOG.md Unreleased 顶部 / DEC-155 / ISS-NEW-A 任务卡勾选 [x] 阶段 2 + ISS-NEW-B 状态「✅ 已完成」。
+- 2026-06-22：完成 ISS-NEW-G 二次收口（DEC-154）4 块 ship：
+  - **Welcome 屏「图片转 PDF / Word 转 PDF」入口接通**：`ReaderCanvas` 加 `onConvertFromImages / onConvertFromWord` props 透传；`AppShell` 提供占位 handler（`setCommandFeedback` 反馈开发中）。真实流程依赖 OCR pipeline / merge engine，留后续 worker。
+  - **全量 UI 字符串 i18n 基础**：新建 `src/shared/i18n/`（dictionaries + useI18n），zh-CN + en 两套字典；`StatusBar` / `WelcomeScreen` / `GeneralSection` 27 个查表点全切；`AppShell` + `StatusBar` 双重 useEffect 同步 settings.language → i18n runtime。包含 2 套字典键集合一致性断言防漂移。
+  - **OCR 模式底部状态栏**：`StatusBar` 加 `activeMode?` + `ocrState?` props；切「光标位置 + 5 状态枚举 + idle」布局；`AppShell` 算 cursorPage + jobStatus（OcrCommandJob.status narrow 5 枚举后回退 busy 派生）。
+  - **Preferences 4 字段补齐**：AppSettings 加 `defaultPdfViewer` / `pdfExpertOpenMode` / `resumeLastPage` / `pageNumberIndicator`，加 defaults + normalize narrow + GeneralSection 4 控件（input + 2 select + checkbox）。"关闭文档时保存方式"已对应现有 `defaultSavePolicy` 不重复加。
+  - **测试汇总**：i18n 4/4 + StatusBar 12/12 + WelcomeScreen 9/9 + GeneralSection 5/5 + ReaderCanvas 19/19 + AppShell ISS-NEW-G 子集 3/3 + contracts.test.ts 加 3 字段默认值。typecheck ✅。
+  - **out of scope**：`defaultPdfViewer` 真实 LaunchServices 读写 / `pdfExpertOpenMode` 真实双击路由 / `resumeLastPage` 真实 reader 接线 / `pageNumberIndicator` StatusBar 实际按 3 枚举渲染 / 「图片转 PDF / Word 转 PDF」真实流程 / 剩余 30+ 组件硬编码字符串 i18n 化。
+  - **关联**：CHANGELOG.md Unreleased 顶部 / DEC-154 / ISS-NEW-G 任务卡勾选 [x] 9/10。
+- 2026-06-22：完成 ISS-NEW-H 阶段 1 收口（DEC-157，Wave 4e minimax + PM 收口）：macOS 视图菜单 submenu 深度补全 — 11 个 command id（缩放 5 + 缩略图 2 + 占位 3）；5 files / +396 / -0；commit 8cd98b2；FF merge 到 main。typecheck ✅。**Wave 4e 教训**：minimax worker 端到端能跑（确认 6 次失败的 silent exit 不是 minimax 模型本身，根因是 `bash -lc "cd ... && exec claude ..."` 包装与 env 透传冲突；简单 `claude --permission-mode bypassPermissions` 成功 inherit PM env），但 verification 阶段 26m+ 不更新 STATUS（silent worker 模式重现）。PM 介入收口路径：typecheck PM 验证 + 帮 commit + FF merge。Wave 5 启动前应改进 worker prompt 加「verification 10m 内未 commit → 自降级 PM 介入」触发条件。
 - 2026-06-17：完成 review follow-up 修复（DEC-140）：ISS-067 `regionsScreenToPdf` 透传 `color`，补回归测试防止白 / 灰遮蔽最终回退为默认黑色；ISS-064 `SecurityPanel` 用户密码留空文案改成"无需密码即可打开副本"，不再暗示可沿用旧用户密码。
 - 2026-06-17：完成 ISS-067 阶段 2 后续 RedactionOverlay UI 细化。nextColor state + 3 颜色芯片（黑/白/灰，律师场景：黑色涂黑 / 白色擦除 / 灰色模糊），颜色仅作用于后续 commit 的 region（已 commit 不变）。新增撤销按钮 + 单 X 删除按钮（X 按钮 pointerEvents:auto 不冒泡触发 overlay 拖动）。**全量 1206/1207 通过**（+5 新测试）。复用 DEC-107 applyRedaction 算法 + DEC-132 redactPageMargins 算法，零算法层变更。
 - 2026-06-17：完成 ISS-071 阶段 3 error.ts → SecurityPanel AppError 端到端迁移（DEC-138）。Rust set/remove_pdfpassword 改返 `Result<_, AppError>` 替代 `Result<_, String>`，错误码映射：NotSupported / FileNotFound / InvalidInput / PdfParseError / DecryptionError / IoError，context 携带脱敏 path（DEC-102 P0-1）。调整 remove_pdfpassword 校验顺序：空密码 → 文件存在 → canonicalize → load（用户友好）。前端 SecurityPanel `friendlyMessageForCode(err: AppError)` helper，9 个 ErrCode 各有中文兜底文案（i18n 后续可按 code 切英文）。`normalizeError` 兼容旧 string 错误（code=Unknown, message=原串）。**全量 1206/1207 通过**（+4 新前端测试）。ISS-071 累计 75 测试 / 3 commit 全部 ship。

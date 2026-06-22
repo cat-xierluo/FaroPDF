@@ -1,6 +1,39 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~153。
+> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~156。
+
+ISS-NEW-H 视图菜单 submenu 深度补全（Wave 4e minimax worker 端到端跑通，PM 收口 / DEC-157）：
+
+- **macOS 视图菜单补 2 submenu + 3 顶层命令**：`src-tauri/src/lib.rs` 视图 SubmenuBuilder 加「缩放」submenu（5 项：放大/缩小/实际大小/适合页面/缩放工具）+「缩略图」submenu（2 项：单列/双列）+ 3 顶层占位命令（跳到当前页/重新载入/添加书签）；menu event handler match arm 加 11 个新 command id。
+- **`src/shared/app/commands.ts` 加 11 个 AppCommandId 枚举 + APP_COMMANDS definition**：全部 `tertiary` 层 + `native-menu` only + `view` group，与 Rust 菜单 id 一一对应。3 个占位命令自带 feedback 文案「视图功能开发中，等待后续 worker 接入。」。
+- **`src/components/layout/AppShell.tsx` nativeMenuBridge 路由**：缩放 5 个走 `reader.zoomIn/zoomOut/setZoomPreset`；缩略图 2 个走 `reader.setViewMode`（single/double）；占位 3 个不 return，让末尾 `if (command.feedback)` fallback 触发 setCommandFeedback。
+- **测试**：`src/shared/app/commands.test.ts` 加 2 新测（注册 11 个新 command id + layer 隔离）；`src/components/layout/AppShell.test.tsx` makeReader mock 加 `setZoom/zoomIn/zoomOut/setViewMode/setZoomPreset`。
+- 5 files / +396 / -0。typecheck ✅；vitest 受 pre-existing vitest 4.x + `html-encoding-sniffer`/`@exodus/bytes` ESM 冲突阻塞（main 仓库根也复现，与本次改动无关）。
+- **Wave 4e 教训**：minimax worker 端到端能跑（确认 6 次失败的 silent exit 不是 minimax 模型本身问题），但 verification 阶段 26m+ 不更新 STATUS（silent worker 模式重现）。PM 介入收口路径：typecheck PM 验证 + 帮 commit + FF merge。Wave 5 启动前应改进 worker prompt 加「verification 10m 内未 commit → 自降级 PM 介入」触发条件。
+
+ISS-NEW-E 第 1 步收口（PM 单 session / DEC-156）：
+
+- **L4 二级工具条统一抽象 — read 模式并入 `ContextToolbar`**：`ContextToolbar` 接受 `mode: Exclude<AppModeId, "pages">`（包含 `"read"`），`reader` prop；`mode === "read"` 分支从 `getModeTools("read")` 拿注册工具（旋转 + 适合页面 3 个）+ 按 order 排序 + `isDisabled` 委托工具本身。`showContextToolbar` 改 `activeMode !== "pages"`（read 模式也显示 L4）。`contextualToolbarLabels` 加 `"read": "阅读模式工具"`。删除独立 `<ReadModeToolbar>` 组件（旧 50 行）和 AppShell 中独立 render 块，**让 `ContextToolbar` 真正按 `activeMode` 路由 5 模式**（read / annotate / ocr / export / forms）。`pages` 模式仍不渲染 L4（页面管理工作台独立）。typecheck ✅ + AppShell 7/7（ISS-NEW-A 子集）+ Toolbar 24/24 + readerModeTools 7/7。
+
+ISS-NEW-A 阶段 2 + ISS-NEW-B 收口 2 块（PM 单 session / DEC-155，Wave 4 multi-agent GLM 配额耗尽降级后单 session 推进）：
+
+- **侧栏 4 toggle 加「书签」按钮（ISS-NEW-A 阶段 2 子项 1）**：`AppToolbarSectionId` 注释更新（"3 个按钮 → 4 个"）；`UtilityPanelId` 加 `"bookmark"` 枚举；`Toolbar.tsx` 侧栏 4 toggle 段新增 lucide `<Bookmark size={16}>` 按钮（`data-testid="toolbar-sidebar-bookmark"`，`aria-label="书签"`）；`AppShell.tsx` 加 `<BookmarkPanelPlaceholder>`（占位 — 真实书签列表 + 添加 / 跳转 / 持久化留后续 worker）+ 渲染分支 `panel === "bookmark"`。+5 Toolbar test + 2 AppShell test。
+- **旋转 + 适合页面按钮下移 L4 二级工具条（ISS-NEW-B）**：`Toolbar.tsx` 移除 L3 reading 段 2 个旋转按钮（DEC-152 恢复的）；`ModeActiveTools` 内部 filter 改为 `activeMode !== "read" && hasDocument`（让 read-mode 工具不渲染在 L3 reading 段）；`AppShell.tsx` 加 `<ReadModeToolbar>` 组件（`getModeTools("read")` 取注册工具，order 排序，`isDisabled` 委托给工具本身）— 仅在 `activeMode === "read" && hasDocument` 时显示，作为 L4 二级工具条接管 read-mode 工具（旋转 + 适合页面，复用 `reader.rotateClockwise` / `rotateCounterClockwise` / `setZoomPreset`）。清理未用 imports（RotateCcw / RotateCw / PageRotation / handleRotate）。+5 AppShell test（含 2 个 rotate mock + 1 个 Toolbar 已有 test 不变）+ Toolbar 24/24 ✅。
+
+**Wave 4 multi-agent retry 失败**（GLM provider 真实不可用，门禁失败降级）：
+
+- spawn 成功，claude + GLM-5.2 settings + bypassPermissions 启动。
+- API 立即 400「模型不存在」（settings.json 中 opus/sonnet 是 `glm-5.2[1M]`，GLM 端不存在；改成本地 `config/glm-5.2.settings.json` 全部 3 model = `glm-5.2` + .gitignore 仍 400）。
+- 推断：GLM 配额耗尽（memory `Wave 3 W2 撞 GLM 配额耗尽 2056`）。
+- 决策：按 skill §2.1 门禁失败降级到 PM 单 session 串行推进，清理 `feat/iss-new-a-stage2-iss-new-b` worktree + 分支。
+- 教训再次印证：multi-agent 在 FaroPDF 本机环境不可靠（4 次失败：DEC-104 / DEC-106 / DEC-150 / 本次 Wave 4），PM 单 session 是稳妥默认路径。
+
+ISS-NEW-G 收口 4 块（PM 单 session / DEC-154）：
+
+- **Welcome 屏「图片转 PDF / Word 转 PDF」入口接通**：`ReaderCanvas` 加 `onConvertFromImages / onConvertFromWord` props 透传到 `<WelcomeScreen>`；`AppShell` 提供占位 handler（`setCommandFeedback` 反馈「图片转 PDF 功能开发中，等待 OCR pipeline / img2pdf engine 接入」+ Word 同步反馈）。真实转换依赖 OCR pipeline / img2pdf / merge engine，留后续 worker 接入。`AppShell` `command-feedback` 加 `data-testid` 方便测试。+7 单测（ReaderCanvas 4 + AppShell 3）。
+- **全量 UI 字符串 i18n 基础**：`src/shared/i18n/` 新建 `dictionaries.ts`（zh-CN + en 两套字典，覆盖 StatusBar / WelcomeScreen / GeneralSection / OCR 状态栏 / feedback / reader viewMode & textLayerStatus 选项）+ `useI18n.ts`（useSyncExternalStore + module-level listener + `setCurrentLanguage` / `getCurrentLanguage` runtime）。`StatusBar` / `WelcomeScreen` / `GeneralSection` 全部用户可见字符串从字典查表（5 + 11 + 11 = 27 个查表点）。`AppShell` 通过 `useEffect([settings.language])` 同步 settings → i18n runtime；`StatusBar` 内部也加 useEffect 兜底单组件直接渲染场景。+4 i18n 单测（含两套字典键集合一致性断言防漂移）。
+- **OCR 模式底部状态栏**：`StatusBar` 加 `activeMode?: AppModeId` + `ocrState?: { cursorPage, jobStatus }` props；`activeMode === "ocr"` 时切布局为「光标位置：第 X 页 / -」+「OCR 状态：running / queued / completed / failed / cancelled / idle」（从 i18n 字典 5+1 状态查表）。`AppShell` 计算 `cursorPage = reader.state.document?.currentPage ?? null` + `jobStatus`（OcrCommandJob.status narrow 5 枚举后回退到 busy 派生）。+7 单测（6 状态枚举 + idle 退化 + 默认 read 模式 + en/zh 切换）。
+- **Preferences 4 字段补齐**：AppSettings 加 `defaultPdfViewer?: string`（macOS LaunchServices 应用标识，占位 UI 真实读写留后续）+ `pdfExpertOpenMode: "always-pdf-expert" | "system-default" | "ask-each-time"`（默认 `ask-each-time`）+ `resumeLastPage: boolean`（默认 `true`）+ `pageNumberIndicator: "current-only" | "current-of-total" | "page-prefix"`（默认 `current-of-total`）。`GeneralSection` 加 4 控件（input + 2 select + checkbox），`defaults.ts` 加默认 + `normalizeAppSettings` 加 narrow。`contracts.test.ts` 加 3 字段默认值补全。+ 持久化往返通过现有 normalize 流程自动覆盖。
 
 Preferences 默认作者字段（PM 单 session / DEC-153）：
 

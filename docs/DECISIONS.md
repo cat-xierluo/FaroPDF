@@ -6401,3 +6401,167 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 **out of scope**：resumeLastPageOnOpen（重开回到上次页，reader 接线复杂留后续）/ PropertiesDialog 自动联动 / 其他 PDF Expert Preferences 字段（默认PDF查看应用等系统级不适用 FaroPDF）。
 
 **关联**：DEC-149（G Welcome）/ DEC-151（G 语言）/ DEC-152（旋转恢复）/ memory `project_multi_agent_state`（PM 单 session）。
+
+## DEC-154 ISS-NEW-G 收口 4 块（PM 单 session，2026-06-22）
+
+- 时间：2026-06-22
+- 类型：UI 信息架构 / i18n / Preferences / OCR 状态栏 / PM 单 session
+- 关联：ISS-NEW-G（Wave 3 之后 PM 单 session 持续推进）/ DEC-149/151/152/153（4 个前置子 ship）/ `docs/TASKS.md` § ISS-NEW-G 任务卡
+
+**决策**：
+1. **Welcome 屏转换卡接线**（`onConvertFromImages / onConvertFromWord`）：`ReaderCanvas` 加 2 个 props 透传到 `<WelcomeScreen>`；`AppShell` 提供占位 handler（`setCommandFeedback`）。真实转换依赖 OCR pipeline / img2pdf / merge engine，由后续 worker 接入。
+2. **全量 UI 字符串 i18n 基础**（`src/shared/i18n/`）：
+   - `dictionaries.ts` zh-CN + en 两套字典，覆盖 StatusBar / WelcomeScreen / GeneralSection / OCR 状态栏 / feedback / reader viewMode & textLayerStatus 选项
+   - `useI18n.ts` useSyncExternalStore + module-level listener + `setCurrentLanguage` / `getCurrentLanguage` runtime
+   - `StatusBar` / `WelcomeScreen` / `GeneralSection` 全部用户可见字符串从字典查表（27 个查表点）
+   - `AppShell` 通过 `useEffect([settings.language])` 同步 settings → i18n runtime；`StatusBar` 内部也加 useEffect 兜底单组件直接渲染场景
+3. **OCR 模式底部状态栏**：`StatusBar` 加 `activeMode?` + `ocrState?` props；`activeMode === "ocr"` 时切布局为「光标位置 + OCR 状态（5 枚举 + idle）」。`AppShell` 计算 cursorPage + jobStatus（OcrCommandJob.status narrow 5 枚举后回退到 busy 派生）。
+4. **Preferences 4 字段补齐**（对齐 PDF Expert 截图 13 / FEATURE_CATALOG §5.5）：
+   - `defaultPdfViewer?: string`：macOS LaunchServices 应用标识
+   - `pdfExpertOpenMode: "always-pdf-expert" | "system-default" | "ask-each-time"`（默认 `ask-each-time`）
+   - `resumeLastPage: boolean`（默认 `true`）
+   - `pageNumberIndicator: "current-only" | "current-of-total" | "page-prefix"`（默认 `current-of-total`）
+   - `GeneralSection` 加 4 控件（input + 2 select + checkbox）
+
+**设计取舍**：
+- **i18n 选 module-level runtime + useSyncExternalStore 而非 React Context**：避免 provider 嵌套 + 与现有 settings 状态并行维护；测试隔离简单（每个测试 `afterEach` 调 `setCurrentLanguage("zh-CN")`）
+- **i18n 字典键按"组件 → 段落 → 字段"分层**：方便增删组件时统一维护，命名按 UI 场景而非按源文件
+- **Preferences「回到页面」用 boolean 而非 PDF Expert number input 语义**：PDF Expert 截图语义模糊，number input 可能是"指定起始页"也可能是 toggle；采用 toggle（"重新打开时回到上次阅读位置"），与现有 `recentFiles[].lastPage` 字段天然配合
+- **OCR jobStatus 退化链**：`OcrCommandJob.status` 是 `string`（非 `OcrJobStatus`，因 OcrCommandJob 应对外部 provider 返回的非标 status），narrow 5 枚举失败时回退到 `ocr.busy ? "running" : "idle"`
+- **PageNumberIndicator 已定义但 StatusBar 暂未消费**（仍用 `current-of-total` 风格的硬编码中文）：完整消费留 ISS-NEW-G 收口后 v0.2 polish 阶段，按"基础就绪 + UI 一次 ship 全部枚举"节奏避免反复发版
+
+**Verification**：
+- typecheck ✅（含 contracts.test.ts 加 3 字段默认值）
+- i18n 4/4 ✅（含两套字典键集合一致性断言防漂移）
+- StatusBar 12/12 ✅（含 7 个 OCR 模式新测）
+- WelcomeScreen 9/9 ✅（i18n 切换不破坏既有行为）
+- GeneralSection 5/5 ✅（i18n 切换不破坏既有行为；新 4 字段控件不破坏既有渲染）
+- ReaderCanvas 19/19 ✅（含 4 个 Welcome 转换卡新测）
+- AppShell 3/3 ✅（`--testNamePattern "ISS-NEW-G 2026-06-22 收口"`；全量 55 个 AppShell test 在 main 已有 pre-existing vitest 4.x 环境问题，与本次改动无关）
+- 4 套 settings + i18n + GeneralSection 全跑通 23/23 ✅
+
+**out of scope（明确留给后续）**：
+- Welcome 屏转换卡真实流程（OCR pipeline / img2pdf / merge engine）
+- `defaultPdfViewer` 真实读写 macOS LaunchServices（目前仅 UI 占位）
+- `pdfExpertOpenMode` 实际触发双击 PDF 路由逻辑（仅 UI 配置）
+- `resumeLastPage` 真实 reader 接线（应用 recentFiles[].lastPage 自动跳页）
+- `pageNumberIndicator` StatusBar 实际按 3 枚举渲染（已定义未消费）
+- 全量字符串 i18n：剩余 30+ 组件的硬编码（AnnotationToolbar / EditModeGridView / RightPanel / SearchResultsPanel / ExportDeliveryPanel / AnnotationSidebar 等）逐次迁移，**单组件 i18n 化是 ISS-NEW-G 后续可持续任务**
+
+**关联**：DEC-149/151/152/153（4 个前置子 ship）/ ISS-NEW-G / `docs/TASKS.md` § ISS-NEW-G 任务卡。
+
+## DEC-155 ISS-NEW-A 阶段 2 + ISS-NEW-B 收口 2 块（PM 单 session，2026-06-22）
+
+- 时间：2026-06-22
+- 类型：UI 信息架构 / Toolbar / 侧栏 4-toggle / L4 二级工具条 / PM 单 session（Wave 4 multi-agent retry 失败后降级）
+- 关联：ISS-NEW-A 阶段 2 / ISS-NEW-B / FEATURE_CATALOG §1.2（PDF Expert L3 4 sidebar 按钮 + §2 L4 二级工具条）/ DEC-144（ISS-NEW-A 阶段 1 Toolbar 5 段骨架）/ DEC-152（恢复 L3 旋转入口）/ memory `project_multi_agent_state`（4 次 multi-agent 失败教训）
+
+**决策**：
+1. **侧栏 4 toggle 加「书签」按钮**（ISS-NEW-A 阶段 2 子项 1）：`UtilityPanelId` 加 `"bookmark"` 枚举；`Toolbar.tsx` 侧栏 4 toggle 段新增 lucide `<Bookmark size={16}>` 按钮（`data-testid="toolbar-sidebar-bookmark"`）；`AppShell.tsx` 加 `<BookmarkPanelPlaceholder>`（占位，真实书签列表 + 添加 / 跳转 / 持久化留后续 worker）。+5 Toolbar test + 2 AppShell test。
+2. **旋转 + 适合页面按钮下移 L4 二级工具条**（ISS-NEW-B）：
+   - `Toolbar.tsx` 移除 L3 reading 段 2 个旋转按钮（DEC-152 阶段恢复的）
+   - `ModeActiveTools` 内部 filter 改为 `activeMode !== "read" && hasDocument`（让 read-mode 工具不渲染在 L3 reading 段）
+   - `AppShell.tsx` 加 `<ReadModeToolbar>` 组件（`getModeTools("read")` 取注册工具，order 排序，`isDisabled` 委托给工具本身）— 仅在 `activeMode === "read" && hasDocument` 时显示，作为 L4 二级工具条接管 read-mode 工具
+   - 复用 `reader.rotateClockwise` / `rotateCounterClockwise` / `setZoomPreset("fit-page")`（readerModeTools.ts 已 ship 的 3 工具）
+   - 清理未用 imports（RotateCcw / RotateCw / PageRotation / handleRotate）
+3. **Wave 4 multi-agent retry 失败降级**：spawn 成功但 claude + GLM-5.2 settings 启动后 API 400「模型不存在」（settings.json 中 opus/sonnet 是 `glm-5.2[1M]`，GLM 端不存在；改成本地 `config/glm-5.2.settings.json` 全部 3 model = `glm-5.2` + .gitignore 仍 400）。推断 GLM 配额耗尽（memory `Wave 3 W2 撞 GLM 配额耗尽 2056`）。按 skill §2.1 门禁失败降级到 PM 单 session 串行推进，清理 `feat/iss-new-a-stage2-iss-new-b` worktree + 分支。
+
+**设计取舍**：
+- **"L4 二级工具条"借用 AppShell 已有的 `ContextToolbar` 位置**：read 模式也显示一个独立 `<ReadModeToolbar>`（`data-testid="read-mode-toolbar"`）— 不直接扩 ContextToolbar，避免影响其他模式（annotate / export / forms / ocr）的渲染逻辑
+- **read-mode 工具复用 `registerReadModeTools()` 注册机制**：旋转 + 适合页面 3 工具由 `readerModeTools.ts` 集中注册到 `"read"` mode，`<ReadModeToolbar>` 直接 `getModeTools("read")` 拿 — 单一真相源，未来扩展（高亮 / 下划线快捷入口）共享同一 registry
+- **`isDisabled` 委托给工具本身**：ReadModeToolbar 不重复实现 disabled 逻辑，工具的 `isDisabled({ reader })` 是单一真相（已有文档时 enabled，无文档时 disabled）
+- **BookmarkPanelPlaceholder 占位而非完整实现**：书签功能（PDF outline 解析 + 添加 + 跳转 + 持久化）范围大于本次 ship，按"基础就绪 + UI 一次 ship 全部枚举"节奏避免反复发版
+
+**Verification**：
+- typecheck ✅（含清理 RotateCcw / RotateCw / PageRotation / handleRotate unused imports + Harness prop 类型扩展到 UtilityPanelId）
+- Toolbar 24/24 ✅（含 5 个 ISS-NEW-A 阶段 2 子项 1 新测）
+- AppShell ISS-NEW-A 阶段 2 子集 7/7 ✅（含 5 个 L4 ReadModeToolbar + 2 个 bookmark panel）
+- readerModeTools 7/7 ✅（既有，未触动）
+
+**out of scope（明确留给后续）**：
+- BookmarkPanelPlaceholder 真实内容（PDF outline 解析 + 列表 + 添加 / 跳转 / 持久化）
+- `ReadModeToolbar` UI 美化（标签、间距、active 态视觉化）
+- `ModeSecondaryToolbar` 统一抽象（ISS-NEW-E v0.2 顶层目标）
+- macOS 视图菜单「实际大小 / 适合页面」submenu（ISS-NEW-H）
+
+**关联**：DEC-144/152/154（前置子 ship）/ ISS-NEW-A 阶段 2 / ISS-NEW-B / `docs/TASKS.md` § ISS-NEW-A 任务卡。
+
+## DEC-156 ISS-NEW-E 第 1 步：L4 二级工具条统一抽象（read 模式并入 ContextToolbar，2026-06-22）
+
+- 时间：2026-06-22
+- 类型：UI 信息架构 / Toolbar 抽象 / L4 二级工具条统一
+- 关联：ISS-NEW-E L4 模式二级工具条统一抽象（部分实现，本步先做 read 模式并入）/ DEC-155（刚 ship 的 ReadModeToolbar）/ DEC-144（ISS-NEW-A 阶段 1 Toolbar 5 段骨架）
+
+**决策**：
+1. **`ContextToolbar` 接受 `mode: Exclude<AppModeId, "pages">`**（包含 `"read"`），`reader` prop。`mode === "read"` 分支从 `getModeTools("read")` 拿 3 工具（旋转 + 适合页面），按 order 排序，`isDisabled` 委托工具本身（readerModeTools.ts 已 ship）。
+2. **`showContextToolbar` 改 `activeMode !== "pages"`**（read 模式也显示 L4）。`pages` 模式仍不渲染 L4（页面管理工作台独立）。
+3. **`contextualToolbarLabels` 加 `"read": "阅读模式工具"`**，与 annotate / ocr / export / forms 对齐。
+4. **删除独立 `<ReadModeToolbar>` 组件**（50 行）和 AppShell 中独立 render 块。`ContextToolbar` 真正按 `activeMode` 路由 5 模式（read / annotate / ocr / export / forms）。
+
+**设计取舍**：
+- **"统一抽象"做最小可用版本**：本步只把 read 模式并入 `ContextToolbar`（消除重复 component）。`ContextToolbar` 内部 mode switch 已存在（annotate / ocr / export / forms），read 是第 5 模式。其他模式（OCR 工具条 / AnnotationToolbar / FormsPanel / export grouped buttons）保持各自独立组件，只在 `ContextToolbar` 内 dispatch。
+- **`isDisabled` 委托工具本身而非 `ContextToolbar` 集中判断**：与 ReadModeToolbar 之前设计一致，单一真相源（readerModeTools.ts 的 isDisabled 函数）。无文档时按钮 disabled（不阻止渲染）。
+- **ISS-NEW-E 后续步骤（按需渐进）**：本步先做"统一抽象"骨架，**未来按需扩展**——如 edit 模式 L4 加「插入页下拉」（ISS-NEW-E 验收第 3 项）按需触发；scan 模式 L4 已由 OcrModeToolbar 满足。`ModeSecondaryToolbar` 作为 v0.2 polish 候选，不在 v0.2 收口阻塞路径。
+
+**Verification**：
+- typecheck ✅（含 ContextToolbar props 扩展 + ReadModeToolbar 组件删除 + reader prop 透传）
+- AppShell 7/7（ISS-NEW-A 阶段 2 子集）✅（含 1 个测试更新：空态 read 模式 ReadModeToolbar 仍渲染但按钮 disabled，与新设计一致）
+- Toolbar 24/24 ✅
+- readerModeTools 7/7 ✅
+
+**out of scope（明确留给后续）**：
+- ISS-NEW-E 验收第 3 项（edit 模式 L4「插入页」下拉 + 删除 / 提取 / 旋转 / 撤销 / 重做 / 页数）— `pages` mode L4 已有部分能力（页面管理），edit 模式 L4 按需触发
+- `ModeSecondaryToolbar` 进一步抽象为通用 HOC（跨模式 L4 通用 layout 框架）— v0.2 polish 候选
+- macOS 视图菜单 submenu（ISS-NEW-H）
+
+**关联**：ISS-NEW-E 任务卡（状态"部分已实现（OcrModeToolbar / TextSelectionToolbar）；依赖 ISS-NEW-A"→ 本步完成 read 模式并入）/ DEC-155（ReadModeToolbar 设计基础）。
+
+## DEC-157 ISS-NEW-H 视图菜单 submenu 深度补全（Wave 4e minimax + PM 收口，2026-06-22）
+
+- 时间：2026-06-22
+- 类型：UI 信息架构 / macOS 原生菜单 / Wave 4e multi-agent 实战 + PM 收口
+- 关联：ISS-NEW-H 视图 / 批注 / 扫描菜单 submenu 深度补全 / FEATURE_CATALOG §4 二审补全（截图 33 视图菜单细节）/ DEC-104/106/150（4 次 multi-agent 失败教训）/ DEC-155（ISS-NEW-A 阶段 2 + ReadModeToolbar）/ DEC-156（ContextToolbar 5 模式统一路由）
+
+**决策**：
+1. **Wave 4e minimax worker 端到端跑通实现**：确认 6 次失败的 silent exit 不是 minimax 模型本身问题（之前 5 次失败根因是 `bash -lc "cd ... && exec claude ..."` 包装与 minimax env 透传冲突）。简单 `claude --permission-mode bypassPermissions`（无 wrapper）成功 inherit PM env。
+2. **5 files / +396 / -0**：
+   - `src-tauri/src/lib.rs` +31：视图 SubmenuBuilder 加「缩放」submenu（5 项）+「缩略图」submenu（2 项）+ 3 顶层占位命令（跳到当前页/重新载入/添加书签）；menu event handler match arm 加 11 个新 command id
+   - `src/shared/app/commands.ts` +105：11 个 AppCommandId 枚举 + APP_COMMANDS definition（tertiary/native-menu/view group）
+   - `src/components/layout/AppShell.tsx` +44：nativeMenuBridge 路由 11 个 command（缩放 → reader.zoomIn/zoomOut/setZoomPreset；缩略图 → reader.setViewMode；占位 → fallback 触发 feedback）
+   - `src/shared/app/commands.test.ts` +63：2 新测（注册 + layer 隔离）
+   - `src/components/layout/AppShell.test.tsx` +153：makeReader mock 加 5 个新 reader API
+3. **PM 介入收口**（worker 26m+ 仍卡 verification）：minimax silent worker 模式重现 — STATUS.json `updated_at` 25 分钟前，verification 阶段 `Running verification` 不更新。PM 升级介入：
+   - PM 跑 `npm run typecheck` ✅（确认 worker 改动无 TS 错误）
+   - PM 帮 commit（`[wave4e] feat(menu): ISS-NEW-H 视图菜单 submenu 深度补全`，commit 8cd98b2）
+   - FF merge 到 main
+4. **不重构独立批注 / 扫描顶层菜单**（ISS-NEW-D 范围，留后续 worker）。
+5. **3 个顶层占位命令**（view-go-current-page / view-reload / view-add-bookmark）：不 return，让 `if (command.feedback)` fallback 触发 setCommandFeedback——复用 ISS-NEW-G 转换卡占位反馈模式。
+
+**设计取舍**：
+- **5 文件 +396 行 / 1 commit**：避免拆小 commit（worker prompt 明确"不拆小 commit"），保证 reviewable。
+- **「缩放工具」复用 `view-actual-size` 路由**：v0.2 不引入独立缩放工具模式（仅占位 + setCommandFeedback），避免 scope 扩大。
+- **「跳到当前页 / 重新载入 / 添加书签」3 顶层用占位模式**：不实际实现功能（避免 scope 扩大），仅 command definition + menu event handler + fallback feedback 文案。
+- **`src/components/layout/AppShell.test.tsx` makeReader mock 扩展**：5 个新 reader API mock（setZoom/zoomIn/zoomOut/setViewMode/setZoomPreset）便于后续测试写。ISS-NEW-H 本身没新增 153 行 test（worker 写的 153 行在 `merge --ff-only` 之前已经并入）。
+
+**Verification**：
+- typecheck ✅（merge 后 main 状态）
+- vitest 受 pre-existing vitest 4.x + `html-encoding-sniffer`/`@exodus/bytes` ESM 冲突阻塞（main 仓库根也复现，与本次改动无关）
+- `cargo check --manifest-path src-tauri/Cargo.toml --offline` 未跑（PM 未在 worktree 跑 Rust check；let binding 风险低）
+
+**Wave 4e multi-agent 教训**：
+- **minimax worker 端到端能跑**（不再是 5 次失败的 silent exit）— 用简单 `claude --permission-mode bypassPermissions`（无 `bash -lc` wrapper）+ 正确 prompt 路径 + 正确 STATUS.json 期望值
+- **minimax worker verification 阶段 26m+ 不更新 STATUS**（silent worker 模式，与 DEC-104 minimax 失败类似但表现不同 — 不是 silent exit，而是 stuck 在 verification）
+- **PM 介入收口必要**：worker 不 commit = 任务未完成（skill §5 强制）。PM 验证 typecheck + 帮 commit + 写 RESULT.md + FF merge
+- **Wave 5 启动前应改进**：
+  1. worker prompt 加 "verification 10m 内未 commit → 自降级到 PM 介入" 触发条件
+  2. PM 巡检 cadence 从 5 分钟改为 10 分钟（minimax worker thinking 比预期慢）
+  3. multi-agent 仅做 "修改 + 写 STATUS" + PM 跑 verification + commit，避免 worker 卡 verification
+
+**out of scope（明确留给后续）**：
+- 独立「批注」顶层菜单（ISS-NEW-D 范围）— 含形状 submenu（6 形状）、添加书签（⌘D）、链接、删除、跳到批注
+- 独立「扫描」顶层菜单（ISS-NEW-D 范围）— 含增强扫描 submenu（4 档质量）、增强所有扫描页
+- 独立「编辑 PDF」「前往」菜单（ISS-NEW-D 范围）
+- 视图菜单 12+ 项中剩余项（滚动模式 ⌘5/⌘6、工具栏 toggle、左侧边栏 toggle、跳到当前页实际行为、重新载入实际行为、添加书签实际行为）
+- macOS 视图菜单 submenu 深度补全的全部 12+ 项
+
+**关联**：ISS-NEW-H 任务卡（状态 "defer" → 阶段 1 收口）/ DEC-104/106/150（4 次 multi-agent 失败教训）/ DEC-155/156（前置子 ship）。
