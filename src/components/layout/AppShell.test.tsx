@@ -1187,18 +1187,20 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
     expect(await screen.findByText("请先打开 PDF 文档。")).toBeInTheDocument();
   });
 
-  test("ISS-NEW-H: native view-go-current-page 在有文档时显示 ISS-NEW-G 占位 feedback", async () => {
+  test("ISS-NEW-H 第 2 阶段：view-go-current-page 实质接通 → reader.setCurrentPage(currentPage) + 反馈", async () => {
+    const reader = makeReadyReader();
     renderAppShell({
       activeMode: "read",
       commandSignal: { id: "view-go-current-page", nonce: 1 },
-      reader: makeReadyReader(),
+      reader,
       utilityPanel: "none",
     });
 
-    expect(await screen.findByText("视图功能开发中，等待后续 worker 接入。")).toBeInTheDocument();
+    expect(reader.setCurrentPage).toHaveBeenCalledWith(reader.state.document?.currentPage);
+    expect(await screen.findByText(/当前已在第/)).toBeInTheDocument();
   });
 
-  test("ISS-NEW-H: native view-reload 在有文档时显示 ISS-NEW-G 占位 feedback", async () => {
+  test("ISS-NEW-H 第 2 阶段：view-reload 留 v0.2 占位（待 reader.reloadDocument 接入）", async () => {
     renderAppShell({
       activeMode: "read",
       commandSignal: { id: "view-reload", nonce: 1 },
@@ -1206,10 +1208,10 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
       utilityPanel: "none",
     });
 
-    expect(await screen.findByText("视图功能开发中，等待后续 worker 接入。")).toBeInTheDocument();
+    expect(await screen.findByText(/重新载入功能待 reader controller 加 reloadDocument/)).toBeInTheDocument();
   });
 
-  test("ISS-NEW-H: native view-add-bookmark 在有文档时显示 ISS-NEW-G 占位 feedback", async () => {
+  test("ISS-NEW-H 第 2 阶段：view-add-bookmark 留 v0.2 占位（待 reader.addBookmark 接入）", async () => {
     renderAppShell({
       activeMode: "read",
       commandSignal: { id: "view-add-bookmark", nonce: 1 },
@@ -1217,7 +1219,7 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
       utilityPanel: "none",
     });
 
-    expect(await screen.findByText("视图功能开发中，等待后续 worker 接入。")).toBeInTheDocument();
+    expect(await screen.findByText(/添加书签功能待 reader controller 加 addBookmark/)).toBeInTheDocument();
   });
 
   // view-zoom-tool / view-thumbnails-* / view-zoom-in / view-zoom-out 在无文档时被挡掉。

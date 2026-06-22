@@ -788,14 +788,22 @@ export function AppShell({
       return;
     }
 
-    // ISS-NEW-H：3 顶层占位命令（不 return，让末尾通用 fallback 设 feedback）。
-    if (
-      command.id === "view-go-current-page" ||
-      command.id === "view-reload" ||
-      command.id === "view-add-bookmark"
-    ) {
-      // 占位：命令定义自带 feedback「视图功能开发中，等待后续 worker 接入。」，
-      // executeCommand 末尾的 `if (command.feedback)` fallback 会自动 setCommandFeedback。
+    // ISS-NEW-H（2026-06-22 第 2 阶段）：3 顶层命令接入。
+    // view-go-current-page 实质接通（reader.setCurrentPage 当前页 + 反馈）。
+    if (command.id === "view-go-current-page" && reader.state.document) {
+      reader.setCurrentPage(reader.state.document.currentPage);
+      setCommandFeedback(`当前已在第 ${reader.state.document.currentPage} 页。`);
+      return;
+    }
+    // view-reload / view-add-bookmark 留 v0.2 占位（需 reader 新 API：
+    // reloadDocument(path → File) / addBookmark(currentPage, label)）。
+    if (command.id === "view-reload") {
+      setCommandFeedback("重新载入功能待 reader controller 加 reloadDocument(path → File) 桥接后接通。");
+      return;
+    }
+    if (command.id === "view-add-bookmark") {
+      setCommandFeedback("添加书签功能待 reader controller 加 addBookmark(currentPage, label) API 后接通。");
+      return;
     }
 
     if (command.id === "export-watermark-text") {
