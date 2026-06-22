@@ -933,6 +933,14 @@ pub fn run() {
                     .separator()
                     .text("ocr-enhance-all", "增强所有扫描页")
                     .build()?)
+                // ISS-NEW-D 阶段 1（2026-06-22）：macOS 编辑 PDF 菜单（5 动作：编辑 / 添加图像 / 添加链接 / 添加文字 / 隐藏）。
+                .item(&SubmenuBuilder::new(app, "编辑 PDF")
+                    .text("pdf-edit-content", "编辑")
+                    .text("pdf-add-image", "添加图像")
+                    .text("pdf-add-link", "添加链接")
+                    .text("pdf-add-text", "添加文字")
+                    .text("pdf-redact", "隐藏")
+                    .build()?)
                 .item(&SubmenuBuilder::new(app, "视图")
                     .text("view-summary", "文档摘要")
                     .text("view-pages", "页面管理")
@@ -1037,6 +1045,11 @@ pub fn run() {
                     | "ocr-recognize-text"
                     | "ocr-make-searchable"
                     | "ocr-enhance-all"
+                    | "pdf-edit-content"
+                    | "pdf-add-image"
+                    | "pdf-add-link"
+                    | "pdf-add-text"
+                    | "pdf-redact"
                     | "export-page-number"
                     | "export-bates"
                     | "export-header-footer"

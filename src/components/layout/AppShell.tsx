@@ -728,6 +728,18 @@ export function AppShell({
       return;
     }
 
+    // ISS-NEW-D 阶段 1（2026-06-22）：编辑 PDF 菜单 5 动作 v0.2 占位反馈。
+    if (
+      command.id === "pdf-edit-content" ||
+      command.id === "pdf-add-image" ||
+      command.id === "pdf-add-link" ||
+      command.id === "pdf-add-text" ||
+      command.id === "pdf-redact"
+    ) {
+      setCommandFeedback(`${command.label}功能待后续 worker 接入 PDF 直接编辑链路；当前可用 L4 批注 / 导出工具条。`);
+      return;
+    }
+
     // ISS-NEW-H：3 顶层占位命令（不 return，让末尾通用 fallback 设 feedback）。
     if (
       command.id === "view-go-current-page" ||
