@@ -257,6 +257,9 @@ describe("shared contracts", () => {
       ocrProviders: [provider],
       requireNetworkOcrConfirmation: true,
       autoUpdateCheck: true,
+      pdfExpertOpenMode: "ask-each-time",
+      resumeLastPage: true,
+      pageNumberIndicator: "current-of-total",
       language: "zh-CN",
     };
 

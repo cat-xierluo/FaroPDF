@@ -1,7 +1,14 @@
 import type { OcrProviderConfig, OcrProviderType } from "../ocr/types";
 import { isAllowedOcrEndpoint, isCredentialReference, isMaskedSecret, isSafeApiKeyRef } from "../ocr/providerSecurity";
 import type { PdfViewMode } from "../pdf/types";
-import type { AppSettings, AppThemePreference, DefaultSavePolicy, RecentPdfFile } from "./types";
+import type {
+  AppSettings,
+  AppThemePreference,
+  DefaultSavePolicy,
+  PageNumberIndicator,
+  PdfExpertOpenMode,
+  RecentPdfFile,
+} from "./types";
 
 const DEFAULT_RECENT_FILE_LIMIT = 20;
 const allowedViewModes = new Set<PdfViewMode>(["continuous", "single", "double", "fit-width"]);
@@ -11,6 +18,16 @@ const allowedSavePolicies = new Set<DefaultSavePolicy>([
   "allow-overwrite-with-confirmation",
 ]);
 const allowedThemePreferences = new Set<AppThemePreference>(["light", "dark"]);
+const allowedPdfExpertOpenModes = new Set<PdfExpertOpenMode>([
+  "always-pdf-expert",
+  "system-default",
+  "ask-each-time",
+]);
+const allowedPageNumberIndicators = new Set<PageNumberIndicator>([
+  "current-only",
+  "current-of-total",
+  "page-prefix",
+]);
 const networkProviderTypes = new Set<OcrProviderType>(["paddleocr", "mineru"]);
 const localProviderTypes = new Set<OcrProviderType>(["local-ocrmypdf", "legal-skills"]);
 
@@ -68,6 +85,10 @@ export function createDefaultAppSettings(): AppSettings {
     ocrProviders: createDefaultOcrProviders(),
     autoUpdateCheck: true,
     language: "zh-CN",
+    // ISS-NEW-G（2026-06-22 收口）：PDF Expert Preferences 4 字段默认值。
+    pdfExpertOpenMode: "ask-each-time",
+    resumeLastPage: true,
+    pageNumberIndicator: "current-of-total",
   };
 }
 
@@ -154,6 +175,16 @@ export function normalizeAppSettings(input: unknown): AppSettings {
       input.language === "en" || input.language === "zh-CN" ? input.language : defaults.language,
     documentAuthor:
       typeof input.documentAuthor === "string" ? input.documentAuthor : undefined,
+    defaultPdfViewer:
+      typeof input.defaultPdfViewer === "string" ? input.defaultPdfViewer : undefined,
+    pdfExpertOpenMode: isPdfExpertOpenMode(input.pdfExpertOpenMode)
+      ? input.pdfExpertOpenMode
+      : defaults.pdfExpertOpenMode,
+    resumeLastPage:
+      typeof input.resumeLastPage === "boolean" ? input.resumeLastPage : defaults.resumeLastPage,
+    pageNumberIndicator: isPageNumberIndicator(input.pageNumberIndicator)
+      ? input.pageNumberIndicator
+      : defaults.pageNumberIndicator,
   };
 }
 
@@ -289,6 +320,14 @@ function isDefaultSavePolicy(value: unknown): value is DefaultSavePolicy {
 
 function isAppThemePreference(value: unknown): value is AppThemePreference {
   return typeof value === "string" && allowedThemePreferences.has(value as AppThemePreference);
+}
+
+function isPdfExpertOpenMode(value: unknown): value is PdfExpertOpenMode {
+  return typeof value === "string" && allowedPdfExpertOpenModes.has(value as PdfExpertOpenMode);
+}
+
+function isPageNumberIndicator(value: unknown): value is PageNumberIndicator {
+  return typeof value === "string" && allowedPageNumberIndicators.has(value as PageNumberIndicator);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

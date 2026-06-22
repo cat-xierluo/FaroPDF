@@ -1,16 +1,17 @@
 import { useRef, type ChangeEvent, type CSSProperties, type DragEvent } from "react";
 import type { RecentPdfFile } from "../../shared/settings/types";
+import { useI18n } from "../../shared/i18n/useI18n";
 import "./WelcomeScreen.css";
 
 /**
- * ISS-NEW-G（Wave 3 W1）：PDF Expert 风格 Welcome 屏。
+ * ISS-NEW-G（Wave 3 W1 / 2026-06-22 收口）：PDF Expert 风格 Welcome 屏。
  *
  * 严格子集（仅 Welcome）：
  *   1) 顶部「转换」区：2 张卡片「图片转 PDF」「Word 转 PDF」（占位 — 真实转换 out of scope）
  *   2) 中部大蓝色「选择文件」按钮 + drop zone
  *   3) 底部「最近」：最多 4 张缩略图网格 + 右上「清除最近」链接
  *
- * 不在本任务范围：语言切换、Preferences 字段、OCR 状态栏光标。
+ * 2026-06-22 收口：所有用户可见字符串从 useI18n() 字典查表，支持 zh-CN / en 切换。
  */
 
 export interface WelcomeScreenProps {
@@ -46,6 +47,7 @@ export function WelcomeScreen({
   onConvertFromImages,
   onConvertFromWord,
 }: WelcomeScreenProps) {
+  const dict = useI18n();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -73,7 +75,7 @@ export function WelcomeScreen({
   return (
     <main className="welcome" aria-label="Welcome 屏">
       {/* 段 1：转换卡片（占位 — 真实转换 out of scope） */}
-      <section className="welcome__convert" aria-label="转换">
+      <section className="welcome__convert" aria-label={dict.welcome.convertSection}>
         <div className="welcome__convert-grid">
           <button
             className="welcome-convert-card"
@@ -82,8 +84,8 @@ export function WelcomeScreen({
             type="button"
           >
             <span className="welcome-convert-card__icon" aria-hidden="true">🖼️</span>
-            <span className="welcome-convert-card__title">图片转 PDF</span>
-            <span className="welcome-convert-card__subtitle">将多张图片合并为 PDF</span>
+            <span className="welcome-convert-card__title">{dict.welcome.convertImagesTitle}</span>
+            <span className="welcome-convert-card__subtitle">{dict.welcome.convertImagesSubtitle}</span>
           </button>
           <button
             className="welcome-convert-card"
@@ -92,8 +94,8 @@ export function WelcomeScreen({
             type="button"
           >
             <span className="welcome-convert-card__icon" aria-hidden="true">📄</span>
-            <span className="welcome-convert-card__title">Word 转 PDF</span>
-            <span className="welcome-convert-card__subtitle">将 Word 文档转为 PDF</span>
+            <span className="welcome-convert-card__title">{dict.welcome.convertWordTitle}</span>
+            <span className="welcome-convert-card__subtitle">{dict.welcome.convertWordSubtitle}</span>
           </button>
         </div>
       </section>
@@ -101,7 +103,7 @@ export function WelcomeScreen({
       {/* 段 2：中部 drop zone + 大蓝色「选择文件」按钮 */}
       <section
         className="welcome__dropzone"
-        aria-label="打开 PDF 文档"
+        aria-label={dict.welcome.openDocument}
         data-testid="welcome-dropzone"
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleDrop}
@@ -109,35 +111,35 @@ export function WelcomeScreen({
         <input
           ref={fileInputRef}
           accept="application/pdf,.pdf"
-          aria-label="选择 PDF 文件"
+          aria-label={dict.welcome.fileInputAria}
           data-testid="welcome-file-input"
           onChange={handleFileChange}
           style={fileInputStyle}
           type="file"
         />
-        <p className="welcome__dropzone-hint">或将文件拖至此处</p>
+        <p className="welcome__dropzone-hint">{dict.welcome.dropHint}</p>
         <button
           className="welcome__primary-button"
           data-testid="welcome-choose-file"
           onClick={() => fileInputRef.current?.click()}
           type="button"
         >
-          选择文件
+          {dict.welcome.chooseFile}
         </button>
       </section>
 
       {/* 段 3：最近 — 4 张缩略图网格 + 右上「清除最近」 */}
       {hasRecent ? (
-        <section className="welcome__recent" aria-label="最近">
+        <section className="welcome__recent" aria-label={dict.welcome.recentSection}>
           <header className="welcome__recent-header">
-            <h3 className="welcome__recent-title">最近</h3>
+            <h3 className="welcome__recent-title">{dict.welcome.recentSection}</h3>
             <button
               className="welcome__recent-clear"
               data-testid="welcome-clear-recent"
               onClick={onClearRecent}
               type="button"
             >
-              清除最近
+              {dict.welcome.clearRecent}
             </button>
           </header>
           <ul className="welcome__recent-grid" data-testid="welcome-recent-grid">
