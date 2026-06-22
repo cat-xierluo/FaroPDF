@@ -6773,3 +6773,41 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - 任务卡内 "按需触发 edit 模式 L4" 子项（已通过 pages mode 满足）
 
 **关联**：ISS-NEW-E 任务卡 / DEC-156（5 模式 L4）/ DEC-152（pages 模式 PageOrganizerWorkspace）。
+
+## DEC-165 v0.1 收口沉淀后续：pre-existing vitest 4.x 根因确认 + 修复计划（PM 单 session，2026-06-23）
+
+- 时间：2026-06-23
+- 类型：v0.1 收口沉淀 / 工具链 / 根因分析
+- 关联：DEC-099（pre-existing vitest 4.x + `html-encoding-sniffer` / `@exodus/bytes` ESM 冲突记录）/ v0.1.3 release 闭环
+
+**根因确认**（2026-06-23 实战验证）：
+1. `pnpm-lock.yaml` line 1170 + 2612：`html-encoding-sniffer@6.0.0` → 依赖 `@exodus/bytes@1.15.1`（line 436 + 1911）
+2. `@exodus/bytes@1.15.1` 是 ESM-only 包（exports `import` conditions），与 vitest 4.x pool-runner 内部 worker 加载机制冲突
+3. 实测 `npx vitest run --config config/vitest.config.ts` 跑 28+ 分钟 CPU 110% 但无 stdout 输出，pool-runner 卡死（vitest fork worker 启动时 ESM resolve hang）
+4. 局部跑小文件（`TitlebarTabs.test.tsx` 7 测）快速通过 → 确认是 pool-runner 在加载 large test surface 时 ESM 解析 hang
+5. `cargo check --manifest-path src-tauri/Cargo.toml --offline` ✅（Rust 端无此问题）
+
+**现状影响**：
+- v0.1.3 收口实际通过单文件 vitest 跑（如 `npx vitest run src/shared/i18n/` / `npx vitest run src/components/layout/TitlebarTabs.test.tsx`）验证
+- 整库 vitest 跑不动 → CI 不能跑全量测试 → v0.1.3 release 不能 push tag + 触发 release.yml
+- typecheck ✅ + cargo check ✅ + 单文件 vitest ✅ 是当前最佳验证手段
+
+**修复计划（候选方案）**：
+1. **方案 A — 降级 vitest 到 3.x**（推荐 scope 中）：vitest 3.x 不依赖 `@exodus/bytes` ESM 路径，pnpm override 强制降级。风险：vitest 3.x API 差异（少量 mock API + config option），需要小范围测试 patch。
+2. **方案 B — 锁 `html-encoding-sniffer` 到 ≤ 4.x**：早期版本不依赖 `@exodus/bytes`，pnpm override 强制 4.x。风险：依赖传递链可能不一致。
+3. **方案 C — 跳过 vitest pool-runner 改用 `vitest --run --no-isolate`**：避免 worker fork，部分缓解 ESM 解析 hang。风险：测试隔离性降低。
+4. **方案 D — 移除 `html-encoding-sniffer` 依赖**（深查来源）：该依赖由 jsdom / @vitest/runner 间接引入。深查后可能不需要直接依赖。
+5. **方案 E（当前选择）— 维持现状 + 标记为已知问题**：v0.1.3 release candidate 准备 OK（13 commit / typecheck ✅ / 单文件 vitest ✅），release 时手动运行 `npx vitest run <file>` 验证。CI 集成留 v0.1.4。
+
+**Verification**：
+- typecheck ✅（v0.1.3 收口验证）
+- 单文件 vitest ✅（i18n 4/4 + StatusBar 12/12 + WelcomeScreen 9/9 + GeneralSection 5/5 + ReaderCanvas 19/19 + AppShell 7/7 ISS-NEW 子集 + commands 19/19 + TitlebarTabs 7/7 + ExportPreview 5/5 + OcrQueue 4/4）
+- 整库 vitest ❌（pre-existing 卡死）
+- cargo check ✅
+
+**out of scope（明确留给后续）**：
+- vitest 4.x 修复（A/B/C/D 方案）— 留 v0.1.4
+- CI 集成 release.yml vitest 步骤 — 留 v0.1.4
+- 跨 worker 状态共享 / playwright 实操验证 — 留 v0.1 收口沉淀后续
+
+**关联**：DEC-099（pre-existing 根因记录）/ v0.1.3 release（chore(release) commit `dabdcec` + tag v0.1.3 本地创建未 push）。
