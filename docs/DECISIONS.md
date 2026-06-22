@@ -6671,3 +6671,25 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - i18n 字典扩展
 
 **关联**：ISS-NEW-D 任务卡状态更新为「阶段 1+2 收口」/ DEC-159（阶段 1 4 commit）/ DEC-158（前置 ship）。
+
+## DEC-161 ISS-NEW-H 第 2 阶段：视图菜单 3 占位改真实行为（PM 单 session，2026-06-22）
+
+- 时间：2026-06-22
+- 类型：UI 信息架构 / 视图菜单真实行为接通
+- 关联：ISS-NEW-H 任务卡 / DEC-157（阶段 1 视图菜单 submenu 补全 11 command）/ DEC-099（pre-existing vitest 环境问题，不影响本步）
+
+**决策**：
+1. **`view-go-current-page` 实质接通**（commit `a0e9d2e`）：`reader.setCurrentPage(currentPage)` + 反馈「当前已在第 X 页」。无功能变化（已经在该页），但给用户明确 ack 反馈。
+2. **`view-reload` v0.2 占位**（commit `a0e9d2e`）：反馈「重新载入功能待 reader controller 加 reloadDocument(path → File) 接入」。reader.openFile 接受 File 对象，Tauri 模式下 path → File 桥接需新增 API。
+3. **`view-add-bookmark` v0.2 占位**（commit `a0e9d2e`）：反馈「添加书签功能待 reader controller 加 addBookmark(currentPage, label) 接入」。addBookmark 是新 API，需 reader 持久化层（持久化到 recentFiles[].bookmarks 数组）+ UI（书签列表右栏 / outline）。
+
+**Verification**：
+- typecheck ✅
+- AppShell ISS-NEW-H 14/14 ✅（含 3 测更新：view-go-current-page 实质 + view-reload 占位 + view-add-bookmark 占位）
+
+**out of scope**：
+- `reader.reloadDocument(path → File)` 新 API（Tauri path → File 桥接）
+- `reader.addBookmark(currentPage, label)` 新 API + 持久化（recentFiles[].bookmarks 数组）
+- 书签右栏（书签列表 / outline 视图）— 可与 ISS-NEW-F tab 拖离窗口剥离联合设计
+
+**关联**：ISS-NEW-H 任务卡 / DEC-157（视图菜单 submenu 补全前置 ship）。

@@ -44,6 +44,8 @@
 
 ISS-NEW-D 阶段 2 收尾（PM 单 session / DEC-160）：批注菜单补 9 辅助 command（链接 / 内容表 / 删除 / 删除全部 / 跳到批注 / 上一项 / 下一项 / 全部折叠 / 全部展开），全部 v0.2 占位反馈（依赖未实装的 history 栈 / AnnotationSidebar 操作）。commit `0adc932`。
 
+ISS-NEW-H 第 2 阶段（PM 单 session / DEC-161）：视图菜单 3 占位改真实行为 — `view-go-current-page` 实质接通（`reader.setCurrentPage(currentPage)` + 反馈「当前已在第 X 页」）；`view-reload` / `view-add-bookmark` 留 v0.2 占位反馈（需 reader controller 加 `reloadDocument(path → File)` / `addBookmark(currentPage, label)` 新 API 后接通）。commit `a0e9d2e` + 3 测更新。
+
 ISS-NEW-D 阶段 1（PM 单 session / DEC-159，4 子菜单按顺序 ship）：
 
 - **批注菜单（commit `0c25006`）**：macOS 批注 SubmenuBuilder 加 8 工具（高亮/下划线/删除线/文本/笔/橡皮擦/便签）+ 形状 submenu（6 形状：矩形/椭圆/箭头/双向/直线/铅笔）。8 工具真实 arm（`armAnnotationTool` / `disarmAnnotationTool`），6 形状 submenu v0.2 占位反馈（PDF_ANNOTATION_TYPES 缺 ellipse/line/double-arrow，真实形状绘制由 AnnotationOverlay 接 armAnnotationTool，DEC-147 已 ship 6 段 ShapeToolPanel）。
