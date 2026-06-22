@@ -29,6 +29,16 @@ export type AppCommandId =
   | "view-summary"
   | "view-pages"
   | "view-settings"
+  | "view-zoom-in"
+  | "view-zoom-out"
+  | "view-actual-size"
+  | "view-fit-page"
+  | "view-zoom-tool"
+  | "view-thumbnails-single"
+  | "view-thumbnails-double"
+  | "view-go-current-page"
+  | "view-reload"
+  | "view-add-bookmark"
   | "settings-open"
   | "mode-annotate"
   | "mode-export"
@@ -134,6 +144,101 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     requiresDocument: false,
     targetMode: "read",
     targetUtilityPanel: "view",
+  },
+  // ISS-NEW-H：macOS 视图菜单 submenu 补全（缩放 / 缩略图 / 3 顶层命令）。
+  // 当前菜单 id 与 src-tauri/src/lib.rs 视图 SubmenuBuilder 一一对应。
+  {
+    id: "view-zoom-in",
+    label: "放大",
+    description: "按 0.1 步进放大阅读区缩放。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "view-zoom-out",
+    label: "缩小",
+    description: "按 0.1 步进缩小阅读区缩放。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "view-actual-size",
+    label: "实际大小",
+    description: "把阅读区缩放重置为 100%。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "view-fit-page",
+    label: "适合页面",
+    description: "应用 fit-page 缩放预设，整页匹配阅读区。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "view-zoom-tool",
+    label: "缩放工具",
+    description: "v0.2 占位：复用实际大小命令，后续接入独立工具模式。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "view-thumbnails-single",
+    label: "单列",
+    description: "把页面视图模式切换为 single。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "view-thumbnails-double",
+    label: "双列",
+    description: "把页面视图模式切换为 double（双页并排）。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "view-go-current-page",
+    label: "跳到当前页",
+    description: "v0.2 占位：把阅读焦点定位到当前激活页。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+    feedback: "视图功能开发中，等待后续 worker 接入。",
+  },
+  {
+    id: "view-reload",
+    label: "重新载入",
+    description: "v0.2 占位：从磁盘重新读取当前 PDF。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+    feedback: "视图功能开发中，等待后续 worker 接入。",
+  },
+  {
+    id: "view-add-bookmark",
+    label: "添加书签",
+    description: "v0.2 占位：在当前页添加书签。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+    feedback: "视图功能开发中，等待后续 worker 接入。",
   },
   {
     id: "settings-open",

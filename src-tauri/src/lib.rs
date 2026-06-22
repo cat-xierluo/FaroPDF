@@ -901,6 +901,27 @@ pub fn run() {
                     .text("view-pages", "页面管理")
                     .text("view-settings", "视图设置")
                     .separator()
+                    // ISS-NEW-H：缩放 submenu（5 项），id 与 src/shared/app/commands.ts 一一对应。
+                    .item(&SubmenuBuilder::new(app, "缩放")
+                        .text("view-zoom-in", "放大")
+                        .text("view-zoom-out", "缩小")
+                        .separator()
+                        .text("view-actual-size", "实际大小")
+                        .text("view-fit-page", "适合页面")
+                        .separator()
+                        .text("view-zoom-tool", "缩放工具")
+                        .build()?)
+                    // ISS-NEW-H：缩略图 submenu（2 项，单列 / 双列 → setViewMode）。
+                    .item(&SubmenuBuilder::new(app, "缩略图")
+                        .text("view-thumbnails-single", "单列")
+                        .text("view-thumbnails-double", "双列")
+                        .build()?)
+                    .separator()
+                    // ISS-NEW-H：3 顶层命令（占位 + 反馈）。
+                    .text("view-go-current-page", "跳到当前页")
+                    .text("view-reload", "重新载入")
+                    .text("view-add-bookmark", "添加书签")
+                    .separator()
                     .text("view-fullscreen", "全屏")
                     .build()?)
                 .item(&SubmenuBuilder::new(app, "工具")
@@ -948,6 +969,16 @@ pub fn run() {
                     | "view-summary"
                     | "view-pages"
                     | "view-settings"
+                    | "view-zoom-in"
+                    | "view-zoom-out"
+                    | "view-actual-size"
+                    | "view-fit-page"
+                    | "view-zoom-tool"
+                    | "view-thumbnails-single"
+                    | "view-thumbnails-double"
+                    | "view-go-current-page"
+                    | "view-reload"
+                    | "view-add-bookmark"
                     | "export-page-number"
                     | "export-bates"
                     | "export-header-footer"

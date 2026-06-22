@@ -195,6 +195,69 @@ describe("app command catalog", () => {
     expect(getCommandById("help-about")?.targetUtilityPanel).toBe("settings");
   });
 
+  test("ISS-NEW-H: 视图菜单 submenu 补全注册 10 个新 command id（缩放 5 + 缩略图 2 + 3 顶层占位）", () => {
+    const zoomIds: AppCommandId[] = [
+      "view-zoom-in",
+      "view-zoom-out",
+      "view-actual-size",
+      "view-fit-page",
+      "view-zoom-tool",
+    ];
+    const thumbnailIds: AppCommandId[] = ["view-thumbnails-single", "view-thumbnails-double"];
+    const placeholderIds: AppCommandId[] = ["view-go-current-page", "view-reload", "view-add-bookmark"];
+    const allNewIds: AppCommandId[] = [...zoomIds, ...thumbnailIds, ...placeholderIds];
+
+    for (const id of allNewIds) {
+      const command = getCommandById(id);
+      expect(command, `command ${id} must be registered in APP_COMMANDS`).toBeDefined();
+      expect(command?.group, `${id} must be in view group`).toBe("view");
+      expect(command?.layer, `${id} must be tertiary`).toBe("tertiary");
+      expect(command?.entryPoints, `${id} must be native-menu only`).toEqual(["native-menu"]);
+      expect(command?.requiresDocument, `${id} requiresDocument`).toBe(true);
+    }
+
+    // 缩放 / 缩略图命令不携带 feedback（直接走 reader API）。
+    for (const id of [...zoomIds, ...thumbnailIds]) {
+      expect(getCommandById(id)?.feedback, `${id} should not declare feedback`).toBeUndefined();
+    }
+
+    // 3 顶层占位命令必须自带 ISS-NEW-G 占位反馈文案。
+    const expectedPlaceholderFeedback = "视图功能开发中，等待后续 worker 接入。";
+    for (const id of placeholderIds) {
+      expect(getCommandById(id)?.feedback, `${id} should carry placeholder feedback`).toBe(expectedPlaceholderFeedback);
+    }
+
+    // native-menu 视图命令必须包含全部 10 个新 id（与 lib.rs 视图 SubmenuBuilder 对齐）。
+    const nativeIds = getNativeMenuCommands().map((command) => command.id);
+    for (const id of allNewIds) {
+      expect(nativeIds, `native-menu must expose ${id}`).toContain(id);
+    }
+  });
+
+  test("ISS-NEW-H: view 顶层菜单 submenu 不污染原有的视图主命令", () => {
+    // 现有 view-summary / view-pages / view-settings 仍然是 primary 层（toolbar 入口）。
+    for (const id of ["view-summary", "view-pages", "view-settings"] as AppCommandId[]) {
+      expect(getCommandById(id)?.layer).toBe("primary");
+      expect(getCommandById(id)?.entryPoints).toEqual(expect.arrayContaining(["toolbar"]));
+    }
+    // 新增 10 个命令都是 tertiary 层（不进 toolbar）。
+    for (const id of [
+      "view-zoom-in",
+      "view-zoom-out",
+      "view-actual-size",
+      "view-fit-page",
+      "view-zoom-tool",
+      "view-thumbnails-single",
+      "view-thumbnails-double",
+      "view-go-current-page",
+      "view-reload",
+      "view-add-bookmark",
+    ] as AppCommandId[]) {
+      expect(getCommandById(id)?.layer).toBe("tertiary");
+      expect(getCommandById(id)?.entryPoints).not.toContain("toolbar");
+    }
+  });
+
   test("exposes a PDF Expert style tool launcher grouped by workflow", () => {
     const sections = getToolLauncherSections();
     expect(sections.map((section) => section.id)).toEqual([

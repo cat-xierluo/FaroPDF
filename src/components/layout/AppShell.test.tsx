@@ -44,6 +44,12 @@ function makeReader(overrides: Partial<ReaderController> = {}): ReaderController
     openFile: vi.fn(),
     renderPageToCanvas: vi.fn().mockResolvedValue(undefined),
     renderThumbnail: vi.fn().mockResolvedValue(undefined),
+    // ISS-NEW-H：视图菜单 submenu 命令路由测试需要这些 reader API 的 mock。
+    setZoom: vi.fn(),
+    zoomIn: vi.fn(),
+    zoomOut: vi.fn(),
+    setViewMode: vi.fn(),
+    setZoomPreset: vi.fn(),
     ...overrides,
   } as unknown as ReaderController;
 }
@@ -1098,6 +1104,153 @@ describe("AppShell AnnotationOverlay ↔ AnnotationSidebar active 联动 (ISS-02
     const sidebarAfterReturn = document.querySelector('[data-annotation-row-id="ann-page1"]') as HTMLElement;
     expect(sidebarAfterReturn).not.toHaveClass("annotation-sidebar__row-button--active");
     expect(sidebarAfterReturn.getAttribute("aria-current")).not.toBe("true");
+  });
+});
+
+describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
+  // 缩放 5 个命令直接调 reader 的 zoom / setZoomPreset API。
+  test("ISS-NEW-H: native view-zoom-in 命令调 reader.zoomIn", async () => {
+    const reader = makeReadyReader();
+    renderAppShell({ activeMode: "read", commandSignal: { id: "view-zoom-in", nonce: 1 }, reader, utilityPanel: "none" });
+
+    await waitFor(() => {
+      expect(reader.zoomIn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  test("ISS-NEW-H: native view-zoom-out 命令调 reader.zoomOut", async () => {
+    const reader = makeReadyReader();
+    renderAppShell({ activeMode: "read", commandSignal: { id: "view-zoom-out", nonce: 1 }, reader, utilityPanel: "none" });
+
+    await waitFor(() => {
+      expect(reader.zoomOut).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  test("ISS-NEW-H: native view-actual-size 命令调 reader.setZoomPreset('1')", async () => {
+    const reader = makeReadyReader();
+    renderAppShell({ activeMode: "read", commandSignal: { id: "view-actual-size", nonce: 1 }, reader, utilityPanel: "none" });
+
+    await waitFor(() => {
+      expect(reader.setZoomPreset).toHaveBeenCalledWith("1");
+    });
+  });
+
+  test("ISS-NEW-H: native view-fit-page 命令调 reader.setZoomPreset('fit-page')", async () => {
+    const reader = makeReadyReader();
+    renderAppShell({ activeMode: "read", commandSignal: { id: "view-fit-page", nonce: 1 }, reader, utilityPanel: "none" });
+
+    await waitFor(() => {
+      expect(reader.setZoomPreset).toHaveBeenCalledWith("fit-page");
+    });
+  });
+
+  test("ISS-NEW-H: native view-zoom-tool 命令复用 setZoomPreset('1') + 给出占位 feedback", async () => {
+    const reader = makeReadyReader();
+    renderAppShell({ activeMode: "read", commandSignal: { id: "view-zoom-tool", nonce: 1 }, reader, utilityPanel: "none" });
+
+    await waitFor(() => {
+      expect(reader.setZoomPreset).toHaveBeenCalledWith("1");
+    });
+    expect(await screen.findByText("缩放工具待后续 worker 接入；当前已切到实际大小。")).toBeInTheDocument();
+  });
+
+  // 缩略图 2 个命令直接调 reader.setViewMode。
+  test("ISS-NEW-H: native view-thumbnails-single 命令调 reader.setViewMode('single')", async () => {
+    const reader = makeReadyReader();
+    renderAppShell({ activeMode: "read", commandSignal: { id: "view-thumbnails-single", nonce: 1 }, reader, utilityPanel: "none" });
+
+    await waitFor(() => {
+      expect(reader.setViewMode).toHaveBeenCalledWith("single");
+    });
+  });
+
+  test("ISS-NEW-H: native view-thumbnails-double 命令调 reader.setViewMode('double')", async () => {
+    const reader = makeReadyReader();
+    renderAppShell({ activeMode: "read", commandSignal: { id: "view-thumbnails-double", nonce: 1 }, reader, utilityPanel: "none" });
+
+    await waitFor(() => {
+      expect(reader.setViewMode).toHaveBeenCalledWith("double");
+    });
+  });
+
+  // 3 顶层占位命令要求打开文档，但命令定义自带占位 feedback。
+  test("ISS-NEW-H: native view-go-current-page 在无文档时给出「请先打开 PDF 文档」", async () => {
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "view-go-current-page", nonce: 1 },
+      reader: makeReader(),
+      utilityPanel: "none",
+    });
+
+    expect(await screen.findByText("请先打开 PDF 文档。")).toBeInTheDocument();
+  });
+
+  test("ISS-NEW-H: native view-go-current-page 在有文档时显示 ISS-NEW-G 占位 feedback", async () => {
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "view-go-current-page", nonce: 1 },
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+
+    expect(await screen.findByText("视图功能开发中，等待后续 worker 接入。")).toBeInTheDocument();
+  });
+
+  test("ISS-NEW-H: native view-reload 在有文档时显示 ISS-NEW-G 占位 feedback", async () => {
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "view-reload", nonce: 1 },
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+
+    expect(await screen.findByText("视图功能开发中，等待后续 worker 接入。")).toBeInTheDocument();
+  });
+
+  test("ISS-NEW-H: native view-add-bookmark 在有文档时显示 ISS-NEW-G 占位 feedback", async () => {
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "view-add-bookmark", nonce: 1 },
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+
+    expect(await screen.findByText("视图功能开发中，等待后续 worker 接入。")).toBeInTheDocument();
+  });
+
+  // view-zoom-tool / view-thumbnails-* / view-zoom-in / view-zoom-out 在无文档时被挡掉。
+  test("ISS-NEW-H: native view-zoom-in 在无文档时被 requiresDocument 拦截", async () => {
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "view-zoom-in", nonce: 1 },
+      reader: makeReader(),
+      utilityPanel: "none",
+    });
+
+    expect(await screen.findByText("请先打开 PDF 文档。")).toBeInTheDocument();
+  });
+
+  test("ISS-NEW-H: native view-fit-page 在无文档时被 requiresDocument 拦截", async () => {
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "view-fit-page", nonce: 1 },
+      reader: makeReader(),
+      utilityPanel: "none",
+    });
+
+    expect(await screen.findByText("请先打开 PDF 文档。")).toBeInTheDocument();
+  });
+
+  test("ISS-NEW-H: native view-thumbnails-single 在无文档时被 requiresDocument 拦截", async () => {
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "view-thumbnails-single", nonce: 1 },
+      reader: makeReader(),
+      utilityPanel: "none",
+    });
+
+    expect(await screen.findByText("请先打开 PDF 文档。")).toBeInTheDocument();
   });
 });
 

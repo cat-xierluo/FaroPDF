@@ -609,6 +609,50 @@ export function AppShell({
       return;
     }
 
+    // ISS-NEW-H：缩放 submenu 5 个命令（放大 / 缩小 / 实际大小 / 适合页面 / 缩放工具）。
+    if (command.id === "view-zoom-in") {
+      reader.zoomIn();
+      return;
+    }
+    if (command.id === "view-zoom-out") {
+      reader.zoomOut();
+      return;
+    }
+    if (command.id === "view-actual-size") {
+      reader.setZoomPreset("1");
+      return;
+    }
+    if (command.id === "view-fit-page") {
+      reader.setZoomPreset("fit-page");
+      return;
+    }
+    if (command.id === "view-zoom-tool") {
+      // 占位：与 view-actual-size 共用 route（v0.2 不引入独立缩放工具模式）。
+      reader.setZoomPreset("1");
+      setCommandFeedback("缩放工具待后续 worker 接入；当前已切到实际大小。");
+      return;
+    }
+
+    // ISS-NEW-H：缩略图 submenu 2 个命令（单列 / 双列 → setViewMode）。
+    if (command.id === "view-thumbnails-single") {
+      reader.setViewMode("single");
+      return;
+    }
+    if (command.id === "view-thumbnails-double") {
+      reader.setViewMode("double");
+      return;
+    }
+
+    // ISS-NEW-H：3 顶层占位命令（不 return，让末尾通用 fallback 设 feedback）。
+    if (
+      command.id === "view-go-current-page" ||
+      command.id === "view-reload" ||
+      command.id === "view-add-bookmark"
+    ) {
+      // 占位：命令定义自带 feedback「视图功能开发中，等待后续 worker 接入。」，
+      // executeCommand 末尾的 `if (command.feedback)` fallback 会自动 setCommandFeedback。
+    }
+
     if (command.id === "export-watermark-text") {
       setActiveExportTool("text-watermark");
     } else if (command.id === "export-watermark-image") {
