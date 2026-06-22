@@ -110,9 +110,26 @@ export function TitlebarTabs(props: TitlebarTabsProps): ReactElement | null {
     setDropTargetIndex(null);
   };
 
-  const handleDragEnd = (): void => {
+  const handleDragEnd = (event: DragEvent<HTMLDivElement>, index: number): void => {
     setDraggingIndex(null);
     setDropTargetIndex(null);
+    // ISS-NEW-F 第 1 步（2026-06-22）：tab 拖离窗口外检测（HTML5 DnD 端）。
+    // 当 dragend 时 mouse 位置在窗口边界外（clientX/Y < 0 或 > viewport 宽高），
+    // 标记为 detach candidate。真实 detach 由 Tauri WebviewWindow IPC 接入（ISS-NEW-F 第 2 步），
+    // 当前 v0.2 仅发占位 feedback。
+    const rect = document.documentElement.getBoundingClientRect();
+    const isOutsideViewport =
+      event.clientX < rect.left ||
+      event.clientX > rect.right ||
+      event.clientY < rect.top ||
+      event.clientY > rect.bottom;
+    if (isOutsideViewport) {
+      // v0.2 占位：Tauri WebviewWindow.create() 接入后真正创建新窗口。
+      // 当前通过 console.warn 留 trace，方便 PM 巡检时验证 DOM 端检测确实工作。
+      console.warn(
+        `[ISS-NEW-F] tab detach candidate: index=${index} tabId=${tabs[index]?.id ?? "?"}`,
+      );
+    }
   };
 
   return (
@@ -138,7 +155,7 @@ export function TitlebarTabs(props: TitlebarTabsProps): ReactElement | null {
             onDragStart={(event) => handleDragStart(event, index)}
             onDragOver={(event) => handleDragOver(event, index)}
             onDrop={(event) => handleDrop(event, index)}
-            onDragEnd={handleDragEnd}
+            onDragEnd={(event) => handleDragEnd(event, index)}
             onClick={() => handleTabClick(tab)}
             onDoubleClick={() => handleTabDoubleClick(tab)}
             role="tab"
