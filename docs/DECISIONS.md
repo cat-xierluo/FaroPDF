@@ -6718,3 +6718,32 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - Playwright 960×720 实操验证
 
 **关联**：ISS-NEW-F 任务卡（line 1201+ 4 子项）/ DEC-144（前置 ship）。
+
+## DEC-163 ISS-NEW-F 第 2 步：Tauri WebviewWindow create IPC + frontend invoke（PM 单 session，2026-06-23）
+
+- 时间：2026-06-23
+- 类型：UI 信息架构 / Tauri IPC / 多窗口基础
+- 关联：ISS-NEW-F 任务卡（line 1201+ 4 子项）/ DEC-162（第 1 步 DOM 端 viewport 边界检测）/ DEC-099（pre-existing vitest 4.x ESM 冲突，不影响本步）
+
+**决策**：
+1. **`create_faropdf_window` 加 `#[tauri::command]` 注解 + `invoke_handler!` 注册**（commit `54e32da`，`src-tauri/src/lib.rs`）：
+   - 函数签名从 `fn create_faropdf_window(app_handle: &AppHandle)` 改为 `#[tauri::command] fn create_faropdf_window(app_handle: AppHandle) -> tauri::Result<String>`（owned AppHandle，return window label 用于调用方追踪）
+   - macOS 菜单 `file-new-window` 已有 call 改 `create_faropdf_window(app_handle.clone())`（owned 模式需要 clone）
+   - 新加 `tab-detach-new-window` event handler arm：tab drag detach 时调 create_faropdf_window 开空新窗口
+2. **`TitlebarTabs.handleDragEnd` 拖离时 `invoke('create_faropdf_window')`**（commit `54e32da`，`src/components/layout/TitlebarTabs.tsx`）：tab 拖到窗口外时前端 invoke 调 Rust 开新 WebviewWindow + `console.error` 兜底。
+3. **v0.2 占位**：文档句柄表（多窗口共享同一文档状态 — `filePath / page / zoom / annotations` 传过去）留 ISS-NEW-F 第 3 步。当前新窗口开空，tab 状态未迁移。
+
+**Verification**：
+- `cargo check --manifest-path src-tauri/Cargo.toml --offline` ✅
+- `npm run typecheck` ✅
+- `TitlebarTabs.test.tsx` 7/7 ✅
+- vitest 受 pre-existing vitest 4.x ESM 冲突阻塞（与本步无关）
+- Tauri webview 实操验证需 Playwright + 实际打包运行（v0.1 收口沉淀后续 — DEC-099）
+
+**out of scope（明确留给后续）**：
+- 文档句柄表（ISS-NEW-F 第 3 步）
+- 跨 tab 拖页（ISS-NEW-F 第 4 步 — 编辑模式从 tab A 拖页到 tab B）
+- 多窗口共享 recentFiles / annotations（状态同步层）
+- Playwright 960×720 实操验证
+
+**关联**：ISS-NEW-F 任务卡（line 1201+ 4 子项）/ DEC-144（前置 ship）/ DEC-162（第 1 步 DOM 检测）。
