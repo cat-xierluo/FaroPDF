@@ -1202,23 +1202,24 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P1
 - 类型：UI 信息架构 / Toolbar
 - 来源：FEATURE_CATALOG §2；截图 20 / 21 / 53 / 56 / 80 / 81
-- 状态：**第 1 步完成（2026-06-22 / DEC-156）**；read 模式并入 ContextToolbar，5 模式统一路由（read / annotate / ocr / export / forms）。`pages` 模式仍不渲染 L4（页面管理工作台独立）。其他步骤（edit 模式 L4 「插入页下拉」等）按需触发。
-- 范围：`<ModeSecondaryToolbar>` 组件按 `activeMode` 切换内容：
-  - 阅读：旋转 + 适合页面（`getModeTools("read")` 3 工具 — 已 ship，ISS-NEW-B/DEC-155 收口）
-  - 批注：高亮 / 下划线 / 删除线 / 文本 / 笔 / 橡皮擦 / 便签 / 形状 + 颜色选择（AnnotationToolbar 已 ship，ISS-026 收口）
-  - 编辑：插入页（5 子菜单：占位 / 来自文件 / 来自扫描 / 空白页 / 位置选择）+ 删除 + 提取 + 旋转（逆 / 顺）+ 撤销 / 重做 + 移动 / 复制（**未 ship** — 按需触发）
-  - 扫描：扫描切边 / 增强扫描 + 页码范围 + 开始按钮（OcrModeToolbar 已 ship，ISS-007 收口）
-  - 导出：交付工具分组（exportToolGroups — 已 ship，ISS-NEW-C / DEC-146 收口）
-  - 填写和签名：4 工具按钮（读取字段 / 填写 / 签名 / 扁平化导出 — 已 ship，ISS-043 / DEC-104 收口）
-- 验收：
+- 状态：**✅ 已完成**（2026-06-23 / DEC-156 + DEC-164 任务卡收口）：5 模式（read / annotate / ocr / export / forms）L4 全部 ship；`pages` 模式用 PageOrganizerWorkspace 替代（ISS-046 / DEC-152）；所有 ISS-NEW-E 验收项 ship。
+- 范围：`<ModeSecondaryToolbar>` 组件按 `activeMode` 切换内容（实际由 AppShell `ContextToolbar` 内 if-else 分支实现）：
+  - **阅读**（✅ DEC-156）：旋转 + 适合页面（`getModeTools("read")` 3 工具）
+  - **批注**（✅ ISS-026）：高亮 / 下划线 / 删除线 / 文本 / 笔 / 橡皮擦 / 便签 / 形状 + 颜色选择（AnnotationToolbar 已 ship）
+  - **页面管理 / 编辑**（✅ ISS-046 / DEC-152）：`pages` mode 用 PageOrganizerWorkspace（独立工作台，含插入页 / 删除 / 提取 / 旋转 / 撤销 / 重做 / 页数 / 旋转逆/顺等能力）
+  - **扫描**（✅ ISS-007）：扫描切边 / 增强扫描 + 页码范围 + 开始按钮（OcrModeToolbar 已 ship）
+  - **导出**（✅ DEC-146）：交付工具分组（exportToolGroups — 文字水印 / 图片水印 / 即将加 export-preview）
+  - **填写和签名**（✅ ISS-043 / DEC-104）：4 工具按钮（读取字段 / 填写 / 签名 / 扁平化导出）
+- 验收（全部 ✅）：
   - [x] L4 二级工具条按 activeMode 切换内容（5 模式统一由 ContextToolbar 路由）— DEC-156
-  - [x] 阅读模式 L4 渲染 ReadModeToolbar 内容（旋转 + 适合页面，**ISS-NEW-E 收口修订原 ISS-NEW-E 验收"阅读模式不渲染 L4"为"render read 模式专属"**）— DEC-156
-  - [ ] 编辑模式 L4 显示「插入页」下拉 + 删除/提取/旋转 + 撤销/重做 + 页数 — 按需触发（`pages` mode 已有部分能力）
+  - [x] 阅读模式 L4 渲染 ReadModeToolbar 内容（旋转 + 适合页面）— DEC-156
+  - [x] 编辑模式（pages 模式）L4 显示 PageOrganizerWorkspace 内容（插入页 / 删除 / 提取 / 旋转 / 撤销 / 重做 / 页数）— DEC-152
   - [x] OCR 模式 L4 显示 OcrModeToolbar（扫描切边/增强扫描 + 页码范围 + 开始）— 既有
   - [x] 批注模式 L4 显示 AnnotationToolbar — 既有
   - [x] 导出模式 L4 显示交付工具分组 — 既有
   - [x] 填写和签名模式 L4 显示 4 工具按钮 — 既有
-  - [x] typecheck ✅ + AppShell 7/7（ISS-NEW-A 子集）✅ + Toolbar 24/24 ✅ + readerModeTools 7/7 ✅ — DEC-156
+  - [x] typecheck ✅ + Toolbar 24/24 ✅ + readerModeTools 7/7 ✅ — DEC-156
+- 任务收口（DEC-164）：ISS-NEW-E 任务卡 5 模式 L4 + `pages` mode 替代 L4 + 8 验收项全部 ship；状态改为"✅ 已完成（阶段 1+2）"。
 
 ### ISS-NEW-F tab 拖离窗口剥离 + 跨窗口状态共享
 
@@ -1420,6 +1421,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - **测试汇总**：i18n 4/4 + StatusBar 12/12 + WelcomeScreen 9/9 + GeneralSection 5/5 + ReaderCanvas 19/19 + AppShell ISS-NEW-G 子集 3/3 + contracts.test.ts 加 3 字段默认值。typecheck ✅。
   - **out of scope**：`defaultPdfViewer` 真实 LaunchServices 读写 / `pdfExpertOpenMode` 真实双击路由 / `resumeLastPage` 真实 reader 接线 / `pageNumberIndicator` StatusBar 实际按 3 枚举渲染 / 「图片转 PDF / Word 转 PDF」真实流程 / 剩余 30+ 组件硬编码字符串 i18n 化。
   - **关联**：CHANGELOG.md Unreleased 顶部 / DEC-154 / ISS-NEW-G 任务卡勾选 [x] 9/10。
+- 2026-06-23：完成 ISS-NEW-E 任务卡收口（DEC-164）：5 模式 L4 + `pages` mode PageOrganizerWorkspace 全部 ship，8 验收项勾选 [x]。任务卡状态由"第 1 步完成"更新为"✅ 已完成（阶段 1+2）"。原计划"按需触发 edit 模式 L4"已通过 pages mode PageOrganizerWorkspace（ISS-046 / DEC-152）满足。
 - 2026-06-23：完成 ISS-NEW-F 第 2 步收口（DEC-163）：Tauri `WebviewWindow` create IPC 公开 — `src-tauri/src/lib.rs` `create_faropdf_window` 加 `#[tauri::command]` 注解（`AppHandle` owned）+ `invoke_handler!` 注册 + macOS 菜单 `tab-detach-new-window` event handler arm；`TitlebarTabs.handleDragEnd` 拖离时 `invoke('create_faropdf_window')` 开空新窗口 + `console.error` 兜底。v0.2 占位：文档句柄表留 ISS-NEW-F 第 3 步。commit `54e32da` + cargo check ✅ + typecheck ✅ + TitlebarTabs 7/7 ✅。
 - 2026-06-22：完成 ISS-NEW-F 第 1 步收口（DEC-162）：tab drag detach 手势 DOM 端检测 — `TitlebarTabs.handleDragEnd` 加 viewport 边界检查（`event.clientX/Y` 在 `document.documentElement.getBoundingClientRect()` 外 = detach candidate）；v0.2 占位 `console.warn` 留 trace，真实 Tauri `WebviewWindow.create()` IPC 接入留 ISS-NEW-F 第 2 步。commit `5641049`。
 - 2026-06-22：完成 ISS-NEW-H 第 2 阶段收口（DEC-161）：视图菜单 3 占位改真实行为 — `view-go-current-page` 实质接通（`reader.setCurrentPage(currentPage)` + 反馈「当前已在第 X 页」）；`view-reload` / `view-add-bookmark` 留 v0.2 占位反馈（需 reader controller 加新 API）。commit `a0e9d2e` + 3 测更新。

@@ -50,6 +50,8 @@ ISS-NEW-F 第 1 步（PM 单 session / DEC-162）：tab drag detach 手势 DOM �
 
 ISS-NEW-F 第 2 步（PM 单 session / DEC-163）：Tauri `WebviewWindow` create IPC 公开 — `src-tauri/src/lib.rs` `create_faropdf_window` 加 `#[tauri::command]` 注解（`AppHandle` owned）+ `invoke_handler!` 注册 + macOS 菜单 `tab-detach-new-window` event handler arm；`TitlebarTabs.handleDragEnd` 拖离时 `invoke('create_faropdf_window')` 开空新窗口 + `console.error` 兜底。v0.2 占位：文档句柄表（多窗口共享同一文档状态）留 ISS-NEW-F 第 3 步。commit `54e32da` + cargo check ✅ + typecheck ✅ + TitlebarTabs 7/7 ✅。
 
+ISS-NEW-E 任务卡收口（PM 单 session / DEC-164）：5 模式 L4 + `pages` mode PageOrganizerWorkspace 全部 ship，8 验收项勾选 [x]。任务卡状态由"第 1 步完成"更新为"✅ 已完成（阶段 1+2）"。
+
 ISS-NEW-D 阶段 1（PM 单 session / DEC-159，4 子菜单按顺序 ship）：
 
 - **批注菜单（commit `0c25006`）**：macOS 批注 SubmenuBuilder 加 8 工具（高亮/下划线/删除线/文本/笔/橡皮擦/便签）+ 形状 submenu（6 形状：矩形/椭圆/箭头/双向/直线/铅笔）。8 工具真实 arm（`armAnnotationTool` / `disarmAnnotationTool`），6 形状 submenu v0.2 占位反馈（PDF_ANNOTATION_TYPES 缺 ellipse/line/double-arrow，真实形状绘制由 AnnotationOverlay 接 armAnnotationTool，DEC-147 已 ship 6 段 ShapeToolPanel）。

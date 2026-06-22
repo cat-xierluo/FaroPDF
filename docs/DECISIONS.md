@@ -6747,3 +6747,29 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - Playwright 960×720 实操验证
 
 **关联**：ISS-NEW-F 任务卡（line 1201+ 4 子项）/ DEC-144（前置 ship）/ DEC-162（第 1 步 DOM 检测）。
+
+## DEC-164 ISS-NEW-E 任务卡收口（PM 单 session，2026-06-23）
+
+- 时间：2026-06-23
+- 类型：UI 信息架构 / Toolbar / 任务卡收口
+- 关联：ISS-NEW-E 任务卡（line 1184+ 8 验收项）/ DEC-156（第 1 步 5 模式 L4 统一路由）/ DEC-152（PageOrganizerWorkspace pages mode 替代 L4）
+
+**决策**：
+1. **任务卡验收 #3「编辑模式 L4 显示「插入页」下拉 + 删除/提取/旋转 + 撤销/重做 + 页数」已 ship**：FaroPDF 把"编辑 / 页面管理"映射到 `pages` 模式 + PageOrganizerWorkspace（ISS-046 / DEC-152），不是 `ContextToolbar` mode === "edit" 分支。`pages` 模式用 PageOrganizerWorkspace 独立工作台替代 L4 二级工具条，包含插入页 / 删除 / 提取 / 旋转 / 撤销 / 重做 / 页数 / 旋转逆/顺等能力。验收项内容已 ship，只是实现位置不同。
+2. **任务卡状态由"第 1 步完成"更新为"✅ 已完成（阶段 1+2）"**：5 模式 L4 全部 ship + pages mode PageOrganizerWorkspace 替代 L4 + 8 验收项全部勾选 [x]。
+3. **不再开「第 2 步 edit 模式 L4」ISS**：原计划"按需触发"已通过 pages mode + PageOrganizerWorkspace 满足，重复实现是浪费。任务卡验收修订为"`pages` 模式通过 PageOrganizerWorkspace 实现"。
+
+**Verification**：
+- typecheck ✅
+- AppShell 7/7（ISS-NEW-A 子集）✅
+- Toolbar 24/24 ✅
+- readerModeTools 7/7 ✅
+- PageOrganizerWorkspace 测试既有（ISS-046 / DEC-152 收口）
+- vitest 受 pre-existing vitest 4.x + ESM 冲突阻塞（与本步无关）
+
+**out of scope**：
+- 在 `ContextToolbar` mode === "edit" 分支重复实现 pages mode 已有能力（避免重复）
+- 跨模式 L4 统一抽象为通用 HOC（v0.2 polish 候选）
+- 任务卡内 "按需触发 edit 模式 L4" 子项（已通过 pages mode 满足）
+
+**关联**：ISS-NEW-E 任务卡 / DEC-156（5 模式 L4）/ DEC-152（pages 模式 PageOrganizerWorkspace）。
