@@ -740,6 +740,38 @@ export function AppShell({
       return;
     }
 
+    // ISS-NEW-D 阶段 1（2026-06-22）：前往菜单 5 顶层 + 5 历史。
+    // 4 个真实跳转（首末前后页）走 reader.setCurrentPage；5 历史 + 1 返回 v0.2 占位。
+    if (command.id === "go-first-page" && reader.state.document) {
+      reader.setCurrentPage(1);
+      return;
+    }
+    if (command.id === "go-last-page" && reader.state.document) {
+      reader.setCurrentPage(reader.state.document.pageCount);
+      return;
+    }
+    if (command.id === "go-previous-page" && reader.state.document) {
+      reader.setCurrentPage(Math.max(1, reader.state.document.currentPage - 1));
+      return;
+    }
+    if (command.id === "go-next-page" && reader.state.document) {
+      reader.setCurrentPage(
+        Math.min(reader.state.document.pageCount, reader.state.document.currentPage + 1),
+      );
+      return;
+    }
+    if (
+      command.id === "go-history-1" ||
+      command.id === "go-history-2" ||
+      command.id === "go-history-3" ||
+      command.id === "go-history-4" ||
+      command.id === "go-history-5" ||
+      command.id === "go-back"
+    ) {
+      setCommandFeedback(`${command.label}功能待后续 worker 接入浏览历史栈；当前可用 L4 阅读 / 缩放工具条。`);
+      return;
+    }
+
     // ISS-NEW-H：3 顶层占位命令（不 return，让末尾通用 fallback 设 feedback）。
     if (
       command.id === "view-go-current-page" ||

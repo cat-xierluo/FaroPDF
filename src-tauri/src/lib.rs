@@ -941,6 +941,23 @@ pub fn run() {
                     .text("pdf-add-text", "添加文字")
                     .text("pdf-redact", "隐藏")
                     .build()?)
+                // ISS-NEW-D 阶段 1（2026-06-22）：macOS 前往菜单（首页 / 末页 / 上一页 / 下一页 / 历史 submenu / 返回）。
+                .item(&SubmenuBuilder::new(app, "前往")
+                    .text("go-first-page", "首页")
+                    .text("go-last-page", "末页")
+                    .separator()
+                    .text("go-previous-page", "上一页")
+                    .text("go-next-page", "下一页")
+                    .separator()
+                    .item(&SubmenuBuilder::new(app, "浏览历史")
+                        .text("go-history-1", "最近 1")
+                        .text("go-history-2", "最近 2")
+                        .text("go-history-3", "最近 3")
+                        .text("go-history-4", "最近 4")
+                        .text("go-history-5", "最近 5")
+                        .build()?)
+                    .text("go-back", "返回")
+                    .build()?)
                 .item(&SubmenuBuilder::new(app, "视图")
                     .text("view-summary", "文档摘要")
                     .text("view-pages", "页面管理")
@@ -1050,6 +1067,16 @@ pub fn run() {
                     | "pdf-add-link"
                     | "pdf-add-text"
                     | "pdf-redact"
+                    | "go-first-page"
+                    | "go-last-page"
+                    | "go-previous-page"
+                    | "go-next-page"
+                    | "go-history-1"
+                    | "go-history-2"
+                    | "go-history-3"
+                    | "go-history-4"
+                    | "go-history-5"
+                    | "go-back"
                     | "export-page-number"
                     | "export-bates"
                     | "export-header-footer"

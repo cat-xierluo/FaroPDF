@@ -66,6 +66,16 @@ export type AppCommandId =
   | "pdf-add-link"
   | "pdf-add-text"
   | "pdf-redact"
+  | "go-first-page"
+  | "go-last-page"
+  | "go-previous-page"
+  | "go-next-page"
+  | "go-history-1"
+  | "go-history-2"
+  | "go-history-3"
+  | "go-history-4"
+  | "go-history-5"
+  | "go-back"
   | "settings-open"
   | "mode-annotate"
   | "mode-export"
@@ -505,6 +515,98 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     description: "v0.2 占位：选中区域涂抹遮蔽（ISS-067 已有遮蔽 UI）。",
     layer: "tertiary",
     group: "export",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  // ISS-NEW-D 阶段 1（2026-06-22）：前往菜单 5 顶层 + 5 历史 submenu 项。
+  // 全部 tertiary / native-menu / view group（导航类）。
+  {
+    id: "go-first-page",
+    label: "首页",
+    description: "跳到文档第一页。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "go-last-page",
+    label: "末页",
+    description: "跳到文档最后一页。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "go-previous-page",
+    label: "上一页",
+    description: "跳到当前页的上一页。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "go-next-page",
+    label: "下一页",
+    description: "跳到当前页的下一页。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "go-history-1",
+    label: "最近 1",
+    description: "v0.2 占位：跳到浏览历史最近 1。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "go-history-2",
+    label: "最近 2",
+    description: "v0.2 占位：跳到浏览历史最近 2。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "go-history-3",
+    label: "最近 3",
+    description: "v0.2 占位：跳到浏览历史最近 3。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "go-history-4",
+    label: "最近 4",
+    description: "v0.2 占位：跳到浏览历史最近 4。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "go-history-5",
+    label: "最近 5",
+    description: "v0.2 占位：跳到浏览历史最近 5。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "go-back",
+    label: "返回",
+    description: "返回上一个浏览位置（浏览历史栈）。",
+    layer: "tertiary",
+    group: "view",
     entryPoints: ["native-menu"],
     requiresDocument: true,
   },
