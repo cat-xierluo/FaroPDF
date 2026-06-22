@@ -39,6 +39,19 @@ export type AppCommandId =
   | "view-go-current-page"
   | "view-reload"
   | "view-add-bookmark"
+  | "annotation-highlight"
+  | "annotation-underline"
+  | "annotation-strikeout"
+  | "annotation-text"
+  | "annotation-pen"
+  | "annotation-eraser"
+  | "annotation-note"
+  | "annotation-shape-rectangle"
+  | "annotation-shape-ellipse"
+  | "annotation-shape-arrow"
+  | "annotation-shape-double-arrow"
+  | "annotation-shape-line"
+  | "annotation-shape-pen"
   | "settings-open"
   | "mode-annotate"
   | "mode-export"
@@ -239,6 +252,126 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     entryPoints: ["native-menu"],
     requiresDocument: true,
     feedback: "视图功能开发中，等待后续 worker 接入。",
+  },
+  // ISS-NEW-D 阶段 1（2026-06-22）：批注菜单 8 工具 + 形状 submenu 6 形状。
+  // 全部 tertiary / native-menu / annotation group，与 macOS 批注 SubmenuBuilder 一一对应。
+  // 形状 submenu 项暂为占位（实际形状绘制由 AnnotationOverlay 接 armAnnotationTool）。
+  {
+    id: "annotation-highlight",
+    label: "高亮",
+    description: "arm 高亮批注工具。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-underline",
+    label: "下划线",
+    description: "arm 下划线批注工具。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-strikeout",
+    label: "删除线",
+    description: "arm 删除线批注工具。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-text",
+    label: "文本",
+    description: "arm 文本框批注工具。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-pen",
+    label: "笔",
+    description: "arm 自由笔批注工具。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-eraser",
+    label: "橡皮擦",
+    description: "disarm 当前批注工具（清空 activeToolType）。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: false,
+  },
+  {
+    id: "annotation-note",
+    label: "便签",
+    description: "arm 便签批注工具。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-shape-rectangle",
+    label: "矩形",
+    description: "v0.2 占位：形状绘制由 AnnotationOverlay 接 armAnnotationTool。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-shape-ellipse",
+    label: "椭圆",
+    description: "v0.2 占位：形状绘制由 AnnotationOverlay 接 armAnnotationTool。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-shape-arrow",
+    label: "箭头",
+    description: "v0.2 占位：形状绘制由 AnnotationOverlay 接 armAnnotationTool。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-shape-double-arrow",
+    label: "双向箭头",
+    description: "v0.2 占位：形状绘制由 AnnotationOverlay 接 armAnnotationTool。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-shape-line",
+    label: "直线",
+    description: "v0.2 占位：形状绘制由 AnnotationOverlay 接 armAnnotationTool。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-shape-pen",
+    label: "铅笔",
+    description: "v0.2 占位：形状绘制由 AnnotationOverlay 接 armAnnotationTool。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
   },
   {
     id: "settings-open",

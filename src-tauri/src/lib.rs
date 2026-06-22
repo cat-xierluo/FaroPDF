@@ -896,6 +896,28 @@ pub fn run() {
                     .paste()
                     .select_all()
                     .build()?)
+                // ISS-NEW-D 阶段 1（2026-06-22）：macOS 批注菜单（8 工具 + 形状 submenu 6 形状）。
+                // command id 与 src/shared/app/commands.ts 一一对应，全部 native-menu only。
+                .item(&SubmenuBuilder::new(app, "批注")
+                    .text("annotation-highlight", "高亮")
+                    .text("annotation-underline", "下划线")
+                    .text("annotation-strikeout", "删除线")
+                    .separator()
+                    .text("annotation-text", "文本")
+                    .text("annotation-pen", "笔")
+                    .text("annotation-eraser", "橡皮擦")
+                    .text("annotation-note", "便签")
+                    .separator()
+                    // 形状 submenu（6 形状：矩形/椭圆/箭头/双向/直线/铅笔）。
+                    .item(&SubmenuBuilder::new(app, "形状")
+                        .text("annotation-shape-rectangle", "矩形")
+                        .text("annotation-shape-ellipse", "椭圆")
+                        .text("annotation-shape-arrow", "箭头")
+                        .text("annotation-shape-double-arrow", "双向箭头")
+                        .text("annotation-shape-line", "直线")
+                        .text("annotation-shape-pen", "铅笔")
+                        .build()?)
+                    .build()?)
                 .item(&SubmenuBuilder::new(app, "视图")
                     .text("view-summary", "文档摘要")
                     .text("view-pages", "页面管理")
@@ -979,6 +1001,19 @@ pub fn run() {
                     | "view-go-current-page"
                     | "view-reload"
                     | "view-add-bookmark"
+                    | "annotation-highlight"
+                    | "annotation-underline"
+                    | "annotation-strikeout"
+                    | "annotation-text"
+                    | "annotation-pen"
+                    | "annotation-eraser"
+                    | "annotation-note"
+                    | "annotation-shape-rectangle"
+                    | "annotation-shape-ellipse"
+                    | "annotation-shape-arrow"
+                    | "annotation-shape-double-arrow"
+                    | "annotation-shape-line"
+                    | "annotation-shape-pen"
                     | "export-page-number"
                     | "export-bates"
                     | "export-header-footer"

@@ -16,7 +16,11 @@ import {
   OcrWorkspace,
   type OcrWorkspaceController,
 } from "../../modules/ocr";
-import { createInitialAnnotationToolState } from "../../modules/annotation";
+import {
+  armAnnotationTool,
+  createInitialAnnotationToolState,
+  disarmAnnotationTool,
+} from "../../modules/annotation";
 import type { AnnotationToolState } from "../../modules/annotation";
 import { useFormController } from "../../modules/forms/useFormController";
 import { setActiveFormController } from "../../modules/forms/activeFormController";
@@ -654,6 +658,52 @@ export function AppShell({
     }
     if (command.id === "view-thumbnails-double") {
       reader.setViewMode("double");
+      return;
+    }
+
+    // ISS-NEW-D 阶段 1（2026-06-22）：批注菜单 8 工具（armAnnotationTool 真实 arm）。
+    // 形状 submenu 6 项（rectangle / ellipse / arrow / double-arrow / line / pen）v0.2 占位
+    // 反馈（PDF_ANNOTATION_TYPES 当前仅 rectangle / arrow / ink，缺 ellipse / line / double-arrow，
+    // 真实形状绘制由 AnnotationOverlay 接 armAnnotationTool，DEC-147 已 ship 6 段 ShapeToolPanel）。
+    const annotationArmSetter = annotationArmed?.onStateChange;
+    if (command.id === "annotation-highlight" && annotationArmSetter) {
+      annotationArmSetter(armAnnotationTool(annotationState, "highlight"));
+      return;
+    }
+    if (command.id === "annotation-underline" && annotationArmSetter) {
+      annotationArmSetter(armAnnotationTool(annotationState, "underline"));
+      return;
+    }
+    if (command.id === "annotation-strikeout" && annotationArmSetter) {
+      annotationArmSetter(armAnnotationTool(annotationState, "strikeout"));
+      return;
+    }
+    if (command.id === "annotation-text" && annotationArmSetter) {
+      annotationArmSetter(armAnnotationTool(annotationState, "textbox"));
+      return;
+    }
+    if (command.id === "annotation-pen" && annotationArmSetter) {
+      annotationArmSetter(armAnnotationTool(annotationState, "ink"));
+      return;
+    }
+    if (command.id === "annotation-eraser" && annotationArmSetter) {
+      annotationArmSetter(disarmAnnotationTool(annotationState));
+      return;
+    }
+    if (command.id === "annotation-note" && annotationArmSetter) {
+      annotationArmSetter(armAnnotationTool(annotationState, "note"));
+      return;
+    }
+    // 形状 submenu 6 项 v0.2 占位反馈（v0.3 由真实形状绘制 worker 接入）。
+    if (
+      command.id === "annotation-shape-rectangle" ||
+      command.id === "annotation-shape-ellipse" ||
+      command.id === "annotation-shape-arrow" ||
+      command.id === "annotation-shape-double-arrow" ||
+      command.id === "annotation-shape-line" ||
+      command.id === "annotation-shape-pen"
+    ) {
+      setCommandFeedback(`${command.label}形状待后续 worker 接入；当前可通过 L4 形状工具条（annotate 模式）切换。`);
       return;
     }
 
