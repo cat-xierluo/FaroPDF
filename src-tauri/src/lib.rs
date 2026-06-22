@@ -52,22 +52,22 @@ struct NativePdfFileResponse {
     path: String,
 }
 
-fn create_faropdf_window(app_handle: &AppHandle) -> tauri::Result<()> {
+/// ISS-NEW-F 第 2 步（2026-06-22）：tab drag detach 创建新窗口入口（IPC 公开）。
+/// 文档句柄表（多窗口共享同一文档状态）留 v0.2 占位：当前仅开空新窗口。
+#[tauri::command]
+fn create_faropdf_window(app_handle: AppHandle) -> tauri::Result<String> {
     let suffix = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis())
         .unwrap_or(0);
 
-    WebviewWindowBuilder::new(
-        app_handle,
-        format!("faropdf-window-{suffix}"),
-        WebviewUrl::default(),
-    )
-    .title("FaroPDF")
-    .inner_size(1280.0, 820.0)
-    .min_inner_size(960.0, 640.0)
-    .build()
-    .map(|_| ())
+    let label = format!("faropdf-window-{suffix}");
+    WebviewWindowBuilder::new(&app_handle, &label, WebviewUrl::default())
+        .title("FaroPDF")
+        .inner_size(1280.0, 820.0)
+        .min_inner_size(960.0, 640.0)
+        .build()?;
+    Ok(label)
 }
 
 #[tauri::command]
@@ -1038,7 +1038,7 @@ pub fn run() {
                         }
                     }
                     "file-new-window" => {
-                        let _ = create_faropdf_window(app_handle);
+                        let _ = create_faropdf_window(app_handle.clone());
                     }
                     "file-open"
                     | "file-save-as"
@@ -1123,6 +1123,7 @@ pub fn run() {
             read_app_settings,
             write_app_settings,
             read_pdf_file_from_path,
+            create_faropdf_window,
             start_scan_preprocess_job,
             list_scan_preprocess_jobs,
             poll_scan_preprocess_job,

@@ -12,6 +12,7 @@
 
 import { useState, type ChangeEvent, type DragEvent, type ReactElement } from "react";
 import { Plus, X } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { useTabStore, type PdfTab } from "../../state/tabStore";
 import "./TitlebarTabs.css";
 
@@ -110,7 +111,7 @@ export function TitlebarTabs(props: TitlebarTabsProps): ReactElement | null {
     setDropTargetIndex(null);
   };
 
-  const handleDragEnd = (event: DragEvent<HTMLDivElement>, index: number): void => {
+  const handleDragEnd = (event: DragEvent<HTMLDivElement>, _index: number): void => {
     setDraggingIndex(null);
     setDropTargetIndex(null);
     // ISS-NEW-F 第 1 步（2026-06-22）：tab 拖离窗口外检测（HTML5 DnD 端）。
@@ -124,11 +125,12 @@ export function TitlebarTabs(props: TitlebarTabsProps): ReactElement | null {
       event.clientY < rect.top ||
       event.clientY > rect.bottom;
     if (isOutsideViewport) {
-      // v0.2 占位：Tauri WebviewWindow.create() 接入后真正创建新窗口。
-      // 当前通过 console.warn 留 trace，方便 PM 巡检时验证 DOM 端检测确实工作。
-      console.warn(
-        `[ISS-NEW-F] tab detach candidate: index=${index} tabId=${tabs[index]?.id ?? "?"}`,
-      );
+      // ISS-NEW-F 第 2 步：v0.2 占位（文档句柄表待接入），开空新窗口 + 提示反馈。
+      // 真实流程：invoke('create_faropdf_window') 调 Rust 开新 WebviewWindow，
+      // 后续把当前 tab 的 document 状态（filePath / page / zoom / annotations）传过去。
+      void invoke<string>("create_faropdf_window").catch((error: unknown) => {
+        console.error("[ISS-NEW-F] create_faropdf_window invoke failed:", error);
+      });
     }
   };
 
