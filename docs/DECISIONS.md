@@ -6693,3 +6693,28 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - 书签右栏（书签列表 / outline 视图）— 可与 ISS-NEW-F tab 拖离窗口剥离联合设计
 
 **关联**：ISS-NEW-H 任务卡 / DEC-157（视图菜单 submenu 补全前置 ship）。
+
+## DEC-162 ISS-NEW-F 第 1 步：tab drag detach 手势 DOM 端检测（PM 单 session，2026-06-22）
+
+- 时间：2026-06-22
+- 类型：UI 信息架构 / Tab 拖离手势 / v0.2 准备
+- 关联：ISS-NEW-F 任务卡（line 1201+）/ DEC-144（ISS-NEW-A 阶段 1 Toolbar 5 段）
+
+**决策**：
+1. **TitlebarTabs.handleDragEnd 加 viewport 边界检测**（commit `5641049`）：当 `event.clientX/Y` 在 `document.documentElement.getBoundingClientRect()` 外（clientX < rect.left / > rect.right / Y 类似）时，标记为 detach candidate。
+2. **v0.2 占位 `console.warn`**：打印 `[ISS-NEW-F] tab detach candidate: index=... tabId=...`，方便 PM 巡检时验证 DOM 端检测确实工作。真实 Tauri `WebviewWindow.create()` IPC 接入留 ISS-NEW-F 第 2 步。
+3. **不依赖 Tauri IPC**：本步仅 DOM 端手势检测，纯前端可测。HTML5 DnD 在 Tauri webview 中行为与浏览器一致（onDragEnd 在 drop / cancel 时触发，包括拖到窗口外 cancel）。
+
+**Verification**：
+- typecheck ✅
+- `TitlebarTabs.test.tsx` 7/7 ✅（既有 tab 切换 / 重排 / 重命名测不变，新加 detach 逻辑不破坏现有行为）
+- 浏览器 / Tauri webview 实操需 Playwright 验证（v0.1 收口沉淀后续 — pre-existing vitest 4.x + ESM 冲突，DEC-099）
+
+**out of scope（明确留给后续）**：
+- Tauri `WebviewWindow.create()` IPC（多窗口 Tauri API 接入）
+- 文档句柄表（多窗口共享同一文档状态）
+- 跨 tab 拖页（截图 81：编辑模式从 tab A 拖页到 tab B）
+- 多窗口共享 recentFiles / annotations
+- Playwright 960×720 实操验证
+
+**关联**：ISS-NEW-F 任务卡（line 1201+ 4 子项）/ DEC-144（前置 ship）。

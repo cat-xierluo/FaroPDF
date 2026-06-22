@@ -46,6 +46,8 @@ ISS-NEW-D 阶段 2 收尾（PM 单 session / DEC-160）：批注菜单补 9 辅�
 
 ISS-NEW-H 第 2 阶段（PM 单 session / DEC-161）：视图菜单 3 占位改真实行为 — `view-go-current-page` 实质接通（`reader.setCurrentPage(currentPage)` + 反馈「当前已在第 X 页」）；`view-reload` / `view-add-bookmark` 留 v0.2 占位反馈（需 reader controller 加 `reloadDocument(path → File)` / `addBookmark(currentPage, label)` 新 API 后接通）。commit `a0e9d2e` + 3 测更新。
 
+ISS-NEW-F 第 1 步（PM 单 session / DEC-162）：tab drag detach 手势 DOM 端检测 — `TitlebarTabs.handleDragEnd` 加 viewport 边界检查（`event.clientX/Y` 在 `document.documentElement.getBoundingClientRect()` 外 = detach candidate）；v0.2 占位 `console.warn` 留 trace，真实 Tauri `WebviewWindow.create()` IPC 接入留 ISS-NEW-F 第 2 步。commit `5641049`。
+
 ISS-NEW-D 阶段 1（PM 单 session / DEC-159，4 子菜单按顺序 ship）：
 
 - **批注菜单（commit `0c25006`）**：macOS 批注 SubmenuBuilder 加 8 工具（高亮/下划线/删除线/文本/笔/橡皮擦/便签）+ 形状 submenu（6 形状：矩形/椭圆/箭头/双向/直线/铅笔）。8 工具真实 arm（`armAnnotationTool` / `disarmAnnotationTool`），6 形状 submenu v0.2 占位反馈（PDF_ANNOTATION_TYPES 缺 ellipse/line/double-arrow，真实形状绘制由 AnnotationOverlay 接 armAnnotationTool，DEC-147 已 ship 6 段 ShapeToolPanel）。
