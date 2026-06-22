@@ -917,6 +917,20 @@ pub fn run() {
                         .text("annotation-shape-line", "直线")
                         .text("annotation-shape-pen", "铅笔")
                         .build()?)
+                    .separator()
+                    // ISS-NEW-D 阶段 2（2026-06-22）：批注菜单补 9 辅助 command。
+                    .text("annotation-add-link", "链接")
+                    .text("annotation-outline", "内容表")
+                    .separator()
+                    .text("annotation-delete", "删除")
+                    .text("annotation-delete-all", "删除全部")
+                    .separator()
+                    .text("annotation-jump-to", "跳到批注")
+                    .text("annotation-previous", "上一项")
+                    .text("annotation-next", "下一项")
+                    .separator()
+                    .text("annotation-collapse-all", "全部折叠")
+                    .text("annotation-expand-all", "全部展开")
                     .build()?)
                 // ISS-NEW-D 阶段 1（2026-06-22）：macOS 扫描菜单。
                 // 增强扫描 4 档质量 submenu（原始/标准/高级/自定义）+ 扫描至可搜索 + OCR 文字 + 调整为可搜索 + 增强所有扫描页。
@@ -1054,6 +1068,15 @@ pub fn run() {
                     | "annotation-shape-double-arrow"
                     | "annotation-shape-line"
                     | "annotation-shape-pen"
+                    | "annotation-add-link"
+                    | "annotation-outline"
+                    | "annotation-delete"
+                    | "annotation-delete-all"
+                    | "annotation-jump-to"
+                    | "annotation-previous"
+                    | "annotation-next"
+                    | "annotation-collapse-all"
+                    | "annotation-expand-all"
                     | "ocr-quality-original"
                     | "ocr-quality-standard"
                     | "ocr-quality-advanced"

@@ -707,6 +707,22 @@ export function AppShell({
       return;
     }
 
+    // ISS-NEW-D 阶段 2（2026-06-22）：批注菜单 9 辅助 command v0.2 占位反馈。
+    if (
+      command.id === "annotation-add-link" ||
+      command.id === "annotation-outline" ||
+      command.id === "annotation-delete" ||
+      command.id === "annotation-delete-all" ||
+      command.id === "annotation-jump-to" ||
+      command.id === "annotation-previous" ||
+      command.id === "annotation-next" ||
+      command.id === "annotation-collapse-all" ||
+      command.id === "annotation-expand-all"
+    ) {
+      setCommandFeedback(`批注操作「${command.label}」待后续 worker 接入 AnnotationSidebar / outline；当前可在 L4 批注工具条操作。`);
+      return;
+    }
+
     // ISS-NEW-D 阶段 1（2026-06-22）：扫描菜单 4 档质量 + 4 顶层动作 v0.2 占位反馈。
     // 真实 OCR 入口由 OcrWorkspace / OcrModeToolbar 提供（activeMode=ocr 走主区域）。
     if (

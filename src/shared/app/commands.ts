@@ -53,6 +53,15 @@ export type AppCommandId =
   | "annotation-shape-double-arrow"
   | "annotation-shape-line"
   | "annotation-shape-pen"
+  | "annotation-add-link"
+  | "annotation-outline"
+  | "annotation-delete"
+  | "annotation-delete-all"
+  | "annotation-jump-to"
+  | "annotation-previous"
+  | "annotation-next"
+  | "annotation-collapse-all"
+  | "annotation-expand-all"
   | "ocr-quality-original"
   | "ocr-quality-standard"
   | "ocr-quality-advanced"
@@ -392,6 +401,89 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     id: "annotation-shape-pen",
     label: "铅笔",
     description: "v0.2 占位：形状绘制由 AnnotationOverlay 接 armAnnotationTool。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  // ISS-NEW-D 阶段 2（2026-06-22）：批注菜单补 9 辅助 command。
+  // 全部 v0.2 占位（依赖未实装的 history 栈 / 选中批注栈 / AnnotationSidebar 操作）。
+  {
+    id: "annotation-add-link",
+    label: "链接",
+    description: "v0.2 占位：在选中文本区域添加超链接。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-outline",
+    label: "内容表",
+    description: "v0.2 占位：打开 PDF 内容表（outline / bookmarks）。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-delete",
+    label: "删除",
+    description: "v0.2 占位：删除当前选中的批注。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-delete-all",
+    label: "删除全部",
+    description: "v0.2 占位：删除当前 PDF 所有批注。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-jump-to",
+    label: "跳到批注",
+    description: "v0.2 占位：跳到当前选中的批注。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-previous",
+    label: "上一项",
+    description: "v0.2 占位：跳到上一个批注。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-next",
+    label: "下一项",
+    description: "v0.2 占位：跳到下一个批注。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-collapse-all",
+    label: "全部折叠",
+    description: "v0.2 占位：折叠 AnnotationSidebar 列表。",
+    layer: "tertiary",
+    group: "annotation",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "annotation-expand-all",
+    label: "全部展开",
+    description: "v0.2 占位：展开 AnnotationSidebar 列表。",
     layer: "tertiary",
     group: "annotation",
     entryPoints: ["native-menu"],

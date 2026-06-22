@@ -1,3 +1,43 @@
+## v0.1.3（草稿，2026-06-22 收口沉淀，未发版）
+
+> v0.1.x → v0.2 过渡版：5 ISS 收口（DEC-154~159）+ 13 commit（不含 catch-up）+ 累计 ~87 单测（i18n 4 + StatusBar 12 + WelcomeScreen 9 + GeneralSection 5 + ReaderCanvas 19 + AppShell ISS-NEW 子集 10 + commands.test 19 + ExportPreview 5 + OcrQueue 4）。typecheck ✅；vitest 受 pre-existing vitest 4.x + `html-encoding-sniffer`/`@exodus/bytes` ESM 冲突阻塞（main 仓库根也复现，与本次改动无关，详见 DEC-099）。
+
+### macOS 菜单栏（ISS-NEW-D 阶段 1 / DEC-159）
+
+- 4 独立顶层菜单 ship：批注（8 工具 + 形状 submenu 6 形状）/ 扫描（增强扫描 submenu 4 档 + 4 顶层动作）/ 编辑 PDF（5 动作）/ 前往（5 顶层 + 浏览历史 submenu 5 项）。共 37 command id 注册 + macOS 菜单 event handler match arm + AppShell nativeMenuBridge 路由。
+- 8 工具真实 arm（`armAnnotationTool` / `disarmAnnotationTool`），29 个 v0.2 占位反馈（复用 ISS-NEW-G 转换卡 + ISS-NEW-H 视图占位模式）。
+
+### Toolbar 5 段布局（ISS-NEW-A 阶段 1+2+B / DEC-144+155）
+
+- L2 TitlebarTabs 上移 + L3 Toolbar 严格 5 段（sidebar-toggles / file / reading / mode / right）。
+- 侧栏 4 toggle（摘要 / 页面管理 / 视图设置 / 书签）+ UtilityPanelId 加 `bookmark` 枚举。
+- 阅读区瘦身 4 元素（页码 + 视图模式 4-icon toggle + 缩放% + -/+）+ 旋转 / 适合页面下移到 L4 二级工具条（`<ReadModeToolbar>` → `ContextToolbar` mode === "read" 分支统一路由）。
+
+### L4 二级工具条统一抽象（ISS-NEW-E 第 1 步 / DEC-156）
+
+- `ContextToolbar` 接受 `mode: Exclude<AppModeId, "pages">`（5 模式）+ `reader` prop；`showContextToolbar` 改 `activeMode !== "pages"`（read 模式也显示 L4）。
+- `contextualToolbarLabels` 加 `"read": "阅读模式工具"`。
+- 删除独立 `<ReadModeToolbar>` 组件（并入 ContextToolbar）。
+
+### 视图菜单 submenu 深度补全（ISS-NEW-H 阶段 1 / DEC-157）
+
+- 视图 SubmenuBuilder 加 2 submenu（缩放 5 + 缩略图 2）+ 3 顶层占位（跳到当前页 / 重新载入 / 添加书签）。共 11 command id。
+- 缩放 5 + 缩略图 2 真实路由（`reader.zoomIn/zoomOut/setZoomPreset` + `reader.setViewMode`）；3 占位 v0.2 占位反馈。
+
+### 全量 UI 字符串 i18n 基础（ISS-NEW-G 收口 4 块 / DEC-154）
+
+- 新建 `src/shared/i18n/`：dictionaries.ts（zh-CN + en 双字典）+ useI18n.ts（useSyncExternalStore + module-level listener）+ setCurrentLanguage runtime。
+- `StatusBar` / `WelcomeScreen` / `GeneralSection` 27 个查表点全切（OCR 模式状态栏新增 + i18n dict 扩）。
+- AppSettings 加 4 Preferences 字段：`defaultPdfViewer` / `pdfExpertOpenMode` / `resumeLastPage` / `pageNumberIndicator`。
+- Welcome 屏 3 段布局（转换卡 + drop zone + 最近文件网格 + 清除最近按钮）+ ReaderCanvas 转换卡接线（`onConvertFromImages / onConvertFromWord` 占位反馈）。
+
+### 右栏真内容 panel（ISS-NEW-C 阶段 2 后续 / DEC-158）
+
+- `ExportPreviewPanelView`（6 active tool + 参数摘要 + 输出文件名后缀）。
+- `OcrQueuePanelView`（任务列表 + status dot + cancel 按钮）。
+- `AppShell` 接线 `exportPreview` + `ocrQueueJobs` + `onCancelOcrJob` 3 个新 props。
+- `AppCommandGroup` 扩 `ocr` 枚举。
+
 ## Unreleased
 
 > v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~158。
