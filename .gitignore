@@ -26,6 +26,11 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Multi-agent provider settings (local only, contain API tokens)
+config/glm-*.settings.json
+config/minimax-*.settings.json
+config/deepseek-*.settings.json
+
 # Logs
 *.log
 npm-debug.log*

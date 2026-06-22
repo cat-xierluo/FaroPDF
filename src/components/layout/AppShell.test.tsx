@@ -10,6 +10,7 @@ import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
 import type { OcrCommandJob } from "../../shared/ocr/jobQueue";
 import { createInitialAnnotationToolState } from "../../modules/annotation";
+import { registerReadModeTools } from "../../modules/reader/readerModeTools";
 import { AppShell } from "./AppShell";
 import { TabProvider, useTabStore } from "../../state/tabStore";
 import type { AnnotationArmedStateBundle, AppModeId, UtilityPanelId } from "./types";
@@ -1353,5 +1354,147 @@ describe("AppShell ISS-NEW-A 阶段 1：Toolbar 5 段骨架 + L2 tab 上移", ()
       const buttons = section.querySelectorAll("button");
       expect(buttons.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("AppShell ISS-NEW-G 2026-06-22 收口：Welcome 屏转换卡接线", () => {
+  test("空态下「图片转 PDF」卡点击触发占位 command feedback", async () => {
+    const user = userEvent.setup();
+    // reader 状态: document=null → 进入空态 → 渲染 WelcomeScreen
+    renderAppShell({
+      activeMode: "read",
+      reader: makeReader({ state: { ...makeReader().state, document: null } }),
+      utilityPanel: "none",
+    });
+
+    const card = screen.getByTestId("welcome-convert-images");
+    expect(card).toBeInTheDocument();
+
+    await user.click(card);
+
+    const feedback = await screen.findByTestId("command-feedback");
+    expect(feedback).toHaveTextContent(/图片转 PDF.*功能开发中/);
+  });
+
+  test("空态下「Word 转 PDF」卡点击触发占位 command feedback", async () => {
+    const user = userEvent.setup();
+    renderAppShell({
+      activeMode: "read",
+      reader: makeReader({ state: { ...makeReader().state, document: null } }),
+      utilityPanel: "none",
+    });
+
+    const card = screen.getByTestId("welcome-convert-word");
+    expect(card).toBeInTheDocument();
+
+    await user.click(card);
+
+    const feedback = await screen.findByTestId("command-feedback");
+    expect(feedback).toHaveTextContent(/Word 转 PDF.*功能开发中/);
+  });
+
+  test("非空态（有 document）不渲染 Welcome 屏转换卡", () => {
+    renderAppShell({
+      activeMode: "read",
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+    expect(screen.queryByTestId("welcome-convert-images")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("welcome-convert-word")).not.toBeInTheDocument();
+  });
+});
+
+describe("AppShell ISS-NEW-A 阶段 2 / ISS-NEW-B 收口（2026-06-22）：L4 ReadModeToolbar", () => {
+  // ISS-NEW-B：read-mode 工具由 `registerReadModeTools()` 注册到 toolbarRegistry，
+  // App 启动时调一次。测试不经过 App.tsx，需显式调一次。
+  registerReadModeTools();
+
+  test("read 模式 + 有文档时渲染 L4 ReadModeToolbar（旋转 + 适合页面）", () => {
+    renderAppShell({
+      activeMode: "read",
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+    const l4 = screen.getByTestId("read-mode-toolbar");
+    expect(l4).toBeInTheDocument();
+    expect(within(l4).getByRole("button", { name: "顺时针" })).toBeInTheDocument();
+    expect(within(l4).getByRole("button", { name: "逆时针" })).toBeInTheDocument();
+    expect(within(l4).getByRole("button", { name: "适合页面" })).toBeInTheDocument();
+  });
+
+  test("非 read 模式（有文档）不渲染 ReadModeToolbar", () => {
+    renderAppShell({
+      activeMode: "annotate",
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+    expect(screen.queryByTestId("read-mode-toolbar")).not.toBeInTheDocument();
+  });
+
+  test("read 模式但无文档（空态）— ReadModeToolbar 仍渲染但所有按钮 disabled（ISS-NEW-E 收口后）", () => {
+    renderAppShell({
+      activeMode: "read",
+      reader: makeReader({ state: { ...makeReader().state, document: null } }),
+      utilityPanel: "none",
+    });
+    const l4 = screen.getByTestId("read-mode-toolbar");
+    expect(l4).toBeInTheDocument();
+    // ISS-NEW-E 收口：read 模式 L4 工具条由 ContextToolbar 统一路由，
+    // 总是渲染；无文档时按钮 disabled（isDisabled 委托给 readerModeTools 工具本身）。
+    const buttons = within(l4).getAllByRole("button");
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const button of buttons) {
+      expect(button).toBeDisabled();
+    }
+  });
+
+  test("点击 L4「顺时针」按钮 → reader.rotateClockwise 被调用", async () => {
+    const user = userEvent.setup();
+    const reader = makeReadyReader();
+    (reader as unknown as { rotateClockwise: () => void }).rotateClockwise = vi.fn();
+    renderAppShell({
+      activeMode: "read",
+      reader,
+      utilityPanel: "none",
+    });
+    await user.click(screen.getByRole("button", { name: "顺时针" }));
+    expect((reader as unknown as { rotateClockwise: ReturnType<typeof vi.fn> }).rotateClockwise).toHaveBeenCalledTimes(1);
+  });
+
+  test("点击 L4「逆时针」按钮 → reader.rotateCounterClockwise 被调用", async () => {
+    const user = userEvent.setup();
+    const reader = makeReadyReader();
+    (reader as unknown as { rotateCounterClockwise: () => void }).rotateCounterClockwise = vi.fn();
+    renderAppShell({
+      activeMode: "read",
+      reader,
+      utilityPanel: "none",
+    });
+    await user.click(screen.getByRole("button", { name: "逆时针" }));
+    expect((reader as unknown as { rotateCounterClockwise: ReturnType<typeof vi.fn> }).rotateCounterClockwise).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AppShell ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏 4 toggle", () => {
+  test("Toolbar 书签按钮点击 → utilityPanel=bookmark", () => {
+    const onUtilityPanelChange = vi.fn();
+    renderAppShell({
+      activeMode: "read",
+      reader: makeReadyReader(),
+      onUtilityPanelChange,
+      utilityPanel: "none",
+    });
+    fireEvent.click(screen.getByTestId("toolbar-sidebar-bookmark"));
+    expect(onUtilityPanelChange).toHaveBeenCalledWith("bookmark");
+  });
+
+  test("utilityPanel=bookmark 时 AppShell 渲染 BookmarkPanelPlaceholder", () => {
+    renderAppShell({
+      activeMode: "read",
+      reader: makeReadyReader(),
+      utilityPanel: "bookmark",
+    });
+    expect(screen.getByTestId("bookmark-panel")).toBeInTheDocument();
+    expect(screen.getByText(/书签功能开发中/)).toBeInTheDocument();
   });
 });
