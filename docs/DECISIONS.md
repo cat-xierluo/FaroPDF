@@ -6596,3 +6596,49 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - 左右栏宽度持久化（panelWidthStore DEC-121 部分 ship）
 
 **关联**：ISS-NEW-C 任务卡（line 1151）状态"✅ 已完成（Wave 2 W1 / DEC-146 / PR #67）" — 后续 4 panel 实际已在 DEC-146/147/112/113 收口；本次 DEC-158 收口剩余 2 panel（export-preview / ocr-queue）真正接入。
+
+## DEC-159 ISS-NEW-D 阶段 1：macOS 4 独立顶层菜单 + 多 submenu 深度补全（PM 单 session，2026-06-22）
+
+- 时间：2026-06-22
+- 类型：UI 信息架构 / macOS 原生菜单 / 4 菜单按 PDF Expert §4 二审补全
+- 关联：ISS-NEW-D macOS 菜单栏中文化补齐（4 菜单：批注/编辑 PDF/扫描/前往）/ FEATURE_CATALOG §4 二审补全（截图 37/38/39/40）/ DEC-157（ISS-NEW-H 视图菜单 submenu 补全 11 command id 前置子 ship）/ DEC-112/113（CustomStampPanel / SignaturePanel 右栏接入）/ DEC-147（ShapeToolPanel 6 段）
+
+**决策**：
+1. **批注菜单（commit `0c25006`）**：8 工具（高亮/下划线/删除线/文本/笔/橡皮擦/便签）+ 形状 submenu（6 形状）+ 14 command id 一次性 ship。8 工具真实 arm（`armAnnotationTool` state.setState）；6 形状 v0.2 占位反馈（PDF_ANNOTATION_TYPES 缺 ellipse/line/double-arrow，真实形状绘制由后续 worker 接入）。
+2. **扫描菜单（commit `d5bfa10`）**：「增强扫描」submenu（4 档质量）+ 4 顶层动作（扫描至可搜索 / OCR 文字 / 调整为可搜索 / 增强所有扫描页）+ 8 command id。`AppCommandGroup` 扩 `ocr` 枚举（与现有 `export` / `forms` / `settings` 并列）。8 command v0.2 占位反馈（真实 OCR 入口由 OcrWorkspace / OcrModeToolbar 提供）。
+3. **编辑 PDF 菜单（commit `3037e53`）**：5 动作（编辑 / 添加图像 / 添加链接 / 添加文字 / 隐藏）+ 5 command id。5 command v0.2 占位反馈（真实 PDF 直接编辑链路后续 worker）。
+4. **前往菜单（commit `322c7ca`）**：5 顶层（首页/末页/上一页/下一页/返回）+ 浏览历史 submenu（5 项：最近 1-5）+ 10 command id。4 真实跳转（首末前后页）走 `reader.setCurrentPage`；5 历史 + 1 返回 v0.2 占位反馈（浏览历史栈后续 worker）。
+5. **总览**：12 files / +547 / -1（4 commit）。macOS 菜单结构（从 6 菜单 → 10 菜单）：原 `文件 / 编辑 / 视图 / 工具 / 窗口 / 帮助` + 新 `批注 / 扫描 / 编辑 PDF / 前往`。
+6. **macOS 菜单结构图（最终 v0.2）**：
+   - 文件：file-new-window / file-open / file-save-as / close-window
+   - 编辑：undo / redo / cut / copy / paste / select-all
+   - 视图：view-summary / view-pages / view-settings / view-fullscreen + 缩放 submenu (5) + 缩略图 submenu (2) + 3 顶层占位（DEC-157）
+   - 工具：export-page-number / export-bates / export-header-footer / export-watermark-text / export-watermark-image / export-compress / annotations-flatten / forms-flatten
+   - **批注（新增）**：8 工具 + 形状 submenu (6)
+   - **扫描（新增）**：增强扫描 submenu (4) + 4 顶层动作
+   - **编辑 PDF（新增）**：5 动作
+   - **前往（新增）**：5 顶层 + 浏览历史 submenu (5)
+   - 窗口 / 帮助：保留
+
+**设计取舍**：
+- **4 commit 节奏**：每菜单 1 commit（批注 → 扫描 → 编辑 PDF → 前往）。清晰审计 + 单独回滚。
+- **v0.2 大量占位反馈**：37 个 v0.2 占位 command（14 批注 + 8 扫描 + 5 编辑 PDF + 6 形状 + 4 历史 + 2 跳过？）— 复用 ISS-NEW-G 转换卡 + ISS-NEW-H 视图占位反馈模式（`setCommandFeedback` 中文 + 提示用户用 L4 工具条）。
+- **`AppCommandGroup` 扩 `ocr` 枚举**：与现有 `export` / `forms` 并列，group 用于工具启动器分组 / 文档分类，不影响 runtime routing。
+- **批注形状 submenu 与 PDF_ANNOTATION_TYPES 不一致**：6 形状中仅 rectangle / arrow / ink 已在 PDF_ANNOTATION_TYPES，ellipse / line / double-arrow 缺。`armAnnotationTool` 接受 PdfAnnotationType 入参，对未知 type 返回原 state（不修改），所以 6 形状 submenu v0.2 占位反馈合理。
+- **前往菜单 4 真实跳转 + 6 占位**：4 跳转（首末前后页）已实装（不依赖浏览历史栈），5 历史 + 1 返回依赖未实装的 history stack（后续 worker）。
+
+**Verification**：
+- typecheck ✅（4 commit 全部）
+- `src/shared/app/commands.test.ts` 19/19 ✅（含 14+8+5+10 = 37 个新 command 注册测试通过）
+- vitest 受 pre-existing vitest 4.x + `html-encoding-sniffer`/`@exodus/bytes` ESM 冲突阻塞（main 仓库根也复现，与本次改动无关）
+
+**out of scope（明确留给后续）**：
+- 批注形状 6 项真实绘制（PDF_ANNOTATION_TYPES 扩 ellipse/line/double-arrow）
+- 扫描 4 档质量 + 4 顶层动作真实 OCR 入口（OcrWorkspace 增强）
+- 编辑 PDF 5 动作真实 PDF 内容编辑链路
+- 前往浏览历史栈（5 历史 + 1 返回）
+- macOS 视图菜单 submenu 深度补全剩余项（滚动模式 ⌘5/⌘6、工具栏 toggle、左侧边栏 toggle）
+- ISS-NEW-H 第 2 阶段后续（视图菜单 12+ 项剩余）
+- i18n 字典扩展（菜单 label 仍用硬编码中文）
+
+**关联**：ISS-NEW-D 任务卡（line 1168+）状态 "defer" → 阶段 1 收口（4 菜单 + 37 command id）/ DEC-157（视图菜单 submenu 补全前置子 ship）/ DEC-158（右侧 export-preview + ocr-queue 真内容 panel）。

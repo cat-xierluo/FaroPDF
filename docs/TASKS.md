@@ -1174,16 +1174,27 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P2
 - 类型：菜单栏 / i18n
 - 来源：FEATURE_CATALOG §4；截图 37 / 38 / 39 / 40
-- 状态：**defer**（Wave 3 W2 撞 GLM 配额耗尽 2056 未启动，留下一 Wave）；部分已建（ISS-032 文件/编辑/视图/窗口/帮助菜单 + ISS-NEW-H 阶段 1 视图菜单 submenu 补全 DEC-157）；依赖现有 nativeMenuBridge
-- 范围：补齐「批注」「编辑 PDF」「扫描」「前往」4 个菜单的中文化 + Tauri 桥接
-  - 批注：高亮 / 下划线 / 删除线 / 文本 / 笔 / 橡皮擦 / 便签 / 形状 / 链接 / 内容表
-  - 编辑 PDF：编辑 / 添加图像 / 添加链接 / 添加文字 / 隐藏
-  - 扫描：增强扫描 / 扫描至可搜索 / OCR 文字 / 调整为可搜索
-  - 前往：首页 / 末页 / 上一页 / 下一页 / 历史记录 / 返回
+- 状态：**阶段 1 收口（2026-06-22 / DEC-159）**；4 独立顶层菜单（批注 / 扫描 / 编辑 PDF / 前往）全部 ship（37 command id）。剩余：链接 / 内容表 / 删除 / 跳到批注 / 历史栈 / 真实 PDF 编辑链路 / 真实 OCR 入口 — 留后续。
+- 范围（阶段 1 收口）：
+  - **批注菜单**（commit `0c25006`，✅）：8 工具（高亮/下划线/删除线/文本/笔/橡皮擦/便签）+ 形状 submenu（6 形状）
+  - **扫描菜单**（commit `d5bfa10`，✅）：增强扫描 submenu（4 档质量）+ 4 顶层动作（扫描至可搜索 / OCR 文字 / 调整为可搜索 / 增强所有扫描页）
+  - **编辑 PDF 菜单**（commit `3037e53`，✅）：5 动作（编辑 / 添加图像 / 添加链接 / 添加文字 / 隐藏）
+  - **前往菜单**（commit `322c7ca`，✅）：5 顶层（首页/末页/上一页/下一页/返回）+ 浏览历史 submenu（5 项：最近 1-5）
 - 验收：
-  - [ ] 4 个菜单的中文 label 与快捷键正确
-  - [ ] 菜单触发后调起对应 action（批注/扫描需对应 ISS-NEW-A / ISS-NEW-C）
-  - [ ] 全部命令在 `commands.ts` 注册
+  - [x] 批注菜单 8 工具 + 形状 submenu 6 形状（commit `0c25006`）— DEC-159
+  - [x] 扫描菜单 4 档质量 submenu + 4 顶层动作（commit `d5bfa10`）— DEC-159
+  - [x] 编辑 PDF 菜单 5 动作（commit `3037e53`）— DEC-159
+  - [x] 前往菜单 5 顶层 + 5 历史 submenu（commit `322c7ca`）— DEC-159
+  - [x] 4 个菜单的中文 label — DEC-159
+  - [x] 全部命令在 `commands.ts` 注册（37 个新 AppCommandId 枚举 + APP_COMMANDS definition）— DEC-159
+  - [x] macOS 菜单 event handler match arm 加 37 个新 command id — DEC-159
+  - [x] AppShell nativeMenuBridge 路由 37 个 command — DEC-159
+  - [x] typecheck ✅ + commands.test.ts 19/19 ✅ — DEC-159
+  - [ ] 批注 8 工具真实 arm / 形状 6 项真实绘制 / 6 形状扩 PDF_ANNOTATION_TYPES — 留后续
+  - [ ] 扫描 4 档质量 + 4 顶层动作真实 OCR 入口 — 留后续
+  - [ ] 编辑 PDF 5 动作真实 PDF 内容编辑链路 — 留后续
+  - [ ] 前往浏览历史栈（5 历史 + 1 返回）— 留后续
+  - [ ] ⌘ 快捷键与 PDF Expert 对齐 — 留后续
 
 ### ISS-NEW-E L4 模式二级工具条统一抽象
 

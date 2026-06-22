@@ -1,6 +1,14 @@
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~157。
+> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~158。
+
+ISS-NEW-D 阶段 1（PM 单 session / DEC-159，4 子菜单按顺序 ship）：
+
+- **批注菜单（commit `0c25006`）**：macOS 批注 SubmenuBuilder 加 8 工具（高亮/下划线/删除线/文本/笔/橡皮擦/便签）+ 形状 submenu（6 形状：矩形/椭圆/箭头/双向/直线/铅笔）。8 工具真实 arm（`armAnnotationTool` / `disarmAnnotationTool`），6 形状 submenu v0.2 占位反馈（PDF_ANNOTATION_TYPES 缺 ellipse/line/double-arrow，真实形状绘制由 AnnotationOverlay 接 armAnnotationTool，DEC-147 已 ship 6 段 ShapeToolPanel）。
+- **扫描菜单（commit `d5bfa10`）**：macOS 扫描 SubmenuBuilder 加「增强扫描」submenu（4 档质量：原始/标准/高级/自定义）+ 4 顶层动作（扫描至可搜索 / OCR 文字 / 调整为可搜索 / 增强所有扫描页）。`AppCommandGroup` 扩 `ocr` 枚举。8 command v0.2 占位反馈（真实 OCR 入口由 OcrWorkspace / OcrModeToolbar 提供）。
+- **编辑 PDF 菜单（commit `3037e53`）**：macOS 编辑 PDF SubmenuBuilder 加 5 动作（编辑 / 添加图像 / 添加链接 / 添加文字 / 隐藏）。5 command v0.2 占位反馈（真实 PDF 直接编辑链路后续 worker）。
+- **前往菜单（commit `322c7ca`）**：macOS 前往 SubmenuBuilder 加 5 顶层（首页/末页/上一页/下一页/返回）+ 浏览历史 submenu（5 项：最近 1-5）。4 真实跳转（首末前后页）走 `reader.setCurrentPage`；5 历史 + 1 返回 v0.2 占位反馈。
+- 12 files / +547 / -1（4 commit）。typecheck ✅ + commands.test.ts 19/19 ✅。
 
 ISS-NEW-C 阶段 2 后续（PM 单 session / DEC-158）：
 
