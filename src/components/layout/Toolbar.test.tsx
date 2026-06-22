@@ -73,7 +73,7 @@ interface HarnessProps {
   activeMode?: AppModeId;
   reader?: ReaderController;
   search?: TextSearchController;
-  utilityPanel?: "summary" | "view" | "settings" | "annotation" | "forms" | "security" | "none";
+  utilityPanel?: import("./types").UtilityPanelId;
   onCommand?: (commandId: import("../../shared/app/commands").AppCommandId) => void;
   onModeChange?: (mode: AppModeId) => void;
   onUtilityPanelChange?: (panel: import("./types").UtilityPanelId) => void;
@@ -302,5 +302,52 @@ describe("Toolbar ModeActiveTools 集成", () => {
     } finally {
       _resetToolbarRegistry();
     }
+  });
+});
+
+describe("Toolbar ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏 4 toggle", () => {
+  test("sidebar-toggles 段有 4 个按钮（摘要 / 页面 / 视图设置 / 书签）", () => {
+    const { container } = render(<Harness reader={makeReadyReader()} />);
+    const sidebarTogglesSection = container.querySelector(
+      '[data-section="sidebar-toggles"]',
+    ) as HTMLElement;
+    const buttons = within(sidebarTogglesSection).getAllByRole("button");
+    expect(buttons).toHaveLength(4);
+    expect(within(sidebarTogglesSection).getByLabelText("书签")).toBeInTheDocument();
+  });
+
+  test("书签按钮默认 aria-pressed=false（panel 未激活）", () => {
+    render(<Harness reader={makeReadyReader()} />);
+    const bookmark = screen.getByTestId("toolbar-sidebar-bookmark");
+    expect(bookmark).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("点击书签 → onUtilityPanelChange('bookmark')", async () => {
+    const onUtilityPanelChange = vi.fn();
+    render(
+      <Harness onUtilityPanelChange={onUtilityPanelChange} reader={makeReadyReader()} />,
+    );
+    await userEvent.click(screen.getByTestId("toolbar-sidebar-bookmark"));
+    expect(onUtilityPanelChange).toHaveBeenCalledWith("bookmark");
+    expect(onUtilityPanelChange).toHaveBeenCalledTimes(1);
+  });
+
+  test("再次点击书签 → onUtilityPanelChange('none')（toggle 回关闭）", async () => {
+    const onUtilityPanelChange = vi.fn();
+    render(
+      <Harness
+        onUtilityPanelChange={onUtilityPanelChange}
+        reader={makeReadyReader()}
+        utilityPanel="bookmark"
+      />,
+    );
+    await userEvent.click(screen.getByTestId("toolbar-sidebar-bookmark"));
+    expect(onUtilityPanelChange).toHaveBeenCalledWith("none");
+  });
+
+  test("utilityPanel=bookmark 时书签按钮 aria-pressed=true", () => {
+    render(<Harness reader={makeReadyReader()} utilityPanel="bookmark" />);
+    const bookmark = screen.getByTestId("toolbar-sidebar-bookmark");
+    expect(bookmark).toHaveAttribute("aria-pressed", "true");
   });
 });

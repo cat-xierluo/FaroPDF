@@ -235,3 +235,57 @@ describe("ReaderCanvas 阅读深化", () => {
     expect(page2).toHaveAttribute("data-active-hit", "true");
   });
 });
+
+describe("ReaderCanvas Welcome 屏转换卡接线（ISS-NEW-G 2026-06-22 收口）", () => {
+  test("空态下「图片转 PDF」卡点击触发 onConvertFromImages", async () => {
+    const user = userEvent.setup();
+    const onConvertFromImages = vi.fn();
+    render(
+      <ReaderCanvas
+        onConvertFromImages={onConvertFromImages}
+        readerState={makeState({ document: null })}
+      />,
+    );
+
+    const card = screen.getByTestId("welcome-convert-images");
+    expect(card).toBeInTheDocument();
+    await user.click(card);
+
+    expect(onConvertFromImages).toHaveBeenCalledTimes(1);
+  });
+
+  test("空态下「Word 转 PDF」卡点击触发 onConvertFromWord", async () => {
+    const user = userEvent.setup();
+    const onConvertFromWord = vi.fn();
+    render(
+      <ReaderCanvas
+        onConvertFromWord={onConvertFromWord}
+        readerState={makeState({ document: null })}
+      />,
+    );
+
+    const card = screen.getByTestId("welcome-convert-word");
+    expect(card).toBeInTheDocument();
+    await user.click(card);
+
+    expect(onConvertFromWord).toHaveBeenCalledTimes(1);
+  });
+
+  test("空态不传 onConvert 回调时，转换卡仍渲染但点击不崩溃", async () => {
+    const user = userEvent.setup();
+    render(<ReaderCanvas readerState={makeState({ document: null })} />);
+
+    await user.click(screen.getByTestId("welcome-convert-images"));
+    await user.click(screen.getByTestId("welcome-convert-word"));
+
+    // 仍能找到 → 组件未崩
+    expect(screen.getByTestId("welcome-convert-images")).toBeInTheDocument();
+    expect(screen.getByTestId("welcome-convert-word")).toBeInTheDocument();
+  });
+
+  test("非空态（有 document）不渲染 Welcome 屏转换卡", () => {
+    render(<ReaderCanvas readerState={makeState()} />);
+    expect(screen.queryByTestId("welcome-convert-images")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("welcome-convert-word")).not.toBeInTheDocument();
+  });
+});

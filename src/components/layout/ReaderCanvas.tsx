@@ -43,6 +43,17 @@ interface ReaderCanvasProps {
    * 当前 stage 占位 — 真实路径打开（reader.openFile + 路径寻址）由后续 worker 接入。
    */
   onOpenRecent?: (entry: RecentPdfFile) => void;
+  /**
+   * ISS-NEW-G（2026-06-22 收口）：用户点击 Welcome 屏「图片转 PDF」转换卡时回调。
+   * 当前 stage 占位 — 真实转换依赖 OCR pipeline / img2pdf engine，由后续 worker 接入。
+   * 未传时按钮仍渲染但点击不触发任何动作（与 onClearRecent 同模式）。
+   */
+  onConvertFromImages?: () => void;
+  /**
+   * ISS-NEW-G（2026-06-22 收口）：用户点击 Welcome 屏「Word 转 PDF」转换卡时回调。
+   * 当前 stage 占位 — 真实转换依赖 merge engine / Word → PDF 库接入。
+   */
+  onConvertFromWord?: () => void;
 }
 
 export function ReaderCanvas({
@@ -56,6 +67,8 @@ export function ReaderCanvas({
   recentFiles,
   onClearRecent,
   onOpenRecent,
+  onConvertFromImages,
+  onConvertFromWord,
 }: ReaderCanvasProps) {
   const document = readerState.document;
 
@@ -74,6 +87,8 @@ export function ReaderCanvas({
       <main className="reader" aria-label="PDF 阅读区">
         <WelcomeScreen
           onClearRecent={onClearRecent}
+          onConvertFromImages={onConvertFromImages}
+          onConvertFromWord={onConvertFromWord}
           onOpenFile={onOpenFile}
           onOpenRecent={onOpenRecent}
           recentFiles={recentFiles ?? []}

@@ -1,4 +1,5 @@
 import {
+  Bookmark,
   ChevronLeft,
   ChevronRight,
   Columns2,
@@ -12,8 +13,6 @@ import {
   PencilLine,
   Plus,
   Rows3,
-  RotateCcw,
-  RotateCw,
   ScanLine,
   Search,
   Settings,
@@ -25,7 +24,7 @@ import { useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
 import { formatZoom } from "../../modules/reader/readerLabels";
-import type { PdfViewMode, PageRotation } from "../../shared/pdf/types";
+import type { PdfViewMode } from "../../shared/pdf/types";
 import { getToolLauncherSections, type AppCommandId } from "../../shared/app/commands";
 import { getModeTools, type ToolbarState } from "./toolbarRegistry";
 import type { AppModeId, AppToolbarSectionId, UtilityPanelId } from "./types";
@@ -98,12 +97,9 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
     onModeChange(activeMode === mode ? "read" : mode);
   }
 
-  function handleRotate(direction: 1 | -1) {
-    // ISS-NEW-A 阶段 2 / 修正 DEC-144 回归：阶段 1 重构移除 L3 旋转按钮后
-    // 用户丢失页面旋转入口（律师扫描件刚需）。此处恢复，engine 复用 reader.setRotation。
-    const current = document?.rotation ?? 0;
-    reader.setRotation(((((current + direction * 90) % 360) + 360) % 360) as PageRotation);
-  }
+  // ISS-NEW-A 阶段 2 / ISS-NEW-B 收口（2026-06-22）：旋转按钮从 L3 reading 段下移到
+  // L4 二级工具条（AppShell `<ReadModeToolbar>`），复用 reader.rotateClockwise /
+  // rotateCounterClockwise / setZoomPreset（"fit-page"）。L3 handleRotate 已废弃。
 
   return (
     <header className="toolbar" data-testid="app-toolbar">
@@ -145,6 +141,21 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
           type="button"
         >
           <PanelTop size={16} />
+        </button>
+        {/* ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏 4 toggle 第 4 个「书签」。
+            与 PDF Expert L3 严格 4 sidebar 按钮对齐（缩略图 / 大纲 / 批注 / 书签）。
+            当前 panel 内容占位（BookmarkPanel），真实书签列表 + 添加 / 跳转 / 持久化留后续 worker。 */}
+        <button
+          aria-label="书签"
+          aria-pressed={utilityPanel === "bookmark" && activeMode !== "pages"}
+          className="tool-button tool-button--icon tool-button--compact"
+          data-testid="toolbar-sidebar-bookmark"
+          data-toolbar-section="sidebar-toggles"
+          onClick={() => openUtilityPanel("bookmark")}
+          title="书签"
+          type="button"
+        >
+          <Bookmark size={16} />
         </button>
       </div>
       <div
@@ -251,30 +262,9 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
             );
           })}
         </div>
-        <button
-          aria-label="逆时针旋转"
-          className="compact-button"
-          data-toolbar-section="reading"
-          data-rotate="ccw"
-          disabled={!document}
-          onClick={() => handleRotate(-1)}
-          title="逆时针旋转 90°"
-          type="button"
-        >
-          <RotateCcw size={15} />
-        </button>
-        <button
-          aria-label="顺时针旋转"
-          className="compact-button"
-          data-toolbar-section="reading"
-          data-rotate="cw"
-          disabled={!document}
-          onClick={() => handleRotate(1)}
-          title="顺时针旋转 90°"
-          type="button"
-        >
-          <RotateCw size={15} />
-        </button>
+        {/* ISS-NEW-A 阶段 2 / ISS-NEW-B 收口（2026-06-22）：2 个旋转按钮从 L3 reading 段
+            下移到 L4 二级工具条（AppShell `<ReadModeToolbar>`），让 reading 段瘦身到 4 元素
+            （页码 + 视图模式 4-icon toggle + 缩放% + -/+），对齐 PDF Expert 4-icon 布局。 */}
         <ModeActiveTools
           activeMode={activeMode}
           reader={reader}
@@ -436,8 +426,11 @@ function ModeActiveTools({
 }) {
   const state: ToolbarState = { activeMode, reader, search };
   const hasDocument = reader.state.document !== null;
+  // ISS-NEW-A 阶段 2 / ISS-NEW-B 收口（2026-06-22）：read-mode 工具（旋转 + 适合页面）
+  // 不在 L3 reading 段渲染，由 AppShell 的 L4 二级工具条 `<ReadModeToolbar>` 接管。
+  // 其他模式（annotate / export / forms / ocr / pages）继续在 reading 段渲染 ModeActiveTools。
   const items = getModeTools(activeMode)
-    .filter(() => activeMode !== "read" || hasDocument)
+    .filter(() => activeMode !== "read" && hasDocument)
     .slice()
     .sort((a, b) => a.order - b.order);
 
