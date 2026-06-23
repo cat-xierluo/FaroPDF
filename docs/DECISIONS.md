@@ -6811,6 +6811,30 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 
 **关联**：ISS-NEW-H 任务卡（视图菜单 12+ 项验收）/ DEC-157（前 11 command）/ DEC-161（前 3 占位）。
 
+## DEC-167 ISS-NEW-D 阶段 3：批注形状 3 补（ellipse / line / double-arrow）实质 arm（PM 单 session，2026-06-23）
+
+- 时间：2026-06-23
+- 类型：UI 信息架构 / 批注 / 形状类型扩展
+- 关联：ISS-NEW-D 任务卡（line 1168+ 4 菜单收口）/ DEC-159（阶段 1 批注菜单 8 工具 + 形状 submenu 6 形状）/ DEC-112/113/147（CustomStampPanel / SignaturePanel / ShapeToolPanel）
+
+**决策**：
+1. **`PDF_ANNOTATION_TYPES` 扩 3 类型**（commit `dae...`）：原 9 类型（highlight / underline / strikeout / note / textbox / rectangle / arrow / ink / stamp）扩到 12 类型（+ ellipse / double-arrow / line）。
+2. **`ANNOTATION_TOOL_LIST` 加 3 descriptor**：ellipse（拖拽选区，160×90 默认）/ double-arrow（拖拽方向）/ line（拖拽方向）。`ANNOTATION_TOOL_MAP` 自动同步。
+3. **AppShell 形状 submenu 6 项从 v0.2 占位改为实质 arm**：`annotation-shape-rectangle/ellipse/arrow/double-arrow/line/pen` 都通过 `armAnnotationTool(state, type)` 真实接通。armAnnotationTool 接受 PdfAnnotationType 入参，对未知 type 返回原 state（不修改），但 3 个新类型现在都在 PDF_ANNOTATION_TYPES 中。
+4. **6 个相关 dict 同步扩 3 类型**：AnnotationSidebar / Sidebar / sidebarGroups / summary / AnnotationOverlay 5 个文件的 6 个 Record<PdfAnnotationType, X> dict 加 ellipse / double-arrow / line（label + icon）。
+5. **AnnotationOverlay 渲染保持 v0.2 占位**：drawEllipse / drawLine / drawDoubleArrow 实际 PDF 绘制后续 worker 接入。arm 后 AnnotationOverlay 检测到 ellipse/line/double-arrow 时会走 ink fallback（v0.2 简化）。
+
+**Verification**：
+- typecheck ✅
+- 127/127 annotation 测 ✅（3 测更新：ANNOTATION_TOOL_LIST 9 → 12 / 9 种类型分组 9 → 12 / 类型 chip 9 → 12）
+
+**out of scope**：
+- AnnotationOverlay 真实 drawEllipse / drawLine / drawDoubleArrow PDF 绘制（后续 worker）
+- 4 菜单真实功能接通（链接 / 内容表 / 删除 / 跳到批注 / OCR 入口 / PDF 编辑 / 历史栈）
+- 前往浏览历史栈（5 历史 + 1 返回）
+
+**关联**：ISS-NEW-D 任务卡（line 1168+ 4 菜单收口）/ DEC-159（阶段 1）/ DEC-160（阶段 2 批注 9 辅助）。
+
 ## DEC-165 v0.1 收口沉淀后续：pre-existing vitest 4.x 根因确认 + 修复计划（PM 单 session，2026-06-23）
 
 - 时间：2026-06-23
