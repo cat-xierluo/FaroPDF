@@ -82,10 +82,11 @@ describe("FaroPDF app shell", () => {
 
     await user.click(screen.getByRole("button", { name: "页面管理" }));
 
-    expect(screen.getByRole("main", { name: "页面管理工作台" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "页面管理空态" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "打开 PDF 后管理页面" })).toBeInTheDocument();
-    expect(screen.queryByRole("toolbar", { name: "页面管理工具条" })).not.toBeInTheDocument();
+    // ISS-NEW-I（DEC-147）：pages 模式由 PageOrganizerWorkspace 切到 EditModeGridView，
+    // main role 改名为「编辑模式网格」；空态文案相应改为「打开 PDF 后进入 T 编辑」。
+    expect(screen.getByRole("main", { name: "编辑模式网格" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "打开 PDF 后进入 T 编辑" })).toBeInTheDocument();
+    expect(screen.queryByRole("toolbar", { name: "编辑模式工具条" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "另存为新 PDF" })).not.toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "文档摘要" })).not.toBeInTheDocument();
   });
