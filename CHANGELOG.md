@@ -42,6 +42,8 @@
 
 > v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~158。
 
+App.test.tsx ISS-NEW-I 同步修复（PM 单 session / DEC-169）：`uses contextual toolbars and task workspaces` 测试断言从 `PageOrganizerWorkspace` 时代的 `页面管理工作台 / 页面管理空态 / 页面管理工具条` 同步到 ISS-NEW-I（DEC-147）后的 `EditModeGridView` 实际暴露的 aria-label（`编辑模式网格 / 打开 PDF 后进入 T 编辑 / 编辑模式工具条`）。行为契约不变（点击 页面管理 → pages mode → 编辑模式网格）。commit `bdc0469` + 6/6 App 测 ✅ + typecheck ✅。
+
 ISS-NEW-D 阶段 2 收尾（PM 单 session / DEC-160）：批注菜单补 9 辅助 command（链接 / 内容表 / 删除 / 删除全部 / 跳到批注 / 上一项 / 下一项 / 全部折叠 / 全部展开），全部 v0.2 占位反馈（依赖未实装的 history 栈 / AnnotationSidebar 操作）。commit `0adc932`。
 
 ISS-NEW-H 第 2 阶段（PM 单 session / DEC-161）：视图菜单 3 占位改真实行为 — `view-go-current-page` 实质接通（`reader.setCurrentPage(currentPage)` + 反馈「当前已在第 X 页」）；`view-reload` / `view-add-bookmark` 留 v0.2 占位反馈（需 reader controller 加 `reloadDocument(path → File)` / `addBookmark(currentPage, label)` 新 API 后接通）。commit `a0e9d2e` + 3 测更新。

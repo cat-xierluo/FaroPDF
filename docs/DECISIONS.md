@@ -6896,3 +6896,33 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - 跨 worker 状态共享 / playwright 实操验证 — 留 v0.1 收口沉淀后续
 
 **关联**：DEC-099（pre-existing 根因记录）/ v0.1.3 release（chore(release) commit `dabdcec` + tag v0.1.3 本地创建未 push）。
+
+## DEC-169 App.test.tsx ISS-NEW-I 同步修复：pages 模式 main role 断言切到 EditModeGridView（PM 单 session，2026-06-23）
+
+- 时间：2026-06-23
+- 类型：测试修复 / ISS-NEW-I 收口后遗漏同步
+- 关联：ISS-NEW-I（DEC-147 / commit `69f038c` + `7ecaf89`）/ DEC-164（ISS-NEW-E 收口提及 pages 模式）/ App.test.tsx
+
+**决策**：
+1. **测试断言从 PageOrganizerWorkspace 切到 EditModeGridView**（commit `bdc0469`，`src/App.test.tsx` line 73-91）：`uses contextual toolbars and task workspaces instead of a permanent inspector` 测试在 ISS-NEW-I（DEC-147）合并后预存在 main 上失败 — 测试还在断言 PageOrganizerWorkspace 时代的 `页面管理工作台 / 页面管理空态 / 页面管理工具条`，但 `AppShell.tsx` line 1065 的 pages 模式已改为渲染 `EditModeGridView`（`aria-label="编辑模式网格"` + `编辑模式工具条` + `打开 PDF 后进入 T 编辑` heading）。
+2. **同步映射**：把测试断言切到 EditModeGridView 实际暴露的 aria-label：
+   - main: `页面管理工作台` → `编辑模式网格`
+   - region: `页面管理空态` → 移除（EditModeGridView 无显式 region role，直接断言 heading 即可）
+   - heading: `打开 PDF 后管理页面` → `打开 PDF 后进入 T 编辑`
+   - toolbar: `页面管理工具条 not.toBeInTheDocument` → `编辑模式工具条 not.toBeInTheDocument`（无 PDF 时工具条不渲染，与原断言语义一致）
+3. **行为契约不变**：点击 页面管理 → `activeMode === "pages"` → 渲染 `EditModeGridView`，仅测试期望与 ISS-NEW-I 实现对齐。
+4. **不动实现**：仅修测试，不回退 AppShell 的 EditModeGridView 渲染。EditModeGridView 是 ISS-NEW-I（DEC-147）ship 的编辑模式 5 列网格视图，是更新更全的 pages 模式入口。
+
+**Verification**：
+- typecheck ✅
+- `App.test.tsx` 6/6 ✅（包含本次修复的「uses contextual toolbars」测试）
+- `TitlebarTabs.test.tsx` 7/7 ✅
+- `PageOrganizerWorkspace.test.tsx` 既有测试不受影响（PageOrganizerWorkspace 仍是独立组件，可通过其他入口使用）
+- `EditModeGridView.test.tsx`（如存在）未触及
+
+**out of scope**：
+- 回退 ISS-NEW-I（DEC-147）把 pages 模式渲染切回 PageOrganizerWorkspace（设计决策已落定）
+- App.test.tsx 其他 pre-existing 失败（v0.1 收口沉淀后续 — DEC-165）
+- vitest 4.x ESM 冲突根因修复（DEC-099 / DEC-165）
+
+**关联**：ISS-NEW-I（DEC-147 commit `69f038c` + `7ecaf89`）/ DEC-164（ISS-NEW-E 收口提及 pages 模式替代 L4）/ DEC-165（pre-existing vitest 根因记录）。
