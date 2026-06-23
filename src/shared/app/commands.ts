@@ -40,6 +40,11 @@ export type AppCommandId =
   | "view-go-current-page"
   | "view-reload"
   | "view-add-bookmark"
+  | "view-scroll-mode"
+  | "view-page-mode"
+  | "view-toolbar-toggle"
+  | "view-sidebar-toggle"
+  | "view-fit-screen"
   | "annotation-highlight"
   | "annotation-underline"
   | "annotation-strikeout"
@@ -697,6 +702,52 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     id: "go-back",
     label: "返回",
     description: "返回上一个浏览位置（浏览历史栈）。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  // ISS-NEW-H 第 3 阶段（2026-06-23）：视图菜单 7 项补。
+  {
+    id: "view-scroll-mode",
+    label: "滚动模式",
+    description: "把页面视图模式切换为 continuous（滚动）。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "view-page-mode",
+    label: "翻页模式",
+    description: "把页面视图模式切换为 single（翻页）。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: true,
+  },
+  {
+    id: "view-toolbar-toggle",
+    label: "工具栏",
+    description: "v0.2 占位：toggle L2/L3 工具条显示（ISS-NEW-A 5 段架构 + TitlebarTabs）。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: false,
+  },
+  {
+    id: "view-sidebar-toggle",
+    label: "左侧边栏",
+    description: "v0.2 占位：toggle 左侧 utilityPanel（bookmark / summary / view）。",
+    layer: "tertiary",
+    group: "view",
+    entryPoints: ["native-menu"],
+    requiresDocument: false,
+  },
+  {
+    id: "view-fit-screen",
+    label: "适合屏幕",
+    description: "把阅读区缩放调整为整页匹配屏幕（fit-page preset）。",
     layer: "tertiary",
     group: "view",
     entryPoints: ["native-menu"],

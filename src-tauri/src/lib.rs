@@ -998,6 +998,14 @@ pub fn run() {
                     .text("view-reload", "重新载入")
                     .text("view-add-bookmark", "添加书签")
                     .separator()
+                    // ISS-NEW-H 第 3 阶段（2026-06-23）：视图菜单 7 项补（滚动 / 翻页 / 工具栏 / 左侧边栏 / 适合屏幕 / 实际全屏）。
+                    .text("view-scroll-mode", "滚动模式")
+                    .text("view-page-mode", "翻页模式")
+                    .separator()
+                    .text("view-toolbar-toggle", "工具栏")
+                    .text("view-sidebar-toggle", "左侧边栏")
+                    .separator()
+                    .text("view-fit-screen", "适合屏幕")
                     .text("view-fullscreen", "全屏")
                     .build()?)
                 .item(&SubmenuBuilder::new(app, "工具")
@@ -1055,6 +1063,11 @@ pub fn run() {
                     | "view-go-current-page"
                     | "view-reload"
                     | "view-add-bookmark"
+                    | "view-scroll-mode"
+                    | "view-page-mode"
+                    | "view-toolbar-toggle"
+                    | "view-sidebar-toggle"
+                    | "view-fit-screen"
                     | "annotation-highlight"
                     | "annotation-underline"
                     | "annotation-strikeout"

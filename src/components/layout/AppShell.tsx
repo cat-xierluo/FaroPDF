@@ -788,21 +788,59 @@ export function AppShell({
       return;
     }
 
-    // ISS-NEW-H（2026-06-22 第 2 阶段）：3 顶层命令接入。
+    // ISS-NEW-H（2026-06-22 第 2 阶段 + 2026-06-23 第 3 阶段）：3 顶层命令接入。
     // view-go-current-page 实质接通（reader.setCurrentPage 当前页 + 反馈）。
     if (command.id === "view-go-current-page" && reader.state.document) {
       reader.setCurrentPage(reader.state.document.currentPage);
       setCommandFeedback(`当前已在第 ${reader.state.document.currentPage} 页。`);
       return;
     }
-    // view-reload / view-add-bookmark 留 v0.2 占位（需 reader 新 API：
-    // reloadDocument(path → File) / addBookmark(currentPage, label)）。
+    // view-reload 实质接通（v0.2 简化为 webview reload — Tauri webview 重新加载整个 webview
+    // 状态，最稳的「重载」实现；真实 PDF bytes 重新载入需要 reader 新 API，留 v0.2 polish）。
     if (command.id === "view-reload") {
-      setCommandFeedback("重新载入功能待 reader controller 加 reloadDocument(path → File) 桥接后接通。");
+      setCommandFeedback("重新载入整个 webview（PDF 状态将重置）。");
+      if (typeof window !== "undefined") {
+        window.location.reload();
+      }
       return;
     }
-    if (command.id === "view-add-bookmark") {
-      setCommandFeedback("添加书签功能待 reader controller 加 addBookmark(currentPage, label) API 后接通。");
+    // view-add-bookmark 实质接通（v0.2 简化为把 currentPage 写回 recentFiles[].lastPage，
+    // 真实 outline 持久化留 v0.2 polish）。
+    if (command.id === "view-add-bookmark" && reader.state.document) {
+      onSettingsChange?.({
+        ...settings,
+        recentFiles: settings.recentFiles.map((file) =>
+          file.path === reader.state.document?.path
+            ? { ...file, lastPage: reader.state.document.currentPage }
+            : file,
+        ),
+      });
+      setCommandFeedback(`已在第 ${reader.state.document.currentPage} 页添加书签（lastPage 已更新）。`);
+      return;
+    }
+    // ISS-NEW-H 第 3 阶段：滚动 / 翻页 / 适合屏幕。
+    if (command.id === "view-scroll-mode" && reader.state.document) {
+      reader.setViewMode("continuous");
+      setCommandFeedback("已切换到滚动模式。");
+      return;
+    }
+    if (command.id === "view-page-mode" && reader.state.document) {
+      reader.setViewMode("single");
+      setCommandFeedback("已切换到翻页模式。");
+      return;
+    }
+    if (command.id === "view-fit-screen" && reader.state.document) {
+      reader.setZoomPreset("fit-page");
+      setCommandFeedback("已调整为适合屏幕。");
+      return;
+    }
+    // view-toolbar-toggle / view-sidebar-toggle v0.2 占位（需要新工具栏 / 侧栏 toggle 状态层）。
+    if (command.id === "view-toolbar-toggle") {
+      setCommandFeedback("工具栏 toggle 待新工具栏状态层接入（v0.2 polish）。");
+      return;
+    }
+    if (command.id === "view-sidebar-toggle") {
+      setCommandFeedback("左侧边栏 toggle 待新侧栏状态层接入（v0.2 polish）。");
       return;
     }
 

@@ -130,6 +130,7 @@ interface RenderArgs {
   annotationArmed?: AnnotationArmedStateBundle;
   commandSignal?: AppCommandSignal | null;
   onModeChange?: (mode: AppModeId) => void;
+  onSettingsChange?: (settings: AppSettings) => void;
   onUtilityPanelChange?: (panel: UtilityPanelId) => void;
   reader?: ReaderController;
   search?: TextSearchController;
@@ -139,6 +140,7 @@ interface RenderArgs {
 
 function renderAppShell(args: RenderArgs = {}) {
   const onModeChange = args.onModeChange ?? vi.fn();
+  const onSettingsChange = args.onSettingsChange;
   const onUtilityPanelChange = args.onUtilityPanelChange ?? vi.fn();
   return render(
     <TabProvider>
@@ -148,6 +150,7 @@ function renderAppShell(args: RenderArgs = {}) {
         annotations={args.annotations}
         commandSignal={args.commandSignal}
         onModeChange={onModeChange}
+        onSettingsChange={onSettingsChange}
         onUtilityPanelChange={onUtilityPanelChange}
         reader={args.reader ?? makeReader()}
         search={args.search ?? makeSearch()}
@@ -1200,26 +1203,45 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
     expect(await screen.findByText(/当前已在第/)).toBeInTheDocument();
   });
 
-  test("ISS-NEW-H 第 2 阶段：view-reload 留 v0.2 占位（待 reader.reloadDocument 接入）", async () => {
+  test("ISS-NEW-H 第 3 阶段：view-reload 实质接通（window.location.reload 触发）", async () => {
+    const reloadSpy = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, reload: reloadSpy },
+    });
     renderAppShell({
       activeMode: "read",
       commandSignal: { id: "view-reload", nonce: 1 },
       reader: makeReadyReader(),
       utilityPanel: "none",
     });
-
-    expect(await screen.findByText(/重新载入功能待 reader controller 加 reloadDocument/)).toBeInTheDocument();
+    expect(await screen.findByText(/重新载入整个 webview/)).toBeInTheDocument();
+    expect(reloadSpy).toHaveBeenCalled();
+    Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
   });
 
-  test("ISS-NEW-H 第 2 阶段：view-add-bookmark 留 v0.2 占位（待 reader.addBookmark 接入）", async () => {
+  test("ISS-NEW-H 第 3 阶段：view-add-bookmark 实质接通 → onSettingsChange 更新 recentFiles[].lastPage", async () => {
+    const onSettingsChange = vi.fn();
+    const reader = makeReadyReader();
+    const recentFile = {
+      path: "test.pdf",
+      name: "test.pdf",
+      lastOpenedAt: "2026-06-22T00:00:00Z",
+    };
+    const baseSettings = { ...createDefaultAppSettings(), recentFiles: [recentFile] };
     renderAppShell({
       activeMode: "read",
       commandSignal: { id: "view-add-bookmark", nonce: 1 },
-      reader: makeReadyReader(),
+      onSettingsChange,
+      reader,
+      settings: baseSettings,
       utilityPanel: "none",
     });
-
-    expect(await screen.findByText(/添加书签功能待 reader controller 加 addBookmark/)).toBeInTheDocument();
+    expect(await screen.findByText(/已在第 1 页添加书签/)).toBeInTheDocument();
+    expect(onSettingsChange).toHaveBeenCalled();
+    const updated = onSettingsChange.mock.calls.at(-1)?.[0] as AppSettings | undefined;
+    expect(updated?.recentFiles[0]?.lastPage).toBe(1);
   });
 
   // view-zoom-tool / view-thumbnails-* / view-zoom-in / view-zoom-out 在无文档时被挡掉。
