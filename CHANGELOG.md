@@ -52,6 +52,8 @@ ISS-NEW-F 第 2 步（PM 单 session / DEC-163）：Tauri `WebviewWindow` create
 
 ISS-NEW-E 任务卡收口（PM 单 session / DEC-164）：5 模式 L4 + `pages` mode PageOrganizerWorkspace 全部 ship，8 验收项勾选 [x]。任务卡状态由"第 1 步完成"更新为"✅ 已完成（阶段 1+2）"。
 
+ISS-NEW-H 第 3 阶段（PM 单 session / DEC-166）：视图菜单补 7 command id（滚动模式 / 翻页模式 / 工具栏 toggle / 左侧边栏 toggle / 适合屏幕）+ 2 真实行为接通（`view-reload` 简化为 `window.location.reload()` / `view-add-bookmark` 写回 `recentFiles[].lastPage`）。commit `da4305b` + 14/14 ISS-NEW-H 测。
+
 ISS-NEW-D 阶段 1（PM 单 session / DEC-159，4 子菜单按顺序 ship）：
 
 - **批注菜单（commit `0c25006`）**：macOS 批注 SubmenuBuilder 加 8 工具（高亮/下划线/删除线/文本/笔/橡皮擦/便签）+ 形状 submenu（6 形状：矩形/椭圆/箭头/双向/直线/铅笔）。8 工具真实 arm（`armAnnotationTool` / `disarmAnnotationTool`），6 形状 submenu v0.2 占位反馈（PDF_ANNOTATION_TYPES 缺 ellipse/line/double-arrow，真实形状绘制由 AnnotationOverlay 接 armAnnotationTool，DEC-147 已 ship 6 段 ShapeToolPanel）。

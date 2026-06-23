@@ -6774,6 +6774,43 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 
 **关联**：ISS-NEW-E 任务卡 / DEC-156（5 模式 L4）/ DEC-152（pages 模式 PageOrganizerWorkspace）。
 
+## DEC-166 ISS-NEW-H 第 3 阶段：视图菜单 7 补 + 2 真实行为接通（PM 单 session，2026-06-23）
+
+- 时间：2026-06-23
+- 类型：UI 信息架构 / macOS 视图菜单 / 真实行为接通
+- 关联：ISS-NEW-H 任务卡（line 1184+ 验收项「视图菜单 12+ 项」）/ FEATURE_CATALOG §4.6 二审补全（截图 33 视图菜单 12+ 项）/ DEC-157（视图菜单 submenu 补全 11 command id）/ DEC-161（第 2 阶段 3 占位改真实行为）
+
+**决策**：
+1. **视图菜单补 7 command id**（commit `da4305b`）：
+   - 滚动模式（view-scroll-mode）
+   - 翻页模式（view-page-mode）
+   - 工具栏 toggle（view-toolbar-toggle）
+   - 左侧边栏 toggle（view-sidebar-toggle）
+   - 适合屏幕（view-fit-screen）
+   - 全屏（view-fullscreen 已有，ISS-NEW-H 阶段 1 ship 视图 submenu 之外）
+2. **2 真实行为接通**（commit `da4305b`）：
+   - `view-scroll-mode` 实质接通：`reader.setViewMode("continuous")` + 反馈
+   - `view-page-mode` 实质接通：`reader.setViewMode("single")` + 反馈
+   - `view-fit-screen` 实质接通：`reader.setZoomPreset("fit-page")` + 反馈
+   - `view-reload` 实质接通（v0.2 简化）：`window.location.reload()`（最稳的「重载」实现 — 整个 webview 重新加载；真实 PDF bytes 重新载入需要 reader 新 API，留 v0.2 polish）
+   - `view-add-bookmark` 实质接通（v0.2 简化）：`onSettingsChange` 更新 `recentFiles[].lastPage = currentPage`（最简的书签语义 — 把当前页码写到 lastPage；真实 outline 持久化留 v0.2 polish）
+3. **2 v0.2 占位**：
+   - `view-toolbar-toggle`：需新工具栏状态层（L2 / L3 工具条显示 toggle）
+   - `view-sidebar-toggle`：需新侧栏状态层（左侧 utilityPanel toggle）
+
+**Verification**：
+- typecheck ✅
+- AppShell 14/14（ISS-NEW-H 子集）✅（含 4 测更新：view-reload / view-add-bookmark 实质接通 + 2 新测 view-scroll-mode / view-page-mode / view-fit-screen / view-toolbar-toggle / view-sidebar-toggle 占位）
+- 1 测加 `onSettingsChange` mock（RenderArgs 扩展）
+
+**out of scope**：
+- `view-toolbar-toggle` / `view-sidebar-toggle` 真实 toggle 状态层（v0.2 polish）
+- 真实 PDF bytes 重新载入（reader 新 API）
+- 真实 outline 持久化（reader 新 API + outline 存储层）
+- ISS-NEW-H 第 2 阶段后续（macOS 视图菜单 12+ 项剩余其他边角）
+
+**关联**：ISS-NEW-H 任务卡（视图菜单 12+ 项验收）/ DEC-157（前 11 command）/ DEC-161（前 3 占位）。
+
 ## DEC-165 v0.1 收口沉淀后续：pre-existing vitest 4.x 根因确认 + 修复计划（PM 单 session，2026-06-23）
 
 - 时间：2026-06-23
