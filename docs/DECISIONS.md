@@ -6835,6 +6835,30 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 
 **关联**：ISS-NEW-D 任务卡（line 1168+ 4 菜单收口）/ DEC-159（阶段 1）/ DEC-160（阶段 2 批注 9 辅助）。
 
+## DEC-168 ISS-NEW-D 阶段 4：扫描菜单 7 ocr command 实质接通（PM 单 session，2026-06-23）
+
+- 时间：2026-06-23
+- 类型：UI 信息架构 / macOS 扫描菜单 / 真实 OCR 入口接通
+- 关联：ISS-NEW-D 任务卡（line 1168+ 4 菜单收口）/ DEC-159（阶段 1 扫描菜单 ship 8 ocr command 占位反馈）
+
+**决策**：
+1. **4 档质量 + 3 顶层动作实质接通**（commit `da9...`）：从 v0.2 占位反馈改为调 `OcrWorkspaceController.startOcr()` 启动 OCR 任务 + 反馈。
+2. **4 档质量档（原始/标准/高级/自定义）当前都触发 startOcr**：`OcrWorkspaceController.startOcr()` 暂无 quality 参数，差异（图像增强 / 预处理 / 后处理）v0.2 polish 接入。
+3. **3 顶层动作（扫描至可搜索 / OCR 文字 / 调整为可搜索）实质接通**：都触发 startOcr + 反馈。区分（strategy / outputLayeredPdf 策略）v0.2 polish 接入。
+4. **`ocr-enhance-all` 留 v0.2 占位**：需 reader controller 加 batch OCR API（v0.2 polish）。
+
+**Verification**：
+- typecheck ✅
+- AppShell OCR tests 未覆盖（v0.2 阶段不写新测，依赖端到端验证 — 留 v0.2 polish）
+
+**out of scope（v0.2 polish）**：
+- OcrWorkspaceController.startOcr 真实 quality 参数接入（4 档质量差异化）
+- 3 顶层动作的 strategy 区分（new-layered-pdf / text-sidecar / quality-check-only）
+- ocr-enhance-all batch OCR API
+- AppShell OCR tests 覆盖（端到端验证）
+
+**关联**：ISS-NEW-D 任务卡（line 1168+ 4 菜单收口）/ DEC-159（阶段 1 8 ocr command 占位反馈）。
+
 ## DEC-165 v0.1 收口沉淀后续：pre-existing vitest 4.x 根因确认 + 修复计划（PM 单 session，2026-06-23）
 
 - 时间：2026-06-23

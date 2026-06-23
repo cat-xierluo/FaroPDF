@@ -56,6 +56,8 @@ ISS-NEW-H 第 3 阶段（PM 单 session / DEC-166）：视图菜单补 7 command
 
 ISS-NEW-D 阶段 3（PM 单 session / DEC-167）：批注形状 submenu 6 项从 v0.2 占位反馈改为实质 arm — `PDF_ANNOTATION_TYPES` 扩 3 类型（`ellipse` / `double-arrow` / `line`）+ `ANNOTATION_TOOL_LIST` 加 3 descriptor + 6 个相关 dict 同步扩 3 类型 + AppShell 形状 submenu 路由 `armAnnotationTool` 真实接通。AnnotationOverlay 渲染保持 v0.2 占位（drawEllipse / drawLine / drawDoubleArrow 后续 worker 接入）。commit `dae...` + typecheck ✅ + 127/127 annotation 测。
 
+ISS-NEW-D 阶段 4（PM 单 session / DEC-168）：扫描菜单 4 档质量 + 3 顶层动作（扫描至可搜索 / OCR 文字 / 调整为可搜索）从 v0.2 占位反馈改为实质接通 — 调 `ocr.startOcr()` 启动 OCR 任务 + 反馈。4 档质量档当前都触发 startOcr（OcrWorkspaceController.startOcr 暂无 quality 参数，差异 v0.2 polish）。`ocr-enhance-all` 留 v0.2 占位（需 reader controller 加 batch OCR 接入）。commit + typecheck ✅。
+
 ISS-NEW-D 阶段 1（PM 单 session / DEC-159，4 子菜单按顺序 ship）：
 
 - **批注菜单（commit `0c25006`）**：macOS 批注 SubmenuBuilder 加 8 工具（高亮/下划线/删除线/文本/笔/橡皮擦/便签）+ 形状 submenu（6 形状：矩形/椭圆/箭头/双向/直线/铅笔）。8 工具真实 arm（`armAnnotationTool` / `disarmAnnotationTool`），6 形状 submenu v0.2 占位反馈（PDF_ANNOTATION_TYPES 缺 ellipse/line/double-arrow，真实形状绘制由 AnnotationOverlay 接 armAnnotationTool，DEC-147 已 ship 6 段 ShapeToolPanel）。
