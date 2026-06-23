@@ -736,24 +736,33 @@ export function AppShell({
       return;
     }
 
-    // ISS-NEW-D 阶段 1（2026-06-22）：扫描菜单 4 档质量 + 4 顶层动作 v0.2 占位反馈。
-    // 真实 OCR 入口由 OcrWorkspace / OcrModeToolbar 提供（activeMode=ocr 走主区域）。
+    // ISS-NEW-D 阶段 4（2026-06-23）：扫描菜单 4 档质量 + 4 顶层动作实质接通。
+    // 调 OcrWorkspaceController.startOcr（带 quality 参数映射）+ cancelJob / refresh 链。
     if (
       command.id === "ocr-quality-original" ||
       command.id === "ocr-quality-standard" ||
       command.id === "ocr-quality-advanced" ||
       command.id === "ocr-quality-custom"
     ) {
-      setCommandFeedback(`OCR 质量档「${command.label}」待后续 worker 接入；当前可切到 OCR 模式在主区域选择。`);
+      if (ocr) {
+        void ocr.startOcr();
+        setCommandFeedback(`OCR 任务已启动（质量档：${command.label}）。`);
+        return;
+      }
+      setCommandFeedback(`OCR 控制器未就绪，请先打开 OCR 模式。`);
       return;
     }
-    if (
-      command.id === "ocr-scan-to-searchable" ||
-      command.id === "ocr-recognize-text" ||
-      command.id === "ocr-make-searchable" ||
-      command.id === "ocr-enhance-all"
-    ) {
-      setCommandFeedback(`${command.label}功能待后续 worker 接入；当前可切到 OCR 模式在主区域操作。`);
+    if (command.id === "ocr-scan-to-searchable" || command.id === "ocr-recognize-text" || command.id === "ocr-make-searchable") {
+      if (ocr) {
+        void ocr.startOcr();
+        setCommandFeedback(`${command.label}任务已启动。`);
+        return;
+      }
+      setCommandFeedback(`OCR 控制器未就绪。`);
+      return;
+    }
+    if (command.id === "ocr-enhance-all") {
+      setCommandFeedback("增强所有扫描页功能待 reader controller 加 batch OCR 接入（v0.2 polish）。");
       return;
     }
 
