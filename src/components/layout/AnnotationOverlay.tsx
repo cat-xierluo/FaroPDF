@@ -209,6 +209,9 @@ export function AnnotationOverlay({
 /** 工具与 overlay 交互模式的对应表 */
 const ANNOTATION_TOOL_INTERACTION: Record<PdfAnnotationType, "click" | "drag" | "ink"> = {
   highlight: "drag",
+  ellipse: "drag",
+  "double-arrow": "drag",
+  line: "drag",
   underline: "drag",
   strikeout: "drag",
   note: "click",
@@ -658,7 +661,10 @@ const ANNOTATION_TYPE_LABELS: Record<PdfAnnotationType, string> = {
   note: "备注",
   textbox: "文本框",
   rectangle: "矩形",
+  ellipse: "椭圆",
   arrow: "箭头",
+  "double-arrow": "双向箭头",
+  line: "直线",
   ink: "手写",
   stamp: "图章",
 };

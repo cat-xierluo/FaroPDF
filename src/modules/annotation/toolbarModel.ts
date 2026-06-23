@@ -28,7 +28,11 @@ export const ANNOTATION_TOOL_LIST: AnnotationToolDescriptor[] = [
   { type: "note", label: "备注", interaction: "click", hint: "点击放置", defaultSize: { width: 28, height: 28 } },
   { type: "textbox", label: "文本框", interaction: "click", hint: "点击放置", defaultSize: { width: 180, height: 48 } },
   { type: "rectangle", label: "矩形", interaction: "drag", hint: "拖拽选区", defaultSize: { width: 160, height: 90 } },
+  // ISS-NEW-D 阶段 3（2026-06-23）：形状 submenu 3 补（PDF 渲染 AnnotationOverlay 留 v0.2 占位）。
+  { type: "ellipse", label: "椭圆", interaction: "drag", hint: "拖拽选区", defaultSize: { width: 160, height: 90 } },
   { type: "arrow", label: "箭头", interaction: "drag", hint: "拖拽方向" },
+  { type: "double-arrow", label: "双向箭头", interaction: "drag", hint: "拖拽方向" },
+  { type: "line", label: "直线", interaction: "drag", hint: "拖拽方向" },
   { type: "ink", label: "手写", interaction: "ink", hint: "按住绘制" },
   {
     type: "stamp",

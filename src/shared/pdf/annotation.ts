@@ -5,7 +5,10 @@ export const PDF_ANNOTATION_TYPES = [
   "note",
   "textbox",
   "rectangle",
+  "ellipse",
   "arrow",
+  "double-arrow",
+  "line",
   "ink",
   "stamp",
 ] as const;

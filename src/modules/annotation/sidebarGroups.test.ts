@@ -91,15 +91,28 @@ describe("groupAnnotationsByColor", () => {
 });
 
 describe("groupAnnotationsByType", () => {
-  test("9 种类型按字母排序分组", () => {
+  test("12 种类型按字母排序分组（ISS-NEW-D 阶段 3 加 ellipse / double-arrow / line）", () => {
     const annotations = ANNOTATION_SIDEBAR_TYPE_CHOICES.map((choice, index) =>
       makeAnnotation({ id: `a-${index}`, pageIndex: 0, type: choice.id }),
     );
     const groups = groupAnnotationsByType(annotations);
-    expect(groups).toHaveLength(9);
+    expect(groups).toHaveLength(12);
     expect(groups[0].title).toBe("高亮");
     expect(groups.map((g) => g.key).sort()).toEqual(
-      ["arrow", "highlight", "ink", "note", "rectangle", "stamp", "strikeout", "textbox", "underline"].sort(),
+      [
+        "arrow",
+        "double-arrow",
+        "ellipse",
+        "highlight",
+        "ink",
+        "line",
+        "note",
+        "rectangle",
+        "stamp",
+        "strikeout",
+        "textbox",
+        "underline",
+      ].sort(),
     );
   });
 });
@@ -272,7 +285,7 @@ describe("ANNOTATION_SIDEBAR_COLOR_CHOICES / TYPE_CHOICES", () => {
     expect(ANNOTATION_SIDEBAR_COLOR_CHOICES[0]).toMatchObject({ id: "yellow", value: "#f6d66f", label: "黄" });
   });
 
-  test("类型 chip 9 个，顺序固定", () => {
+  test("类型 chip 12 个，顺序固定（ISS-NEW-D 阶段 3 加 ellipse / double-arrow / line）", () => {
     expect(ANNOTATION_SIDEBAR_TYPE_CHOICES.map((c) => c.id)).toEqual([
       "highlight",
       "underline",
@@ -280,7 +293,10 @@ describe("ANNOTATION_SIDEBAR_COLOR_CHOICES / TYPE_CHOICES", () => {
       "note",
       "textbox",
       "rectangle",
+      "ellipse",
       "arrow",
+      "double-arrow",
+      "line",
       "ink",
       "stamp",
     ]);

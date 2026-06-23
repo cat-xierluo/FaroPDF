@@ -22,6 +22,7 @@ import {
   disarmAnnotationTool,
 } from "../../modules/annotation";
 import type { AnnotationToolState } from "../../modules/annotation";
+import type { PdfAnnotationType } from "../../shared/pdf/annotation";
 import { useFormController } from "../../modules/forms/useFormController";
 import { setActiveFormController } from "../../modules/forms/activeFormController";
 import { FormsPanel } from "../../modules/forms/ui/FormsPanel";
@@ -703,8 +704,20 @@ export function AppShell({
       command.id === "annotation-shape-line" ||
       command.id === "annotation-shape-pen"
     ) {
-      setCommandFeedback(`${command.label}形状待后续 worker 接入；当前可通过 L4 形状工具条（annotate 模式）切换。`);
-      return;
+      // ISS-NEW-D 阶段 3（2026-06-23）：armAnnotationTool 真实接通（PDF_ANNOTATION_TYPES 扩 3 类型 + ANNOTATION_TOOL_MAP 加 descriptor）。
+      // AnnotationOverlay 渲染保持 v0.2 占位（drawEllipse / drawLine / drawDoubleArrow 后续 worker 接入）。
+      const armType: PdfAnnotationType | null =
+        command.id === "annotation-shape-rectangle" ? "rectangle" :
+        command.id === "annotation-shape-ellipse" ? "ellipse" :
+        command.id === "annotation-shape-arrow" ? "arrow" :
+        command.id === "annotation-shape-double-arrow" ? "double-arrow" :
+        command.id === "annotation-shape-line" ? "line" :
+        command.id === "annotation-shape-pen" ? "ink" :
+        null;
+      if (armType && annotationArmSetter) {
+        annotationArmSetter(armAnnotationTool(annotationState, armType));
+        return;
+      }
     }
 
     // ISS-NEW-D 阶段 2（2026-06-22）：批注菜单 9 辅助 command v0.2 占位反馈。

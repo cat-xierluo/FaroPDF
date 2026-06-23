@@ -12,7 +12,7 @@ import {
 } from "./toolbarModel";
 
 describe("annotation toolbar model", () => {
-  test("ANNOTATION_TOOL_LIST 列出 9 种工具", () => {
+  test("ANNOTATION_TOOL_LIST 列出 12 种工具（ISS-NEW-D 阶段 3 加 ellipse / double-arrow / line）", () => {
     expect(ANNOTATION_TOOL_LIST.map((tool) => tool.type)).toEqual([
       "highlight",
       "underline",
@@ -20,7 +20,10 @@ describe("annotation toolbar model", () => {
       "note",
       "textbox",
       "rectangle",
+      "ellipse",
       "arrow",
+      "double-arrow",
+      "line",
       "ink",
       "stamp",
     ]);

@@ -35,6 +35,9 @@ interface BuildAnnotationSummaryOptions {
 
 const TYPE_LABELS: Record<PdfAnnotationType, string> = {
   highlight: "高亮",
+  ellipse: "椭圆",
+  "double-arrow": "双向箭头",
+  line: "直线",
   underline: "下划线",
   strikeout: "删除线",
   note: "备注",
