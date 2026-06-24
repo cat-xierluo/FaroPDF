@@ -8,7 +8,7 @@ import {
 } from "./modules/annotation";
 import { createMemoryAnnotationStorage } from "./modules/annotation";
 import { AnnotationRepository } from "./modules/annotation";
-import { useReaderController } from "./modules/reader";
+import { useReaderController, type ReaderController } from "./modules/reader";
 import { registerReadModeTools } from "./modules/reader/readerModeTools";
 import { openNativePdfFileDialog } from "./modules/reader/tauriPdfFileService";
 import { useTextSearchController } from "./modules/search";
@@ -19,7 +19,50 @@ import { subscribeNativeMenuCommands } from "./shared/app/nativeMenuBridge";
 import type { AppSettings } from "./shared/settings/types";
 import { createDefaultAppSettings } from "./shared/settings/defaults";
 import "./styles/app.css";
-import { TabProvider } from "./state/tabStore";
+import { TabProvider, useTabStore } from "./state/tabStore";
+
+/**
+ * ISS-NEW-F 第 3 步（2026-06-24）步 2：把 reader 的当前页码同步到 active tab 的 lastPage。
+ *
+ * 当前架构里 reader 单例在 App.tsx，tabStore 在 TabProvider 内。两个组件各持一份 state，
+ * 这里用 useEffect + tabStoreRef 解耦：reader.currentPage 或 document.path 变化时，
+ * 找到 active tab 并 dispatch SET_LAST_PAGE，让 TitlebarTabs.handleDragEnd 拿到的
+ * tab.lastPage 始终是真实页码。
+ *
+ * 边界：
+ * - document 为 null → 不动（无 PDF 可同步）
+ * - active tab.filePath !== document.path → 不动（用户在别的 tab，不能写错位置）
+ * - active tab 未找到 → 不动
+ * - 当前 lastPage === currentPage → 不动（避免无意义 dispatch）
+ */
+export function ActiveTabPageSync({ reader }: { reader: ReaderController }): null {
+  const tabStore = useTabStore();
+
+  // 直接读 tabStore（不走 ref）。tabStore.state 变化（开 / 关 tab / setLastPage）会让 effect 重跑，
+  // 内部 `if (lastPage !== currentPage)` 守卫确保不会无限循环。
+  useEffect(() => {
+    const document = reader.state.document;
+    if (!document) {
+      return;
+    }
+    const activeTab = tabStore.state.tabs.find((tab) => tab.id === tabStore.state.activeTabId);
+    if (!activeTab || activeTab.filePath !== document.path) {
+      return;
+    }
+    if (activeTab.lastPage !== document.currentPage) {
+      tabStore.setLastPage(activeTab.id, document.currentPage);
+    }
+  }, [
+    reader,
+    reader.state.document?.currentPage,
+    reader.state.document?.path,
+    tabStore,
+    tabStore.state.activeTabId,
+    tabStore.state.tabs,
+  ]);
+
+  return null;
+}
 
 /** 在应用启动时一次性注册阅读模式工具集（旋转 + 适合页面）。 */
 registerReadModeTools();
@@ -206,6 +249,7 @@ function App() {
 
   return (
     <TabProvider>
+      <ActiveTabPageSync reader={reader} />
       <AppShell
         activeMode={activeMode}
         annotationArmed={{ state: annotationToolState, onStateChange: setAnnotationToolState }}

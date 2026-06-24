@@ -1,7 +1,10 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import App from "./App";
+import App, { ActiveTabPageSync } from "./App";
+import type { ReaderController } from "./modules/reader";
+import { TabProvider, useTabStore } from "./state/tabStore";
+import type { ReactElement } from "react";
 
 const appMocks = vi.hoisted(() => ({
   nativeMenuHandler: null as null | ((id: string) => void),
@@ -168,5 +171,156 @@ describe("FaroPDF app shell", () => {
     expect(document.documentElement).toHaveAttribute("data-theme", "dark");
     expect(screen.queryByRole("button", { name: "深色模式" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "工具" })).toBeInTheDocument();
+  });
+});
+
+// ISS-NEW-F 第 3 步（2026-06-24）步 2：ActiveTabPageSync 把 reader.currentPage 同步到 active tab.lastPage。
+// 用最小 reader mock（只暴露 ActiveTabPageSync 实际读到的 state.document），通过重新
+// 渲染驱动 effect 重跑（reader prop 引用变化 → effect 重新执行）。
+describe("ActiveTabPageSync (ISS-NEW-F 第 3 步 第 2 块)", () => {
+  function makeReader(document: ReaderController["state"]["document"]): ReaderController {
+    return { state: { document } } as unknown as ReaderController;
+  }
+
+  function makeDoc(path: string, currentPage: number): ReaderController["state"]["document"] {
+    return {
+      path,
+      name: path.split("/").pop() ?? path,
+      pageCount: 10,
+      currentPage,
+      fingerprint: `fp-${path}`,
+      documentId: `doc-${path}`,
+    } as ReaderController["state"]["document"];
+  }
+
+  test("active tab 与 reader.document.path 一致 → currentPage 同步到 lastPage", async () => {
+    let storeApi: ReturnType<typeof useTabStore> | null = null;
+    function CaptureStore(): ReactElement {
+      storeApi = useTabStore();
+      return <></>;
+    }
+
+    const { rerender } = render(
+      <TabProvider>
+        <CaptureStore />
+        <ActiveTabPageSync reader={makeReader(null)} />
+      </TabProvider>,
+    );
+    expect(storeApi).not.toBeNull();
+
+    // 开一个 tab，path 匹配后续 document.path
+    act(() => {
+      storeApi!.openTab("/case/a.pdf", "a.pdf");
+    });
+    const tabId = storeApi!.state.tabs[0]!.id;
+    expect(storeApi!.state.tabs[0]!.lastPage).toBe(1);
+
+    // 模拟 reader 加载文档（currentPage=5）
+    rerender(
+      <TabProvider>
+        <CaptureStore />
+        <ActiveTabPageSync reader={makeReader(makeDoc("/case/a.pdf", 5))} />
+      </TabProvider>,
+    );
+    await waitFor(() => expect(storeApi!.state.tabs[0]!.lastPage).toBe(5));
+
+    // currentPage 跳到 12
+    rerender(
+      <TabProvider>
+        <CaptureStore />
+        <ActiveTabPageSync reader={makeReader(makeDoc("/case/a.pdf", 12))} />
+      </TabProvider>,
+    );
+    await waitFor(() => expect(storeApi!.state.tabs[0]!.lastPage).toBe(12));
+
+    void tabId;
+  });
+
+  test("active tab 与 reader.document.path 不一致 → 不动 lastPage（避免 stale 同步）", async () => {
+    let storeApi: ReturnType<typeof useTabStore> | null = null;
+    function CaptureStore(): ReactElement {
+      storeApi = useTabStore();
+      return <></>;
+    }
+
+    const { rerender } = render(
+      <TabProvider>
+        <CaptureStore />
+        <ActiveTabPageSync reader={makeReader(null)} />
+      </TabProvider>,
+    );
+
+    act(() => {
+      storeApi!.openTab("/case/a.pdf", "a.pdf");
+    });
+    expect(storeApi!.state.tabs[0]!.lastPage).toBe(1);
+
+    // reader 加载了 b.pdf，但 active tab 是 a.pdf → 不应同步
+    rerender(
+      <TabProvider>
+        <CaptureStore />
+        <ActiveTabPageSync reader={makeReader(makeDoc("/case/b.pdf", 7))} />
+      </TabProvider>,
+    );
+    // 等一拍确认没动
+    await new Promise((r) => setTimeout(r, 50));
+    expect(storeApi!.state.tabs[0]!.lastPage).toBe(1);
+  });
+
+  test("reader.document 为 null → 不动", async () => {
+    let storeApi: ReturnType<typeof useTabStore> | null = null;
+    function CaptureStore(): ReactElement {
+      storeApi = useTabStore();
+      return <></>;
+    }
+
+    render(
+      <TabProvider>
+        <CaptureStore />
+        <ActiveTabPageSync reader={makeReader(null)} />
+      </TabProvider>,
+    );
+
+    act(() => {
+      storeApi!.openTab("/case/a.pdf", "a.pdf");
+    });
+    expect(storeApi!.state.tabs[0]!.lastPage).toBe(1);
+    // 不抛错即可
+    expect(storeApi!.state.tabs).toHaveLength(1);
+  });
+
+  test("currentPage 跳到与 lastPage 相同 → 不写回（避免循环 dispatch）", async () => {
+    // 当前实现：effect 内 if (activeTab.lastPage !== document.currentPage) 才 dispatch。
+    // 这里直接验证同步后 lastPage 是 currentPage；后续 reader.currentPage 不变时，
+    // 即使 reader prop 引用变化，也不会触发 setLastPage（reducer 内值相同 → state 引用不变）。
+    let storeApi: ReturnType<typeof useTabStore> | null = null;
+    function CaptureStore(): ReactElement {
+      storeApi = useTabStore();
+      return <></>;
+    }
+
+    const { rerender } = render(
+      <TabProvider>
+        <CaptureStore />
+        <ActiveTabPageSync reader={makeReader(makeDoc("/case/a.pdf", 7))} />
+      </TabProvider>,
+    );
+
+    act(() => {
+      storeApi!.openTab("/case/a.pdf", "a.pdf");
+    });
+    await waitFor(() => expect(storeApi!.state.tabs[0]!.lastPage).toBe(7));
+
+    // 再次渲染时 document 引用变化但 currentPage 不变（lastPage 也是 7）
+    // effect 重跑，activeTab.lastPage === document.currentPage → 不 dispatch。
+    rerender(
+      <TabProvider>
+        <CaptureStore />
+        <ActiveTabPageSync reader={makeReader(makeDoc("/case/a.pdf", 7))} />
+      </TabProvider>,
+    );
+    // 等一拍确认没动（仍为 7）
+    await new Promise((r) => setTimeout(r, 50));
+    expect(storeApi!.state.tabs[0]!.lastPage).toBe(7);
   });
 });
