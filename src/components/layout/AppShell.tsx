@@ -798,15 +798,42 @@ export function AppShell({
       );
       return;
     }
+    // ISS-NEW-D 前往浏览历史栈（DEC-171）步 3：5 历史 + 1 返回实质接通。
+    if (command.id === "go-back") {
+      if (!reader.state.document) {
+        setCommandFeedback("请先打开 PDF 文档。");
+        return;
+      }
+      const historyLength = reader.state.history?.length ?? 0;
+      if (historyLength === 0) {
+        setCommandFeedback("没有可返回的浏览历史。");
+        return;
+      }
+      const previousPage = reader.state.history?.[0];
+      reader.goBack();
+      setCommandFeedback(`已返回第 ${previousPage ?? "?"} 页。`);
+      return;
+    }
     if (
       command.id === "go-history-1" ||
       command.id === "go-history-2" ||
       command.id === "go-history-3" ||
       command.id === "go-history-4" ||
-      command.id === "go-history-5" ||
-      command.id === "go-back"
+      command.id === "go-history-5"
     ) {
-      setCommandFeedback(`${command.label}功能待后续 worker 接入浏览历史栈；当前可用 L4 阅读 / 缩放工具条。`);
+      if (!reader.state.document) {
+        setCommandFeedback("请先打开 PDF 文档。");
+        return;
+      }
+      const index = Number.parseInt(command.id.replace("go-history-", ""), 10);
+      const history = reader.state.history ?? [];
+      if (index < 1 || index > history.length) {
+        setCommandFeedback(`浏览历史只有 ${history.length} 项，无法跳到第 ${index} 个。`);
+        return;
+      }
+      const target = history[index - 1];
+      reader.goToHistory(index);
+      setCommandFeedback(`已跳到浏览历史第 ${index} 项（第 ${target ?? "?"} 页）。`);
       return;
     }
 

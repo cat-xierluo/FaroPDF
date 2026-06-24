@@ -51,6 +51,9 @@ function makeReader(overrides: Partial<ReaderController> = {}): ReaderController
     zoomOut: vi.fn(),
     setViewMode: vi.fn(),
     setZoomPreset: vi.fn(),
+    // ISS-NEW-D 前往浏览历史栈（DEC-171）：go-back + go-history-N 命令路由需要。
+    goBack: vi.fn(),
+    goToHistory: vi.fn(),
     ...overrides,
   } as unknown as ReaderController;
 }
@@ -1219,6 +1222,99 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
     expect(await screen.findByText(/重新载入整个 webview/)).toBeInTheDocument();
     expect(reloadSpy).toHaveBeenCalled();
     Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
+  });
+
+  // ISS-NEW-D 前往浏览历史栈（DEC-171）步 3：go-back + go-history-1..5 命令路由
+  function makeReadyReaderWithHistory(
+    history: number[],
+    currentPage: number = 7,
+  ): ReaderController {
+    return makeReader({
+      state: {
+        status: "ready",
+        defaults: { viewMode: "continuous", zoom: 1 },
+        document: {
+          documentId: "doc-1",
+          path: "test.pdf",
+          fingerprint: "fp-1",
+          name: "test.pdf",
+          currentPage,
+          pageCount: 12,
+          zoom: 1,
+          viewMode: "continuous",
+          rotation: 0,
+          textLayerStatus: "available",
+          ocrStatus: "not-needed",
+          dirty: false,
+        },
+        pageViewports: [{ pageIndex: 0, width: 612, height: 792, rotation: 0, scale: 1 }],
+        renderRange: { startPage: 1, endPage: 12, pageNumbers: Array.from({ length: 12 }, (_, index) => index + 1) },
+        history,
+        errorMessage: undefined,
+      },
+    });
+  }
+
+  test("ISS-NEW-D: native go-back 命令调 reader.goBack + 反馈「已返回第 X 页」", async () => {
+    const reader = makeReadyReaderWithHistory([3, 5, 7], 7);
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "go-back", nonce: 1 },
+      reader,
+      utilityPanel: "none",
+    });
+    expect(reader.goBack).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(/已返回第 3 页/)).toBeInTheDocument();
+  });
+
+  test("ISS-NEW-D: native go-back 在无历史时给出「没有可返回的浏览历史」", async () => {
+    const reader = makeReadyReaderWithHistory([]);
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "go-back", nonce: 1 },
+      reader,
+      utilityPanel: "none",
+    });
+    expect(reader.goBack).not.toHaveBeenCalled();
+    expect(await screen.findByText("没有可返回的浏览历史。")).toBeInTheDocument();
+  });
+
+  test("ISS-NEW-D: native go-back 在无文档时给出「请先打开 PDF 文档」", async () => {
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "go-back", nonce: 1 },
+      reader: makeReader(), // document: null
+      utilityPanel: "none",
+    });
+    expect(await screen.findByText("请先打开 PDF 文档。")).toBeInTheDocument();
+  });
+
+  test("ISS-NEW-D: native go-history-1..5 命令调 reader.goToHistory(N)", async () => {
+    const reader = makeReadyReaderWithHistory([3, 5, 7], 7);
+    for (const n of [1, 2, 3] as const) {
+      const { unmount } = renderAppShell({
+        activeMode: "read",
+        commandSignal: { id: `go-history-${n}` as const, nonce: n },
+        reader,
+        utilityPanel: "none",
+      });
+      expect(reader.goToHistory).toHaveBeenCalledWith(n);
+      expect(await screen.findByText(new RegExp(`已跳到浏览历史第 ${n} 项`))).toBeInTheDocument();
+      unmount();
+      (reader.goToHistory as ReturnType<typeof vi.fn>).mockClear();
+    }
+  });
+
+  test("ISS-NEW-D: native go-history-N 越界给出友好提示", async () => {
+    const reader = makeReadyReaderWithHistory([3, 5]); // 只有 2 项
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "go-history-5", nonce: 1 },
+      reader,
+      utilityPanel: "none",
+    });
+    expect(reader.goToHistory).not.toHaveBeenCalled();
+    expect(await screen.findByText(/浏览历史只有 2 项/)).toBeInTheDocument();
   });
 
   test("ISS-NEW-H 第 3 阶段：view-add-bookmark 实质接通 → onSettingsChange 更新 recentFiles[].lastPage", async () => {
