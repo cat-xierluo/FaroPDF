@@ -37,6 +37,7 @@ describe("tabStore (ISS-059 Phase 1)", () => {
     expect(result.current.state.tabs[0].filePath).toBe("/case/a.pdf");
     expect(result.current.state.tabs[0].customTitle).toBeNull();
     expect(result.current.state.tabs[0].isDirty).toBe(false);
+    expect(result.current.state.tabs[0].lastPage).toBe(1);
     expect(result.current.state.activeTabId).toBe(result.current.state.tabs[0].id);
   });
 
@@ -202,5 +203,74 @@ describe("tabStore (ISS-059 Phase 1)", () => {
       result.current.reorderTabs(0, 5);
     });
     expect(result.current.state.tabs.map((t) => t.filePath)).toEqual(original);
+  });
+
+  // ISS-NEW-F 第 3 步（2026-06-24）：tab.lastPage 字段，用于跨窗口 detach 恢复。
+  test("setLastPage 正整数 → 更新 lastPage", () => {
+    const { result } = renderHook(() => useTabStore(), { wrapper });
+    act(() => {
+      result.current.openTab("/case/a.pdf", "a.pdf");
+    });
+    const id = result.current.state.tabs[0].id;
+    act(() => {
+      result.current.setLastPage(id, 7);
+    });
+    expect(result.current.state.tabs[0].lastPage).toBe(7);
+  });
+
+  test("setLastPage 非法输入（非整数 / < 1 / 0） → 不动", () => {
+    const { result } = renderHook(() => useTabStore(), { wrapper });
+    act(() => {
+      result.current.openTab("/case/a.pdf", "a.pdf");
+    });
+    const id = result.current.state.tabs[0].id;
+    act(() => {
+      result.current.setLastPage(id, 5); // 设为 5
+    });
+    expect(result.current.state.tabs[0].lastPage).toBe(5);
+    act(() => {
+      result.current.setLastPage(id, 0); // 0 → no-op
+    });
+    expect(result.current.state.tabs[0].lastPage).toBe(5);
+    act(() => {
+      result.current.setLastPage(id, -1); // -1 → no-op
+    });
+    expect(result.current.state.tabs[0].lastPage).toBe(5);
+    act(() => {
+      result.current.setLastPage(id, 1.5); // 浮点 → no-op
+    });
+    expect(result.current.state.tabs[0].lastPage).toBe(5);
+  });
+
+  test("setLastPage 未知 tabId → 不动", () => {
+    const { result } = renderHook(() => useTabStore(), { wrapper });
+    act(() => {
+      result.current.openTab("/case/a.pdf", "a.pdf");
+    });
+    act(() => {
+      result.current.setLastPage("non-existent-tab-id", 99);
+    });
+    expect(result.current.state.tabs[0].lastPage).toBe(1);
+  });
+
+  test("setLastPage 只影响指定 tab，其他 tab 的 lastPage 不变", () => {
+    const { result } = renderHook(() => useTabStore(), { wrapper });
+    act(() => {
+      result.current.openTab("/case/a.pdf", "a.pdf");
+      result.current.openTab("/case/b.pdf", "b.pdf");
+    });
+    const aId = result.current.state.tabs[0].id;
+    const bId = result.current.state.tabs[1].id;
+    act(() => {
+      result.current.setLastPage(aId, 12);
+    });
+    expect(result.current.state.tabs[0].lastPage).toBe(12);
+    expect(result.current.state.tabs[1].lastPage).toBe(1);
+    // 切换 active tab 后 setLastPage(b) 也只影响 b
+    act(() => {
+      result.current.setLastPage(bId, 3);
+    });
+    expect(result.current.state.tabs[0].lastPage).toBe(12);
+    expect(result.current.state.tabs[1].lastPage).toBe(3);
   });
 });

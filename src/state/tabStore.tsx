@@ -31,6 +31,8 @@ export interface PdfTab {
   customTitle: string | null;
   /** 自打开后是否被修改（尚未实现 dirty 检测，先预留接口） */
   isDirty: boolean;
+  /** ISS-NEW-F 第 3 步（2026-06-24）：上次阅读页码（用于跨窗口 detach 恢复）。默认 1。 */
+  lastPage: number;
 }
 
 interface TabState {
@@ -46,7 +48,8 @@ type TabAction =
   | { type: "CLOSE_ALL_TABS" }
   | { type: "RENAME_TAB"; payload: { tabId: string; customTitle: string } }
   | { type: "MARK_DIRTY"; payload: { tabId: string; isDirty: boolean } }
-  | { type: "REORDER_TABS"; payload: { fromIndex: number; toIndex: number } };
+  | { type: "REORDER_TABS"; payload: { fromIndex: number; toIndex: number } }
+  | { type: "SET_LAST_PAGE"; payload: { tabId: string; lastPage: number } };
 
 function generateTabId(filePath: string, fileName: string): string {
   // 用 filePath + fileName + 时间戳生成。同一文件重复打开会开多个 tab（与 PDF Expert 一致）
@@ -66,6 +69,7 @@ function reducer(state: TabState, action: TabAction): TabState {
             filePath: action.payload.filePath,
             customTitle: null,
             isDirty: false,
+            lastPage: 1,
           },
         ],
         activeTabId: id,
@@ -135,6 +139,18 @@ function reducer(state: TabState, action: TabAction): TabState {
       tabs.splice(toIndex, 0, moved);
       return { ...state, tabs };
     }
+    case "SET_LAST_PAGE": {
+      // ISS-NEW-F 第 3 步：仅接受正整数；非法输入视为 no-op（不抛错，
+      // 避免 reader.currentPage 抖动导致 reducer 抛错）。
+      const { tabId, lastPage } = action.payload;
+      if (!Number.isInteger(lastPage) || lastPage < 1) {
+        return state;
+      }
+      return {
+        ...state,
+        tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, lastPage } : t)),
+      };
+    }
     default:
       return state;
   }
@@ -152,6 +168,7 @@ export interface TabStore {
   renameTab: (tabId: string, customTitle: string) => void;
   markDirty: (tabId: string, isDirty: boolean) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
+  setLastPage: (tabId: string, lastPage: number) => void;
 }
 
 const TabStoreContext = createContext<TabStore | null>(null);
@@ -185,6 +202,9 @@ export function TabProvider({ children }: { children: ReactNode }): ReactNode {
   const reorderTabs = useCallback((fromIndex: number, toIndex: number) => {
     dispatch({ type: "REORDER_TABS", payload: { fromIndex, toIndex } });
   }, []);
+  const setLastPage = useCallback((tabId: string, lastPage: number) => {
+    dispatch({ type: "SET_LAST_PAGE", payload: { tabId, lastPage } });
+  }, []);
 
   const value = useMemo<TabStore>(
     () => ({
@@ -197,6 +217,7 @@ export function TabProvider({ children }: { children: ReactNode }): ReactNode {
       renameTab,
       markDirty,
       reorderTabs,
+      setLastPage,
     }),
     [
       state,
@@ -208,6 +229,7 @@ export function TabProvider({ children }: { children: ReactNode }): ReactNode {
       renameTab,
       markDirty,
       reorderTabs,
+      setLastPage,
     ],
   );
 
