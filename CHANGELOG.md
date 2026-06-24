@@ -42,6 +42,12 @@
 
 > v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~158。
 
+ISS-NEW-F 第 3 步：跨窗口 detach 状态共享 3 块 ship（PM 单 session / DEC-170）：
+- **第 1 块**（commit `c6b31cb`）：`tabStore.tsx` 扩展 `PdfTab.lastPage` 字段 + `SET_LAST_PAGE` action + `setLastPage(tabId, lastPage)` API，非法输入（0 / 负数 / 浮点）no-op。tabStore +4 测（17/17 ✅）。
+- **第 2 块**（commit `4729231`）：`App.tsx` 加 `ActiveTabPageSync` 内层组件（TabProvider 子节点），把 `reader.state.document.currentPage` 同步到 active tab 的 `lastPage`。边界：document 为 null / active tab.filePath 不匹配 / lastPage === currentPage 都不 dispatch。App +4 测（10/10 ✅）。
+- **第 3 块**（commit `7a565ea`）：`TitlebarTabs.handleDragEnd` 拖到视口外时把 `{filePath, fileName, lastPage}` 写到 localStorage `faropdf:pending-detach`，然后 invoke Rust `create_faropdf_window` 开新 WebviewWindow；`App.tsx` 加 `PendingDetachRestore` 内层组件，新窗口 mount 时读 key → 调 `tabStore.openTab` + `readPdfFileFromPath` + `reader.openNativeFile` + `reader.setCurrentPage` → finally 清 key。异常路径（非法 JSON / 字段缺失 / 读 bytes 失败）都清 key + console.error。TitlebarTabs +3 测（10/10 ✅） + App +5 测（15/15 ✅）。test/setup.ts 加 testing-library auto-cleanup 受益全 suite。
+- 跨窗口状态共享闭环：源窗口 detach → localStorage 写 → 新窗口 mount 读 → tabStore + reader 状态恢复 → lastPage 跳页。新窗口能继续阅读同一 PDF 同页（与 PDF Expert 多窗口行为对齐）。
+
 App.test.tsx ISS-NEW-I 同步修复（PM 单 session / DEC-169）：`uses contextual toolbars and task workspaces` 测试断言从 `PageOrganizerWorkspace` 时代的 `页面管理工作台 / 页面管理空态 / 页面管理工具条` 同步到 ISS-NEW-I（DEC-147）后的 `EditModeGridView` 实际暴露的 aria-label（`编辑模式网格 / 打开 PDF 后进入 T 编辑 / 编辑模式工具条`）。行为契约不变（点击 页面管理 → pages mode → 编辑模式网格）。commit `bdc0469` + 6/6 App 测 ✅ + typecheck ✅。
 
 ISS-NEW-D 阶段 2 收尾（PM 单 session / DEC-160）：批注菜单补 9 辅助 command（链接 / 内容表 / 删除 / 删除全部 / 跳到批注 / 上一项 / 下一项 / 全部折叠 / 全部展开），全部 v0.2 占位反馈（依赖未实装的 history 栈 / AnnotationSidebar 操作）。commit `0adc932`。

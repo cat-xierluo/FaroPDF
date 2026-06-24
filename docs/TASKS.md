@@ -1226,17 +1226,17 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P3（v0.2 收尾）
 - 类型：UI 信息架构 / Tauri IPC
 - 来源：FEATURE_CATALOG §9；截图 30 / 80-83
-- 状态：未启动；依赖 ISS-NEW-A + ISS-NEW-E
+- 状态：**✅ 第 1+2+3 步收口（2026-06-24 / DEC-162 + DEC-163 + DEC-170）**；tab drag detach 手势 + Tauri WebviewWindow IPC + 跨窗口 localStorage 状态恢复 闭环 ship。剩余：跨 tab 拖页（截图 81）+ 多窗口共享 recentFiles / annotations + Tauri 文档句柄表（多窗口共享 bytes）— 留后续。
 - 范围：
-  1. tab drag detach 手势（拖到窗口外 → 创建新窗口）
-  2. Tauri `WebviewWindow` 新建 IPC
-  3. 文档句柄表（多窗口共享同一文档状态）
-  4. 跨 tab 拖页（截图 81）：编辑模式下从 tab A 拖页到 tab B
+  1. tab drag detach 手势（拖到窗口外 → 创建新窗口）— ✅ 第 1+2 步（DEC-162/163）
+  2. Tauri `WebviewWindow` 新建 IPC — ✅ 第 2 步（DEC-163）
+  3. 文档句柄表（多窗口共享同一文档状态）— ⏳ 第 3 步部分 ship（仅 filePath/fileName/lastPage，bytes 仍每次重读）
+  4. 跨 tab 拖页（截图 81）：编辑模式下从 tab A 拖页到 tab B — ⏳ 留后续
 - 验收：
-  - [ ] tab 拖离窗口外 → 新窗口创建并接管该 tab
-  - [ ] 新窗口能继续读取文档
-  - [ ] 编辑模式跨 tab 拖页：拖到目标 tab 的 drop zone 触发移动/复制
-  - [ ] 多窗口共享 recentFiles / annotations
+  - [x] tab 拖离窗口外 → 新窗口创建并接管该 tab — DEC-163（IPC）+ DEC-170（localStorage 状态）
+  - [x] 新窗口能继续读取文档 — DEC-170（PendingDetachRestore 调 readPdfFileFromPath + openNativeFile + setCurrentPage）
+  - [ ] 编辑模式跨 tab 拖页：拖到目标 tab 的 drop zone 触发移动/复制 — 留后续（需要 EditModeGridView 拖动 API + tab 间 IPC）
+  - [ ] 多窗口共享 recentFiles / annotations — 留后续（持久化层 + 状态广播）
 
 ### ISS-NEW-G Welcome 屏 + 状态栏语言切换 + Preferences 字段对齐
 
@@ -1423,6 +1423,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - **关联**：CHANGELOG.md Unreleased 顶部 / DEC-154 / ISS-NEW-G 任务卡勾选 [x] 9/10。
 - 2026-06-23：完成 ISS-NEW-D 阶段 4 收口（DEC-168）：扫描菜单 4 档质量 + 3 顶层动作（扫描至可搜索 / OCR 文字 / 调整为可搜索）从 v0.2 占位反馈改为实质接通 — 调 `ocr.startOcr()` 启动 OCR 任务 + 反馈。4 档质量档当前都触发 startOcr（OcrWorkspaceController.startOcr 暂无 quality 参数，差异 v0.2 polish）。`ocr-enhance-all` 留 v0.2 占位（需 reader controller 加 batch OCR 接入）。commit + typecheck ✅。
 - 2026-06-23：完成 App.test.tsx ISS-NEW-I 同步修复（DEC-169）：`uses contextual toolbars and task workspaces` 测试断言从 PageOrganizerWorkspace 时代的 `页面管理工作台 / 页面管理空态 / 页面管理工具条` 同步到 ISS-NEW-I（DEC-147）后 `EditModeGridView` 实际暴露的 aria-label（`编辑模式网格 / 打开 PDF 后进入 T 编辑 / 编辑模式工具条`）。行为契约不变（点击 页面管理 → pages mode → 编辑模式网格），仅同步测试期望到 ISS-NEW-I 的实现现状。commit `bdc0469` + App.test 6/6 ✅ + typecheck ✅。
+- 2026-06-24：完成 ISS-NEW-F 第 3 步 3 块 ship（DEC-170）：跨窗口 detach 状态共享闭环 — 第 1 块 `tabStore.PdfTab.lastPage` 字段 + `setLastPage` API（commit `c6b31cb`，tabStore 17/17 ✅）；第 2 块 `App.tsx` `ActiveTabPageSync` 内层组件同步 `reader.currentPage` → active tab.lastPage（commit `4729231`，App 10/10 ✅）；第 3 块 `TitlebarTabs.handleDragEnd` 写 localStorage `faropdf:pending-detach` + `App.tsx` `PendingDetachRestore` 内层组件新窗口 mount 读 key → 调 `readPdfFileFromPath` + `openNativeFile` + `setCurrentPage` → finally 清 key（commit `7a565ea`，TitlebarTabs 10/10 + App 15/15 ✅）。test/setup.ts 加 testing-library auto-cleanup 受益全 suite。任务卡状态更新为「✅ 第 1+2+3 步收口」，4 验收项中 2/4 ship（tab 拖离 + 新窗口读文档）；跨 tab 拖页 + 多窗口共享 recentFiles/annotations 留后续。
 - 2026-06-23：完成 ISS-NEW-D 阶段 3 收口（DEC-167）：批注形状 submenu 6 项从 v0.2 占位反馈改为实质 arm — `PDF_ANNOTATION_TYPES` 扩 3 类型（`ellipse` / `double-arrow` / `line`）+ `ANNOTATION_TOOL_LIST` 加 3 descriptor + 6 个相关 dict 同步扩 3 类型 + AppShell 形状 submenu 路由 `armAnnotationTool` 真实接通。AnnotationOverlay 渲染保持 v0.2 占位（drawEllipse / drawLine / drawDoubleArrow 后续 worker 接入）。commit `dae...` + typecheck ✅ + 127/127 annotation 测。
 - 2026-06-23：完成 ISS-NEW-H 第 3 阶段收口（DEC-166）：视图菜单补 7 command id（滚动模式 / 翻页模式 / 工具栏 toggle / 左侧边栏 toggle / 适合屏幕）+ 2 真实行为接通（view-reload 简化为 window.location.reload() / view-add-bookmark 写回 recentFiles[].lastPage）。commit `da4305b` + 14/14 ISS-NEW-H 测。
 - 2026-06-23：完成 ISS-NEW-E 任务卡收口（DEC-164）：5 模式 L4 + `pages` mode PageOrganizerWorkspace 全部 ship，8 验收项勾选 [x]。任务卡状态由"第 1 步完成"更新为"✅ 已完成（阶段 1+2）"。原计划"按需触发 edit 模式 L4"已通过 pages mode PageOrganizerWorkspace（ISS-046 / DEC-152）满足。

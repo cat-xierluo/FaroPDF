@@ -6926,3 +6926,55 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - vitest 4.x ESM 冲突根因修复（DEC-099 / DEC-165）
 
 **关联**：ISS-NEW-I（DEC-147 commit `69f038c` + `7ecaf89`）/ DEC-164（ISS-NEW-E 收口提及 pages 模式替代 L4）/ DEC-165（pre-existing vitest 根因记录）。
+
+## DEC-170 ISS-NEW-F 第 3 步：跨窗口 detach 状态共享（PM 单 session，2026-06-24）
+
+- 时间：2026-06-24
+- 类型：UI 信息架构 / Tab 拖离 / 跨窗口状态共享 / v0.2 收尾
+- 关联：ISS-NEW-F 任务卡（line 1201+ 4 验收项）/ DEC-162（第 1 步 DOM 检测）/ DEC-163（第 2 步 Tauri WebviewWindow IPC）/ memory `feedback_pm_decisiveness`（小步独立验证教训 — 之前一次性做完被回退，本次分 3 块每块独立 commit + 验证）
+
+**决策**：分 3 块小步推进（避免上一轮被回退的大提交踩坑）。
+
+**第 1 块**（commit `c6b31cb`，`src/state/tabStore.tsx`）：扩展 `PdfTab.lastPage` 字段 + `SET_LAST_PAGE` action + `setLastPage(tabId, lastPage)` API。
+- `OPEN_TAB` reducer 默认 `lastPage: 1`
+- `SET_LAST_PAGE` 校验 `Number.isInteger && lastPage >= 1`，非法输入 no-op（避免 reader.currentPage 抖动抛错）
+- reducer 仅更新匹配 tabId 的 tab，其他 tab 的 lastPage 不变
+- 测试：tabStore +4 测（正整数 / 非法输入 / 未知 tabId / 只影响指定 tab）；原 openTab 测断言加 `lastPage === 1`
+
+**第 2 块**（commit `4729231`，`src/App.tsx`）：`ActiveTabPageSync` 内层组件（TabProvider 子节点）把 `reader.state.document.currentPage` 同步到 active tab 的 `lastPage`。
+- 第 1 版用 `tabStoreRef` 模式（tab 开后 effect 不自动重跑 → 同步失败）
+- 第 2 版直接读 `tabStore`，把 `tabs / activeTabId` 加入 deps，tabStore.state 变化触发 effect 重跑；`if (lastPage !== currentPage)` 守卫避免循环
+- 边界：document 为 null / active tab.filePath 不匹配（用户在别的 tab）/ lastPage === currentPage 都不 dispatch
+- 组件 `export function ActiveTabPageSync` 便于直接 unit test
+- 测试：App +4 测（path 一致 → 同步 / path 不一致 → 不动 / doc null → 不动 / 同值 → 不写回）
+
+**第 3 块**（commit `7a565ea`，`src/components/layout/TitlebarTabs.tsx` + `src/App.tsx`）：源窗口 detach 时写 localStorage + 新窗口 mount 时恢复。
+- `TitlebarTabs.handleDragEnd` 拖到视口外时构造 `{filePath, fileName, lastPage}` payload，写 `localStorage["faropdf:pending-detach"]`；`tab.lastPage` 由第 2 块保证最新；然后 invoke Rust `create_faropdf_window` 开新 WebviewWindow（第 2 步已 ship）
+- `App.tsx` 新增 `PendingDetachRestore` 内层组件（TabProvider 子节点），mount 时：
+  1. 读 localStorage，命中即尝试恢复
+  2. 校验 payload 字段（filePath / fileName 字符串，lastPage 正整数）
+  3. 调 `tabStore.openTab` + `readPdfFileFromPath` + `reader.openNativeFile` + `reader.setCurrentPage`
+  4. finally 清 key（无论成功失败），避免下次启动误恢复
+- 异常路径：非法 JSON / 字段缺失 / readPdfFileFromPath 失败 → `console.error` + 清 key
+- `src/test/setup.ts` 加 testing-library auto-cleanup（`afterEach cleanup`）防止前一个 render 残留导致跨测试污染
+- 测试：TitlebarTabs +3 测（视口外 → 写 + invoke / 视口内 → 不动 / localStorage 抛错 → 不影响 invoke）；App +5 测（有效 payload → 调 readPdfFileFromPath + setCurrentPage(7) + 清 key / 字段缺失 → 清 key + 报错 / 非法 JSON → 清 key + 报错 / 无 key → 不报错 / readPdfFileFromPath 失败 → 仍清 key + 报错）
+
+**技术细节**：
+- TitlebarTabs dragend 测试用 `dispatchEvent(new Event("dragend"))` + `Object.defineProperty` 设 clientX/Y，因为 jsdom 的合成 DragEvent 不传递 clientX（`fireEvent.dragEnd({ clientX })` 不生效）
+- 「未调用 readPdfFileFromPath」负断言在跨测试不稳定（mockReset 在 vitest hoisted mock 上的语义不明，前一个测试 mockResolvedValueOnce 残留的实现仍可能消费），改为「不报错」或「setCurrentPage 未调」正向断言
+- 直接 mount PendingDetachRestore 而非 <App /> 测（避免 App 级其它 effect / useEffect 干扰）
+
+**Verification**：
+- typecheck ✅
+- tabStore.test.tsx 17/17 ✅
+- TitlebarTabs.test.tsx 10/10 ✅
+- App.test.tsx 15/15 ✅
+- 测试覆盖：5 + 4 + 4 = 13 个新测（tabStore 4 + App 9 — ActiveTabPageSync 4 + PendingDetachRestore 5）
+
+**out of scope（明确留给后续）**：
+- 跨 tab 拖页（截图 81：编辑模式从 tab A 拖页到 tab B）— 需要 EditModeGridView 拖动 API + tab 间 IPC，非本步范围
+- 多窗口共享 recentFiles / annotations — 持久化层 + 状态广播，本步仅 filePath/fileName/lastPage
+- Playwright 960×720 实操验证（pre-existing vitest 4.x + AppShell.test.tsx 挂起环境问题，DEC-099 / DEC-165）
+- Tauri 文档句柄表（多窗口共享同一 PDF 源 bytes，避免每窗口重读文件）— 性能优化，后续
+
+**关联**：ISS-NEW-F 任务卡（line 1201+ 4 验收项中 2/4 闭环：tab 拖离 → 新窗口接管 ✅ / 新窗口能继续读取文档 ✅；编辑模式跨 tab 拖页 / 多窗口共享 recentFiles+annotations 留后续）/ DEC-162（第 1 步）/ DEC-163（第 2 步）/ memory `feedback_pm_decisiveness`（小步独立验证策略）。
