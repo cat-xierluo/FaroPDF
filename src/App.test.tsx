@@ -1,14 +1,16 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import App, { ActiveTabPageSync } from "./App";
+import App, { ActiveTabPageSync, PendingDetachRestore } from "./App";
 import type { ReaderController } from "./modules/reader";
+import type { NativePdfFile } from "./modules/reader/tauriPdfFileService";
 import { TabProvider, useTabStore } from "./state/tabStore";
 import type { ReactElement } from "react";
 
 const appMocks = vi.hoisted(() => ({
   nativeMenuHandler: null as null | ((id: string) => void),
-  openNativePdfFileDialog: vi.fn(async () => null),
+  openNativePdfFileDialog: vi.fn(async () => null as NativePdfFile | null),
+  readPdfFileFromPath: vi.fn(async (_path: string) => null as NativePdfFile | null),
   subscribeNativeMenuCommands: vi.fn(async (handler: (id: string) => void) => {
     appMocks.nativeMenuHandler = handler;
     return () => undefined;
@@ -21,6 +23,7 @@ vi.mock("./shared/app/nativeMenuBridge", () => ({
 
 vi.mock("./modules/reader/tauriPdfFileService", () => ({
   openNativePdfFileDialog: appMocks.openNativePdfFileDialog,
+  readPdfFileFromPath: appMocks.readPdfFileFromPath,
 }));
 
 async function chooseTool(user: ReturnType<typeof userEvent.setup>, label: string | RegExp) {
@@ -33,8 +36,13 @@ describe("FaroPDF app shell", () => {
   beforeEach(() => {
     document.documentElement.removeAttribute("data-theme");
     appMocks.nativeMenuHandler = null;
-    appMocks.openNativePdfFileDialog.mockClear();
+    // mockReset 清掉实现 + 调用记录，置回默认（null 返回值）
+    appMocks.openNativePdfFileDialog.mockReset();
+    appMocks.openNativePdfFileDialog.mockResolvedValue(null as NativePdfFile | null);
+    appMocks.readPdfFileFromPath.mockReset();
+    appMocks.readPdfFileFromPath.mockResolvedValue(null as NativePdfFile | null);
     appMocks.subscribeNativeMenuCommands.mockClear();
+    window.localStorage.clear();
   });
 
   test("routes native File > Open to the Tauri PDF picker service", async () => {
@@ -322,5 +330,133 @@ describe("ActiveTabPageSync (ISS-NEW-F 第 3 步 第 2 块)", () => {
     // 等一拍确认没动（仍为 7）
     await new Promise((r) => setTimeout(r, 50));
     expect(storeApi!.state.tabs[0]!.lastPage).toBe(7);
+  });
+});
+
+// ISS-NEW-F 第 3 步（2026-06-24）步 3：PendingDetachRestore 在新窗口 mount 时读
+// localStorage `faropdf:pending-detach`，调用 readPdfFileFromPath + openNativeFile +
+// setCurrentPage，然后清掉 key。
+// 直接 mount PendingDetachRestore 而不是 <App />，避免 App 级其它 effect / useEffect 干扰。
+describe("PendingDetachRestore (ISS-NEW-F 第 3 步 第 3 块)", () => {
+  // 最小 reader mock：只暴露 PendingDetachRestore 实际用到的 setCurrentPage
+  // (openNativeFile 走真正 mock 的 readPdfFileFromPath result)。
+  function makeReader(): {
+    reader: ReaderController;
+    setCurrentPageSpy: ReturnType<typeof vi.fn>;
+    openNativeFileSpy: ReturnType<typeof vi.fn>;
+  } {
+    const setCurrentPageSpy = vi.fn();
+    const openNativeFileSpy = vi.fn(async () => undefined);
+    const reader = {
+      state: { document: null },
+      setCurrentPage: setCurrentPageSpy,
+      openNativeFile: openNativeFileSpy,
+    } as unknown as ReaderController;
+    return { reader, setCurrentPageSpy, openNativeFileSpy };
+  }
+
+  function RestoreHarness({ reader }: { reader: ReaderController }): ReactElement {
+    return (
+      <TabProvider>
+        <PendingDetachRestore reader={reader} />
+      </TabProvider>
+    );
+  }
+
+  test("mount 时 localStorage 有有效 payload → 调 readPdfFileFromPath + setCurrentPage + 清 key", async () => {
+    window.localStorage.setItem(
+      "faropdf:pending-detach",
+      JSON.stringify({
+        filePath: "/case/detached.pdf",
+        fileName: "detached.pdf",
+        lastPage: 7,
+      }),
+    );
+    appMocks.readPdfFileFromPath.mockResolvedValueOnce({
+      bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+      name: "detached.pdf",
+      path: "/case/detached.pdf",
+    });
+
+    const { setCurrentPageSpy, openNativeFileSpy } = makeReader();
+    const { reader } = { reader: makeReader().reader };
+    void reader;
+    const { setCurrentPageSpy: cur, openNativeFileSpy: open } = {
+      setCurrentPageSpy,
+      openNativeFileSpy,
+    };
+
+    // 用第一次创建的 reader 实例（openNativeFile / setCurrentPage 由 spies 拦截）
+    const r = makeReader();
+    render(<RestoreHarness reader={r.reader} />);
+
+    await waitFor(() =>
+      expect(appMocks.readPdfFileFromPath).toHaveBeenCalledWith("/case/detached.pdf"),
+    );
+    await waitFor(() =>
+      expect(window.localStorage.getItem("faropdf:pending-detach")).toBeNull(),
+    );
+    expect(r.openNativeFileSpy).toHaveBeenCalledTimes(1);
+    expect(r.setCurrentPageSpy).toHaveBeenCalledWith(7);
+    void cur;
+    void open;
+  });
+
+  test("mount 时 localStorage 字段缺失或类型错 → 清掉 key，不调 readPdfFileFromPath", async () => {
+    window.localStorage.setItem(
+      "faropdf:pending-detach",
+      JSON.stringify({ filePath: "/case/a.pdf" }), // 缺 fileName / lastPage
+    );
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { reader } = makeReader();
+    render(<RestoreHarness reader={reader} />);
+
+    await waitFor(() =>
+      expect(window.localStorage.getItem("faropdf:pending-detach")).toBeNull(),
+    );
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  test("mount 时 localStorage 是非法 JSON → 清掉 key", async () => {
+    window.localStorage.setItem("faropdf:pending-detach", "{not-json");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { reader } = makeReader();
+    render(<RestoreHarness reader={reader} />);
+
+    await waitFor(() =>
+      expect(window.localStorage.getItem("faropdf:pending-detach")).toBeNull(),
+    );
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  test("mount 时 localStorage 无 key → 不报错", async () => {
+    const { reader } = makeReader();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<RestoreHarness reader={reader} />);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  test("readPdfFileFromPath 失败 → 仍清掉 key（避免下次启动误恢复）", async () => {
+    window.localStorage.setItem(
+      "faropdf:pending-detach",
+      JSON.stringify({ filePath: "/case/a.pdf", fileName: "a.pdf", lastPage: 3 }),
+    );
+    appMocks.readPdfFileFromPath.mockRejectedValueOnce(new Error("file not found"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { reader } = makeReader();
+    render(<RestoreHarness reader={reader} />);
+
+    await waitFor(() =>
+      expect(window.localStorage.getItem("faropdf:pending-detach")).toBeNull(),
+    );
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 });

@@ -10,7 +10,7 @@ import { createMemoryAnnotationStorage } from "./modules/annotation";
 import { AnnotationRepository } from "./modules/annotation";
 import { useReaderController, type ReaderController } from "./modules/reader";
 import { registerReadModeTools } from "./modules/reader/readerModeTools";
-import { openNativePdfFileDialog } from "./modules/reader/tauriPdfFileService";
+import { openNativePdfFileDialog, readPdfFileFromPath } from "./modules/reader/tauriPdfFileService";
 import { useTextSearchController } from "./modules/search";
 import { useOcrWorkspaceController } from "./modules/ocr";
 import type { PdfAnnotation } from "./shared";
@@ -20,6 +20,95 @@ import type { AppSettings } from "./shared/settings/types";
 import { createDefaultAppSettings } from "./shared/settings/defaults";
 import "./styles/app.css";
 import { TabProvider, useTabStore } from "./state/tabStore";
+
+/** ISS-NEW-F 第 3 步（2026-06-24）步 3：源窗口 tab 拖离后写入 localStorage 的待恢复 payload。 */
+interface PendingDetachPayload {
+  filePath: string;
+  fileName: string;
+  lastPage: number;
+}
+
+const PENDING_DETACH_STORAGE_KEY = "faropdf:pending-detach";
+
+/**
+ * ISS-NEW-F 第 3 步（2026-06-24）步 3：新窗口 mount 时尝试恢复源窗口拖离的 tab。
+ *
+ * 流程：
+ * 1. 读 localStorage `faropdf:pending-detach`；命中即尝试恢复
+ * 2. 调 Rust `read_pdf_file_from_path` 拿 bytes（避免在 localStorage 存大对象）
+ * 3. 调 `tabStore.openTab` 在新窗口的 tab store 注册该 tab（沿用源 filePath / fileName）
+ * 4. 调 `reader.openNativeFile` 加载文档，load 完成后调 `reader.setCurrentPage(lastPage)` 跳页
+ * 5. 完成后清掉 localStorage key（无论成功失败），避免下次启动误恢复
+ *
+ * 实现位置：作为 TabProvider 子节点，确保能调 `useTabStore()`。
+ * 仅运行一次（restoredRef 守卫 + React StrictMode 双调用安全）。
+ */
+export function PendingDetachRestore({ reader }: { reader: ReaderController }): null {
+  const tabStore = useTabStore();
+  const restoredRef = useRef(false);
+
+  useEffect(() => {
+    if (restoredRef.current) {
+      return;
+    }
+    restoredRef.current = true;
+
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem(PENDING_DETACH_STORAGE_KEY);
+    } catch (error) {
+      console.error("[ISS-NEW-F] localStorage read failed:", error);
+      return;
+    }
+
+    if (!raw) {
+      return;
+    }
+
+    let payload: PendingDetachPayload;
+    try {
+      const parsed = JSON.parse(raw) as Partial<PendingDetachPayload>;
+      if (
+        typeof parsed.filePath !== "string" ||
+        typeof parsed.fileName !== "string" ||
+        typeof parsed.lastPage !== "number" ||
+        !Number.isInteger(parsed.lastPage) ||
+        parsed.lastPage < 1
+      ) {
+        console.error("[ISS-NEW-F] pending-detach payload 字段缺失或类型错误", parsed);
+        window.localStorage.removeItem(PENDING_DETACH_STORAGE_KEY);
+        return;
+      }
+      payload = {
+        filePath: parsed.filePath,
+        fileName: parsed.fileName,
+        lastPage: parsed.lastPage,
+      };
+    } catch (error) {
+      console.error("[ISS-NEW-F] pending-detach JSON 解析失败:", error);
+      window.localStorage.removeItem(PENDING_DETACH_STORAGE_KEY);
+      return;
+    }
+
+    const { filePath, fileName, lastPage } = payload;
+    tabStore.openTab(filePath, fileName);
+
+    void readPdfFileFromPath(filePath)
+      .then((file) => reader.openNativeFile(file).then(() => reader.setCurrentPage(lastPage)))
+      .catch((error: unknown) => {
+        console.error("[ISS-NEW-F] pending-detach restore failed:", error);
+      })
+      .finally(() => {
+        try {
+          window.localStorage.removeItem(PENDING_DETACH_STORAGE_KEY);
+        } catch (error) {
+          console.error("[ISS-NEW-F] localStorage cleanup failed:", error);
+        }
+      });
+  }, [reader, tabStore]);
+
+  return null;
+}
 
 /**
  * ISS-NEW-F 第 3 步（2026-06-24）步 2：把 reader 的当前页码同步到 active tab 的 lastPage。
@@ -249,6 +338,7 @@ function App() {
 
   return (
     <TabProvider>
+      <PendingDetachRestore reader={reader} />
       <ActiveTabPageSync reader={reader} />
       <AppShell
         activeMode={activeMode}

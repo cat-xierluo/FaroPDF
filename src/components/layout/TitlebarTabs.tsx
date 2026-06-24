@@ -111,7 +111,7 @@ export function TitlebarTabs(props: TitlebarTabsProps): ReactElement | null {
     setDropTargetIndex(null);
   };
 
-  const handleDragEnd = (event: DragEvent<HTMLDivElement>, _index: number): void => {
+  const handleDragEnd = (event: DragEvent<HTMLDivElement>, index: number): void => {
     setDraggingIndex(null);
     setDropTargetIndex(null);
     // ISS-NEW-F 第 1 步（2026-06-22）：tab 拖离窗口外检测（HTML5 DnD 端）。
@@ -125,9 +125,25 @@ export function TitlebarTabs(props: TitlebarTabsProps): ReactElement | null {
       event.clientY < rect.top ||
       event.clientY > rect.bottom;
     if (isOutsideViewport) {
-      // ISS-NEW-F 第 2 步：v0.2 占位（文档句柄表待接入），开空新窗口 + 提示反馈。
-      // 真实流程：invoke('create_faropdf_window') 调 Rust 开新 WebviewWindow，
-      // 后续把当前 tab 的 document 状态（filePath / page / zoom / annotations）传过去。
+      // ISS-NEW-F 第 3 步（2026-06-24）：把 tab 状态（filePath / fileName / lastPage）写到
+      // localStorage（key=`faropdf:pending-detach`），新窗口 frontend mount 时读该 key 恢复。
+      // lastPage 由 ActiveTabPageSync 在 reader.currentPage 变化时同步到 tab（步 2 已 ship）。
+      const tab = tabs[index];
+      if (tab) {
+        try {
+          window.localStorage.setItem(
+            "faropdf:pending-detach",
+            JSON.stringify({
+              filePath: tab.filePath,
+              fileName: tab.title,
+              lastPage: tab.lastPage,
+            }),
+          );
+        } catch (error) {
+          console.error("[ISS-NEW-F] localStorage write failed:", error);
+        }
+      }
+      // 第 2 步：开空新 WebviewWindow（文档恢复由新窗口 mount 时 PendingDetachRestore 处理）。
       void invoke<string>("create_faropdf_window").catch((error: unknown) => {
         console.error("[ISS-NEW-F] create_faropdf_window invoke failed:", error);
       });
