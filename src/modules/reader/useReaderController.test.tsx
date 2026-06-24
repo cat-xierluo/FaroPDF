@@ -300,3 +300,148 @@ describe("useReaderController 阅读深化", () => {
     });
   });
 });
+
+// ISS-NEW-D 前往浏览历史栈（DEC-171）步 2 端到端测试：goBack + goToHistory API
+describe("useReaderController 浏览历史栈", () => {
+  let sessionStorage: ReturnType<typeof createMemoryReaderSessionStorage>;
+
+  beforeEach(() => {
+    vi.mocked(loadPdfFromFile).mockReset();
+    // 用内存 session storage 避免 jsdom localStorage 跨测试污染（其他测试存了 fp-test 7 页）
+    sessionStorage = createMemoryReaderSessionStorage();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("setCurrentPage 跳页 → state.history 累计；goBack 弹回", async () => {
+    vi.mocked(loadPdfFromFile).mockResolvedValue(createLoadedDocument());
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} sessionStorage={sessionStorage} />);
+
+    const file = new File([new Uint8Array([1])], "doc.pdf", { type: "application/pdf" });
+    await act(async () => {
+      await ref.current?.openFile(file);
+    });
+    await flushEffects();
+    expect(ref.current?.state.document?.currentPage).toBe(1);
+
+    // 跳 1 → 5 → 7
+    act(() => ref.current?.setCurrentPage(5));
+    act(() => ref.current?.setCurrentPage(7));
+    expect(ref.current?.state.document?.currentPage).toBe(7);
+    expect(ref.current?.state.history).toEqual([5, 1]);
+
+    // goBack 弹 history[0] (=5)，不再 push
+    act(() => ref.current?.goBack());
+    expect(ref.current?.state.document?.currentPage).toBe(5);
+    expect(ref.current?.state.history).toEqual([1]);
+
+    // 再 goBack → currentPage=1, history=[]
+    act(() => ref.current?.goBack());
+    expect(ref.current?.state.document?.currentPage).toBe(1);
+    expect(ref.current?.state.history).toEqual([]);
+
+    // 再 goBack (历史空) → no-op
+    act(() => ref.current?.goBack());
+    expect(ref.current?.state.document?.currentPage).toBe(1);
+  });
+
+  test("goToHistory(1) 跳到 history[0] 不 push（避免循环）", async () => {
+    vi.mocked(loadPdfFromFile).mockResolvedValue(createLoadedDocument());
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} sessionStorage={sessionStorage} />);
+
+    const file = new File([new Uint8Array([1])], "doc.pdf", { type: "application/pdf" });
+    await act(async () => {
+      await ref.current?.openFile(file);
+    });
+    await flushEffects();
+
+    act(() => ref.current?.setCurrentPage(5));
+    act(() => ref.current?.setCurrentPage(7));
+    expect(ref.current?.state.history).toEqual([5, 1]);
+
+    // 跳到 history[0] = 5，跳页不应 push
+    act(() => ref.current?.goToHistory(1));
+    expect(ref.current?.state.document?.currentPage).toBe(5);
+    expect(ref.current?.state.history).toEqual([5, 1]); // 不变
+  });
+
+  test("goToHistory(N) 越界 → no-op", async () => {
+    vi.mocked(loadPdfFromFile).mockResolvedValue(createLoadedDocument());
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} sessionStorage={sessionStorage} />);
+
+    const file = new File([new Uint8Array([1])], "doc.pdf", { type: "application/pdf" });
+    await act(async () => {
+      await ref.current?.openFile(file);
+    });
+    await flushEffects();
+
+    act(() => ref.current?.setCurrentPage(5));
+    expect(ref.current?.state.history).toEqual([1]);
+
+    // 越界：history 只有 1 项，goToHistory(5) 应 no-op
+    act(() => ref.current?.goToHistory(5));
+    expect(ref.current?.state.document?.currentPage).toBe(5); // 不变
+
+    // 非整数：no-op
+    act(() => ref.current?.goToHistory(1.5));
+    expect(ref.current?.state.document?.currentPage).toBe(5);
+
+    // 0 / 负数：no-op
+    act(() => ref.current?.goToHistory(0));
+    act(() => ref.current?.goToHistory(-1));
+    expect(ref.current?.state.document?.currentPage).toBe(5);
+  });
+
+  test("goToHistory(2) 跳到 history[1] = 1（跳回最早的访问）", async () => {
+    vi.mocked(loadPdfFromFile).mockResolvedValue(createLoadedDocument());
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} sessionStorage={sessionStorage} />);
+
+    const file = new File([new Uint8Array([1])], "doc.pdf", { type: "application/pdf" });
+    await act(async () => {
+      await ref.current?.openFile(file);
+    });
+    await flushEffects();
+
+    act(() => ref.current?.setCurrentPage(5));
+    act(() => ref.current?.setCurrentPage(7));
+    // history=[5, 1], currentPage=7
+    // goToHistory(2) 跳到 history[1] = 1
+    act(() => ref.current?.goToHistory(2));
+    expect(ref.current?.state.document?.currentPage).toBe(1);
+    expect(ref.current?.state.history).toEqual([5, 1]); // 不变
+  });
+
+  test("openFile 新文档 → 清空 history（跨文档不串台）", async () => {
+    vi.mocked(loadPdfFromFile).mockResolvedValue(createLoadedDocument());
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} sessionStorage={sessionStorage} />);
+
+    const file1 = new File([new Uint8Array([1])], "doc1.pdf", { type: "application/pdf" });
+    await act(async () => {
+      await ref.current?.openFile(file1);
+    });
+    await flushEffects();
+    act(() => ref.current?.setCurrentPage(5));
+    expect(ref.current?.state.history).toEqual([1]);
+
+    // 打开第二个文档（不同 fingerprint）
+    vi.mocked(loadPdfFromFile).mockResolvedValueOnce(
+      createLoadedDocument({
+        fileName: "doc2.pdf",
+        fingerprint: "fp-doc2",
+      }),
+    );
+    const file2 = new File([new Uint8Array([2])], "doc2.pdf", { type: "application/pdf" });
+    await act(async () => {
+      await ref.current?.openFile(file2);
+    });
+    await flushEffects();
+    expect(ref.current?.state.history).toEqual([]);
+  });
+});

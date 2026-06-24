@@ -31,7 +31,7 @@ export type ReaderAction =
   | { type: "reader/loadStarted"; payload: { fileName: string } }
   | { type: "reader/loadSucceeded"; payload: { documentId: string; metadata: ReaderLoadedMetadata } }
   | { type: "reader/loadFailed"; payload: { errorMessage: string } }
-  | { type: "reader/setCurrentPage"; payload: { currentPage: number } }
+  | { type: "reader/setCurrentPage"; payload: { currentPage: number; skipHistoryPush?: boolean } }
   | { type: "reader/setZoom"; payload: { zoom: number } }
   | { type: "reader/setViewMode"; payload: { viewMode: PdfViewMode } }
   | { type: "reader/setRotation"; payload: { rotation: PageRotation } }
@@ -157,11 +157,14 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
         return state;
       }
 
-      // ISS-NEW-D 前往浏览历史栈（DEC-171）：跳页前把旧页 push 到 history 顶部。
-      // 上限 HISTORY_LIMIT，超出丢最旧。reverse chronological order。
       const oldPage = state.document.currentPage;
-      const newHistory = [oldPage, ...(state.history ?? [])].slice(0, HISTORY_LIMIT);
       const document = { ...state.document, currentPage: newPage };
+
+      // ISS-NEW-D 前往浏览历史栈（DEC-171）：跳页前把旧页 push 到 history 顶部。
+      // goToHistory 等「直接跳到历史项」场景传 skipHistoryPush=true，避免循环。
+      const newHistory = action.payload.skipHistoryPush
+        ? (state.history ?? [])
+        : [oldPage, ...(state.history ?? [])].slice(0, HISTORY_LIMIT);
 
       return { ...state, document, history: newHistory, renderRange: updateRenderRange(document) };
     }

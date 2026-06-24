@@ -165,6 +165,36 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     dispatch({ type: "reader/setCurrentPage", payload: { currentPage } });
   }, []);
 
+  // ISS-NEW-D 前往浏览历史栈（DEC-171）步 2：
+  // 弹 history[0] 作为新 currentPage；不再 push（避免循环）。
+  // 无历史时 no-op。
+  const goBack = useCallback(() => {
+    dispatch({ type: "reader/goBack" });
+  }, []);
+
+  // 直接跳到 history[N-1]（1-indexed），不改变 history 栈（避免循环）。
+  // N 越界（>= history.length）时 no-op。
+  const goToHistory = useCallback(
+    (oneBasedIndex: number) => {
+      const history = state.history ?? [];
+      if (!state.document) {
+        return;
+      }
+      if (!Number.isInteger(oneBasedIndex) || oneBasedIndex < 1 || oneBasedIndex > history.length) {
+        return;
+      }
+      const target = history[oneBasedIndex - 1];
+      if (target === undefined) {
+        return;
+      }
+      dispatch({
+        type: "reader/setCurrentPage",
+        payload: { currentPage: target, skipHistoryPush: true },
+      });
+    },
+    [state.document, state.history],
+  );
+
   const setZoom = useCallback((zoom: number) => {
     dispatch({ type: "reader/setZoom", payload: { zoom: clampZoom(zoom) } });
   }, []);
@@ -319,6 +349,8 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     openFile,
     openNativeFile,
     setCurrentPage,
+    goBack,
+    goToHistory,
     setZoom,
     zoomIn,
     zoomOut,
