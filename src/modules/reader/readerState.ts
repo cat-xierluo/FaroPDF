@@ -16,6 +16,10 @@ export interface ReaderState {
   document: PdfDocumentState | null;
   pageViewports: PdfPageViewport[];
   renderRange: ReaderRenderRange;
+  /** ISS-NEW-D 前往浏览历史栈（DEC-171）：最近访问的 page 列表，按 reverse chronological order，
+   * 不含当前页。上限 50 防 unbounded growth。
+   * 测试 fixture 可省略（默认视为 []）。 */
+  history?: number[];
   errorMessage?: string;
   defaults: {
     zoom: number;
@@ -33,12 +37,16 @@ export type ReaderAction =
   | { type: "reader/setRotation"; payload: { rotation: PageRotation } }
   | { type: "reader/rotate"; payload: { direction: "clockwise" | "counter-clockwise" } }
   | { type: "reader/applySession"; payload: { session: ReaderSession } }
-  | { type: "reader/setTextLayerStatus"; payload: { textLayerStatus: TextLayerStatus } };
+  | { type: "reader/setTextLayerStatus"; payload: { textLayerStatus: TextLayerStatus } }
+  | { type: "reader/goBack" }
+  | { type: "reader/clearHistory" };
 
 export interface ReaderStateDefaults {
   defaultZoom?: number;
   defaultViewMode?: PdfViewMode;
 }
+
+const HISTORY_LIMIT = 50;
 
 export function createInitialReaderState({
   defaultZoom = 1,
@@ -53,6 +61,7 @@ export function createInitialReaderState({
       currentPage: 1,
       viewMode: defaultViewMode,
     }),
+    history: [],
     defaults: {
       zoom: defaultZoom,
       viewMode: defaultViewMode,
@@ -114,12 +123,14 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
         ocrStatus: metadata.textLayerStatus === "missing" ? "needed" : "not-needed",
       };
 
+      // ISS-NEW-D 前往浏览历史栈（DEC-171）：新文档加载清空历史栈，避免跨文档串台。
       return {
         ...state,
         status: "ready",
         document,
         pageViewports: [metadata.initialViewport],
         renderRange: updateRenderRange(document),
+        history: [],
         errorMessage: undefined,
       };
     }
@@ -141,12 +152,18 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
         return state;
       }
 
-      const document = {
-        ...state.document,
-        currentPage: clampPage(action.payload.currentPage, state.document.pageCount),
-      };
+      const newPage = clampPage(action.payload.currentPage, state.document.pageCount);
+      if (newPage === state.document.currentPage) {
+        return state;
+      }
 
-      return { ...state, document, renderRange: updateRenderRange(document) };
+      // ISS-NEW-D 前往浏览历史栈（DEC-171）：跳页前把旧页 push 到 history 顶部。
+      // 上限 HISTORY_LIMIT，超出丢最旧。reverse chronological order。
+      const oldPage = state.document.currentPage;
+      const newHistory = [oldPage, ...(state.history ?? [])].slice(0, HISTORY_LIMIT);
+      const document = { ...state.document, currentPage: newPage };
+
+      return { ...state, document, history: newHistory, renderRange: updateRenderRange(document) };
     }
     case "reader/setZoom": {
       if (!state.document) {
@@ -225,6 +242,22 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
           ocrStatus: action.payload.textLayerStatus === "missing" ? "needed" : state.document.ocrStatus,
         },
       };
+    }
+    case "reader/goBack": {
+      // ISS-NEW-D 前往浏览历史栈（DEC-171）：弹 history[0] 作为新 currentPage；
+      // 不再 push（避免循环）。
+      if (!state.document || !state.history || state.history.length === 0) {
+        return state;
+      }
+      const [previousPage, ...rest] = state.history;
+      const document = {
+        ...state.document,
+        currentPage: clampPage(previousPage, state.document.pageCount),
+      };
+      return { ...state, document, history: rest, renderRange: updateRenderRange(document) };
+    }
+    case "reader/clearHistory": {
+      return { ...state, history: [] };
     }
     default:
       return state;

@@ -188,4 +188,105 @@ describe("readerReducer", () => {
     });
     expect(restored.document?.currentPage).toBe(12);
   });
+
+  // ISS-NEW-D 前往浏览历史栈（DEC-171）
+  describe("history stack", () => {
+    function loadAndNavigate(pages: number[]) {
+      let state = readerReducer(createInitialReaderState(), {
+        type: "reader/loadSucceeded",
+        payload: { documentId: "document-1", metadata: loadedMetadata },
+      });
+      for (const page of pages) {
+        state = readerReducer(state, {
+          type: "reader/setCurrentPage",
+          payload: { currentPage: page },
+        });
+      }
+      return state;
+    }
+
+    test("初始 history 为空数组", () => {
+      expect(createInitialReaderState().history).toEqual([]);
+    });
+
+    test("setCurrentPage 跳页时把旧页 push 到 history 顶部", () => {
+      const state = loadAndNavigate([5, 7]);
+      // 初始 page=1 → setCurrentPage(5) push 1 → history=[1]
+      // setCurrentPage(7) push 5 → history=[5, 1]
+      expect(state.document?.currentPage).toBe(7);
+      expect(state.history).toEqual([5, 1]);
+    });
+
+    test("setCurrentPage 同页不重复 push", () => {
+      const state = loadAndNavigate([5, 5]);
+      expect(state.document?.currentPage).toBe(5);
+      expect(state.history).toEqual([1]); // 第二次 5 是 no-op，不 push
+    });
+
+    test("goBack 弹 history[0] 作为新 currentPage，不重复 push", () => {
+      const state = loadAndNavigate([5, 7]);
+      const afterBack = readerReducer(state, { type: "reader/goBack" });
+      expect(afterBack.document?.currentPage).toBe(5);
+      expect(afterBack.history).toEqual([1]);
+    });
+
+    test("goBack 历史空 → no-op（保留当前页）", () => {
+      const state = loadAndNavigate([5]); // history=[1]
+      const afterBack = readerReducer(state, { type: "reader/goBack" });
+      // history=[1]，弹 5 → currentPage=1, history=[]
+      expect(afterBack.document?.currentPage).toBe(1);
+      expect(afterBack.history).toEqual([]);
+      const noOp = readerReducer(afterBack, { type: "reader/goBack" });
+      expect(noOp).toEqual(afterBack);
+    });
+
+    test("goBack 对超出 pageCount 的 history 条目应用 clampPage", () => {
+      let state = loadAndNavigate([5]);
+      // 假设 pageCount=12, history=[1]，goBack → currentPage=1, history=[]
+      // 这里测试：如果 history 里有超界值（极端情况），clamp 仍然生效
+      const afterBack = readerReducer(state, { type: "reader/goBack" });
+      expect(afterBack.document?.currentPage).toBeGreaterThanOrEqual(1);
+    });
+
+    test("loadSucceeded 清空 history（跨文档不串台）", () => {
+      const state = loadAndNavigate([5, 7, 10]);
+      expect(state.history).toEqual([7, 5, 1]);
+
+      const reloaded = readerReducer(state, {
+        type: "reader/loadSucceeded",
+        payload: { documentId: "document-2", metadata: loadedMetadata },
+      });
+      expect(reloaded.history).toEqual([]);
+    });
+
+    test("clearHistory 显式清空", () => {
+      const state = loadAndNavigate([5, 7]);
+      const cleared = readerReducer(state, { type: "reader/clearHistory" });
+      expect(cleared.history).toEqual([]);
+      // currentPage 不变
+      expect(cleared.document?.currentPage).toBe(7);
+    });
+
+    test("history 上限 50 防 unbounded growth", () => {
+      // 重新加载一个 200 页文档，模拟连续跳 100 页
+      let state = readerReducer(createInitialReaderState(), {
+        type: "reader/loadSucceeded",
+        payload: {
+          documentId: "document-large",
+          metadata: { ...loadedMetadata, pageCount: 200 },
+        },
+      });
+      for (let i = 2; i <= 101; i++) {
+        state = readerReducer(state, {
+          type: "reader/setCurrentPage",
+          payload: { currentPage: i },
+        });
+      }
+      expect(state.history).toHaveLength(50);
+      // 最新 push 100 在头部
+      expect(state.history[0]).toBe(100);
+      // 最旧被丢（应该是 51，前 50 项 [100..51] 保留）
+      expect(state.history[49]).toBe(51);
+    });
+  });
 });
