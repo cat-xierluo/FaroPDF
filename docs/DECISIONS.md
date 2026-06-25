@@ -6978,3 +6978,57 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - Tauri 文档句柄表（多窗口共享同一 PDF 源 bytes，避免每窗口重读文件）— 性能优化，后续
 
 **关联**：ISS-NEW-F 任务卡（line 1201+ 4 验收项中 2/4 闭环：tab 拖离 → 新窗口接管 ✅ / 新窗口能继续读取文档 ✅；编辑模式跨 tab 拖页 / 多窗口共享 recentFiles+annotations 留后续）/ DEC-162（第 1 步）/ DEC-163（第 2 步）/ memory `feedback_pm_decisiveness`（小步独立验证策略）。
+
+## DEC-171 ISS-NEW-D 阶段 5：前往浏览历史栈实质接通（PM 单 session，2026-06-25）
+
+- 时间：2026-06-25
+- 类型：UI 信息架构 / macOS 原生菜单 / 实质行为接通
+- 关联：ISS-NEW-D 任务卡（line 1172+ 前往浏览历史栈验收项）/ DEC-159（前往菜单 ship 5+5 占位）/ memory `feedback_pm_decisiveness`（分 3 块小步独立验证 — DEC-170 教训）
+
+**决策**：分 3 块小步推进（DEC-170 验证有效 pattern），避免大提交回退风险。
+
+**第 1 块**（commit `48e1684`，`src/modules/reader/readerState.ts`）：reader 内部状态先就位。
+- `ReaderState.history?: number[]`（optional 兼容既有 test fixture）
+- `setCurrentPage` action：跳页前把旧页 push 到 history 顶部（dedupe 连续同页短路）
+- `loadSucceeded` action：清空 history（跨文档不串台）
+- 新增 `reader/goBack` action：弹 history[0] 作为新 currentPage，不再 push（避免循环）
+- 新增 `reader/clearHistory` action
+- `HISTORY_LIMIT = 50` 防 unbounded growth，超出丢最旧
+- 测试：readerReducer +8 测（初始空 / push 旧页 / 同页 no-op / goBack 弹 / 历史空 no-op / clampPage / 跨文档清空 / clearHistory 显式清 / 上限 50）
+
+**第 2 块**（commit `e64b4d8`，`src/modules/reader/useReaderController.ts`）：暴露 API。
+- `goBack()`：dispatch reader/goBack
+- `goToHistory(oneBasedIndex)`：跳到 history[N-1]，传 `skipHistoryPush: true` 避免循环
+- `setCurrentPage` payload 加可选 `skipHistoryPush` 字段（默认 false，向后兼容）
+- 边界：goToHistory 越界 / 非整数 / < 1 / 无文档 → no-op
+- 测试：useReaderController +5 测（push+pop 完整流程 / goToHistory 不 push / 越界 no-op / 跨文档清空）
+- 测试用 `createMemoryReaderSessionStorage` 隔离 localStorage（避免其他测试残留 fp-test session 污染）
+
+**第 3 块**（commit `8725724`，`src/components/layout/AppShell.tsx`）：路由命令。
+- `go-back`：无文档 → 「请先打开 PDF 文档」；无历史 → 「没有可返回的浏览历史」；有效 → `reader.goBack()` + 「已返回第 X 页」
+- `go-history-1..5`：无文档 → 「请先打开 PDF 文档」；越界 → 「浏览历史只有 M 项，无法跳到第 N 个」；有效 → `reader.goToHistory(N)` + 「已跳到浏览历史第 N 项（第 X 页）」
+- makeReader mock 工厂加 `goBack` / `goToHistory` spies
+- 测试：AppShell +5 测覆盖 go-back 3 个分支（正常/无历史/无文档）+ go-history-1..3 + 越界
+
+**Verification**：
+- typecheck ✅
+- readerReducer 19/19 ✅
+- useReaderController 历史栈 5 测全过 ✅（注：原 zoomIn/zoomOut 测预存在失败 — localStorage 跨测试污染，DEC-099 已知，与本次改动无关）
+- AppShell ISS-NEW-D 5 测全过 ✅
+
+**ISS-NEW-D 4 菜单收口现状**：
+| 菜单 | ship 状态 |
+| --- | --- |
+| 批注 | ✅ 真实 arm（DEC-167）/ 形状 submenu 实 arm |
+| 扫描 | ✅ 真实接通（DEC-168） |
+| 编辑 PDF | ⏳ v0.2 占位（依赖未来 PDF 编辑 API） |
+| 前往 | ✅ 5 顶层 + 5 历史 submenu 真实接通（本 commit）+ 浏览历史栈 +1 返回 |
+
+**out of scope（明确留给后续）**：
+- ISS-NEW-D 编辑 PDF 菜单 5 动作真实 PDF 内容编辑链路
+- ⌘ 快捷键与 PDF Expert 对齐（菜单 shortcut 分配）
+- 跨窗口共享 recentFiles / annotations（ISS-NEW-F 留后续）
+- 跨 tab 拖页（ISS-NEW-F 留后续）
+- Playwright 960×720 实操验证（pre-existing AppShell.test.tsx 挂起环境问题，DEC-099 / DEC-165）
+
+**关联**：ISS-NEW-D 任务卡 / DEC-159（前往菜单 ship）/ DEC-170（同样 3 块模式，验证有效）。

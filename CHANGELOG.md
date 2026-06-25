@@ -42,6 +42,12 @@
 
 > v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~158。
 
+ISS-NEW-D 阶段 5：前往浏览历史栈 实质接通（PM 单 session / DEC-171）：
+- **第 1 块**（commit `48e1684`）：`ReaderState.history` 字段（reverse chronological order，上限 50）+ `setCurrentPage` 跳页前 push 旧页（dedupe 连续同页）+ `reader/goBack` action（弹顶部 + 不 push）+ `reader/clearHistory` + `loadSucceeded` 跨文档清空。readerReducer +8 测（19/19 ✅）。
+- **第 2 块**（commit `e64b4d8`）：useReaderController 暴露 `goBack()` + `goToHistory(N)` API；`setCurrentPage` payload 加可选 `skipHistoryPush` 字段供 `goToHistory` 避免循环。useReaderController +5 测覆盖（push / pop / goToHistory 不 push / 越界 / 跨文档清空）。
+- **第 3 块**（commit `8725724`）：AppShell 路由 6 个命令（`go-back` + `go-history-1..5`）从 v0.2 占位反馈改为实质接通。无文档 → 「请先打开 PDF 文档」；`go-back` 无历史 → 「没有可返回的浏览历史」；`go-history-N` 越界 → 「浏览历史只有 M 项」；有效 → 调 reader API + 反馈页码。AppShell +5 测。
+- 前往菜单 5 顶层（首页/末页/上一页/下一页/返回）+ 浏览历史 submenu（5 项）全部从 v0.2 占位反馈改为实质接通。
+
 ISS-NEW-F 第 3 步：跨窗口 detach 状态共享 3 块 ship（PM 单 session / DEC-170）：
 - **第 1 块**（commit `c6b31cb`）：`tabStore.tsx` 扩展 `PdfTab.lastPage` 字段 + `SET_LAST_PAGE` action + `setLastPage(tabId, lastPage)` API，非法输入（0 / 负数 / 浮点）no-op。tabStore +4 测（17/17 ✅）。
 - **第 2 块**（commit `4729231`）：`App.tsx` 加 `ActiveTabPageSync` 内层组件（TabProvider 子节点），把 `reader.state.document.currentPage` 同步到 active tab 的 `lastPage`。边界：document 为 null / active tab.filePath 不匹配 / lastPage === currentPage 都不 dispatch。App +4 测（10/10 ✅）。

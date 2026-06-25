@@ -1193,7 +1193,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [ ] 批注 8 工具真实 arm / 形状 6 项真实绘制 / 6 形状扩 PDF_ANNOTATION_TYPES — 留后续
   - [ ] 扫描 4 档质量 + 4 顶层动作真实 OCR 入口 — 留后续
   - [ ] 编辑 PDF 5 动作真实 PDF 内容编辑链路 — 留后续
-  - [ ] 前往浏览历史栈（5 历史 + 1 返回）— 留后续
+  - [x] 前往浏览历史栈（5 历史 + 1 返回）— DEC-171（3 块 ship：readerState history 字段 + controller goBack/goToHistory API + AppShell 路由）
   - [ ] 批注菜单 9 辅助 command 真实功能（链接 / 内容表 / 删除 / 跳到批注 / 折叠 / 展开）— 留后续
   - [ ] ⌘ 快捷键与 PDF Expert 对齐 — 留后续
 
@@ -1424,6 +1424,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 2026-06-23：完成 ISS-NEW-D 阶段 4 收口（DEC-168）：扫描菜单 4 档质量 + 3 顶层动作（扫描至可搜索 / OCR 文字 / 调整为可搜索）从 v0.2 占位反馈改为实质接通 — 调 `ocr.startOcr()` 启动 OCR 任务 + 反馈。4 档质量档当前都触发 startOcr（OcrWorkspaceController.startOcr 暂无 quality 参数，差异 v0.2 polish）。`ocr-enhance-all` 留 v0.2 占位（需 reader controller 加 batch OCR 接入）。commit + typecheck ✅。
 - 2026-06-23：完成 App.test.tsx ISS-NEW-I 同步修复（DEC-169）：`uses contextual toolbars and task workspaces` 测试断言从 PageOrganizerWorkspace 时代的 `页面管理工作台 / 页面管理空态 / 页面管理工具条` 同步到 ISS-NEW-I（DEC-147）后 `EditModeGridView` 实际暴露的 aria-label（`编辑模式网格 / 打开 PDF 后进入 T 编辑 / 编辑模式工具条`）。行为契约不变（点击 页面管理 → pages mode → 编辑模式网格），仅同步测试期望到 ISS-NEW-I 的实现现状。commit `bdc0469` + App.test 6/6 ✅ + typecheck ✅。
 - 2026-06-24：完成 ISS-NEW-F 第 3 步 3 块 ship（DEC-170）：跨窗口 detach 状态共享闭环 — 第 1 块 `tabStore.PdfTab.lastPage` 字段 + `setLastPage` API（commit `c6b31cb`，tabStore 17/17 ✅）；第 2 块 `App.tsx` `ActiveTabPageSync` 内层组件同步 `reader.currentPage` → active tab.lastPage（commit `4729231`，App 10/10 ✅）；第 3 块 `TitlebarTabs.handleDragEnd` 写 localStorage `faropdf:pending-detach` + `App.tsx` `PendingDetachRestore` 内层组件新窗口 mount 读 key → 调 `readPdfFileFromPath` + `openNativeFile` + `setCurrentPage` → finally 清 key（commit `7a565ea`，TitlebarTabs 10/10 + App 15/15 ✅）。test/setup.ts 加 testing-library auto-cleanup 受益全 suite。任务卡状态更新为「✅ 第 1+2+3 步收口」，4 验收项中 2/4 ship（tab 拖离 + 新窗口读文档）；跨 tab 拖页 + 多窗口共享 recentFiles/annotations 留后续。
+- 2026-06-25：完成 ISS-NEW-D 阶段 5（DEC-171）：前往浏览历史栈实质接通 3 块 ship — 第 1 块 `ReaderState.history` 字段 + `setCurrentPage` push 旧页 + `goBack` action + `loadSucceeded` 清空（commit `48e1684`，readerReducer 19/19 ✅）；第 2 块 `useReaderController` 暴露 `goBack()` + `goToHistory(N)` API，`setCurrentPage` payload 加可选 `skipHistoryPush` 避免循环（commit `e64b4d8`，useReaderController 历史栈 5 测全过 ✅）；第 3 块 `AppShell` 路由 `go-back` + `go-history-1..5` 共 6 个命令从 v0.2 占位改为实质接通（commit `8725724`，AppShell ISS-NEW-D 5 测全过 ✅）。ISS-NEW-D 任务卡「前往浏览历史栈（5 历史 + 1 返回）」勾 [x]，前往菜单 5 顶层 + 5 历史 submenu 全部真实接通。
 - 2026-06-23：完成 ISS-NEW-D 阶段 3 收口（DEC-167）：批注形状 submenu 6 项从 v0.2 占位反馈改为实质 arm — `PDF_ANNOTATION_TYPES` 扩 3 类型（`ellipse` / `double-arrow` / `line`）+ `ANNOTATION_TOOL_LIST` 加 3 descriptor + 6 个相关 dict 同步扩 3 类型 + AppShell 形状 submenu 路由 `armAnnotationTool` 真实接通。AnnotationOverlay 渲染保持 v0.2 占位（drawEllipse / drawLine / drawDoubleArrow 后续 worker 接入）。commit `dae...` + typecheck ✅ + 127/127 annotation 测。
 - 2026-06-23：完成 ISS-NEW-H 第 3 阶段收口（DEC-166）：视图菜单补 7 command id（滚动模式 / 翻页模式 / 工具栏 toggle / 左侧边栏 toggle / 适合屏幕）+ 2 真实行为接通（view-reload 简化为 window.location.reload() / view-add-bookmark 写回 recentFiles[].lastPage）。commit `da4305b` + 14/14 ISS-NEW-H 测。
 - 2026-06-23：完成 ISS-NEW-E 任务卡收口（DEC-164）：5 模式 L4 + `pages` mode PageOrganizerWorkspace 全部 ship，8 验收项勾选 [x]。任务卡状态由"第 1 步完成"更新为"✅ 已完成（阶段 1+2）"。原计划"按需触发 edit 模式 L4"已通过 pages mode PageOrganizerWorkspace（ISS-046 / DEC-152）满足。
