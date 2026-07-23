@@ -39,7 +39,7 @@ describe("EditModeGridView (ISS-NEW-I)", () => {
     expect(screen.getByText(/打开 PDF 后进入 T 编辑/)).toBeTruthy();
   });
 
-  test("有文档 → 渲染 5 列网格 + 页面卡片", () => {
+  test("有文档 → 渲染当前页面卡片集合", () => {
     render(<EditModeGridView reader={createMockReader({ pageCount: 12 })} />);
     const cards = screen.getAllByTestId("edit-mode-grid-card");
     // 上限 60，pageCount 12 → 渲染 12
@@ -47,7 +47,7 @@ describe("EditModeGridView (ISS-NEW-I)", () => {
     expect(screen.getByTestId("edit-mode-grid-count").textContent).toContain("共 12 页");
   });
 
-  test("pageCount > 60 → 仅显示前 60 个卡片（截图 80/81 多页文档）", () => {
+  test("pageCount > 60 → 当前 skeleton 仅显示前 60 个卡片", () => {
     render(<EditModeGridView reader={createMockReader({ pageCount: 120 })} />);
     const cards = screen.getAllByTestId("edit-mode-grid-card");
     expect(cards.length).toBe(60);

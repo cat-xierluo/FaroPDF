@@ -1,13 +1,13 @@
 import { useId, useState, type ReactElement } from "react";
 
-/** ISS-NEW-C：右栏「OCR 状态」面板（截图 53 对齐）。
+/** 右栏「OCR 状态」历史 skeleton；R10 只能证明 OCR 对话框，不能证明本面板层级。
  *  - state: idle / running / completed / failed
  *  - message: 状态文字（自由文案）
  *  - progress: 0..1（仅在 running / completed 显式渲染）
  *  - error: 仅 failed 显示
  *
- *  本视图不发起真实 OCR 调用；onStart 由调用方实现，
- *  当前为 placeholder（PM Mission 明确：真实 OCR 不在本任务）。 */
+ *  本视图不发起真实 OCR 调用；onStart 由调用方实现，当前为 placeholder。
+ *  目标状态与真实 controller 接线分别等待 M1 与 M5。 */
 export type OcrJobStatusState = "idle" | "running" | "completed" | "failed";
 
 export interface OcrJobStatus {

@@ -212,10 +212,9 @@ export function AppShell({
   }, [activeMode]);
   // override 优先（用户 tab 显式切换），否则用 mode 默认派生
   const rightPanel: RightPanelId = rightPanelOverride ?? defaultRightPanel;
-  // ISS-NEW-I（W2 worker）：L3 联动 — T 编辑模式（activeMode === "forms"）下，
-  // 用户从 Toolbar L3 段4「形状/搜索」二级按钮进入时应自动打开右栏 shape / search
-  // panel。当前实现：进入 forms 模式且 rightPanel === "none" 时，派生为 "shape"。
-  // annotate 模式默认走 stamps（保持原派生），不动既有行为。
+  // 历史 ISS-NEW-I fallback：forms 在无右栏时会派生 shape。
+  // 这不是现行“T 编辑”合同（T 编辑实际是 pages），也未经过可靠证据验收；
+  // 保留为 implementation-map 中的待修行为，M1 前不在上下文里合理化它。
   const rightPanelWithEditFallback: RightPanelId =
     rightPanel === "none" && activeMode === "forms" ? "shape" : rightPanel;
   const showRightPanel =
@@ -666,10 +665,8 @@ export function AppShell({
       return;
     }
 
-    // ISS-NEW-D 阶段 1（2026-06-22）：批注菜单 8 工具（armAnnotationTool 真实 arm）。
-    // 形状 submenu 6 项（rectangle / ellipse / arrow / double-arrow / line / pen）v0.2 占位
-    // 反馈（PDF_ANNOTATION_TYPES 当前仅 rectangle / arrow / ink，缺 ellipse / line / double-arrow，
-    // 真实形状绘制由 AnnotationOverlay 接 armAnnotationTool，DEC-147 已 ship 6 段 ShapeToolPanel）。
+    // 批注菜单命令会 arm 对应工具。ellipse / line / double-arrow 已进入类型契约；
+    // 具体绘制能力与形状右栏层级仍需分别按 implementation-map 和 M1/M4 验收。
     const annotationArmSetter = annotationArmed?.onStateChange;
     if (command.id === "annotation-highlight" && annotationArmSetter) {
       annotationArmSetter(armAnnotationTool(annotationState, "highlight"));

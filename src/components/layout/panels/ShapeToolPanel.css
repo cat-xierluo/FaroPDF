@@ -1,5 +1,4 @@
-/* ISS-NEW-I（W2 worker）：形状工具右栏 6 段（PDF Expert 截图 59）
- * 独立 CSS 文件，遵循 W2 worker 边界：不改 src/styles/app.css。 */
+/* 形状工具历史 skeleton；分组和尺寸尚未通过 M1/accepted-golden。 */
 
 .shape-panel {
   display: flex;
@@ -29,7 +28,7 @@
   text-transform: uppercase;
 }
 
-/* 段 1：形状选择 2×3 网格 */
+/* 当前 skeleton 的形状选择网格 */
 .shape-panel__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

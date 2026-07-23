@@ -96,9 +96,8 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
     onModeChange(activeMode === mode ? "read" : mode);
   }
 
-  // ISS-NEW-A 阶段 2 / ISS-NEW-B 收口（2026-06-22）：旋转按钮从 L3 reading 段下移到
-  // L4 二级工具条（AppShell `<ReadModeToolbar>`），复用 reader.rotateClockwise /
-  // rotateCounterClockwise / setZoomPreset（"fit-page"）。L3 handleRotate 已废弃。
+  // DEC-173：read 当前不渲染 L4。旋转/适合页面不在本 L3 分区渲染，
+  // 由已验证的菜单或后续经 M1 取证的入口承载；不得恢复旧 ReadModeToolbar 注释。
 
   return (
     <header className="toolbar" data-testid="app-toolbar">
@@ -141,9 +140,8 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
         >
           <PanelTop size={16} />
         </button>
-        {/* ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏 4 toggle 第 4 个「书签」。
-            与 PDF Expert L3 严格 4 sidebar 按钮对齐（缩略图 / 大纲 / 批注 / 书签）。
-            当前 panel 内容占位（BookmarkPanel），真实书签列表 + 添加 / 跳转 / 持久化留后续 worker。 */}
+        {/* 当前第 4 个侧栏 toggle「书签」；四按钮结构尚未通过 accepted-golden。
+            panel 内容仍是 BookmarkPanel 占位，真实列表/添加/跳转/持久化见 implementation-map。 */}
         <button
           aria-label="书签"
           aria-pressed={utilityPanel === "bookmark" && activeMode !== "pages"}
@@ -261,9 +259,8 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
             );
           })}
         </div>
-        {/* ISS-NEW-A 阶段 2 / ISS-NEW-B 收口（2026-06-22）：2 个旋转按钮从 L3 reading 段
-            下移到 L4 二级工具条（AppShell `<ReadModeToolbar>`），让 reading 段瘦身到 4 元素
-            （页码 + 视图模式 4-icon toggle + 缩放% + -/+），对齐 PDF Expert 4-icon 布局。 */}
+        {/* DEC-173：read-mode items 在这里被过滤；read 无 L4。
+            现有 L3 结构只算 geometry-verified，不声称与 PDF Expert 视觉对齐。 */}
         <ModeActiveTools
           activeMode={activeMode}
           reader={reader}
@@ -425,9 +422,8 @@ function ModeActiveTools({
 }) {
   const state: ToolbarState = { activeMode, reader, search };
   const hasDocument = reader.state.document !== null;
-  // ISS-NEW-A 阶段 2 / ISS-NEW-B 收口（2026-06-22）：read-mode 工具（旋转 + 适合页面）
-  // 不在 L3 reading 段渲染，由 AppShell 的 L4 二级工具条 `<ReadModeToolbar>` 接管。
-  // 其他模式（annotate / export / forms / ocr / pages）继续在 reading 段渲染 ModeActiveTools。
+  // DEC-173：read 不渲染 L4，read-mode items 在 L3 也保持过滤。
+  // 其他模式仍按当前注册表渲染；其目标层级要等 M1 逐态取证。
   const items = getModeTools(activeMode)
     .filter(() => activeMode !== "read" && hasDocument)
     .slice()

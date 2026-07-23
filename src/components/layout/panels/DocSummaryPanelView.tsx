@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-/** ISS-NEW-C：右栏「文档摘要」面板输入（截图 61 对齐）。
+/** 右栏「文档摘要」历史 skeleton；当前没有可靠参考图证明字段层级或顺序。
  *  - fileName: 当前打开 PDF 的文件名
  *  - pageCount: 总页数
  *  - fileSizeBytes: 文件字节数

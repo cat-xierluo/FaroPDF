@@ -1,5 +1,4 @@
-/* ISS-NEW-I（W2 worker）：搜索结果右栏 4 段（PDF Expert 截图 41）
- * 独立 CSS 文件，遵循 W2 worker 边界：不改 src/styles/app.css。 */
+/* 搜索结果历史 skeleton；层级和尺寸尚未通过 M1/accepted-golden。 */
 
 .search-panel {
   display: flex;

@@ -9,19 +9,10 @@ import {
 } from "lucide-react";
 import "./ShapeToolPanel.css";
 
-/** ISS-NEW-I（W2 worker）：形状工具右栏 6 段。
+/** 形状工具右栏的历史 skeleton。
  *
- * 设计参照：research/pdf-expert/FEATURE_CATALOG.md §3 + 截图 59。
- *
- * 段 1 形状选择 2×3 网格：矩形 / 椭圆 / 箭头 / 双向箭头 / 直线 / 铅笔
- * 段 2 线条工具：实线 / 虚线 二选一
- * 段 3 线条宽度：1-12 px 滑块
- * 段 4 不透明度：10-100 % 滑块
- * 段 5 边框色：7 色块（黑/红/橙/黄/绿/蓝/紫）
- * 段 6 填充色：7 色块 + 透明
- *
- * 真实绘制引擎（shape 拖到页面画布 → 写入 PDF annotation）由后续 worker 接入；
- * 本任务只做 UI 结构 + 受控 state + 占位 `onChange` 回调。
+ * 当前控件分组来自已降级的旧 catalog，DEC-173 不再承认“固定 6 段”是 PDF Expert
+ * 规格。组件只有受控 UI；真实绘制和目标层级分别等待 M3/M4 与 M1 证据。
  */
 
 export type ShapeKind = "rectangle" | "ellipse" | "arrow" | "double-arrow" | "line" | "pencil";
@@ -91,7 +82,7 @@ export function ShapeToolPanel({ value, onChange }: ShapeToolPanelProps = {}): R
 
   return (
     <section className="shape-panel" data-testid="shape-tool-panel" aria-label="形状工具">
-      {/* 段 1：形状选择 2×3 网格（截图 59 第 1 段） */}
+      {/* 当前 skeleton 的形状选择网格；未通过 accepted-golden。 */}
       <div className="shape-panel__section">
         <span className="shape-panel__heading">形状</span>
         <div className="shape-panel__grid" role="radiogroup" aria-label="形状选择">

@@ -2,17 +2,10 @@ import { useCallback, useMemo, type ReactElement } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import "./SearchResultsPanel.css";
 
-/** ISS-NEW-I（W2 worker）：搜索结果右栏 4 段（PDF Expert 截图 41）。
+/** 搜索结果右栏的历史 skeleton。
  *
- * 设计参照：research/pdf-expert/FEATURE_CATALOG.md §3 + 截图 41。
- *
- * 段 1 header：「已找到 N 项」+ 查询关键词回显
- * 段 2 输入框 + X 关闭按钮：受控 + onChange + onClose
- * 段 3 命中列表：每行 "Line N" + 文本片段，关键词高亮
- * 段 4 footer：「回到第 1 项」+ 上下页码导航
- *
- * 真实查询走 TextSearchController；本组件只消费 results + 提供 onChangeQuery /
- * onSelectHit / onJumpPrevious / onJumpNext / onClose 占位回调。
+ * R06 只证明搜索结果面板、命中高亮和结果列表存在；旧 catalog 的固定四段与具体
+ * footer 不是现行合同。组件当前只消费 results 并暴露回调，真实层级等待 M1 量测。
  */
 
 export interface SearchHitItem {
@@ -42,7 +35,7 @@ function highlightSnippet(snippet: string, query: string): ReactElement {
   if (!trimmed) {
     return <>{snippet}</>;
   }
-  // 简单高亮：按 trim 后 query 分段切分片段，保留大小写敏感匹配（PDF Expert 截图 41 风格）
+  // 当前本地高亮实现；不声称与 PDF Expert 视觉一致。
   const lower = snippet.toLowerCase();
   const needle = trimmed.toLowerCase();
   const segments: Array<{ text: string; matched: boolean }> = [];

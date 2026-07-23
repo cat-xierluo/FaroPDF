@@ -1,5 +1,5 @@
-/* ISS-NEW-I：T 编辑模式页面网格视图（PDF Expert 5 列 + 蓝边框选中 + drop indicator）
- * 独立 CSS 文件，遵循 W2 worker 边界：不改 src/styles/app.css。 */
+/* T 编辑历史 skeleton。DEC-173 已撤销“PDF Expert 固定 5 列”规格；
+ * 下列列数/断点只是待 M3 替换的当前实现，不是目标合同。 */
 
 .edit-mode-grid {
   display: flex;
@@ -34,7 +34,7 @@
   color: var(--muted);
 }
 
-/* 5 列 PDF Expert 网格：minmax 让小屏自适应收缩；gap 宽，匹配截图 80/81 间距 */
+/* 当前临时列数。M1 量测卡片最小宽度、gap 和断点后由 M3 重写。 */
 .edit-mode-grid__list {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -83,7 +83,7 @@
 }
 
 .edit-mode-grid__card--selected {
-  /* 蓝边框选中 — 截图 80/81/83 风格 */
+  /* 当前选中态；尚未经过 accepted-golden 验收。 */
   border-color: var(--accent, #2a8df0);
   border-width: 2px;
   box-shadow: 0 0 0 2px rgba(42, 141, 240, 0.2);

@@ -83,8 +83,8 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
     signatures: { title: "签名", hint: "右栏画手写签名或选历史签名，落入文档" },
     "export-preview": { title: "导出预览", hint: "在导出模式下，右栏展示导出文件预览" },
     "ocr-queue": { title: "OCR 队列", hint: "OCR 模式不进入批注流程" },
-    // ISS-NEW-C（扩展不改写）：文档摘要 + OCR 状态
-    summary: { title: "文档摘要", hint: "文件名 / 页数 / 大小 / 元数据，截图 61 对齐" },
+    // 历史 skeleton：具体字段、顺序和密度等待 M1 参考证据。
+    summary: { title: "文档摘要", hint: "文件名 / 页数 / 大小 / 元数据；目标层级待 M1 验证" },
     "ocr-status": { title: "OCR 状态", hint: "当前 OCR 任务状态 + 页码范围 + 开始按钮（placeholder）" },
     shape: { title: "形状", hint: "批注时插入矩形/椭圆/箭头/直线/铅笔，含线宽/不透明度/边框/填充色。" },
     search: { title: "搜索", hint: "批注文档的全文搜索命中导航与高亮。" },

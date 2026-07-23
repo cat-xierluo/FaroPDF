@@ -3,27 +3,18 @@ import { useEffect } from "react";
 import type { ReaderController } from "../../modules/reader";
 import "./EditModeGridView.css";
 
-/** ISS-NEW-I（W2 worker）：T 编辑模式页面网格视图（PDF Expert 5 列）。
+/** T 编辑模式的历史 skeleton。
  *
- * 设计参照：
- *  - research/pdf-expert/FEATURE_CATALOG.md §2.1 编辑模式 5 列网格
- *  - 截图 80/81/83（选中页蓝边框 + 尺寸 label + 拖动重排 drop indicator）
- *
- * 行为：
- *  - 复用 PageOrganizerWorkspace 的 grid 渲染思路，但用 5 列固定网格（PDF Expert 风格）。
- *  - 选中页 = 2px 蓝边框 + soft shadow（截图 81 选中态）。
- *  - 拖动重排：HTML5 DnD，给 page card 设 draggable，dragenter 时显示 drop indicator（before / after）。
- *  - 真实 IPC 留后续 worker；本任务只做 UI 结构 + placeholder 回调 `onReorder` / `onSelect`。
- *
- * 注意：本组件只读 `reader.state.document.pageCount` + `reader.renderThumbnail`（可选）。
- *       真实重排由调用方（AppShell）接 `reader.reorderPages` 之类；当前 stage 仅 placeholder。
+ * DEC-173 已撤销旧 catalog 的“PDF Expert 固定 5 列”结论。当前组件仍包含固定列 CSS、
+ * 空白渐变、硬编码 A4、额外局部工具条和 placeholder 回调，这些都是 ISS-NEW-M M3
+ * 的待修现状，不是目标规格。M1 完成量测前不得据此反推页面卡片布局。
  */
 
 export interface EditModeGridViewProps {
   reader: ReaderController;
-  /** 用户点击某页 → 进入阅读态定位到该页（placeholder） */
+  /** 用户点击某页；当前调用方行为需在 M3 重新验收。 */
   onSelectPage?: (pageNumber: number) => void;
-  /** 用户拖动重排完成 → 调用方拿 (from, to) 触发真实重排（placeholder） */
+  /** 仅发出本地拖动结果；当前调用方未写回 PDF，仍是 placeholder。 */
   onReorder?: (from: number, to: number) => void;
 }
 
@@ -125,8 +116,8 @@ export function EditModeGridView({ reader, onSelectPage, onReorder }: EditModeGr
         <div className="edit-mode-grid__empty" data-testid="edit-mode-grid-empty">
           <h2>打开 PDF 后进入 T 编辑</h2>
           <p>
-            T 编辑模式提供 5 列页面网格视图，支持选中页蓝边框、拖动重排、批量操作。
-            请打开任意 PDF 进入此模式。
+            当前页面网格仍在重建中。请先打开 PDF；真实缩略图、响应式布局和重排写回
+            将按 ISS-NEW-M 的量测与验收门禁补齐。
           </p>
         </div>
       </main>

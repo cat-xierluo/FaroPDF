@@ -1,7 +1,7 @@
 export type AppModeId = "read" | "annotate" | "export" | "forms" | "ocr" | "pages";
 
 /** ISS-NEW-A 阶段 1：Toolbar 5 段 id（与 Toolbar.tsx data-section 一一对应）。
- *  - sidebar-toggles: 侧栏切换 3 个按钮（摘要 / 页面 / 视图设置）
+ *  - sidebar-toggles: 侧栏切换 4 个按钮（摘要 / 页面 / 视图设置 / 书签）
  *  - file:           打开按钮（隐藏 file input）
  *  - reading:        页码导航 + 缩放 +/- + 视图模式 4-icon toggle
  *  - mode:           A 批注 / T 编辑 按钮
@@ -26,26 +26,24 @@ export type UtilityPanelId =
   | "bookmark"
   | "none";
 
-/** 右侧模式驱动栏 id（v0.2 候选）。
+/** 右侧模式驱动栏 id。
  *  - 由 AppShell 通过 activeMode 推导 + 显式 rightPanel 覆盖
  *  - 「none」= 右栏折叠
- *  ISS-NEW-I（W2 worker）：
- *  - "shape" 形状工具右栏（截图 59，6 段：形状/线条/线宽/不透明度/边框色/填充色）
- *  - "search" 搜索结果右栏（截图 41，4 段：header/输入/命中列表/footer）
- *  注意：summary / ocr-status 由 W1 worker（ISS-NEW-C）独占，本文件不要追加。
+ *  DEC-173：shape/search 的现有分段只是历史 skeleton，不是可靠截图合同；
+ *  具体层级待 ISS-NEW-M M1 重采量测。
  */
 export type RightPanelId =
   | "stamps"
   | "signatures"
   | "export-preview"
   | "ocr-queue"
-  /** ISS-NEW-C：右栏文档摘要面板（截图 61 对齐）。 */
+  /** 右栏文档摘要 skeleton；字段层级待 M1 验证。 */
   | "summary"
-  /** ISS-NEW-C：右栏 OCR 状态面板（截图 53 对齐）。 */
+  /** 右栏 OCR 状态 skeleton；参考状态待 M1 重采。 */
   | "ocr-status"
-  /** ISS-NEW-I：右栏形状工具面板（6 段，截图 59 对齐）。 */
+  /** 右栏形状工具 skeleton；真实层级待 M1。 */
   | "shape"
-  /** ISS-NEW-I：右栏搜索结果面板（4 段，截图 41 对齐）。 */
+  /** 右栏搜索结果 skeleton；真实层级待 M1。 */
   | "search"
   | "none";
 
