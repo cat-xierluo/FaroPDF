@@ -42,6 +42,18 @@
 
 > v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~158。
 
+## 2026-07-23
+
+ISS-NEW-M 第一阶段：PDF Expert 复刻合同与主布局门禁（DEC-172）：
+- 新增受版本控制的 `docs/reference/pdf-expert/`：15 张黄金状态图、manifest、state matrix、覆盖缺口和 fail-closed 验收合同，worker / worktree 不再依赖被忽略的 `research/`。
+- AppShell L5 列改为 `left → main → right` 的单一布局解析；修复 read 主画布只剩 290px、右栏抢占中央弹性列的问题。
+- 修复 Toolbar「DOM 有 5 段、CSS 只有 4 列」导致 right section 换行的问题；L3 现在是计算后 5 列单行，L4 也不再保留 300px 假左缩进。
+- read 模式不再渲染 L4；`T 编辑` 从错误的 forms 映射改为进入 5 列页面编辑网格。
+- 模式切换不再自动强开左侧 annotation / summary panel，用户显式面板状态与模式状态解耦。
+- 新增 `npm run verify:ui-layout`：自动生成 5 页 PDF，在 1500×900 / 1280×800 下验证 read、annotate、双栏、edit 的几何和 DOM 顺序，并输出 8 张实机截图。
+
+## 2026-06-25
+
 ISS-NEW-D 阶段 5：前往浏览历史栈 实质接通（PM 单 session / DEC-171）：
 - **第 1 块**（commit `48e1684`）：`ReaderState.history` 字段（reverse chronological order，上限 50）+ `setCurrentPage` 跳页前 push 旧页（dedupe 连续同页）+ `reader/goBack` action（弹顶部 + 不 push）+ `reader/clearHistory` + `loadSucceeded` 跨文档清空。readerReducer +8 测（19/19 ✅）。
 - **第 2 块**（commit `e64b4d8`）：useReaderController 暴露 `goBack()` + `goToHistory(N)` API；`setCurrentPage` payload 加可选 `skipHistoryPush` 字段供 `goToHistory` 避免循环。useReaderController +5 测覆盖（push / pop / goToHistory 不 push / 越界 / 跨文档清空）。
@@ -936,4 +948,3 @@ v0.3 follow-ups（已在 `docs/RELEASE.md §4` 文档化，不阻塞 beta.1）�
   - **范围控制**：worker 不超 allowed files；PM 自身 docs 改动也走 TASKS / DECISIONS / CHANGELOG 闭环
 - 导火索：Wave 1 W1 (ISS-NEW-A 阶段 1) ship 后 PM 直接 `git merge --ff-only` 跳 PR 流程，违反 `multi-agent-orchestration` §8.0；git revert 链修复后落地本章
 - 不覆盖 subagent / Agent Teams / ACP 等其他执行模式（仅针对 `tmux + worktree`）
-

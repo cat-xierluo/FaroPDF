@@ -1118,28 +1118,14 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P1
 - 类型：UI 信息架构 / Toolbar
 - 来源：FEATURE_CATALOG §1.3 + §2；截图 04 / 05 / 06
-- 状态：**✅ 已完成**（2026-06-22 / DEC-155 / 与 ISS-NEW-A 阶段 2 合并推进 / PM 单 session）
+- 状态：**已被 ISS-NEW-M / DEC-172 基线纠偏**。PDF Expert 的 read 模式 L4 为空；旧的「阅读工具下移 L4」结论不再作为现行规范。
 - 范围：
-  1. ✅ 把当前 L3 阅读控制区的 2 个旋转按钮（逆时针 / 顺时针）下移到 L4 二级工具条
-  2. ✅ 「适合页面」按钮通过 L4 二级工具条复用 `registerReadModeTools()` 的 `read.fit-page` 工具
-  3. ✅ Toolbar 阅读区瘦身到 4 元素（详见 ISS-NEW-A 阶段 2 第 5 项）
-  4. ⏳ macOS 视图菜单「实际大小」「适合页面」可用（ISS-NEW-H v0.2 顶层目标）
-- 验收：
-  - [x] L3 阅读区无旋转按钮（已下移）
-  - [x] L4 二级工具条（`<ReadModeToolbar>`）出现旋转（逆 / 顺）+ 适合页面（仅 read 模式 + 有文档时）
-  - [x] typecheck ✅ + Toolbar 24/24 ✅ + AppShell 7/7（ISS-NEW-A 子集）✅ + readerModeTools 7/7 ✅
-
-- 优先级：P1
-- 类型：UI 信息架构 / Toolbar
-- 来源：FEATURE_CATALOG §1.3 + §2；截图 04 / 05 / 06
-- 状态：待启动；依赖 ISS-NEW-A
-- 范围：
-  1. 把当前 L3 阅读控制区的 6 个额外按钮（逆时针 / 顺时针 / 适合页面）下移到 L4 二级工具条
-  2. 「适合页面」/「实际大小」也可走 macOS 视图菜单（FEATURE_CATALOG §4 视图菜单）
-  3. Toolbar 阅读区瘦身到 4 元素（详见 ISS-NEW-A 第 5 项）
+  1. L3 阅读区保持页码、视图模式、缩放百分比、缩小 / 放大。
+  2. read 模式不渲染 L4。
+  3. 旋转、适合页面、实际大小进入 macOS 视图菜单，不在 read L4 常驻。
 - 验收：
   - [ ] L3 阅读区无旋转 / 适合页面按钮
-  - [ ] L4 二级工具条出现旋转（逆 / 顺）+ 适合页面（在「适合宽度」模式下隐藏）
+  - [x] read 模式 L4 为空（ISS-NEW-M 第一阶段，Playwright 两种 viewport 验证）
   - [ ] macOS 视图菜单「实际大小」「适合页面」可用
 
 ### ISS-NEW-C 右侧 mode-driven panel 体系（L5b）
@@ -1147,7 +1133,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P0（v0.2 阻塞）
 - 类型：UI 信息架构 / 侧栏
 - 来源：FEATURE_CATALOG §3；截图 20 / 36 / 50 / 53 / 55 / 57-60 / 61-multi-tab-opened-2nd
-- 状态：**✅ 已完成**（Wave 2 W1 / DEC-146 / PR #67 + 阶段 2 后续 DEC-158 收口）。文档摘要 + OCR 状态 2 个 panel 落地；形状/搜索/图章/签名/导出预览/OCR 队列 6 panel 全部 ship。
+- 状态：**结构已接线，尚未完成**。panel 组件已落地；`docSummary=null`、`onStartOcr=noop` 等占位仍存在，行为完成和逐状态视觉验收未通过。ISS-NEW-M 第一阶段只验证了 L5b 位于 L5c 右侧。
 - 范围：完整 `<RightPanel>` 组件 + `rightPanelMode` 状态，按触发切换内容：
   | 触发 | 内容 | 状态 |
   | --- | --- | --- |
@@ -1202,24 +1188,25 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P1
 - 类型：UI 信息架构 / Toolbar
 - 来源：FEATURE_CATALOG §2；截图 20 / 21 / 53 / 56 / 80 / 81
-- 状态：**✅ 已完成**（2026-06-23 / DEC-156 + DEC-164 任务卡收口）：5 模式（read / annotate / ocr / export / forms）L4 全部 ship；`pages` 模式用 PageOrganizerWorkspace 替代（ISS-046 / DEC-152）；所有 ISS-NEW-E 验收项 ship。
+- 状态：**结构已接线，尚未完成**。read L4 已按黄金矩阵纠偏为空；annotate / OCR / export / forms 已有结构，edit 的真实命令和整体视觉验收仍未完成。
 - 范围：`<ModeSecondaryToolbar>` 组件按 `activeMode` 切换内容（实际由 AppShell `ContextToolbar` 内 if-else 分支实现）：
-  - **阅读**（✅ DEC-156）：旋转 + 适合页面（`getModeTools("read")` 3 工具）
+  - **阅读**（✅ ISS-NEW-M / DEC-172）：L4 为空；旋转与适合页面走视图菜单
   - **批注**（✅ ISS-026）：高亮 / 下划线 / 删除线 / 文本 / 笔 / 橡皮擦 / 便签 / 形状 + 颜色选择（AnnotationToolbar 已 ship）
   - **页面管理 / 编辑**（✅ ISS-046 / DEC-152）：`pages` mode 用 PageOrganizerWorkspace（独立工作台，含插入页 / 删除 / 提取 / 旋转 / 撤销 / 重做 / 页数 / 旋转逆/顺等能力）
   - **扫描**（✅ ISS-007）：扫描切边 / 增强扫描 + 页码范围 + 开始按钮（OcrModeToolbar 已 ship）
   - **导出**（✅ DEC-146）：交付工具分组（exportToolGroups — 文字水印 / 图片水印 / 即将加 export-preview）
   - **填写和签名**（✅ ISS-043 / DEC-104）：4 工具按钮（读取字段 / 填写 / 签名 / 扁平化导出）
-- 验收（全部 ✅）：
+- 验收：
   - [x] L4 二级工具条按 activeMode 切换内容（5 模式统一由 ContextToolbar 路由）— DEC-156
-  - [x] 阅读模式 L4 渲染 ReadModeToolbar 内容（旋转 + 适合页面）— DEC-156
-  - [x] 编辑模式（pages 模式）L4 显示 PageOrganizerWorkspace 内容（插入页 / 删除 / 提取 / 旋转 / 撤销 / 重做 / 页数）— DEC-152
+  - [x] 阅读模式 L4 为空 — ISS-NEW-M / DEC-172
+  - [ ] 编辑模式 8 个命令真实接通；当前网格仍有缩略图和重排 placeholder
   - [x] OCR 模式 L4 显示 OcrModeToolbar（扫描切边/增强扫描 + 页码范围 + 开始）— 既有
   - [x] 批注模式 L4 显示 AnnotationToolbar — 既有
   - [x] 导出模式 L4 显示交付工具分组 — 既有
   - [x] 填写和签名模式 L4 显示 4 工具按钮 — 既有
   - [x] typecheck ✅ + Toolbar 24/24 ✅ + readerModeTools 7/7 ✅ — DEC-156
-- 任务收口（DEC-164）：ISS-NEW-E 任务卡 5 模式 L4 + `pages` mode 替代 L4 + 8 验收项全部 ship；状态改为"✅ 已完成（阶段 1+2）"。
+  - [ ] read / annotate / edit / OCR / export / forms 全状态 Playwright 视觉验证
+- 历史收口 DEC-164 被 DEC-172 纠偏：组件存在不等于行为和视觉完成。
 
 ### ISS-NEW-F tab 拖离窗口剥离 + 跨窗口状态共享
 
@@ -1310,7 +1297,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P0（与 ISS-NEW-A / C 并行）
 - 类型：UI 信息架构 / 模式 / 右栏 / L3 toolbar
 - 来源：FEATURE_CATALOG §2.1 + §3 + §1.3.1 + §1.3.2 三审补全（2026-06-20）；截图 50 / 59 / 65 / 67 / 69 / 80 / 81 / 83
-- 状态：**✅ 已完成**（Wave 2 W2 / DEC-147 / PR #68）。EditModeGridView 5 列网格 + ShapeToolPanel 6 段 + SearchResultsPanel 4 段 + Toolbar L3 模式附加按钮落地；OCR L3「开始/增强扫描」按钮因 commands.ts 未暴露 AppCommandId 暂缓（合理降级，后续 worker 补）；真实形状绘制/跨 tab IPC 接 placeholder。
+- 状态：**skeleton / wired，尚未完成**。EditModeGridView、ShapeToolPanel、SearchResultsPanel 已存在；真实页面缩略图、重排写回、形状绘制、跨 tab IPC 和全状态视觉验收仍未完成。
 - 范围：
   1. **T 编辑模式页面网格视图**：
      - PDF 内容区从单页流式改为 5 列缩略图网格
@@ -1340,7 +1327,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
      - 底部 status bar 持久显示「已找到 N 项」
   6. **图章 / 形状 / 自定义双 tab**：右栏形状 tab 包含「形状」「自定义」2 个 sub-tab
 - 验收：
-  - [ ] T 编辑模式 PDF 内容区是 5 列网格（截图 80 / 81 / 83 对齐）
+  - [x] 点击 `T 编辑` 进入 5 列网格结构（ISS-NEW-M 第一阶段）；缩略图与重排行为仍未完成
   - [ ] 编辑模式 L4 8 命令全实现
   - [ ] 扫描模式 L4 5 区段全实现
   - [ ] 形状工具右栏 6 段（截图 59 对齐）
@@ -1513,3 +1500,34 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [x] Pages 通用性验证
   - [ ] v0.3.0 8+3 meta-layer 实施
 - 备注：v0.3.0 是架构重构，会破坏现有 catalog 引用，需大版本 bump。触发时机：v0.2 收口后。
+
+### ISS-NEW-M PDF Expert 复刻合同、黄金参考与实机布局门禁
+
+- 优先级：P0
+- 类型：UI 信息架构 / 上下文治理 / 实机验收
+- 来源：2026-07-23 用户反馈「多次要求完整复刻 PDF Expert，但截图研究没有转化为最终布局和功能」
+- 状态：**第一阶段实现与实机验收完成；完整复刻持续进行（Codex 主会话，2026-07-23 / DEC-172）**
+- 根因边界：
+  1. `research/` 被 Git 忽略，截图、catalog 与 S4 报告没有稳定进入 worker worktree。
+  2. DESIGN 旧约束与 ISS-NEW-A~J 的高保真复刻目标冲突，没有正式的 supersede 规则。
+  3. `skeleton / noop / placeholder` 被直接记为「完成」，缺少行为完成和实机视觉验证两个状态。
+  4. 既有测试只验证组件/DOM 存在，没有验证 L5a/L5b/L5c 的顺序、宽度和中央画布可用面积。
+- 第一阶段范围：
+  1. 在受版本控制目录建立 PDF Expert 黄金状态清单、状态矩阵、覆盖缺口和验收合同。
+  2. 更新 DESIGN：明确高保真复刻边界、规范优先级、L2-L6 布局和四级完成状态。
+  3. 修复 AppShell grid：无侧栏时中央阅读区占满；左右栏出现时保持 L5a → L5c → L5b 顺序。
+  4. 阅读模式不渲染 L4；`T 编辑` 进入现有页面编辑网格，不再误入 forms。
+  5. 增加 1500×900 与 1280×800 的 Playwright 几何断言和截图证据。
+- 验收：
+  - [x] 黄金参考已纳入 Git 跟踪，不依赖被忽略的 `research/`；提交后以临时 worktree 复核 15 张黄金图和 manifest 可见
+  - [x] state matrix 每个 cell 标记 evidence / missing / YAGNI
+  - [x] DESIGN 与 TASKS 对「严格复刻 / FaroPDF 例外」不再冲突
+  - [x] L3 计算后为 5 列单行，不再只靠 5 个 DOM section 假通过
+  - [x] read：L4 为空、右栏折叠、L5c 占满 workspace
+  - [x] annotate：L5c 在中间、L5b 在右侧且宽度约 320px
+  - [x] 双栏：L5a → L5c → L5b，中央区不被挤到最右 320px
+  - [x] 点击 `T 编辑` 进入 5 列页面网格
+  - [x] `typecheck`、聚焦单测、build 通过
+  - [ ] 全仓 lint 通过（本轮文件 scoped lint 已通过；用户未提交的 `readerReducer.test.ts` 有 1 个 pre-existing `prefer-const`）
+  - [x] 实际启动 Vite，Playwright 两种 viewport 几何断言与截图通过
+  - [x] DECISIONS / CHANGELOG / TASKS / README / ARCHITECTURE 同步

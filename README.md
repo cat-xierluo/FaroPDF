@@ -38,9 +38,12 @@ open /Applications/FaroPDF.app
 
 以下能力基于 v0.1.1 实际交付范围（详见 `CHANGELOG.md`）：
 
+> PDF Expert 高保真复刻正在按 `skeleton → wired → behavior-complete → visually-verified` 重新验收。组件存在或类型检查通过不再等同于完整复刻；当前基线、黄金截图与覆盖缺口见 [`docs/reference/pdf-expert/`](docs/reference/pdf-expert/README.md)。
+
 ### 阅读与检索
 
-- 阅读态顶栏保持克制：布局、打开、页码 / 缩放、搜索、工具和设置；批注、导出、填写签名、OCR 从 `工具` 工作流菜单进入
+- L2 tab bar + L3 五段工具栏；`A 批注`、`T 编辑` 常驻主模式入口，导出、填写签名、OCR 从 `工具` 工作流菜单进入
+- read 模式不显示 L4；左右栏出现时中央阅读区始终保持在 L5a 与 L5b 之间
 - 打开本地 PDF（对话框 / 拖拽），PDF.js worker 独立加载，不阻塞主线程
 - 页面虚拟化：只渲染可见页和邻近页，大卷宗打开轻快
 - 4 种视图模式：连续 / 单页 / 双页 / 适合宽度
@@ -165,6 +168,7 @@ npm run dev
 npm run typecheck   # TypeScript 类型检查
 npm test            # Vitest 单测
 npm run lint        # ESLint
+npm run verify:ui-layout # 启动 Vite + Playwright，验证两种视口的 L2-L5 几何与模式切换
 ```
 
 ## 构建

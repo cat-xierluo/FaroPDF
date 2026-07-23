@@ -190,6 +190,8 @@ Foundation Gate 合并后，ISS-002 和 ISS-014 可并行推进，因为阅读�
 
 ## DEC-013 应用 Shell 采用阅读优先的任务模式信息架构
 
+> 状态：在 PDF Expert 布局目标与完成定义冲突的范围内已被 DEC-172 取代；本节仅保留历史事实。
+
 - 日期：2026-06-02
 - 状态：已采纳
 
@@ -6126,6 +6128,8 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求"单窗口可开�
 
 ## DEC-144 ISS-NEW-A 阶段 1：L2 tab 上移 + Toolbar 5 段骨架 + A/T 按钮 + 视图模式 4-icon toggle
 
+> 状态：五段结构仍有效；「DOM 结构存在即可收口」的完成解释受 DEC-172 实机几何与视觉门禁约束。
+
 - 时间：2026-06-21
 - 类型：UI 信息架构 / Toolbar 重构 / PDF Expert 对齐
 - 关联：ISS-NEW-A 阶段 1 / ISS-073 v0.2 桶 1 / ISS-059 位置修正
@@ -6234,6 +6238,8 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 
 ## DEC-146 ISS-NEW-C 右栏文档摘要 + OCR 状态 panel（Wave 2 W1）
 
+> 状态：组件交付事实保留；`null / idle / noop` 占位和「已完成」解释已被 DEC-172 纠偏。
+
 - 时间：2026-06-21
 - 类型：UI 信息架构 / 右栏 panel / 多 Agent Wave 2
 - 关联：ISS-NEW-C / ISS-073 v0.2 桶 1 / PR #67 / DEC-145（多 Agent 纪律）
@@ -6251,6 +6257,8 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 **Verification**：typecheck/lint/build 干净；RightPanel.test 18/18；新 panel 单测 11/11；AppShell 全量 known-fail（DEC-144 vitest 环境）。PM Playwright 实操：上传 PDF + L2 tab + 阅读区 0 console error。
 
 ## DEC-147 ISS-NEW-I 编辑网格 + 形状/搜索右栏 + L3 按钮（Wave 2 W2）
+
+> 状态：组件交付事实保留；placeholder 重排、形状绘制和视觉完成解释已被 DEC-172 纠偏。
 
 - 时间：2026-06-21
 - 类型：UI 信息架构 / 编辑模式 / 右栏 / L3 / 多 Agent Wave 2
@@ -6452,6 +6460,8 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 
 ## DEC-155 ISS-NEW-A 阶段 2 + ISS-NEW-B 收口 2 块（PM 单 session，2026-06-22）
 
+> 状态：L3 瘦身事实保留；read L4 常驻阅读工具的结论已被 DEC-172 取代。
+
 - 时间：2026-06-22
 - 类型：UI 信息架构 / Toolbar / 侧栏 4-toggle / L4 二级工具条 / PM 单 session（Wave 4 multi-agent retry 失败后降级）
 - 关联：ISS-NEW-A 阶段 2 / ISS-NEW-B / FEATURE_CATALOG §1.2（PDF Expert L3 4 sidebar 按钮 + §2 L4 二级工具条）/ DEC-144（ISS-NEW-A 阶段 1 Toolbar 5 段骨架）/ DEC-152（恢复 L3 旋转入口）/ memory `project_multi_agent_state`（4 次 multi-agent 失败教训）
@@ -6487,6 +6497,8 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 **关联**：DEC-144/152/154（前置子 ship）/ ISS-NEW-A 阶段 2 / ISS-NEW-B / `docs/TASKS.md` § ISS-NEW-A 任务卡。
 
 ## DEC-156 ISS-NEW-E 第 1 步：L4 二级工具条统一抽象（read 模式并入 ContextToolbar，2026-06-22）
+
+> 状态：非 read 模式的 ContextToolbar 结构保留；read 并入 L4 的结论已被 DEC-172 取代。
 
 - 时间：2026-06-22
 - 类型：UI 信息架构 / Toolbar 抽象 / L4 二级工具条统一
@@ -6749,6 +6761,8 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 **关联**：ISS-NEW-F 任务卡（line 1201+ 4 子项）/ DEC-144（前置 ship）/ DEC-162（第 1 步 DOM 检测）。
 
 ## DEC-164 ISS-NEW-E 任务卡收口（PM 单 session，2026-06-23）
+
+> 状态：原「全部 ship」仅代表结构交付；行为完成与 visually-verified 状态已由 DEC-172 重新打开。
 
 - 时间：2026-06-23
 - 类型：UI 信息架构 / Toolbar / 任务卡收口
@@ -7032,3 +7046,31 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - Playwright 960×720 实操验证（pre-existing AppShell.test.tsx 挂起环境问题，DEC-099 / DEC-165）
 
 **关联**：ISS-NEW-D 任务卡 / DEC-159（前往菜单 ship）/ DEC-170（同样 3 块模式，验证有效）。
+
+## DEC-172 PDF Expert 高保真复刻合同与 fail-closed 实机验收（2026-07-23）
+
+- 时间：2026-07-23
+- 类型：UI 信息架构 / 上下文治理 / 验收门禁
+- 关联：ISS-NEW-M、ISS-NEW-A~J、`docs/reference/pdf-expert/`
+
+**问题**：用户多次要求完整复刻 PDF Expert，但 82 张截图和 catalog 位于被 Git 忽略的 `research/`，worker worktree 通常只收到压缩后的 TASKS 描述。与此同时，DESIGN、DEC-013、ISS-NEW-A~J 对 Toolbar、L4、左右栏和「T 编辑」的语义互相冲突；组件骨架、noop 和 placeholder 又被直接记为完成。实际运行中 AppShell 的列模板与 DOM 顺序导致 read 主画布只有约 290px，annotate/forms 的右栏占据中央弹性列。
+
+**决策**：
+
+1. FaroPDF 对 PDF Expert 采用高保真信息架构、可见几何、模式语义和核心交互基线；保留 FaroPDF 品牌、安全和不覆盖原文件规则。
+2. 新增受版本控制的 `docs/reference/pdf-expert/`，首批纳入 15 张黄金状态图、manifest、state matrix、coverage gap 和 acceptance contract。历史 `research/` 继续作为原始素材池，不再作为 worker 唯一证据源。
+3. UI 任务使用 `skeleton → wired → behavior-complete → visually-verified` 四级状态；只有最后一级可关闭。noop、TODO、placeholder、仅 toast、模式冒充或未启动应用验证时不得标记完成。
+4. 规范优先级改为：acceptance contract → state matrix → DESIGN → 当前 TASKS → 历史 DECISIONS/catalog。本决策在冲突范围内 supersede DEC-013、DEC-144、DEC-146、DEC-147、DEC-155、DEC-156 和 DEC-164 的旧布局/完成解释，但保留其历史事实。
+5. AppShell L5 DOM 与视觉顺序固定为 L5a → L5c → L5b；`workspaceLayout.ts` 根据实际可见 panel 生成四种列模板。模式切换不再隐式打开左栏。
+6. PDF Expert read L4 为空；旋转、适合页面等低频动作走视图菜单。`T 编辑` 使用当前内部 `pages` mode 进入 5 列网格，forms 继续由工具启动器进入。
+7. 新增 `npm run verify:ui-layout`，在 1500×900 和 1280×800 下真实启动 Vite、打开动态生成的 5 页 PDF，验证 read / annotate / 双栏 / edit 的几何、DOM 顺序和截图。
+
+**第一阶段验证**：
+
+- typecheck：通过。
+- 聚焦测试：`workspaceLayout` + Toolbar + AppShell ISS-NEW-M，14 passed。
+- build：通过；保留既有 bundle size / Node browser-external warning。
+- Playwright：两种 viewport 均通过。L3 计算后为 5 列且单行；1500×900 下 read / annotate / 双栏中央区宽度分别为 1500 / 1180 / 890px；1280×800 下为 1280 / 960 / 670px；右栏均为 320px。
+- lint：本轮变更文件的 scoped ESLint 通过；全仓只剩用户当前未提交的 `readerReducer.test.ts` `prefer-const` 阻塞，本轮不改写该文件。
+
+**未完成**：ZAI bbox MCP 未配置，82 张源图的 `s1-elements.json` 尚未生成；forms/export、双栏黄金参考、edit 真实缩略图与重排写回、多个 noop/placeholder 仍在 `coverage-gap.md` 和 ISS-NEW-M 保持未完成。

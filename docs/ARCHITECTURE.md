@@ -1,6 +1,6 @@
 # FaroPDF 架构文档
 
-> Last updated: 2026-06-09
+> Last updated: 2026-07-23
 
 ## 技术栈
 
@@ -23,15 +23,16 @@
 │ ┌─────────────────────────────────────────┐ │
 │ │ React App                               │ │
 │ │ ┌──────────────────────────────────────┐ │ │
-│ │ │ Main Toolbar                         │ │ │
-│ │ │ Summary / Page / View / Open / Tools │ │ │
+│ │ │ L2 Titlebar Tabs                     │ │ │
+│ │ ├──────────────────────────────────────┤ │ │
+│ │ │ L3 Toolbar: left/file/read/mode/right│ │ │
+│ │ ├──────────────────────────────────────┤ │ │
+│ │ │ L4 mode tools (empty in read)        │ │ │
 │ │ └──────────────────────────────────────┘ │ │
-│ │ ┌──────────────┬──────────────────────┐ │ │
-│ │ │ Utility Pane │ PDF Reader Canvas    │ │ │
-│ │ │ Summary/View/Forms │ or Task Workspace│ │ │
-│ │ │ Settings     │ Page grid / PDF.js   │ │ │
-│ │ └──────────────┴──────────────────────┘ │ │
-│ │ Context Toolbar after workflow selection │ │
+│ │ ┌──────────┬────────────────┬─────────┐ │ │
+│ │ │ L5a Left │ L5c Main       │L5b Right│ │ │
+│ │ │ optional │ PDF / Edit Grid│ optional│ │ │
+│ │ └──────────┴────────────────┴─────────┘ │ │
 │ └─────────────────────────────────────────┘ │
 │ Tauri commands/events: menu / dialog / OCR  │
 └─────────────────────────────────────────────┘
@@ -82,16 +83,18 @@ macOS 原生菜单由 `src-tauri/src/lib.rs` 使用 Tauri v2 `MenuBuilder` / `Su
 
 ### 工具启动器与上下文工具条
 
-前端业务命令统一由 `src/shared/app/commands.ts` 描述。阅读态顶栏只保留布局、打开、阅读控制、全文搜索、`工具` 和设置入口；`mode-annotate` / `mode-export` / `mode-forms` / `mode-ocr` 不再作为顶栏 entry point 暴露，而是通过 `工具` 工作流启动器进入。
+前端业务命令统一由 `src/shared/app/commands.ts` 描述。L3 顶栏固定为 5 段，并常驻 `A 批注` 与 `T 编辑` 两个主模式入口；export / forms / OCR 等低频工作流继续通过 `工具` 启动器进入。
 
 进入任务模式后，`AppShell` 按 `activeMode` 渲染第二行上下文工具条或独立工作台：
 
+- `read`：不渲染 L4，L5c 使用所有未被显式侧栏占用的空间。
 - `annotate`：显示批注上下文工具条和批注 overlay。
+- `pages`：作为当前 `T 编辑` 的内部 mode，L5c 切换为 5 列页面编辑网格。
 - `export`：显示导出上下文工具条，并挂右侧 `ExportDeliveryPanel`。
 - `forms`：显示填写和签名上下文工具条，扁平化等低频动作进入 FormsPanel。
 - `ocr`：独占主工作区，显示 OCR 工具条和 OCR 任务 / 质量报告工作台。
 
-阅读辅助工具仍通过 `toolbarRegistry` 注册到 `read` mode，但只在已打开 PDF 时以图标按钮追加到阅读控制区，避免空态或阅读态顶栏重新堆叠任务模式文字。
+`src/components/layout/workspaceLayout.ts` 是 L5 列计算的单一入口。它只根据实际可见的左右栏生成 `main-only / left-main / main-right / left-main-right` 四种布局；AppShell DOM 固定按 L5a → L5c → L5b 排列，避免 RightPanel 抢占中央弹性列。对应的跨 worktree 黄金证据与验收门禁位于 `docs/reference/pdf-expert/`。
 
 ## 核心接口
 

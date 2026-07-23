@@ -1,0 +1,100 @@
+{
+  "app": {
+    "name": "PDF Expert",
+    "platform": "macOS",
+    "version": "25.2.1"
+  },
+  "purpose": "FaroPDF high-fidelity layout and interaction baseline",
+  "screenshots": [
+    {
+      "id": "G01",
+      "path": "golden/G01-launch.png",
+      "trigger": "launch application with no document",
+      "state_hypothesis": { "activeMode": null, "documentOpen": false }
+    },
+    {
+      "id": "G02",
+      "path": "golden/G02-read-default.png",
+      "trigger": "open a PDF",
+      "state_hypothesis": { "activeMode": "read", "rightPanelMode": "closed", "viewMode": "continuous" }
+    },
+    {
+      "id": "G03",
+      "path": "golden/G03-two-page.png",
+      "trigger": "switch to two-page view",
+      "state_hypothesis": { "activeMode": "read", "viewMode": "two" }
+    },
+    {
+      "id": "G04",
+      "path": "golden/G04-thumbnail-sidebar.png",
+      "trigger": "open thumbnail sidebar",
+      "state_hypothesis": { "activeMode": "read", "leftPanelMode": "thumbnail" }
+    },
+    {
+      "id": "G05",
+      "path": "golden/G05-annotate.png",
+      "trigger": "click A 批注",
+      "state_hypothesis": { "activeMode": "annotate" }
+    },
+    {
+      "id": "G06",
+      "path": "golden/G06-search-results.png",
+      "trigger": "search a keyword with multiple hits",
+      "state_hypothesis": { "activeMode": "read", "rightPanelMode": "search", "searchKeywordPresent": true }
+    },
+    {
+      "id": "G07",
+      "path": "golden/G07-text-selection.png",
+      "trigger": "select text in the PDF canvas",
+      "state_hypothesis": { "activeMode": "read", "selectionOverlay": true }
+    },
+    {
+      "id": "G08",
+      "path": "golden/G08-signature-panel.png",
+      "trigger": "open the signature tool",
+      "state_hypothesis": { "activeMode": "annotate", "rightPanelMode": "signature" }
+    },
+    {
+      "id": "G09",
+      "path": "golden/G09-password-dialog.png",
+      "trigger": "open set password",
+      "state_hypothesis": { "modal": "set-password" }
+    },
+    {
+      "id": "G10",
+      "path": "golden/G10-ocr.png",
+      "trigger": "open recognize text / OCR",
+      "state_hypothesis": { "activeMode": "ocr", "rightPanelMode": "ocr" }
+    },
+    {
+      "id": "G11",
+      "path": "golden/G11-stamps.png",
+      "trigger": "open stamp templates",
+      "state_hypothesis": { "activeMode": "annotate", "rightPanelMode": "stamp" }
+    },
+    {
+      "id": "G12",
+      "path": "golden/G12-shape.png",
+      "trigger": "activate rectangle shape",
+      "state_hypothesis": { "activeMode": "annotate", "activeTool": "shape", "activeSubTool": "rectangle", "rightPanelMode": "shape" }
+    },
+    {
+      "id": "G13",
+      "path": "golden/G13-multi-tab.png",
+      "trigger": "open three documents",
+      "state_hypothesis": { "activeMode": "read", "tabsCount": 3 }
+    },
+    {
+      "id": "G14",
+      "path": "golden/G14-annotation-summary.png",
+      "trigger": "open annotation summary sidebar",
+      "state_hypothesis": { "activeMode": "read", "leftPanelMode": "annotation" }
+    },
+    {
+      "id": "G15",
+      "path": "golden/G15-edit-grid.png",
+      "trigger": "click T 编辑",
+      "state_hypothesis": { "activeMode": "edit", "canvasMode": "five-column-grid" }
+    }
+  ]
+}
