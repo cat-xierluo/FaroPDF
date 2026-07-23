@@ -53,6 +53,7 @@ ISS-NEW-M 上下文与证据纠偏（DEC-173，部分纠正 DEC-172）：
 - 清理源码注释、测试名称和编辑空态中的旧规格话术：不再声称 read 工具由 L4 接管、固定五列等于 PDF Expert、截图 41/59 能证明固定分段或 forms 等于 T 编辑；本项不改变业务行为。
 - 将后续工作固定为 M0 上下文纠偏 → M1 规范化重采/量测 → M2 视觉验证器 → M3 编辑闭环 → M4 Shell/Sidebar/RightPanel → M5 forms/export/OCR/异常态。
 - 独立 S4 三轮审计与 doc-curator 收口通过；M0 关闭，M1 成为唯一可领取下一项。
+- 增加多 Agent 阶段并发门禁（DEC-174）：M1/M2/M3 使用单一 owner，M4/M5 仅在 accepted-golden、可失败验证器和文件隔离齐备后条件式并行；明确“上下文一致”不等于“可以立刻多人改 UI”。
 
 ISS-NEW-M 结构与几何门禁（DEC-172，仍有效的部分）：
 - 新增受版本控制的 `docs/reference/pdf-expert/`，worker / worktree 不再只依赖被忽略的 `research/`。

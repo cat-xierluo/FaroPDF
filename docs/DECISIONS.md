@@ -7109,3 +7109,27 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - M1 未建立至少 read、thumbnails、annotate、edit 的 accepted-golden 前，不开始按像素调样式。
 - M2 未提供超阈值非零退出码前，不以“生成了截图”或“肉眼大致相似”关闭视觉任务。
 - 每个 worker 必须声明目标 surface、证据 ID、当前完成级别、allowed files、行为验证和视觉验证；缺一项不得标记完成。
+## DEC-174 PDF Expert 多 Agent 阶段并发权与 PM 证据验收（2026-07-23）
+
+- 时间：2026-07-23
+- 类型：多 Agent 编排 / UI 复刻门禁 / 上下文治理
+- 关联：ISS-NEW-M、DEC-173、`docs/reference/pdf-expert/`
+- 状态：生效
+
+**问题**：DEC-173 已经消除了主要上下文矛盾，但“worker 都能读到一致文档”不等于“视觉规格已经完备”。当前 accepted-golden 为 0，如果立即让多个 Agent 同时修改 Toolbar、Sidebar、RightPanel 和编辑网格，它们仍会从 raw capture 猜测尺寸与交互，并争抢 AppShell、全局样式和共享状态。历史多 Agent 记录还证明，模型可能 silent done、漏写 STATUS、扩大范围或把测试通过误报成产品完成。
+
+**决策**：
+
+1. 文档完整是多 Agent 启动的必要条件，不是充分条件。并行解锁还必须具备 accepted-golden、可失败的 M2 验证器、互不重叠的 allowed files 和独立验收闭环。
+2. M1 由单一证据 owner 完成采集、量测和 golden 准入，期间禁止 UI 实现 worker；M2 由单一 foundation owner 建立统一验证器；M3 由单一纵向 owner 收口页面状态、重排、写回和重开验证。
+3. M4/M5 才允许条件式并行：每个 surface/工作流一个 owner；AppShell、全局布局、全局样式、共享状态、共享契约和 PDF 写回链路只允许单一 owner。
+4. 每个 worker prompt 必须包含阶段、surface、证据 ID/等级、allowed/forbidden files、目标完成等级、行为验证和视觉验证。字段不齐时 PM 不得启动 worker。
+5. PM 以真实应用截图、DOM/bbox 量测、交互断言和 PDF round-trip 验收。worker 自述、typecheck、单测、lint、build 或截图数量都不能单独关闭任务。
+6. 并行 worker 继续服从双层监测、独立 PR 和范围检查；文档治理降低的是理解歧义，执行波动仍由编排和验收机制兜底。
+
+**当前影响**：
+
+- M1 仍是唯一可领取下一项；现在可以派出的是规范化采集与量测 worker，而不是多个 UI 实现 worker。
+- 未来 Agent 无权从“文档已清理”推导“所有 UI 阶段都已解锁”；阶段并发权只看 `docs/TASKS.md`。
+- 本决策不改变产品代码和现有完成等级，只补足后续派工与验收上下文。
+

@@ -53,6 +53,20 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | M4 | Shell / Sidebar / RightPanel 分域复刻 | 阻塞于 M2 | 目标 surface 有 accepted-golden | 每个 surface 独立 PR 和视觉/行为验收 |
 | M5 | forms/export/OCR/异常态补齐 | 阻塞于对应 capture | 状态矩阵证据完整 | 纵向工作流逐项 behavior-complete + visually-verified |
 
+### PDF Expert 阶段并发权
+
+文档整理完成只表示 worker 能获得一致上下文，不表示 UI 已具备并行实现条件。并发必须同时满足“前置阶段完成、证据准入、验证器可失败、文件范围不重叠”四项条件。
+
+| 阶段 | 并发权 | 约束 |
+| --- | --- | --- |
+| M1 | 单一证据 owner | 只采集、量测和准入 golden；不得修改或并行实现 `src/**` |
+| M2 | 单一 foundation owner | 先建立统一视觉验证器，避免各 surface 自建不同阈值 |
+| M3 | 单一纵向闭环 owner | 页面状态、拖拽重排、PDF 写回和重开验证由同一 owner 收口 |
+| M4 | 条件式并行 | 仅目标 surface 已有 accepted-golden 且 allowed files 不重叠时拆分；全局布局只允许一个 owner |
+| M5 | 条件式 Wave | forms/export/OCR/异常态按独立工作流拆分；共享契约、AppShell 和写回链路不得并行争抢 |
+
+当前 M1 仍是唯一可领取项，因此此刻允许启动的是证据 worker，不是多个 UI 实现 worker。后续每次解锁并行前，由 PM 在本表和 ISS-NEW-M 中确认阶段状态、目标 surface、证据 ID、allowed/forbidden files 与验收命令。
+
 ### 状态词统一
 
 - `skeleton`：组件或静态外观存在。
@@ -1549,6 +1563,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 4. `skeleton / noop / placeholder / toast-only` 曾被当作功能完成，缺少从行为到导出结果的闭环。
 5. `verify:ui-layout` 只证明 L3/L5 几何、DOM 顺序和模式路由，却曾被描述为视觉一致性验证。
 6. T 编辑依据误标截图被实现成固定 5 列、空白渐变缩略图和硬编码 A4，并且重排仍是 noop。
+7. 过去的多 Agent 推进缺少阶段并发门禁；在证据和验证器尚未就绪时同时修改 UI，只会放大猜测、共享文件冲突和“自述完成”风险。
 
 #### M0 — 上下文与证据纠偏
 
@@ -1561,6 +1576,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - [x] 清理源码中的 read L4、固定五列、截图 41/59 分段和 forms=T 编辑等过期注释/提示文案，不改变业务行为
 - [x] 同步 DEC-173、README、ROADMAP、CHANGELOG
 - [x] 完成独立 S4 三轮歧义审计与 doc-curator 一致性扫描
+- [x] 补充 DEC-174 多 Agent 阶段并发权：M1/M2/M3 单 owner，M4/M5 满足证据、验证器和文件隔离后才条件式并行
 
 #### M1 — 规范化重采集与量测
 
