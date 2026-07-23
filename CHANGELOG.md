@@ -1,6 +1,8 @@
 ## v0.1.3（草稿，2026-06-22 收口沉淀，未发版）
 
 > v0.1.x → v0.2 过渡版：5 ISS 收口（DEC-154~159）+ 13 commit（不含 catch-up）+ 累计 ~87 单测（i18n 4 + StatusBar 12 + WelcomeScreen 9 + GeneralSection 5 + ReaderCanvas 19 + AppShell ISS-NEW 子集 10 + commands.test 19 + ExportPreview 5 + OcrQueue 4）。typecheck ✅；vitest 受 pre-existing vitest 4.x + `html-encoding-sniffer`/`@exodus/bytes` ESM 冲突阻塞（main 仓库根也复现，与本次改动无关，详见 DEC-099）。
+>
+> 本草稿只保留 2026-06-22 的代码变更历史，其中关于 read L4、视觉对齐和完成状态的表述已由 2026-07-23 DEC-173 / ISS-NEW-M 纠偏，不得作为当前 UI 规格或任务入口。
 
 ### macOS 菜单栏（ISS-NEW-D 阶段 1 / DEC-159）
 
@@ -40,17 +42,25 @@
 
 ## Unreleased
 
-> v0.2 PDF Expert 视觉信息架构对齐 + 律师场景核心功能落地。详见 `docs/TASKS.md` + `docs/DECISIONS.md` DEC-100~158。
+> 历史条目记录当时已落地的代码，不自动等于当前高保真验收通过。PDF Expert UI 的现行状态只看 `docs/TASKS.md` ISS-NEW-M、DEC-173 与 `docs/reference/pdf-expert/`。
 
 ## 2026-07-23
 
-ISS-NEW-M 第一阶段：PDF Expert 复刻合同与主布局门禁（DEC-172）：
-- 新增受版本控制的 `docs/reference/pdf-expert/`：15 张黄金状态图、manifest、state matrix、覆盖缺口和 fail-closed 验收合同，worker / worktree 不再依赖被忽略的 `research/`。
+ISS-NEW-M 上下文与证据纠偏（DEC-173，部分纠正 DEC-172）：
+- 人工复核首批 15 张图片后，确认存在自动化失败、重复画面、状态误标和未统一裁剪；全部从 `golden/` 降级到 `captures/raw/` 并按真实画面重命名，当前 accepted-golden 为 0。
+- 重写 manifest、state matrix 和 acceptance contract；新增 implementation map、rebuild guide、completeness checklist 与 S4 验证报告，明确 raw capture 不能推导精确 CSS 或关闭视觉任务。
+- 撤销“T 编辑固定 5 列”的错误合同：现有固定 5 列、空白渐变缩略图、硬编码 A4、额外局部工具条和 noop 重排均登记为 M3 待修。
+- 清理源码注释、测试名称和编辑空态中的旧规格话术：不再声称 read 工具由 L4 接管、固定五列等于 PDF Expert、截图 41/59 能证明固定分段或 forms 等于 T 编辑；本项不改变业务行为。
+- 将后续工作固定为 M0 上下文纠偏 → M1 规范化重采/量测 → M2 视觉验证器 → M3 编辑闭环 → M4 Shell/Sidebar/RightPanel → M5 forms/export/OCR/异常态。
+- 独立 S4 三轮审计与 doc-curator 收口通过；M0 关闭，M1 成为唯一可领取下一项。
+
+ISS-NEW-M 结构与几何门禁（DEC-172，仍有效的部分）：
+- 新增受版本控制的 `docs/reference/pdf-expert/`，worker / worktree 不再只依赖被忽略的 `research/`。
 - AppShell L5 列改为 `left → main → right` 的单一布局解析；修复 read 主画布只剩 290px、右栏抢占中央弹性列的问题。
 - 修复 Toolbar「DOM 有 5 段、CSS 只有 4 列」导致 right section 换行的问题；L3 现在是计算后 5 列单行，L4 也不再保留 300px 假左缩进。
-- read 模式不再渲染 L4；`T 编辑` 从错误的 forms 映射改为进入 5 列页面编辑网格。
+- read 模式不再渲染 L4；`T 编辑` 从错误的 forms 映射改为进入内部 `pages` mode。该路由不证明网格视觉或编辑行为已完成。
 - 模式切换不再自动强开左侧 annotation / summary panel，用户显式面板状态与模式状态解耦。
-- 新增 `npm run verify:ui-layout`：自动生成 5 页 PDF，在 1500×900 / 1280×800 下验证 read、annotate、双栏、edit 的几何和 DOM 顺序，并输出 8 张实机截图。
+- 新增 `npm run verify:ui-layout`：自动生成 5 页 PDF，在 1500×900 / 1280×800 下验证 read、annotate、双栏、edit 的结构几何和 DOM 顺序，并输出 8 张实机截图；它不是视觉 diff。
 
 ## 2026-06-25
 

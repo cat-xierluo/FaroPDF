@@ -89,12 +89,12 @@ macOS 原生菜单由 `src-tauri/src/lib.rs` 使用 Tauri v2 `MenuBuilder` / `Su
 
 - `read`：不渲染 L4，L5c 使用所有未被显式侧栏占用的空间。
 - `annotate`：显示批注上下文工具条和批注 overlay。
-- `pages`：作为当前 `T 编辑` 的内部 mode，L5c 切换为 5 列页面编辑网格。
+- `pages`：作为当前 `T 编辑` 的内部 mode，L5c 切换为响应式页面卡片网格。现有固定 5 列实现是待修缺陷，不属于架构合同。
 - `export`：显示导出上下文工具条，并挂右侧 `ExportDeliveryPanel`。
 - `forms`：显示填写和签名上下文工具条，扁平化等低频动作进入 FormsPanel。
 - `ocr`：独占主工作区，显示 OCR 工具条和 OCR 任务 / 质量报告工作台。
 
-`src/components/layout/workspaceLayout.ts` 是 L5 列计算的单一入口。它只根据实际可见的左右栏生成 `main-only / left-main / main-right / left-main-right` 四种布局；AppShell DOM 固定按 L5a → L5c → L5b 排列，避免 RightPanel 抢占中央弹性列。对应的跨 worktree 黄金证据与验收门禁位于 `docs/reference/pdf-expert/`。
+`src/components/layout/workspaceLayout.ts` 是 L5 列计算的单一入口。它只根据实际可见的左右栏生成 `main-only / left-main / main-right / left-main-right` 四种布局；AppShell DOM 固定按 L5a → L5c → L5b 排列，避免 RightPanel 抢占中央弹性列。该结果目前只达到 geometry-verified；证据等级、缺口和验收门禁位于 `docs/reference/pdf-expert/`。
 
 ## 核心接口
 
@@ -702,51 +702,38 @@ FaroPDF 可复用本机 `legal-skills` 中成熟 PDF 脚本的算法，但不直
 - 外部 API 和密钥由设置页管理；联网 OCR 必须主动确认。
 - 所有处理默认输出新 PDF，不覆盖原始材料。
 
-## PDF Expert 视觉与架构对照（v0.2 起点）
+## PDF Expert 复刻架构现状
 
-参考 `research/pdf-expert/FEATURE_CATALOG.md` 与 `docs/DESIGN.md §18` 的素材池，逐模块总结 PDF Expert 与 FaroPDF 之间的功能差异与可借鉴的工程做法，驱动 ISS-059..065 的任务卡。
+现行证据、状态矩阵和完成门禁位于 `docs/reference/pdf-expert/`。被忽略的 `research/pdf-expert/` 与本节旧版本仅是历史材料，不能直接驱动实现。
 
-### A. Window / Shell
+### 证据层
 
-| 维度 | PDF Expert | FaroPDF | 差距 |
-| --- | --- | --- | --- |
-| 窗口 chrome | macOS 标准 traffic lights + 自绘 toolbar，Big Sur+ 圆角 | 自绘 48px toolbar，无 traffic lights | 保持现状（自绘更稳） |
-| Tab 行为 | 顶栏多文件 tab 含 inline rename / 拖排序 / 拖出窗口 | 单 PDF / 窗口 | **ISS-059**（P0） |
+- `captures/raw/` 保存原始采集；其中存在误标和失败画面。
+- `manifest.json` 记录 observed state、可信度和禁止推论。
+- `golden/` 当前没有 accepted 图片。
+- bbox、规范化窗口 crop、视觉 diff 和完整状态覆盖尚未建立。
 
-### B. 模式驱动侧栏
+### UI 运行时
 
-PDF Expert 在工具 / 批注 / 编辑 / OCR 切换时浮出**右栏**展示对应内容（签章缩略图、图章模板、OCR 状态），避免顶栏堆 8 类工具。FaroPDF 现行 v0.1 仅有左 4-tab Sidebar 与 2 级工具条。**ISS-060**（P1）：引入右栏 + 模式驱动切换。
+| 模块 | 当前架构事实 | 未完成 |
+| --- | --- | --- |
+| Shell | L2/L3 分行；L3 五个语义区；L5 DOM 固定左/中/右 | 只通过几何门禁，未视觉对齐 |
+| Read | read 不渲染 L4；PDF.js 阅读能力存在 | 双页和主题缺可靠 reference |
+| Sidebar | 左栏容器和多个 panel 已存在 | thumbnails/outline/annotation/bookmark 需逐态视觉和行为复核 |
+| Edit | `T 编辑` 进入 `EditModeGridView` | 当前是固定 5 列、空白缩略图、硬编码 A4 和 noop reorder |
+| RightPanel | mode-driven 容器和多个 panel component 已存在 | `docSummary=null`、OCR noop、shape placeholder 等仍在 |
+| Search/Annotate | 业务模块和部分 UI 已接线 | 参考状态、转换、保存重开和视觉验收不完整 |
+| Forms/Export/OCR | 有独立业务模块和部分真实输出 | 不能从“底座存在”推导完整工作流或视觉完成 |
+| Validation | typecheck/test/build + L3/L5 geometry script | 缺 L2/L3 顺序断言、accepted-golden visual diff 和 PDF round-trip gate |
 
-### C. 浮动工具条
+逐组件等级与 placeholder 以 `docs/reference/pdf-expert/implementation-map.md` 为准。
 
-PDF Expert 选中即弹出 6-7 按钮（高亮/下划线/删除线/便签/复制/翻译/朗读）。FaroPDF `TextSelectionOverlay` 仅 4 色调色板。**ISS-061**（P1）：补齐 Ul/St/Note/Copy + 翻译/朗读占位。
+### 不变量与待量测项
 
-### D. 图章与签名
-
-- 图章：标准 4 个 + 自定义 N 个 tab + 缩略图渲染。FaroPDF 标准 5 个、无自定义。**ISS-062**（P1）。
-- 签名：手写签名缩略图列表 + 单击激活。FaroPDF 仅 PNG/JPG 静态导入，无手写板。**v0.3 候选**。
-
-### E. 对话框
-
-| 模态 | 关键交互 | FaroPDF 现状 | 差距 |
-| --- | --- | --- | --- |
-| 合并文件 | 拖放 + 蓝主按钮 + 缩略图横排 | ✅ PDFOperationEngine | 已对齐 |
-| 设置密码 | 密码 + 确认输入 | ❌ | **ISS-064** |
-| 拆分页面 | 缩略图横排 + 中央拆分线 | ❌ | v0.3 候选 |
-| 文档属性 | 设置页右栏 | ❌ | **ISS-063** |
-
-### F. 视觉与交互对比小结
-
-- 工具栏：双行 48px PDF Expert vs 单层 48px FaroPDF；FaroPDF 已收口任务模式入口。
-- 视图模式：FaroPDF 已实现 4 种 + `getModeTools()`（DEC-032）。
-- 状态栏：FaroPDF 已有 `ReaderStatusBar` 指示页码 / 缩放 / 文字层 / 脏。
-- 左 utility pane：FaroPDF 已 4-tab（书签/大纲/批注/缩略图）。
-- 右 utility pane：FaroPDF v0.1 不存在，**ISS-060** 候选。
-- 浮动文本工具条：FaroPDF v0.1 简化，**ISS-061** 候选。
-- 图章：5 内置 + 无自定义，**ISS-062** 候选。
-- 签名：PNG/JPG 静态，无手写板，**v0.3 候选**。
-- 密码保护：未实现，**ISS-064** 候选。
-- 文档属性：未实现，**ISS-063** 候选。
+- 当前代码不变量：L5a → L5c → L5b，中央列始终是弹性列。
+- 目标不变量：`T 编辑` 使用响应式页面卡片网格，不固定列数。
+- 待量测：参考窗口尺寸、左右栏宽度、页卡最小宽度、gap、断点、字体、颜色、图标和动画。
+- 架构变更不得先于证据校准；下一步顺序由 `docs/TASKS.md` ISS-NEW-M 定义。
 
 ## 文档健康监控（doc-curator）
 

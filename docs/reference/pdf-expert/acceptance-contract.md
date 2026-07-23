@@ -4,54 +4,66 @@
 
 | 状态 | 定义 | 能否关闭 UI 复刻任务 |
 | --- | --- | --- |
-| `skeleton` | 组件、入口或静态面板存在 | 否 |
-| `wired` | 入口与真实状态/控制器连接；无 noop | 否 |
-| `behavior-complete` | 主流程可操作，保存/导出后可验证结果 | 否 |
-| `visually-verified` | behavior-complete，并通过真实应用的几何、截图和交互验收 | 是 |
+| `skeleton` | 组件、入口、静态面板或演示数据存在 | 否 |
+| `wired` | 入口与真实 state/controller 连接；无 noop、toast-only 或不可达分支 | 否 |
+| `behavior-complete` | 主流程可操作，保存/导出后能验证真实结果 | 否 |
+| `visually-verified` | behavior-complete，并通过 accepted-golden 的几何、视觉 diff 和交互验收 | 是 |
+
+`geometry-verified` 是验证标签，不是第五种完成状态。它只说明某些 DOM 顺序和宽度断言通过，不能把 `wired` 自动升级为 `visually-verified`。
 
 出现以下任一情况时，状态最高只能是 `skeleton`：
 
 - `noop`、`TODO`、`placeholder`、`等待后续 worker`；
 - 只显示 toast，没有改变文档或应用状态；
 - 使用其他 mode 冒充目标 mode；
-- 只有单元测试，没有启动应用验证；
-- 参考截图、状态或异常路径仍标记 `missing`，但任务卡没有保留未完成项。
+- 使用空白渐变、硬编码 A4 或演示缩略图冒充真实页面；
+- 只有单元测试或几何测试，没有真实应用行为验证；
+- 参考截图、状态或异常路径为 `missing`，但任务卡把对应 surface 写成完成。
 
-## 第一阶段几何门禁
+## 证据门禁
 
-测试视口：1500×900 和 1280×800。允许测量误差为 2px。
+1. `rejected` 图片不得参与实现决策。
+2. `raw` 图片只能支持可见事实，不能支持精确尺寸、颜色、断点或未显示的交互。
+3. 精确 CSS/布局规格必须来自 `measured` 或 `accepted-golden`。
+4. 当前 accepted-golden 数量为 0，因此整个高保真复刻仍未达到 `visually-verified`。
+5. 任何新 golden 必须遵守 `golden/README.md` 的准入规则。
+6. M1 的 reference-vs-reference 稳定性 diff 只负责参考证据准入；M2 的 FaroPDF-vs-reference diff 才负责产品视觉回归。
 
-### Read
+## 已通过的代码几何门禁
 
-- L2 在 L3 上方。
-- L3 有 5 个 `data-section`，计算后的 CSS Grid 也必须是 5 列。
-- L3 保持单行，默认高度约 48px，不能把 right section 自动换到第二行。
-- L4 不渲染。
-- 默认无 L5a、无 L5b。
-- `.workspace__main` 与 `.workspace` 的 x、宽度相同。
+`scripts/verify-pdf-expert-layout.mjs` 当前只验证：
 
-### Annotate
+- L3 的五个语义 section 映射到五个 CSS Grid 列并保持单行；
+- read 不渲染 L4；
+- L5 DOM 顺序为 L5a → L5c → L5b；
+- 无侧栏时 L5c 占满 workspace；
+- `T 编辑` 进入 edit workspace，而不是 forms。
 
-- L4 渲染批注工具。
-- 默认 L5b 位于 `.workspace__main` 右侧，宽度使用持久化值，默认约 320px。
-- 无 L5a 时，`.workspace__main.x === .workspace.x`。
-- L5a、L5b 同时出现时，顺序必须是 L5a → L5c → L5b；中央宽度等于 workspace 减去两栏。
+以下内容没有通过该脚本验证：
 
-### Edit
+- PDF Expert 的主题、颜色、字号、间距、图标、窗口 chrome；
+- 左右栏在参考产品中的精确宽度；
+- 缩略图内容、卡片尺寸和响应式断点；
+- 页面重排是否写回、导出和重开；
+- raw capture 与 FaroPDF 的像素/感知差异。
 
-- 点击 `T 编辑` 后 `aria-pressed=true`。
-- 中央区显示 `编辑模式网格`，不是填写签名面板。
-- 网格目标为 5 列；空文档状态也必须保留正确模式和工作台语义。
-- 拖动重排只有在真实写回页面顺序并可导出验证后才能达到 `behavior-complete`。
+## Edit 专项门禁
+
+- 不得再写“固定 5 列”。R15 在其捕获窗口内明确呈现首行 4 页、次行 1 页；精确窗口 crop 和断点尚未量测。
+- 网格必须基于可用宽度响应式排列，并在 measured spec 形成后固定最小卡片宽度、gap 和断点。
+- 每张卡必须渲染真实页面缩略图和真实页面尺寸；空白渐变与硬编码 A4 只能算 skeleton。
+- 不得增加参考状态中没有证据的局部工具条或说明行；确需 FaroPDF 差异时必须在 DESIGN 和 DECISIONS 记录。
+- 拖动重排只有在页面顺序写入真实操作状态、导出副本并重新打开验证后，才能达到 `behavior-complete`。
 
 ## PR / 交付门禁
 
-任何涉及 AppShell、Toolbar、TitlebarTabs、RightPanel 或全局布局 CSS 的交付必须附：
+任何涉及 AppShell、Toolbar、TitlebarTabs、Sidebar、RightPanel、EditModeGridView 或全局布局 CSS 的交付必须附：
 
-1. 使用的 golden evidence id。
-2. 两种 viewport 的 Playwright 几何断言结果。
-3. read、annotate、双栏、edit 四张应用截图。
-4. typecheck、聚焦测试、build 的实际结果。
-5. 所有 placeholder/noop 列表及其任务状态。
+1. 使用的 capture id、证据等级和明确未推断事项。
+2. 两种以上 viewport 的几何 JSON；涉及响应式网格时还要覆盖断点两侧。
+3. 目标状态的应用截图；存在 accepted-golden 后必须附视觉 diff。
+4. typecheck、聚焦测试、build 和实际启动结果。
+5. placeholder/noop/toast-only 列表及其 TASKS 状态。
+6. 交付等级及升级理由。
 
-不满足时保持任务未完成，不能用「后续优化」关闭验收项。
+不满足时保持任务未完成，不能用“后续优化”关闭验收项。

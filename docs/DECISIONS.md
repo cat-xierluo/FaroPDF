@@ -2916,7 +2916,7 @@ ISS-022 第一版 PR #25 已合并，5 个 section 已落 `src/modules/settings/
 ### 1. 背景
 
 - ISS-023（DEC-051）落 `AuthorCard` 组件时，因「实际添加时 PM 替换」约定保留 1×1 灰阶 PNG 占位（67 字节，Python 直接写 PNG 三 chunk 生成）；`QRCODE_LICENSE.md` 明确写「后续替换：把图片放到 `src/assets/`，建议保留文件名 `wechat-qrcode.png`」。
-- personal-site `ISS-010`（DEC-009）已经把同一张真实 QR 落到 personal-site 仓 `src/assets/wechat-qrcode.png`（183452 字节 / 734×734），资源单源 = Folia 仓 `docs/wechat-qr.png`（734×734 / 184KB / 2026-05-20 入仓），DEC-009 supersede DEC-007 修正了「从 FaroPDF 复制」的单源误读。
+- personal-site `ISS-010`（personal-site DEC-009）已经把同一张真实 QR 落到 personal-site 仓 `src/assets/wechat-qrcode.png`（183452 字节 / 734×734），资源单源 = Folia 仓 `docs/wechat-qr.png`（734×734 / 184KB / 2026-05-20 入仓）；personal-site DEC-009 supersede personal-site DEC-007，修正了「从 FaroPDF 复制」的单源误读。
 - ISS-029 收尾 FaroPDF 仓的同源 cleanup：把 AuthorCard 实际渲染的占位 PNG 替换为真图，避免「FaroPDF 设置页 `关于` 渲染 1×1 灰块」与「personal-site 官网 / FaroPDF 详情页 footer 渲染 734×734 真实 QR」的口径不一致。
 - 不再走「FaroPDF 仓单独维护 1×1 占位」的旧路径，三仓都指向 Folia docs 真源；FaroPDF 不再保留任何形式的占位。
 
@@ -7052,17 +7052,18 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - 时间：2026-07-23
 - 类型：UI 信息架构 / 上下文治理 / 验收门禁
 - 关联：ISS-NEW-M、ISS-NEW-A~J、`docs/reference/pdf-expert/`
+- 状态：**部分有效，部分由 DEC-173 纠偏。** 四级完成状态、L5 顺序、read 无 L4 和结构/几何门禁继续有效；“15 张黄金图”“固定 5 列编辑网格”与“第一阶段高保真完成”已撤销。
 
 **问题**：用户多次要求完整复刻 PDF Expert，但 82 张截图和 catalog 位于被 Git 忽略的 `research/`，worker worktree 通常只收到压缩后的 TASKS 描述。与此同时，DESIGN、DEC-013、ISS-NEW-A~J 对 Toolbar、L4、左右栏和「T 编辑」的语义互相冲突；组件骨架、noop 和 placeholder 又被直接记为完成。实际运行中 AppShell 的列模板与 DOM 顺序导致 read 主画布只有约 290px，annotate/forms 的右栏占据中央弹性列。
 
 **决策**：
 
 1. FaroPDF 对 PDF Expert 采用高保真信息架构、可见几何、模式语义和核心交互基线；保留 FaroPDF 品牌、安全和不覆盖原文件规则。
-2. 新增受版本控制的 `docs/reference/pdf-expert/`，首批纳入 15 张黄金状态图、manifest、state matrix、coverage gap 和 acceptance contract。历史 `research/` 继续作为原始素材池，不再作为 worker 唯一证据源。
+2. 新增受版本控制的 `docs/reference/pdf-expert/`，首批纳入 15 张候选状态图、manifest、state matrix、coverage gap 和 acceptance contract。后续人工复核发现这些图片尚不满足 golden 准入，现行分类见 DEC-173。历史 `research/` 继续作为原始素材池，不再作为 worker 唯一证据源。
 3. UI 任务使用 `skeleton → wired → behavior-complete → visually-verified` 四级状态；只有最后一级可关闭。noop、TODO、placeholder、仅 toast、模式冒充或未启动应用验证时不得标记完成。
 4. 规范优先级改为：acceptance contract → state matrix → DESIGN → 当前 TASKS → 历史 DECISIONS/catalog。本决策在冲突范围内 supersede DEC-013、DEC-144、DEC-146、DEC-147、DEC-155、DEC-156 和 DEC-164 的旧布局/完成解释，但保留其历史事实。
 5. AppShell L5 DOM 与视觉顺序固定为 L5a → L5c → L5b；`workspaceLayout.ts` 根据实际可见 panel 生成四种列模板。模式切换不再隐式打开左栏。
-6. PDF Expert read L4 为空；旋转、适合页面等低频动作走视图菜单。`T 编辑` 使用当前内部 `pages` mode 进入 5 列网格，forms 继续由工具启动器进入。
+6. PDF Expert read L4 为空；旋转、适合页面等低频动作走视图菜单。`T 编辑` 使用当前内部 `pages` mode，forms 继续由工具启动器进入；页面网格的列数、断点和卡片规格待可靠量测，DEC-173 明确禁止固定 5 列作为合同。
 7. 新增 `npm run verify:ui-layout`，在 1500×900 和 1280×800 下真实启动 Vite、打开动态生成的 5 页 PDF，验证 read / annotate / 双栏 / edit 的几何、DOM 顺序和截图。
 
 **第一阶段验证**：
@@ -7073,4 +7074,38 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - Playwright：两种 viewport 均通过。L3 计算后为 5 列且单行；1500×900 下 read / annotate / 双栏中央区宽度分别为 1500 / 1180 / 890px；1280×800 下为 1280 / 960 / 670px；右栏均为 320px。
 - lint：本轮变更文件的 scoped ESLint 通过；全仓只剩用户当前未提交的 `readerReducer.test.ts` `prefer-const` 阻塞，本轮不改写该文件。
 
-**未完成**：ZAI bbox MCP 未配置，82 张源图的 `s1-elements.json` 尚未生成；forms/export、双栏黄金参考、edit 真实缩略图与重排写回、多个 noop/placeholder 仍在 `coverage-gap.md` 和 ISS-NEW-M 保持未完成。
+**未完成**：ZAI bbox MCP 未配置，82 张源图的 `s1-elements.json` 尚未生成；forms/export、双栏可靠参考、edit 真实缩略图与重排写回、多个 noop/placeholder 仍在 `coverage-gap.md` 和 ISS-NEW-M 保持未完成。这里的“第一阶段验证”只表示结构/几何回归通过，不表示视觉完成。
+
+## DEC-173 PDF Expert 参考证据降级、任务状态重置与唯一推进序列（2026-07-23）
+
+- 时间：2026-07-23
+- 类型：上下文治理 / 证据质量 / UI 复刻门禁
+- 关联：ISS-NEW-M、DEC-172、DEC-144～147、DEC-155～156、DEC-164、`docs/reference/pdf-expert/`
+- 状态：生效；在冲突范围内 supersede 旧决策的视觉规格与完成结论
+
+**问题**：对 `docs/reference/pdf-expert/golden/` 的 15 张图片逐张人工复核后发现，G01 是终端自动化错误，G03 未进入双页，G04/G05 都是大纲而非缩略图/批注，G07 未证明文本选择，G10 是 OCR 对话框而非右栏，G14 是 welcome 而非批注汇总，G15 在所捕获窗口为 4+1 页面排列而非固定 5 列。所有图片还包含桌面背景，缺少统一应用窗口 crop、bbox、窗口尺寸和可复现触发步骤。因此，把它们称作 golden 并据此关闭视觉任务不成立。
+
+**决策**：
+
+1. 首批 15 张图片全部撤销 golden 资格，迁入 `docs/reference/pdf-expert/captures/raw/` 并按 observed state 重命名；当前 accepted-golden 数量为 0。
+2. 证据统一分为 `rejected → raw → measured → accepted-golden`。只有 measured/accepted-golden 可以生成精确视觉规格；只有 accepted-golden 可以用于最终视觉 diff。
+3. `manifest.json` 必须记录每张图真实观察到的状态、可证明项、不可证明项、限制和置信度；文件名或原任务意图不得覆盖画面事实。
+4. UI 完成状态统一为 `skeleton → wired → behavior-complete → visually-verified`；`geometry-verified` 只是附加标签。accepted-golden 为 0 时，任何 PDF Expert surface 都不能关闭为高保真完成。
+5. 现有 `verify:ui-layout` 只验证 L3 五个语义分区、read 无 L4、L5 DOM/列顺序、中央区宽度和 `T 编辑 → pages` 路由。它不验证字体、颜色、图标、缩略图、间距、断点或感知相似度。
+6. 撤销固定 5 列编辑网格合同。现有 `EditModeGridView` 的固定列数、空白渐变、硬编码 A4、无证据局部工具条和 noop reorder 均是待修缺陷；目标是按重新量测结果实现真实缩略图、真实页面尺寸、响应式网格和导出/重开闭环。
+7. `docs/TASKS.md` 的 ISS-NEW-M 是 PDF Expert 高保真恢复的唯一可领取任务，执行顺序固定为 M0 上下文纠偏 → M1 规范化重采/量测 → M2 视觉验证器 → M3 编辑闭环 → M4 Shell/Sidebar/RightPanel → M5 forms/export/OCR/异常态。
+8. `docs/reference/pdf-expert/README.md` 是唯一证据入口；`implementation-map.md` 说明当前代码状态；`acceptance-contract.md` 说明关闭门槛；`rebuild-guide.md` 说明依赖和交付方式。它们不另建任务源。
+9. 历史 DEC、CHANGELOG 和 TASKS 进度日志只保留“当时做过什么”的事实。遇到与本决策冲突的“完成、对齐、黄金图、固定五列、read L4”描述时，以本决策和 ISS-NEW-M 为准。
+10. 源码注释、测试名称和空态文案也属于 Agent 上下文：已清理 read L4、固定五列、截图 41/59 精确分段和 forms=T 编辑等过期说法；本轮不借上下文清理改变对应业务行为，真实缺陷继续留在 implementation map 与 M3～M5。
+
+**仍然有效的旧结论**：
+
+- DEC-172 的四级完成状态、L5a → L5c → L5b、read 不渲染 L4、模式切换不隐式强开面板和结构/几何回归门禁。
+- DEC-144～147、DEC-155～156、DEC-164 已提交过的组件、路由和测试历史事实；但它们的 PDF Expert 视觉等价或“已完成”结论不再有效。
+- FaroPDF 的品牌、安全、不覆盖原文件、可回退与隐私边界。
+
+**后续门禁**：
+
+- M1 未建立至少 read、thumbnails、annotate、edit 的 accepted-golden 前，不开始按像素调样式。
+- M2 未提供超阈值非零退出码前，不以“生成了截图”或“肉眼大致相似”关闭视觉任务。
+- 每个 worker 必须声明目标 surface、证据 ID、当前完成级别、allowed files、行为验证和视觉验证；缺一项不得标记完成。

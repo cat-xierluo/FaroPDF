@@ -40,7 +40,32 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - `feat/app-distribution`：ISS-021
 - `feat/settings-page`：ISS-022、ISS-023
 
+## 当前唯一推进序列（PDF Expert 高保真恢复）
+
+截至 2026-07-23，PDF Expert 高保真复刻是 UI 方向的 P0。执行只按 ISS-NEW-M 的下列阶段推进，不从旧 ISS 的“已完成”段、CHANGELOG 或历史 DEC 自行领取 UI 任务。
+
+| 顺序 | 阶段 | 状态 | 进入条件 | 交付 |
+| --- | --- | --- | --- | --- |
+| M0 | 上下文纠偏 | 已完成 | 无 | raw capture 重新分类；DESIGN/ARCH/TASKS/DEC 统一；实现映射和门禁 |
+| M1 | 规范化重采集与量测 | **唯一下一项，待领取** | M0 完成 | 固定 fixture/主题/窗口；窗口 crop；bbox；accepted-golden |
+| M2 | 视觉验证器 | 阻塞于 M1 | 至少 read/thumbnail/annotate/edit 有 accepted-golden | 几何 JSON + 感知 diff + 非零失败码 |
+| M3 | `T 编辑` 纵向闭环 | 阻塞于 M1/M2 | edit spec 和 verifier 可用 | 真实缩略图 → 响应式网格 → 重排写回 → 导出副本 → 重开 |
+| M4 | Shell / Sidebar / RightPanel 分域复刻 | 阻塞于 M2 | 目标 surface 有 accepted-golden | 每个 surface 独立 PR 和视觉/行为验收 |
+| M5 | forms/export/OCR/异常态补齐 | 阻塞于对应 capture | 状态矩阵证据完整 | 纵向工作流逐项 behavior-complete + visually-verified |
+
+### 状态词统一
+
+- `skeleton`：组件或静态外观存在。
+- `wired`：入口与真实 state/controller 连接，无 noop。
+- `behavior-complete`：真实 PDF 结果可保存/导出并重开验证。
+- `visually-verified`：在 behavior-complete 基础上通过 accepted-golden。
+- `geometry-verified` 只是验证标签，不代表视觉完成。
+
+当前 accepted-golden 为 0，因此没有任何 PDF Expert surface 可以按“高保真”关闭。
+
 ## 活跃任务
+
+本节含少量尚未机械迁移的历史完成卡。`状态：已完成`、`✅` 或所有验收均勾选的卡片只作历史记录，不是可领取任务；Agent 只能领取明确写为“待开始 / 进行中 / 部分完成”且仍有未勾选验收项的卡片。PDF Expert UI 例外：即使旧卡写“已完成”，仍须服从上方 M0–M5 和 ISS-NEW-M 的重新验收。
 
 ### ISS-039 PDF 工具启动器与导出编号面板收口
 
@@ -682,7 +707,9 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - **下一阶段**（v0.2）：是否把 `computer-use` skill 升级到 v2（封装 MCP + trajectory + verification）？
 - **绝对不要**：在 v0.1.x 内把 ISS-057 装到生产账户；ISS-058 不要阻塞 v0.1.x 收口。
 
-## ISS-059..065：PDF Expert 视觉与功能对照复检（v0.2 候选）
+## 历史冻结卡：ISS-059..065 PDF Expert 视觉与功能对照复检
+
+> **不可领取。** 本区保留 2026-06 的实现和拆解历史，其中的“进行中”“待启动”、截图编号、百分比、宽度和 Wave 顺序均不是现行需求。未完成内容已由 ISS-NEW-M 的 M1～M5 接管；任何 Agent 不得从本区直接开工，也不得把 `research/pdf-expert/FEATURE_CATALOG.md` 当规范源。
 
 > 触发：2026-06-15 大批次 PDF Expert 截图复检（v0.1.2 封箱期间 30 张 + 6 月 15 日新增 39 张），目标是把 PDF Expert 界面语言、画面语义和交互行为系统化记录到仓内，供后续 v0.2 设计 / 实现对照参考。
 > 详细图片索引：见 `research/pdf-expert/FEATURE_CATALOG.md`（按 chrome / 视图与导航 / 侧边栏 / 批注 / 对话框 5 大块罗列 69 张截图要点）。
@@ -961,11 +988,11 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [ ] 输出 `*-metadata.pdf` 新副本验证 metadata 已更新
   - [ ] Producer 字段默认写"FaroPDF"，不写底层库名（避免实现细节泄露）
 
-### ISS-073 v0.2 阶段 2 "PDF Expert 页面布局"完整对齐路线图（差距追踪）
+### ISS-073【历史冻结，不可领取】v0.2 阶段 2 “PDF Expert 页面布局”旧差距追踪
 
 - 优先级：P0（v0.2 顶层目标，wrap ISS-059/060 阶段 2 + ISS-065 持续）
 - 类型：UI 信息架构 / 整体 polish / 路线图
-- 状态：路线图（不直接交付，作为差距追踪 + 阶段 2 ISS 入口）；部分 ship — panelWidthStore localStorage 持久化（DEC-121）+ AppShell 集成读宽度（DEC-131 即将 ship）
+- 状态：**历史冻结，已被 ISS-NEW-M / DEC-173 接管。** 下列百分比、分桶和 Wave 只记录当时判断，不是当前完成度、任务入口或执行顺序。
 - 来源：2026-06-15 PDF Expert audit 揭露剩余差距 + DEC-103 PDF-Guru 调研 + DEC-105 ISS-071 阶段 1 落地后的下一波
 
 ### 当前 "页面布局" 完成度（vs PDF Expert）
@@ -1063,7 +1090,9 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - DEC-105（ISS-071 阶段 1 工程基础设施落地）
 - skill 侧 v1.16.2（multi-agent 启动注意事项警示）
 
-## ISS-NEW-A ~ F：v0.2 PDF Expert 工具栏 + tab 全量对齐（基于 2026-06-20 截图复核）
+## 历史冻结卡：ISS-NEW-A～J PDF Expert UI 旧拆解
+
+> **不可领取。** 本区只记录已提交组件、路由和测试的历史。所有未完成项、视觉结论和旧截图规格已由 ISS-NEW-M 接管；M0 完成后唯一下一项是 M1。后续 Agent 不得从 A～J 自选实现任务。
 
 > 立项依据：研究 `research/pdf-expert/FEATURE_CATALOG.md`（含 §0 顶层架构 5 层分层 + §1.2 tab 位置 + §1.3 toolbar 5 段 + §2 L4 二级工具条 + §3 L5b 右栏 + §4 菜单栏 + §7.1/7.2 批注工具 + §9 多 tab）后，发现 ISS-059 (DEC-142 / adcd8f0) 的 tab bar 位置错误 + 整个 Toolbar 偏离 PDF Expert 5 段布局，需要从 PDF Expert 视角重新拆分 v0.2 收口工作。
 
@@ -1072,13 +1101,13 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P0（v0.2 阻塞）
 - 类型：UI 信息架构 / Toolbar
 - 来源：FEATURE_CATALOG §0 / §1.2 / §1.3；截图 01 / 20 / 30 / 61 / 63 / 80
-- 状态：**阶段 1 + 2 已完成（2026-06-22 / DEC-155 / PM 单 session 收口）**
+- 状态：**结构与几何已接线，视觉重新验收中**。历史阶段 1/2 只证明组件和 DOM；DEC-173 撤销“整体已完成”含义。
 - 范围：
   1. **L2 行 1**：`<TitlebarTabs>` 上移到 `<Toolbar>` **上方**作为独立行（修复 ISS-059 位置错误）— ✅ 阶段 1
   2. **L3 行 2**：`<Toolbar>` 重构为 5 段（sidebar toggles / file / reading / mode / right）— ✅ 阶段 1
-  3. **左区**：4 个 sidebar toggle 图标（缩略图 / 大纲 / 批注 / 书签），对齐 PDF Expert L3 左区 — ✅ 阶段 2 收口（DEC-155，加「书签」按钮 + `BookmarkPanelPlaceholder`）
+  3. **左区**：4 个 sidebar toggle 图标（缩略图 / 大纲 / 批注 / 书签）已存在；书签仍是 placeholder，顺序和视觉缺 accepted-golden
   4. **文件区**：打开按钮保持（已是 icon-only）— ✅ 阶段 1
-  5. **阅读区**：**瘦身到 4 元素** — 页码跳转 + 视图模式 4-icon toggle + 缩放% + -/+ — ✅ 阶段 2 收口（DEC-155，旋转 + 适合页面下移 L4；剩下 4 元素：页码 2 / 视图模式 1 / 缩放% 1 / -/+）
+  5. **阅读区**：当前为页码跳转 + 视图模式 4-icon toggle + 缩放% + -/+；“旋转/适合页面下移 read L4”的旧结论已撤销，read L4 为空
   6. **模式切换区**：恢复「A 批注」「T 编辑」按钮 — ✅ 阶段 1
   7. **右区**：搜索 / 工具 / 设置保持 — ✅ 阶段 1
   8. **视图模式呈现**：combobox → 4-icon toggle — ✅ 阶段 1
@@ -1091,15 +1120,15 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - `src/components/layout/Toolbar.css` — ✅ 阶段 1
   - `src/components/layout/Toolbar.test.tsx` — ✅ 阶段 1 + 阶段 2（+5 新测）
   - `src/components/layout/AppShell.test.tsx` — ✅ 阶段 1 + 阶段 2（+7 新测）
-- 验收：
+- 验收（`[x]` 只代表结构/历史测试，不代表 visually-verified）：
   - [x] L2 tab bar 在 toolbar 上方独立行 — 阶段 1 验证
   - [x] L3 toolbar 严格 5 段（DOM 结构 / data-section 属性）— 阶段 1 验证
   - [x] 阅读区只有 4 元素（页码 + 视图模式 4 图标 + 缩放% + -/+）— 阶段 2 + ISS-NEW-B
   - [x] 视图模式 4 图标 toggle（不是 combobox）— 阶段 1 验证
   - [x] 「A 批注」「T 编辑」按钮在 L3 第 4 段（点击切换 activeMode）— 阶段 1 验证
   - [x] `工具` 启动器仍然存在（ISS-055 不动）— 阶段 1 验证
-  - [x] 侧栏 4 toggle（新增「书签」按钮）— 阶段 2 验证（DEC-155）
-  - [x] 旋转 + 适合页面下移 L4 二级工具条（`<ReadModeToolbar>`）— 阶段 2 验证（DEC-155）
+  - [ ] 侧栏 4 toggle 的顺序、图标、密度和真实 panel 均通过 accepted-golden
+  - [x] read 模式不显示 L4；旋转/适合页面由视图菜单承载 — geometry-verified，视觉待 M1/M2
   - [x] typecheck pass — 阶段 1 + 阶段 2
   - [x] Toolbar 24/24 ✅ + AppShell 7/7（ISS-NEW-A 子集）✅ + readerModeTools 7/7 ✅
 
@@ -1111,49 +1140,51 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 阶段 2 收口（2026-06-22 / DEC-155）：
   - 4 files / 5 new tests
   - PM 单 session 推进（Wave 4 multi-agent GLM provider 配额耗尽降级）
-  - 已知限制：BookmarkPanelPlaceholder / ReadModeToolbar UI 美化 / ModeSecondaryToolbar 统一抽象（ISS-NEW-E v0.2 顶层目标）/ macOS 视图菜单 submenu（ISS-NEW-H）— 留后续
+  - 历史限制：BookmarkPanelPlaceholder / 旧 ReadModeToolbar / ModeSecondaryToolbar / macOS 视图菜单 submenu。现行处理见 ISS-NEW-B/E/M。
 
 ### ISS-NEW-B 阅读辅助按钮下移 L4 二级工具条
 
 - 优先级：P1
 - 类型：UI 信息架构 / Toolbar
 - 来源：FEATURE_CATALOG §1.3 + §2；截图 04 / 05 / 06
-- 状态：**已被 ISS-NEW-M / DEC-172 基线纠偏**。PDF Expert 的 read 模式 L4 为空；旧的「阅读工具下移 L4」结论不再作为现行规范。
+- 状态：**旧任务标题已作废，现行结论见 ISS-NEW-M / DEC-173**。当前代码和 raw R02 均未显示 read L4；视觉结论待 accepted-golden。
 - 范围：
   1. L3 阅读区保持页码、视图模式、缩放百分比、缩小 / 放大。
   2. read 模式不渲染 L4。
   3. 旋转、适合页面、实际大小进入 macOS 视图菜单，不在 read L4 常驻。
 - 验收：
-  - [ ] L3 阅读区无旋转 / 适合页面按钮
-  - [x] read 模式 L4 为空（ISS-NEW-M 第一阶段，Playwright 两种 viewport 验证）
+  - [x] L3 阅读区不常驻旋转 / 适合页面按钮（代码与几何验证）
+  - [x] read 模式 L4 为空（geometry-verified；不是视觉完成）
   - [ ] macOS 视图菜单「实际大小」「适合页面」可用
+  - [ ] read accepted-golden 建立并通过视觉 diff
 
 ### ISS-NEW-C 右侧 mode-driven panel 体系（L5b）
 
 - 优先级：P0（v0.2 阻塞）
 - 类型：UI 信息架构 / 侧栏
 - 来源：FEATURE_CATALOG §3；截图 20 / 36 / 50 / 53 / 55 / 57-60 / 61-multi-tab-opened-2nd
-- 状态：**结构已接线，尚未完成**。panel 组件已落地；`docSummary=null`、`onStartOcr=noop` 等占位仍存在，行为完成和逐状态视觉验收未通过。ISS-NEW-M 第一阶段只验证了 L5b 位于 L5c 右侧。
-- 范围：完整 `<RightPanel>` 组件 + `rightPanelMode` 状态，按触发切换内容：
-  | 触发 | 内容 | 状态 |
+- 状态：**混合 skeleton/wired，尚未完成**。RightPanel 容器已落地且 L5b 几何位置通过；各 panel 必须独立验收，不能沿用旧表的统一 `✅`。
+- 当前分项：
+  | 触发 | 目标内容 | 当前等级 / 阻塞 |
   | --- | --- | --- |
-  | 阅读默认 | 折叠 | ✅ 等价 |
-  | 批注 / 形状 | 颜色选择 + 工具切换 + 形状选择（矩形/椭圆/箭头/双向/直线/铅笔）+ 线条宽度 + 透明度 + 边框/填充色 | ✅ ISS-NEW-I / DEC-147 |
-  | 签名 | 手写签名缩略图列表 | ✅ ISS-070 / DEC-113 |
-  | 图章 | 标准 2×2 + 自定义 tab | ✅ ISS-062 / DEC-112 |
-  | OCR / 扫描（ocr-status）| 状态 + 页码范围 + 开始按钮 | ✅ DEC-146 |
-  | OCR / 扫描（ocr-queue）| 任务列表（status dot + 短文件名 + cancel 按钮）| ✅ DEC-158 |
-  | 搜索 | 命中列表 + 上下导航 + 回到第 1 项 | ✅ ISS-NEW-I / DEC-147 |
-  | 文档摘要 | 文件信息缩略图 + 元数据 | ✅ DEC-146 |
-  | 导出预览 | active tool + 参数摘要（页数 / 源文件名 / 输出文件名）| ✅ DEC-158 |
+  | 阅读默认 | 折叠 | `wired + geometry-verified`；视觉待 read golden |
+  | 批注 / 形状 | 形状/样式设置 | `skeleton/wired`；R12 语义不确定，controlled placeholder 仍在 |
+  | 签名 | 手写签名缩略图列表 | `wired`，部分真实行为；选择→落点→保存重开未统一验收 |
+  | 图章 | 标准 + 自定义 tab | `wired`，部分真实行为；参考结构和落点链路未视觉验收 |
+  | OCR status | 状态、范围、开始 | `skeleton`；AppShell 仍传 noop |
+  | OCR queue | 任务列表和取消 | 组件/部分 controller 存在；完整行为与视觉未验收 |
+  | 搜索 | 命中列表和导航 | `wired`，部分真实行为；零结果/关闭/状态保持缺证据 |
+  | 文档摘要 | 文件信息和元数据 | `skeleton`；AppShell 仍传 `docSummary=null` |
+  | 导出预览 | active tool 和参数摘要 | 组件/部分行为存在；export reference 缺失 |
 - 验收：
-  - [x] 形状工具右栏：6 形状选择 + 宽度滑块 + 透明度滑块 + 边框/填充色块（对齐截图 57-60）— DEC-147
-  - [x] 搜索右栏：命中列表 + 上下导航 + 回到第 1 项（对齐截图 36）— DEC-147
-  - [x] 文档摘要右栏：文件信息 + 元数据（对齐截图 61）— DEC-146
-  - [x] OCR 模式右栏：状态 + 页码范围 + 开始按钮（对齐截图 53）— DEC-146
-  - [x] 导出模式右栏：导出预览（active tool + 参数摘要 + 输出文件名）— DEC-158
-  - [x] OCR 队列右栏：任务列表 + cancel 按钮 — DEC-158
-  - [ ] 旧 popover / utilityPanel 平滑迁移（ISS-NEW-J v0.3 候选）
+  - [x] L5b 在 L5c 右侧，双栏 DOM 顺序正确 — geometry-verified
+  - [ ] shape 语义重采后接真实 state 和绘制
+  - [ ] signature / stamp 完成选择→页面落点→保存重开
+  - [ ] OCR status 去除 noop，接真实队列和取消
+  - [ ] document summary 接真实数据和空/加载/错误态
+  - [ ] search 完成零结果、导航、关闭和状态保持
+  - [ ] 每个 panel 有 accepted-golden 和视觉 diff
+  - [ ] 旧 popover / utilityPanel 平滑迁移
 
 ### ISS-NEW-D macOS 菜单栏中文化补齐
 
@@ -1188,25 +1219,22 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P1
 - 类型：UI 信息架构 / Toolbar
 - 来源：FEATURE_CATALOG §2；截图 20 / 21 / 53 / 56 / 80 / 81
-- 状态：**结构已接线，尚未完成**。read L4 已按黄金矩阵纠偏为空；annotate / OCR / export / forms 已有结构，edit 的真实命令和整体视觉验收仍未完成。
+- 状态：**结构已接线，尚未完成**。read L4 为空只达到 geometry-verified；其他 mode 的组件存在不等于行为或视觉完成。
 - 范围：`<ModeSecondaryToolbar>` 组件按 `activeMode` 切换内容（实际由 AppShell `ContextToolbar` 内 if-else 分支实现）：
-  - **阅读**（✅ ISS-NEW-M / DEC-172）：L4 为空；旋转与适合页面走视图菜单
-  - **批注**（✅ ISS-026）：高亮 / 下划线 / 删除线 / 文本 / 笔 / 橡皮擦 / 便签 / 形状 + 颜色选择（AnnotationToolbar 已 ship）
-  - **页面管理 / 编辑**（✅ ISS-046 / DEC-152）：`pages` mode 用 PageOrganizerWorkspace（独立工作台，含插入页 / 删除 / 提取 / 旋转 / 撤销 / 重做 / 页数 / 旋转逆/顺等能力）
-  - **扫描**（✅ ISS-007）：扫描切边 / 增强扫描 + 页码范围 + 开始按钮（OcrModeToolbar 已 ship）
-  - **导出**（✅ DEC-146）：交付工具分组（exportToolGroups — 文字水印 / 图片水印 / 即将加 export-preview）
-  - **填写和签名**（✅ ISS-043 / DEC-104）：4 工具按钮（读取字段 / 填写 / 签名 / 扁平化导出）
+  - **阅读**：L4 为空；旋转与适合页面走视图菜单（geometry-verified）
+  - **批注**：AnnotationToolbar 组件存在，工具真实行为和视觉逐项验收
+  - **页面管理 / 编辑**：`pages` / EditModeGridView 与 PageOrganizerWorkspace 尚未形成单一闭环
+  - **扫描**：OcrModeToolbar 组件存在；右栏 OCR 开始仍有 noop
+  - **导出**：exportToolGroups 和交付面板存在；参考状态缺失
+  - **填写和签名**：4 个工具入口存在；forms reference 缺失
 - 验收：
-  - [x] L4 二级工具条按 activeMode 切换内容（5 模式统一由 ContextToolbar 路由）— DEC-156
-  - [x] 阅读模式 L4 为空 — ISS-NEW-M / DEC-172
+  - [x] L4 路由结构按 activeMode 切换 — 只代表 wired 结构
+  - [x] 阅读模式 L4 为空 — geometry-verified
   - [ ] 编辑模式 8 个命令真实接通；当前网格仍有缩略图和重排 placeholder
-  - [x] OCR 模式 L4 显示 OcrModeToolbar（扫描切边/增强扫描 + 页码范围 + 开始）— 既有
-  - [x] 批注模式 L4 显示 AnnotationToolbar — 既有
-  - [x] 导出模式 L4 显示交付工具分组 — 既有
-  - [x] 填写和签名模式 L4 显示 4 工具按钮 — 既有
-  - [x] typecheck ✅ + Toolbar 24/24 ✅ + readerModeTools 7/7 ✅ — DEC-156
-  - [ ] read / annotate / edit / OCR / export / forms 全状态 Playwright 视觉验证
-- 历史收口 DEC-164 被 DEC-172 纠偏：组件存在不等于行为和视觉完成。
+  - [x] OCR / annotate / export / forms 的对应组件可渲染 — 只代表 skeleton/wired
+  - [x] 历史 typecheck / Toolbar / readerModeTools 测试通过 — 不代表业务或视觉
+  - [ ] read / annotate / edit / OCR / export / forms 全状态 accepted-golden + Playwright 视觉验证
+- 历史收口 DEC-164 由 DEC-172、DEC-173 纠偏：组件存在不等于行为和视觉完成。
 
 ### ISS-NEW-F tab 拖离窗口剥离 + 跨窗口状态共享
 
@@ -1292,48 +1320,46 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [ ] 扫描菜单 5 项，4 档质量 submenu
   - [ ] 全菜单 ⌘ 快捷键与 PDF Expert 对齐
 
-### ISS-NEW-I 编辑模式页面网格 + 形状工具右栏 6 段 + 搜索右栏 + L3 模式附加按钮
+### ISS-NEW-I【历史冻结】编辑模式、形状与搜索组件旧拆解
 
-- 优先级：P0（与 ISS-NEW-A / C 并行）
+- 优先级：P0（实现阻塞于 ISS-NEW-M M1/M2）
 - 类型：UI 信息架构 / 模式 / 右栏 / L3 toolbar
 - 来源：FEATURE_CATALOG §2.1 + §3 + §1.3.1 + §1.3.2 三审补全（2026-06-20）；截图 50 / 59 / 65 / 67 / 69 / 80 / 81 / 83
 - 状态：**skeleton / wired，尚未完成**。EditModeGridView、ShapeToolPanel、SearchResultsPanel 已存在；真实页面缩略图、重排写回、形状绘制、跨 tab IPC 和全状态视觉验收仍未完成。
 - 范围：
   1. **T 编辑模式页面网格视图**：
-     - PDF 内容区从单页流式改为 5 列缩略图网格
-     - 选中页：蓝边框 + label 显示页面尺寸（如「A4 (210×297 毫米)」）
-     - 拖动重排：水平 / 垂直 drop indicator（截图 69）
-     - 跨 tab 拖页：drag-monitor-fixture tab 在底栏显示「drop monitor」状态（截图 81）
-     - 与现有 `PageOrganizerWorkspace`（ISS-046）的关系：T 编辑模式可复用其 grid 组件
+     - PDF 内容区从单页流式改为响应式真实页面卡片网格；禁止固定 5 列
+     - R15 在所捕获窗口中为首行 4 页、次行 1 页；精确断点待 M1 量测
+     - 选中页：蓝边框 + 真实页码和页面尺寸；禁止硬编码所有页面为 A4
+     - 拖动重排：需补 drag start / in-progress / drop indicator 证据
+     - 跨 tab 拖页：阻塞于可靠 capture 和 tab 间 IPC
+     - 与 `PageOrganizerWorkspace` 形成单一页面操作工作流，避免两套网格/状态
   2. **L4 工具条命令补全**：
      - 编辑模式 L4：8 命令（插入页 5 子菜单 / 删除 / 提取 / 旋转双向 / 移动 / 复制 / 撤销 / 重做 / 页数 + 尺寸）
      - 扫描模式 L4：5 区段（扫描切边 / 增强扫描 / 页码 - / + / 输入范围 / 页数显示）
      - 批注模式 L4：8 工具（书签 / 高亮 / 下划线 / 删除线 / 文本 / 笔 / 橡皮擦 / 便签 / 形状）
-  3. **L5b 形状工具右栏 6 段**（ISS-NEW-C 子任务）：
-     - 形状选择（6 形状 2×3 网格：矩形 / 椭圆 / 箭头 / 双向箭头 / 直线 / 铅笔）
-     - 线条工具（实线 / 虚线 2 切换）
-     - 线条宽度滑块（1 像素）
-     - 不透明度滑块（100%）
-     - 边框色（7 色块：灰 / 黑 / 红 / 橙 / 黄 / 绿 / 蓝）
-     - 填充色（7 色块 + 透明）
+  3. **L5b 形状工具右栏**（ISS-NEW-C 子任务）：
+     - R12 只能证明“可能是形状工具状态”，不能证明旧 catalog 所写固定 6 段
+     - M1 先重采并量测形状选择、线型、宽度、透明度、边框和填充的真实层级
+     - 量测前只允许清理 placeholder 或接真实 state，不允许按旧 6 段猜布局
   4. **L5b 搜索右栏**（ISS-NEW-C 子任务）：
-     - Header：「已找到 N 项」
-     - 输入框 + X 关闭
-     - 命中列表：每行 Line N: 文本（关键词高亮）
-     - Footer：「回到第 1 项」按钮 + 页码导航 2/2
+     - R06 只能证明搜索结果面板、命中高亮和结果列表存在
+     - 旧 catalog 的固定四段、具体按钮文案和 footer 布局均降级为 M1 待验证 hypothesis
   5. **L3 模式附加按钮**：
-     - 扫描模式激活后 L3 第 4 段插入「增强扫描」「开始」按钮
-     - L3 右区搜索框常驻（含 X 关闭）
-     - 底部 status bar 持久显示「已找到 N 项」
-  6. **图章 / 形状 / 自定义双 tab**：右栏形状 tab 包含「形状」「自定义」2 个 sub-tab
+     - 旧 catalog 中的扫描附加按钮、常驻搜索框和状态栏文案均未形成 measured evidence
+     - 由 M1 重新采集对应 mode 后决定，不在本历史卡继续实现
+  6. **图章 / 形状 / 自定义 tab**：具体 tab 数量、命名与层级待 M1 重采，不沿用旧 catalog 推测
 - 验收：
-  - [x] 点击 `T 编辑` 进入 5 列网格结构（ISS-NEW-M 第一阶段）；缩略图与重排行为仍未完成
+  - [x] 点击 `T 编辑` 进入 edit workspace，而不是 forms — geometry-verified
+  - [ ] 移除固定 5 列、空白渐变、硬编码 A4 和额外无证据局部工具条
+  - [ ] 真实缩略图 + 响应式断点 + 真实页尺寸
+  - [ ] 重排写回 → 导出新副本 → 重开顺序一致
   - [ ] 编辑模式 L4 8 命令全实现
   - [ ] 扫描模式 L4 5 区段全实现
-  - [ ] 形状工具右栏 6 段（截图 59 对齐）
-  - [ ] 搜索右栏 4 段（截图 41 对齐）
-  - [ ] L3 模式附加按钮就位
-  - [ ] 全部组件 Playwright 960×720 实操验证
+  - [ ] 形状状态重采量测后按真实层级实现
+  - [ ] 搜索右栏经 M1 重采后按真实层级验收
+  - [ ] L3 模式附加按钮经 M1 取证后再决定
+  - [ ] accepted-golden 建立后覆盖断点两侧的 Playwright + visual diff
 
 ### ISS-NEW-J 残留 PDF Expert 细节（v0.3 候选，不阻塞 v0.2 收口）
 
@@ -1392,6 +1418,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 需要恢复为活跃任务时，先在 `docs/DECISIONS.md` 的归档条目下加"恢复"标注，再回到本文件新增任务卡。
 
 ## 进度日志
+
+> 本节只记录历史动作，不是当前状态或任务入口。凡涉及 PDF Expert UI，2026-07-23 之前的“完成”“对齐”“黄金图”“固定 5 列”和 read L4 记录均由 ISS-NEW-M / DEC-173 重新解释；领取任务只看本文件顶部的 M0～M5 与 ISS-NEW-M。
 
 - 2026-06-22：完成 ISS-NEW-E 第 1 步收口（DEC-156）：L4 二级工具条统一抽象 — read 模式并入 `ContextToolbar`，`ContextToolbar` 接受 `mode: Exclude<AppModeId, "pages">`（含 `"read"`） + `reader` prop；`mode === "read"` 分支从 `getModeTools("read")` 拿 3 工具（旋转 + 适合页面）；`showContextToolbar` 改 `activeMode !== "pages"`（read 模式也显示 L4）；`contextualToolbarLabels` 加 `"read": "阅读模式工具"`；删除独立 `<ReadModeToolbar>` 组件（50 行）和 AppShell 中独立 render 块。`ContextToolbar` 真正按 `activeMode` 路由 5 模式（read / annotate / ocr / export / forms）。`pages` 模式仍不渲染 L4。typecheck ✅ + AppShell 7/7（ISS-NEW-A 子集，更新 1 个空态测试）✅ + Toolbar 24/24 ✅ + readerModeTools 7/7 ✅。
 - 2026-06-22：完成 ISS-NEW-A 阶段 2 + ISS-NEW-B 收口（DEC-155）2 块 ship：
@@ -1501,33 +1529,94 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [ ] v0.3.0 8+3 meta-layer 实施
 - 备注：v0.3.0 是架构重构，会破坏现有 catalog 引用，需大版本 bump。触发时机：v0.2 收口后。
 
-### ISS-NEW-M PDF Expert 复刻合同、黄金参考与实机布局门禁
+### ISS-NEW-M PDF Expert 高保真复刻：证据、上下文与执行门禁
 
 - 优先级：P0
-- 类型：UI 信息架构 / 上下文治理 / 实机验收
+- 类型：UI 信息架构 / 上下文治理 / 视觉与行为验收
 - 来源：2026-07-23 用户反馈「多次要求完整复刻 PDF Expert，但截图研究没有转化为最终布局和功能」
-- 状态：**第一阶段实现与实机验收完成；完整复刻持续进行（Codex 主会话，2026-07-23 / DEC-172）**
-- 根因边界：
-  1. `research/` 被 Git 忽略，截图、catalog 与 S4 报告没有稳定进入 worker worktree。
-  2. DESIGN 旧约束与 ISS-NEW-A~J 的高保真复刻目标冲突，没有正式的 supersede 规则。
-  3. `skeleton / noop / placeholder` 被直接记为「完成」，缺少行为完成和实机视觉验证两个状态。
-  4. 既有测试只验证组件/DOM 存在，没有验证 L5a/L5b/L5c 的顺序、宽度和中央画布可用面积。
-- 第一阶段范围：
-  1. 在受版本控制目录建立 PDF Expert 黄金状态清单、状态矩阵、覆盖缺口和验收合同。
-  2. 更新 DESIGN：明确高保真复刻边界、规范优先级、L2-L6 布局和四级完成状态。
-  3. 修复 AppShell grid：无侧栏时中央阅读区占满；左右栏出现时保持 L5a → L5c → L5b 顺序。
-  4. 阅读模式不渲染 L4；`T 编辑` 进入现有页面编辑网格，不再误入 forms。
-  5. 增加 1500×900 与 1280×800 的 Playwright 几何断言和截图证据。
-- 验收：
-  - [x] 黄金参考已纳入 Git 跟踪，不依赖被忽略的 `research/`；提交后以临时 worktree 复核 15 张黄金图和 manifest 可见
-  - [x] state matrix 每个 cell 标记 evidence / missing / YAGNI
-  - [x] DESIGN 与 TASKS 对「严格复刻 / FaroPDF 例外」不再冲突
-  - [x] L3 计算后为 5 列单行，不再只靠 5 个 DOM section 假通过
-  - [x] read：L4 为空、右栏折叠、L5c 占满 workspace
-  - [x] annotate：L5c 在中间、L5b 在右侧且宽度约 320px
-  - [x] 双栏：L5a → L5c → L5b，中央区不被挤到最右 320px
-  - [x] 点击 `T 编辑` 进入 5 列页面网格
-  - [x] `typecheck`、聚焦单测、build 通过
-  - [ ] 全仓 lint 通过（本轮文件 scoped lint 已通过；用户未提交的 `readerReducer.test.ts` 有 1 个 pre-existing `prefer-const`）
-  - [x] 实际启动 Vite，Playwright 两种 viewport 几何断言与截图通过
-  - [x] DECISIONS / CHANGELOG / TASKS / README / ARCHITECTURE 同步
+- 状态：**M0 上下文纠偏已完成；M1 是唯一可领取下一项，M2～M5 未完成。当前没有任何 PDF Expert surface 达到 `visually-verified`。**
+- 当前负责人：未领取。领取时必须按 `cross-agent-coordination` 更新状态、负责人和 allowed files。
+- 唯一证据入口：`docs/reference/pdf-expert/README.md`
+- 实现现状入口：`docs/reference/pdf-expert/implementation-map.md`
+- 验收入口：`docs/reference/pdf-expert/acceptance-contract.md`
+- 执行方式：`docs/reference/pdf-expert/rebuild-guide.md`
+
+#### 已确认根因
+
+1. 原始研究材料长期只在被 Git 忽略的 `research/`，worker 无法稳定获得完整证据。
+2. 自动化失败、重复画面和状态不符的截图被错误命名为 golden；后续实现据此推导了错误布局。
+3. DESIGN、ARCHITECTURE、TASKS 和历史 DEC 对 L4、右栏、编辑网格与“完成”的含义互相冲突。
+4. `skeleton / noop / placeholder / toast-only` 曾被当作功能完成，缺少从行为到导出结果的闭环。
+5. `verify:ui-layout` 只证明 L3/L5 几何、DOM 顺序和模式路由，却曾被描述为视觉一致性验证。
+6. T 编辑依据误标截图被实现成固定 5 列、空白渐变缩略图和硬编码 A4，并且重排仍是 noop。
+
+#### M0 — 上下文与证据纠偏
+
+- [x] 将首批 15 张图片从 `golden/` 降级并按真实画面迁入 `captures/raw/`
+- [x] 在 manifest 逐张记录 observed state、可证明项、不可证明项、局限和置信度
+- [x] 明确 accepted-golden 数量为 0；禁止继续声称“已有 15 张黄金图”
+- [x] 重写 state matrix，只记录画面确实证明的状态
+- [x] 建立 acceptance contract、coverage gap、implementation map、rebuild guide 和 completeness checklist
+- [x] 同步 AGENTS、DESIGN、ARCHITECTURE 和本任务源的现行口径
+- [x] 清理源码中的 read L4、固定五列、截图 41/59 分段和 forms=T 编辑等过期注释/提示文案，不改变业务行为
+- [x] 同步 DEC-173、README、ROADMAP、CHANGELOG
+- [x] 完成独立 S4 三轮歧义审计与 doc-curator 一致性扫描
+
+#### M1 — 规范化重采集与量测
+
+- 可领取状态：M0 完成后，本阶段是唯一下一项；不得跳到 M2～M5。
+- 必须调用：`computer-use` 负责可复现采集，`feature-extract-from-screenshots` 负责状态矩阵、量测与 S4 反向验证。
+- Allowed files：`docs/reference/pdf-expert/captures/`、`golden/`、`manifest.json`、`state-matrix.md`、`coverage-gap.md`、`completeness-checklist.md`，以及新建 `measurements.json` / `state-specs/`；仅在认领和收口时更新本任务卡状态。
+- Forbidden files：`src/**`、`src-tauri/**`、`package*.json`、全局样式和历史 DEC/CHANGELOG；M1 不实现 UI。
+- 交付证据：每个 capture 的 fixture、主题、应用版本、窗口尺寸、触发步骤、应用窗口 crop、bbox/量测方法、分类和 uncertainty；不完整状态保持 missing。
+- Golden 准入：同一 PDF Expert 参考状态至少重复采集两次，执行 reference-vs-reference 稳定性 diff 并记录阈值/结果；这是参考证据准入，不是 M2 的 FaroPDF-vs-reference 回归验证器。
+- [ ] 固定 PDF fixture、应用版本、主题、缩放、窗口尺寸和触发步骤
+- [ ] 重采 read default / two-page / thumbnails / outline / annotate / text selection / search
+- [ ] 重采 signature / stamp / shape / annotation summary / forms / export / OCR / 双栏
+- [ ] 重采 edit 默认态、选择态、拖拽态和落点态；记录断点两侧布局
+- [ ] 每张图只保留应用窗口，记录 window crop、组件 bbox、字体和间距量测
+- [ ] 至少为 read、thumbnails、annotate、edit 建立可复现的 accepted-golden
+
+#### M2 — 可失败的视觉验证器
+
+- [ ] 以 M1 的 accepted-golden 为 reference，在相同 fixture、主题、窗口和 crop 下启动 FaroPDF 并截图
+- [ ] 同时输出几何 JSON、感知视觉 diff 和交互断言
+- [ ] 超出阈值时返回非零退出码，不能只生成报告或截图
+- [ ] 报告包含参考图、实际图、diff、DOM/bbox 测量和失败原因
+- [ ] 明确保留 `verify:ui-layout` 的“结构/几何回归”定位，不冒充视觉验证器
+
+#### M3 — T 编辑垂直闭环
+
+- [ ] 删除固定 5 列、空白渐变缩略图、硬编码 A4 和无证据的额外局部工具条
+- [ ] 使用真实页面缩略图和页面尺寸，按 M1 量测实现响应式卡片网格
+- [ ] 实现选择、多选、拖拽排序、插入、删除、旋转和撤销的真实状态
+- [ ] 重排结果写入导出 PDF；导出后重新打开，验证页序和页面数
+- [ ] 覆盖默认态、选择态、拖拽态、落点态的行为测试和视觉 diff
+
+#### M4 — Shell / Sidebar / RightPanel 分域复刻
+
+- [ ] 按 accepted-golden 依次验收 L2、L3、L5、状态栏，不并行争抢全局布局
+- [ ] 左栏分别完成 thumbnails、outline、annotations、bookmarks、search 的真实面板和状态
+- [ ] 右栏分别完成 signatures、stamps、shape-style、annotation-summary、forms、export、OCR
+- [ ] 每个 surface 单独记录 `skeleton / wired / behavior-complete / visually-verified`
+- [ ] 不用相邻面板、重复画面或文字说明替代目标状态证据
+
+#### M5 — 功能闭环与错误状态
+
+- [ ] 表单填写、签名、导出、重新打开闭环
+- [ ] OCR 启动、进度、取消、产物和质量报告闭环
+- [ ] 密码 PDF、文件损坏、权限不足、OCR 失败等错误态可复现并验收
+- [ ] 所有写入型操作继续遵守“不覆盖原文件、可回退、可交接”的 FaroPDF 安全边界
+
+#### 当前只可声称的验证结果
+
+- `geometry-verified`：L3 为 5 个语义分区且单行；read 不渲染 L4；L5 DOM 顺序为 L5a → L5c → L5b；`T 编辑` 可路由到内部 `pages` mode。
+- 两个测试视口已证明左右栏展开时中央区仍有可用宽度。
+- 这些结果**没有**证明颜色、字体、图标、间距、缩略图、响应式断点或 PDF Expert 视觉等价。
+
+#### 已知阻塞与边界
+
+- ZAI bbox MCP 未配置，尚无自动元素坐标抽取；M1 可先人工量测，但必须记录方法。
+- 当前 raw captures 未统一 crop、窗口尺寸和触发步骤，不能直接生成精确 CSS。
+- `src/modules/reader/readerReducer.test.ts` 有用户未提交修改；本任务不改写、不归并该文件。
+- 历史 DEC、CHANGELOG 和进度日志只证明“当时做过什么”，不得覆盖本卡的当前状态。

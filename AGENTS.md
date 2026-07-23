@@ -32,6 +32,7 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常阅读卷宗、证据�
 | `docs/DECISIONS.md` | 技术决策记录与工作日志 |
 | `docs/ARCHITECTURE.md` | 架构、数据流、核心接口和技术边界 |
 | `docs/DESIGN.md` | 视觉系统、布局、控件和交互规范 |
+| `docs/reference/pdf-expert/` | PDF Expert 复刻证据、状态矩阵、实现映射和验收门禁 |
 
 ## PDF 安全边界
 
@@ -59,6 +60,26 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常阅读卷宗、证据�
 - 文件范围重叠、共享依赖多或存在强依赖链的任务可以同组；会争抢脚手架、锁文件、`src-tauri/`、`src/shared/` 或全局布局的任务必须谨慎拆分。
 - 分支和 worktree 命名遵循 `git-workflow` 与 `multi-agent-orchestration`：分支名写任务语义，worktree 路径可写本地执行来源前缀。
 
+## PDF Expert 复刻启动门禁
+
+任何涉及 L2–L6、Toolbar、AppShell、Sidebar、RightPanel、EditModeGridView 或模式切换的 Agent，开工前必须按顺序读取：
+
+1. `docs/TASKS.md` 的“当前唯一推进序列”和 ISS-NEW-M；
+2. `docs/reference/pdf-expert/README.md`；
+3. `docs/reference/pdf-expert/acceptance-contract.md`；
+4. `docs/reference/pdf-expert/manifest.json`、目标 capture 和 `state-matrix.md`；
+5. `docs/reference/pdf-expert/implementation-map.md`；
+6. `docs/DESIGN.md` 与 `docs/ARCHITECTURE.md`。
+
+硬约束：
+
+- `research/pdf-expert/` 是被忽略的历史采集区，不是 worker 可依赖的规范源。
+- `captures/raw/` 不是 golden；当前 accepted-golden 数量以 manifest 为准。
+- 文件名、历史 TASKS/DEC/CHANGELOG 和截图画面冲突时，以经过观察校准的 manifest 与验收合同为准。
+- 固定列数、精确宽度、颜色、字号、间距和交互不得从 raw capture 猜测。
+- `skeleton`、`wired`、`behavior-complete`、`visually-verified` 必须分开记录；只有最后一级可以关闭高保真 UI 任务。
+- 发现规范冲突时停止业务实现，先更新 `docs/TASKS.md` 并由 PM 决定是否补采或修订规范。
+
 ## Skill 强制调用
 
 FaroPDF 的协作依赖 `.claude/skills/` 下的 Skill 统一协议、门禁和工作流规范。下面场景必须先调用对应 Skill 再行动，避免漏掉协议、提交门禁或交接约束：
@@ -71,6 +92,7 @@ FaroPDF 的协作依赖 `.claude/skills/` 下的 Skill 统一协议、门禁和�
 | `docs/TASKS.md` 任务领取、状态更新、归档迁移 | `cross-agent-coordination` | 任务状态机、归属和归档入口由该 Skill 管理 |
 | 发布与版本变更 | `release-workflow` | 版本号、CHANGELOG 与发版流程 |
 | 文档膨胀 / 归档不一致 / PR 创建后 / PR 合并后 | `doc-curator` | 文档瘦身 subagent 跑体检，必要时自动提 maintenance PR；post-action 触发，不阻断 PR |
+| PDF Expert 规范化重采、截图状态矩阵、bbox/量测与 S4 反向验证 | `computer-use`、`feature-extract-from-screenshots` | 采集可复现性、证据等级、状态覆盖和独立漏项审计由两项 Skill 共同约束 |
 
 通用原则：
 

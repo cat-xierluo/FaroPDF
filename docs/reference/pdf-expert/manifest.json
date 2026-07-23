@@ -1,100 +1,187 @@
 {
+  "schema_version": 2,
   "app": {
     "name": "PDF Expert",
     "platform": "macOS",
-    "version": "25.2.1"
+    "observed_version": "25.2.1"
   },
-  "purpose": "FaroPDF high-fidelity layout and interaction baseline",
-  "screenshots": [
+  "purpose": "FaroPDF high-fidelity evidence index",
+  "audit_date": "2026-07-23",
+  "evidence_status": {
+    "accepted_golden_count": 0,
+    "measured_count": 0,
+    "raw_count": 11,
+    "rejected_count": 4,
+    "bbox_file_available": false,
+    "visual_diff_available": false
+  },
+  "classification_rules": {
+    "rejected": "The visible content does not prove the intended state.",
+    "raw": "The visible content is useful but is not normalized or measured.",
+    "measured": "Window crop, element bounds and responsive conditions have been reviewed.",
+    "accepted-golden": "Measured reference evidence with reproducible trigger steps, repeat-capture stability diff and independent state audit. FaroPDF-to-reference regression belongs to M2."
+  },
+  "captures": [
     {
-      "id": "G01",
-      "path": "golden/G01-launch.png",
-      "trigger": "launch application with no document",
-      "state_hypothesis": { "activeMode": null, "documentOpen": false }
+      "id": "R01",
+      "path": "captures/raw/R01-terminal-error-not-launch.png",
+      "legacy_intended_state": "launch application with no document",
+      "observed_state": "Terminal or automation error text; no usable PDF Expert window",
+      "classification": "rejected",
+      "usable_for": [],
+      "not_evidence_for": ["launch", "welcome", "window chrome"],
+      "confidence": "high"
     },
     {
-      "id": "G02",
-      "path": "golden/G02-read-default.png",
-      "trigger": "open a PDF",
-      "state_hypothesis": { "activeMode": "read", "rightPanelMode": "closed", "viewMode": "continuous" }
+      "id": "R02",
+      "path": "captures/raw/R02-read-default-cropped.png",
+      "legacy_intended_state": "read default",
+      "observed_state": "PDF Expert read shell with one document and no visible secondary toolbar",
+      "classification": "raw",
+      "usable_for": ["read shell", "L2/L3 ordering", "dark chrome"],
+      "not_evidence_for": ["exact window geometry", "responsive breakpoints", "full page layout"],
+      "limitations": ["window is cropped", "unrelated desktop content remains visible"],
+      "confidence": "medium"
     },
     {
-      "id": "G03",
-      "path": "golden/G03-two-page.png",
-      "trigger": "switch to two-page view",
-      "state_hypothesis": { "activeMode": "read", "viewMode": "two" }
+      "id": "R03",
+      "path": "captures/raw/R03-read-single-not-two-page.png",
+      "legacy_intended_state": "two-page view",
+      "observed_state": "A single visible PDF page in the read shell",
+      "classification": "rejected",
+      "usable_for": ["read shell duplicate"],
+      "not_evidence_for": ["two-page view", "view-mode transition"],
+      "confidence": "high"
     },
     {
-      "id": "G04",
-      "path": "golden/G04-thumbnail-sidebar.png",
-      "trigger": "open thumbnail sidebar",
-      "state_hypothesis": { "activeMode": "read", "leftPanelMode": "thumbnail" }
+      "id": "R04",
+      "path": "captures/raw/R04-outline-panel-not-thumbnails.png",
+      "legacy_intended_state": "thumbnail sidebar",
+      "observed_state": "Left panel with the label 大纲 and an empty outline state",
+      "classification": "raw",
+      "usable_for": ["outline panel", "left panel placement"],
+      "not_evidence_for": ["thumbnail list", "thumbnail dimensions", "current-page thumbnail highlight"],
+      "limitations": ["window is cropped", "exact panel width is unmeasured"],
+      "confidence": "high"
     },
     {
-      "id": "G05",
-      "path": "golden/G05-annotate.png",
-      "trigger": "click A 批注",
-      "state_hypothesis": { "activeMode": "annotate" }
+      "id": "R05",
+      "path": "captures/raw/R05-outline-panel-not-annotate.png",
+      "legacy_intended_state": "annotate mode",
+      "observed_state": "A duplicate outline-panel state; annotate tools are not visible",
+      "classification": "rejected",
+      "usable_for": ["outline panel duplicate"],
+      "not_evidence_for": ["annotate mode", "annotation toolbar", "annotation right panel"],
+      "confidence": "high"
     },
     {
-      "id": "G06",
-      "path": "golden/G06-search-results.png",
-      "trigger": "search a keyword with multiple hits",
-      "state_hypothesis": { "activeMode": "read", "rightPanelMode": "search", "searchKeywordPresent": true }
+      "id": "R06",
+      "path": "captures/raw/R06-search-results.png",
+      "legacy_intended_state": "search results",
+      "observed_state": "Search query with highlighted matches and a right-side result list",
+      "classification": "raw",
+      "usable_for": ["search result panel structure", "match highlighting"],
+      "not_evidence_for": ["exact bounds", "hover/focus", "zero-results state"],
+      "limitations": ["full desktop capture", "no bbox"],
+      "confidence": "high"
     },
     {
-      "id": "G07",
-      "path": "golden/G07-text-selection.png",
-      "trigger": "select text in the PDF canvas",
-      "state_hypothesis": { "activeMode": "read", "selectionOverlay": true }
+      "id": "R07",
+      "path": "captures/raw/R07-read-page-selection-not-visible.png",
+      "legacy_intended_state": "text selection",
+      "observed_state": "Read page without a clearly visible selection overlay or floating toolbar",
+      "classification": "rejected",
+      "usable_for": ["read shell duplicate"],
+      "not_evidence_for": ["text selection", "selection toolbar", "selection transition"],
+      "confidence": "high"
     },
     {
-      "id": "G08",
-      "path": "golden/G08-signature-panel.png",
-      "trigger": "open the signature tool",
-      "state_hypothesis": { "activeMode": "annotate", "rightPanelMode": "signature" }
+      "id": "R08",
+      "path": "captures/raw/R08-signature-panel.png",
+      "legacy_intended_state": "signature panel",
+      "observed_state": "Right-side vertical signature thumbnail panel",
+      "classification": "raw",
+      "usable_for": ["signature panel content order", "right panel placement"],
+      "not_evidence_for": ["signature insertion behavior", "exact dimensions", "empty state"],
+      "limitations": ["full desktop capture", "no bbox"],
+      "confidence": "high"
     },
     {
-      "id": "G09",
-      "path": "golden/G09-password-dialog.png",
-      "trigger": "open set password",
-      "state_hypothesis": { "modal": "set-password" }
+      "id": "R09",
+      "path": "captures/raw/R09-password-dialog.png",
+      "legacy_intended_state": "set password",
+      "observed_state": "Centered password dialog with two input rows and actions",
+      "classification": "raw",
+      "usable_for": ["password dialog structure", "modal backdrop"],
+      "not_evidence_for": ["validation error", "loading", "success"],
+      "limitations": ["full desktop capture", "no bbox"],
+      "confidence": "high"
     },
     {
-      "id": "G10",
-      "path": "golden/G10-ocr.png",
-      "trigger": "open recognize text / OCR",
-      "state_hypothesis": { "activeMode": "ocr", "rightPanelMode": "ocr" }
+      "id": "R10",
+      "path": "captures/raw/R10-ocr-dialog.png",
+      "legacy_intended_state": "OCR",
+      "observed_state": "OCR recognition dialog with preview, language and page-range controls",
+      "classification": "raw",
+      "usable_for": ["OCR dialog structure"],
+      "not_evidence_for": ["OCR queue panel", "progress", "failed/cancelled states"],
+      "limitations": ["full desktop capture", "no bbox"],
+      "confidence": "high"
     },
     {
-      "id": "G11",
-      "path": "golden/G11-stamps.png",
-      "trigger": "open stamp templates",
-      "state_hypothesis": { "activeMode": "annotate", "rightPanelMode": "stamp" }
+      "id": "R11",
+      "path": "captures/raw/R11-stamp-panel.png",
+      "legacy_intended_state": "stamp templates",
+      "observed_state": "Right-side stamp preset panel with a two-by-two preset area",
+      "classification": "raw",
+      "usable_for": ["stamp panel structure", "preset density"],
+      "not_evidence_for": ["custom stamp tab behavior", "stamp placement"],
+      "limitations": ["full desktop capture", "no bbox"],
+      "confidence": "high"
     },
     {
-      "id": "G12",
-      "path": "golden/G12-shape.png",
-      "trigger": "activate rectangle shape",
-      "state_hypothesis": { "activeMode": "annotate", "activeTool": "shape", "activeSubTool": "rectangle", "rightPanelMode": "shape" }
+      "id": "R12",
+      "path": "captures/raw/R12-shape-panel-uncertain.png",
+      "legacy_intended_state": "rectangle shape active",
+      "observed_state": "An annotation tool appears active; the exact meaning of the right-side presets is uncertain",
+      "classification": "raw",
+      "usable_for": ["possible shape-tool state"],
+      "not_evidence_for": ["six-section shape contract", "exact shape list", "drawing behavior"],
+      "limitations": ["semantic uncertainty", "full desktop capture", "no bbox"],
+      "confidence": "low"
     },
     {
-      "id": "G13",
-      "path": "golden/G13-multi-tab.png",
-      "trigger": "open three documents",
-      "state_hypothesis": { "activeMode": "read", "tabsCount": 3 }
+      "id": "R13",
+      "path": "captures/raw/R13-multi-tab-edit-grid.png",
+      "legacy_intended_state": "multi-tab",
+      "observed_state": "Two document tabs are visible while the active document is in page-edit grid mode with two page cards",
+      "classification": "raw",
+      "usable_for": ["multiple tabs", "edit toolbar", "page card appearance"],
+      "not_evidence_for": ["three-or-more tab overflow", "cross-tab drag", "fixed grid column count"],
+      "limitations": ["full desktop capture", "no bbox"],
+      "confidence": "high"
     },
     {
-      "id": "G14",
-      "path": "golden/G14-annotation-summary.png",
-      "trigger": "open annotation summary sidebar",
-      "state_hypothesis": { "activeMode": "read", "leftPanelMode": "annotation" }
+      "id": "R14",
+      "path": "captures/raw/R14-welcome-not-annotation-summary.png",
+      "legacy_intended_state": "annotation summary sidebar",
+      "observed_state": "Welcome screen with conversion cards, open-PDF area and recent documents",
+      "classification": "raw",
+      "usable_for": ["welcome layout", "recent document area"],
+      "not_evidence_for": ["annotation summary", "left annotation panel"],
+      "limitations": ["full desktop capture", "no bbox"],
+      "confidence": "high"
     },
     {
-      "id": "G15",
-      "path": "golden/G15-edit-grid.png",
-      "trigger": "click T 编辑",
-      "state_hypothesis": { "activeMode": "edit", "canvasMode": "five-column-grid" }
+      "id": "R15",
+      "path": "captures/raw/R15-edit-grid-responsive.png",
+      "legacy_intended_state": "edit grid",
+      "observed_state": "Five page cards; four cards on the first row and one on the second row at the captured app-window width",
+      "classification": "raw",
+      "usable_for": ["edit page-card appearance", "selected card", "responsive four-plus-one arrangement"],
+      "not_evidence_for": ["fixed five-column grid", "drag-in-progress", "drop indicator", "reorder persistence"],
+      "limitations": ["full desktop capture", "app-window crop and width not measured"],
+      "confidence": "high"
     }
   ]
 }

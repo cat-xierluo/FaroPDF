@@ -38,7 +38,7 @@ open /Applications/FaroPDF.app
 
 以下能力基于 v0.1.1 实际交付范围（详见 `CHANGELOG.md`）：
 
-> PDF Expert 高保真复刻正在按 `skeleton → wired → behavior-complete → visually-verified` 重新验收。组件存在或类型检查通过不再等同于完整复刻；当前基线、黄金截图与覆盖缺口见 [`docs/reference/pdf-expert/`](docs/reference/pdf-expert/README.md)。
+> 下列清单描述 FaroPDF 已存在的功能模块，不代表已经完成 PDF Expert 高保真复刻。复刻正按 `skeleton → wired → behavior-complete → visually-verified` 重新验收；首批 15 张候选截图均非 golden，正式分类为 11 raw + 4 rejected，accepted-golden 为 0。现状、证据和下一步见 [`docs/reference/pdf-expert/`](docs/reference/pdf-expert/README.md) 与 [`docs/TASKS.md`](docs/TASKS.md) 的 ISS-NEW-M。
 
 ### 阅读与检索
 
@@ -168,7 +168,7 @@ npm run dev
 npm run typecheck   # TypeScript 类型检查
 npm test            # Vitest 单测
 npm run lint        # ESLint
-npm run verify:ui-layout # 启动 Vite + Playwright，验证两种视口的 L2-L5 几何与模式切换
+npm run verify:ui-layout # 启动 Vite + Playwright，只验证两种视口的 L3/L5 结构几何与模式切换
 ```
 
 ## 构建
@@ -205,5 +205,6 @@ npm run tauri build
 - `docs/DECISIONS.md`：关键决策与工作日志（含每条 ISS 的方案、范围、验证与已知限制）
 - `docs/ARCHITECTURE.md`：技术架构、模块边界与接口模型
 - `docs/DESIGN.md`：视觉与交互规范
+- `docs/reference/pdf-expert/`：PDF Expert 复刻的唯一证据入口、实现现状、验收门禁与重建指南
 - `docs/RELEASE.md`：发布流水线、`latest.json` schema 与 keypair 管理
 - `CHANGELOG.md`：用户可见变更记录（按 0.1.0-alpha.X 顺序）
