@@ -1,6 +1,6 @@
 # FaroPDF 路线图
 
-> Last updated: 2026-07-23（PDF Expert 高保真复刻上下文纠偏，DEC-173）
+> Last updated: 2026-07-23（PDF Expert 高保真复刻上下文纠偏 DEC-173 + 证据治理与补采归档 DEC-175~178 + ISS-NEW-N 启动）
 
 ## 项目愿景
 
@@ -12,21 +12,23 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 | --- | --- | --- |
 | v0.0 上下文初始化 | 固定项目名、定位、技术选型、文档体系 | 已完成 |
 | v0.1 完整基础版 | 快读、检索、批注、OCR/扫描、页面整理、常用导出、表单签署、设置 | 进行中（alpha.0 ~ 0.1.0-alpha.18 已封箱；详细子项审计留 follow-up，下一版起逐节刷新） |
-| v0.2 法律增强与界面恢复 | PDF Expert 高保真界面恢复、批注摘要、证据目录、材料拆合并、Bates 编号深化 | 进行中：M0 已完成，唯一下一项 M1；法律能力逐项以 TASKS 为准 |
+| v0.2 法律增强与界面恢复 | PDF Expert 高保真界面恢复、批注摘要、证据目录、材料拆合并、Bates 编号深化 | 进行中：M0 已完成；M1（规范化重采集）仍按 ISS-NEW-M 推进；ISS-NEW-N 启动基于 raw 的有限面板修正批次（6 个 P0x 子卡）+ 4 个补采子卡（CROP/THUMB/SEL/SHAPE），均与 M1 并行；法律能力逐项以 TASKS 为准 |
 | v0.3 性能与发布 | 大卷宗性能、自动更新、跨平台打包、官网与文档站（迁出 personal-site） | 待开始 |
 
 ## 当前 P0：PDF Expert 高保真界面恢复
 
-路线图只保留里程碑；可领取任务、状态和 allowed files 以 `docs/TASKS.md` 的“当前唯一推进序列”与 ISS-NEW-M 为准。
+路线图只保留里程碑；可领取任务、状态和 allowed files 以 `docs/TASKS.md` 的“当前唯一推进序列”、ISS-NEW-M 与 ISS-NEW-N 为准。
 
 1. M0：纠正截图分类、冲突文档和完成状态。
-2. M1：按固定 fixture、主题和窗口重采、裁剪并量测参考状态。
+2. M1：按固定 fixture、主题和窗口重采、裁剪并量测参考状态（仍按 ISS-NEW-M 推进；不阻塞 ISS-NEW-N）。
 3. M2：建立会以非零退出码失败的几何 + 感知 diff 验证器。
 4. M3：先闭环 `T 编辑` 的真实缩略图、响应式网格、重排、导出和重开。
 5. M4：按 surface 分别恢复 Shell、左栏和右栏。
 6. M5：完成 forms、export、OCR 和错误状态的行为/视觉闭环。
 
-当前 accepted-golden 为 0；既有 `verify:ui-layout` 只证明结构与几何，不表示视觉完成。历史进度日志保留为事实记录，但不覆盖 DEC-173 和 ISS-NEW-M。
+并发旁支（ISS-NEW-N，2026-07-23 启动）：基于 6 张 raw-Aminus 的面板修正批次（SignaturePanel / SetPasswordDialog / OcrPanelView / StampPanel / EditModeGridView / AnnotationToolbar）+ 4 张补采子卡（窗口 crop / 缩略图 / selection 浮条 / shape 6 段合同）。允许面板修正子卡在 M1 全量重采未完成时推进，但禁止宣称 `visually-verified`，最高交付等级为 `wired` + `geometry-coarse-verified`（基于 raw 粗估，未 crop、未稳定性 diff）；详见 DEC-177。
+
+当前 accepted-golden 为 0；既有 `verify:ui-layout` 只证明结构与几何，不表示视觉完成。历史进度日志保留为事实记录，但不覆盖 DEC-173 / DEC-177 / ISS-NEW-M / ISS-NEW-N。
 
 ## v0.1 完整基础版
 
@@ -137,6 +139,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 ## 进度日志
 
+- 2026-07-23：DEC-175~178 + ISS-NEW-N 启动 PDF Expert 证据治理与补采归档：新建 `tests/fixtures/expert/` 受控 fixture（5 页 A4 文字层英文法律样例），把 `manifest.json` `observed_version` 由 25.2.1 更正为实机 3.9.2，新增 `capture-protocol.md` 复现协议；15 张首批图片重新分级为 6 raw-Aminus / 4 raw-B + 1 raw-B-low-confidence / 4 raw-C；4 块硬缺图（chrome 精确尺寸 / 缩略图 / selection 浮条 / shape 6 段合同）归档为 ISS-NEW-N-CROP / THUMB / SEL / SHAPE 子卡；6 处面板修正子卡（ISS-NEW-N-P01~P06）允许基于 raw-Aminus 推进，最高交付等级 wired + geometry-coarse-verified，禁止 visually-verified。
 - 2026-07-23：DEC-173 纠正 PDF Expert 复刻上下文：首批 15 张误标参考图全部迁入 `captures/raw/`，正式证据分类为 11 raw + 4 rejected，accepted-golden 归零；撤销固定 5 列编辑网格和“第一阶段高保真完成”的错误表述；后续只按 TASKS 的 M0～M5 推进。
 - 2026-06-02：初始化 FaroPDF 项目上下文，固定独立项目定位、技术选型、首版功能范围和文档体系。
 - 2026-06-02：将 v0.1 推进方式调整为先完成 Foundation Gate，再按任务包使用多分支、多 worktree 并行实现完整基础版。

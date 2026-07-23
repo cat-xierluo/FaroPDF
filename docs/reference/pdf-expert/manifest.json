@@ -3,7 +3,8 @@
   "app": {
     "name": "PDF Expert",
     "platform": "macOS",
-    "observed_version": "25.2.1"
+    "observed_version": "3.9.2",
+    "version_note": "observed_version 由 25.2.1 更正为实机版本 3.9.2（2026-07-23 ISS-NEW-M M1）。25.2.1 为历史误标，实机 mdls/PlistBuddy 读取均为 3.9.2；M1 每张采集图以实机可复采的 3.9.2 为准。"
   },
   "purpose": "FaroPDF high-fidelity evidence index",
   "audit_date": "2026-07-23",
@@ -12,12 +13,67 @@
     "measured_count": 0,
     "raw_count": 11,
     "rejected_count": 4,
+    "raw_a_minus_count": 6,
+    "raw_b_count": 5,
+    "raw_c_count": 4,
     "bbox_file_available": false,
     "visual_diff_available": false
+  },
+  "raw_rerating": {
+    "audit_date": "2026-07-23",
+    "trigger": "ISS-NEW-N 启动前评估：raw 是否足以支撑有限范围的面板修正开发；用户选择从现有 raw 推进、不阻塞等 M1 重采。",
+    "method": "独立 S4 反向审计（Explore agent）逐图 Read + 对照 state-matrix/manifest；不修改图片。",
+    "scale": {
+      "raw-Aminus": "可作面板/对话框级实现 wireframe + 关键 bbox 粗估；仍未 crop 到窗口、未做 reference-vs-reference 稳定性 diff。禁止据此升级到 visually-verified。",
+      "raw-B": "只证实目标状态出现过或排除反例；不能给精确尺寸、间距或断点。",
+      "raw-C": "误标或与目标状态不符；不可作基线，但保留以避免再次误用。"
+    },
+    "assignments": {
+      "R02": "raw-B", "R04": "raw-B", "R06": "raw-B", "R12": "raw-B-low-confidence", "R14": "raw-B",
+      "R08": "raw-Aminus", "R09": "raw-Aminus", "R10": "raw-Aminus", "R11": "raw-Aminus", "R13": "raw-Aminus", "R15": "raw-Aminus",
+      "R01": "raw-C", "R03": "raw-C", "R05": "raw-C", "R07": "raw-C"
+    }
+  },
+  "pending_recapture": {
+    "purpose": "现有 raw 在以下 surface 仍无可靠图；这些 surface 无法仅靠 raw 推进，必须补采。归档为 ISS-NEW-N 子卡，由后续 worker 执行。",
+    "items": [
+      {
+        "id": "ISS-NEW-N-CROP",
+        "surface": "PDF Expert 窗口 chrome 精确像素宽高",
+        "blocking_surfaces": ["L3 toolbar 自适应断点", "窗口外边距", "左右栏与中央分割线"],
+        "closest_existing": "R06（含桌面背景，未 crop）",
+        "required": "单张已 crop 到 PDF Expert 窗口、含完整 L3 工具栏全展开 + macOS 菜单栏的图；分辨率与 manifest pixelWidth 不冲突"
+      },
+      {
+        "id": "ISS-NEW-N-THUMB",
+        "surface": "左栏 thumbnail 列表 + 当前页高亮",
+        "blocking_surfaces": ["Sidebar thumbnails tab", "缩略图卡片尺寸与间距", "多页滚动当前页定位"],
+        "closest_existing": "R03/R04/R05（都不是 thumbnail 实图）",
+        "required": "缩略图模式打开左栏的稳定截图；至少 5 页可见、当前页高亮可见"
+      },
+      {
+        "id": "ISS-NEW-N-SEL",
+        "surface": "text selection 浮动工具条",
+        "blocking_surfaces": ["TextSelectionToolbar", "选区可见性", "翻译占位文案"],
+        "closest_existing": "R07（无 selection 浮条）",
+        "required": "在 read 模式下用真实文字层 fixture 框选一段，捕捉浮出工具条"
+      },
+      {
+        "id": "ISS-NEW-N-SHAPE",
+        "surface": "shape 6 段合同的真参考",
+        "blocking_surfaces": ["Shape panel", "形状工具激活态与右栏样式", "形状绘制行为"],
+        "closest_existing": "R12（实为 stamp，不是 shape）",
+        "required": "形状工具激活态截图；右侧面板展示 6 段形状样式合同"
+      }
+    ]
   },
   "classification_rules": {
     "rejected": "The visible content does not prove the intended state.",
     "raw": "The visible content is useful but is not normalized or measured.",
+    "raw-Aminus": "Re-rated 2026-07-23: usable for wireframe + coarse bbox estimation; still unmeasured and not stability-diffed. Cannot promote to visually-verified.",
+    "raw-B": "Re-rated 2026-07-23: confirms presence or contradicts a hypothesis, but does not give precise geometry.",
+    "raw-B-low-confidence": "Re-rated 2026-07-23: B-grade content with low semantic confidence; usable only for negative evidence (e.g. \"this is NOT shape panel\").",
+    "raw-C": "Re-rated 2026-07-23: mis-labelled or off-target; retained to prevent re-use as evidence.",
     "measured": "Window crop, element bounds and responsive conditions have been reviewed.",
     "accepted-golden": "Measured reference evidence with reproducible trigger steps, repeat-capture stability diff and independent state audit. FaroPDF-to-reference regression belongs to M2."
   },
@@ -27,7 +83,7 @@
       "path": "captures/raw/R01-terminal-error-not-launch.png",
       "legacy_intended_state": "launch application with no document",
       "observed_state": "Terminal or automation error text; no usable PDF Expert window",
-      "classification": "rejected",
+      "classification": "raw-C",
       "usable_for": [],
       "not_evidence_for": ["launch", "welcome", "window chrome"],
       "confidence": "high"
@@ -37,10 +93,10 @@
       "path": "captures/raw/R02-read-default-cropped.png",
       "legacy_intended_state": "read default",
       "observed_state": "PDF Expert read shell with one document and no visible secondary toolbar",
-      "classification": "raw",
-      "usable_for": ["read shell", "L2/L3 ordering", "dark chrome"],
-      "not_evidence_for": ["exact window geometry", "responsive breakpoints", "full page layout"],
-      "limitations": ["window is cropped", "unrelated desktop content remains visible"],
+      "classification": "raw-B",
+      "usable_for": ["read shell presence", "L3 主工具栏 6 控件顺序粗证"],
+      "not_evidence_for": ["exact window geometry", "responsive breakpoints", "full chrome", "side/bottom bars"],
+      "limitations": ["window cropped at right edge", "desktop background visible", "no bbox"],
       "confidence": "medium"
     },
     {
@@ -48,7 +104,7 @@
       "path": "captures/raw/R03-read-single-not-two-page.png",
       "legacy_intended_state": "two-page view",
       "observed_state": "A single visible PDF page in the read shell",
-      "classification": "rejected",
+      "classification": "raw-C",
       "usable_for": ["read shell duplicate"],
       "not_evidence_for": ["two-page view", "view-mode transition"],
       "confidence": "high"
@@ -58,10 +114,10 @@
       "path": "captures/raw/R04-outline-panel-not-thumbnails.png",
       "legacy_intended_state": "thumbnail sidebar",
       "observed_state": "Left panel with the label 大纲 and an empty outline state",
-      "classification": "raw",
-      "usable_for": ["outline panel", "left panel placement"],
-      "not_evidence_for": ["thumbnail list", "thumbnail dimensions", "current-page thumbnail highlight"],
-      "limitations": ["window is cropped", "exact panel width is unmeasured"],
+      "classification": "raw-B",
+      "usable_for": ["outline panel exists", "left panel placement"],
+      "not_evidence_for": ["thumbnail list", "thumbnail dimensions", "current-page thumbnail highlight", "exact panel width"],
+      "limitations": ["window cropped", "left panel precise width unmeasured"],
       "confidence": "high"
     },
     {
@@ -69,7 +125,7 @@
       "path": "captures/raw/R05-outline-panel-not-annotate.png",
       "legacy_intended_state": "annotate mode",
       "observed_state": "A duplicate outline-panel state; annotate tools are not visible",
-      "classification": "rejected",
+      "classification": "raw-C",
       "usable_for": ["outline panel duplicate"],
       "not_evidence_for": ["annotate mode", "annotation toolbar", "annotation right panel"],
       "confidence": "high"
@@ -79,10 +135,10 @@
       "path": "captures/raw/R06-search-results.png",
       "legacy_intended_state": "search results",
       "observed_state": "Search query with highlighted matches and a right-side result list",
-      "classification": "raw",
-      "usable_for": ["search result panel structure", "match highlighting"],
-      "not_evidence_for": ["exact bounds", "hover/focus", "zero-results state"],
-      "limitations": ["full desktop capture", "no bbox"],
+      "classification": "raw-B",
+      "usable_for": ["search result panel structure", "match highlighting", "L3 全展开工具栏顺序粗证"],
+      "not_evidence_for": ["exact window bounds", "exact side-panel width", "hover/focus", "zero-results state", "responsive breakpoints"],
+      "limitations": ["full desktop capture", "no bbox", "panel width only estimated from image"],
       "confidence": "high"
     },
     {
@@ -90,7 +146,7 @@
       "path": "captures/raw/R07-read-page-selection-not-visible.png",
       "legacy_intended_state": "text selection",
       "observed_state": "Read page without a clearly visible selection overlay or floating toolbar",
-      "classification": "rejected",
+      "classification": "raw-C",
       "usable_for": ["read shell duplicate"],
       "not_evidence_for": ["text selection", "selection toolbar", "selection transition"],
       "confidence": "high"
@@ -99,21 +155,21 @@
       "id": "R08",
       "path": "captures/raw/R08-signature-panel.png",
       "legacy_intended_state": "signature panel",
-      "observed_state": "Right-side vertical signature thumbnail panel",
-      "classification": "raw",
-      "usable_for": ["signature panel content order", "right panel placement"],
-      "not_evidence_for": ["signature insertion behavior", "exact dimensions", "empty state"],
-      "limitations": ["full desktop capture", "no bbox"],
+      "observed_state": "Right-side vertical signature thumbnail panel with 7 stacked cards (first selected)",
+      "classification": "raw-Aminus",
+      "usable_for": ["SignaturePanel 竖排签名卡骨架", "选中蓝描边色", "右栏 placement", "header `签名` + `+` 组合"],
+      "not_evidence_for": ["精确面板像素宽度", "签名卡真实像素高度/字号", "empty state", "insertion behavior", "save/reopen"],
+      "limitations": ["full desktop capture", "no bbox", "size estimates only"],
       "confidence": "high"
     },
     {
       "id": "R09",
       "path": "captures/raw/R09-password-dialog.png",
       "legacy_intended_state": "set password",
-      "observed_state": "Centered password dialog with two input rows and actions",
-      "classification": "raw",
-      "usable_for": ["password dialog structure", "modal backdrop"],
-      "not_evidence_for": ["validation error", "loading", "success"],
+      "observed_state": "Centered password dialog with two input rows and two actions over a translucent backdrop",
+      "classification": "raw-Aminus",
+      "usable_for": ["SetPasswordDialog 中心 modal + 半透明遮罩骨架", "2 row label+input + 2 action 布局", "focus 蓝色边框"],
+      "not_evidence_for": ["对话框精确像素宽度", "字体大小", "validation error / loading / success 态"],
       "limitations": ["full desktop capture", "no bbox"],
       "confidence": "high"
     },
@@ -121,32 +177,32 @@
       "id": "R10",
       "path": "captures/raw/R10-ocr-dialog.png",
       "legacy_intended_state": "OCR",
-      "observed_state": "OCR recognition dialog with preview, language and page-range controls",
-      "classification": "raw",
-      "usable_for": ["OCR dialog structure"],
-      "not_evidence_for": ["OCR queue panel", "progress", "failed/cancelled states"],
-      "limitations": ["full desktop capture", "no bbox"],
+      "observed_state": "OCR panel with preview, language dropdown and start button; L3 主工具栏 `扫描和文本识别` 段展开次级工具条",
+      "classification": "raw-Aminus",
+      "usable_for": ["OcrPanelView 5 段结构 (header / 预览 / 说明 / label+select / 主按钮)", "L3 `扫描和文本识别` 段次级工具条行为", "语言下拉 + 主按钮组合"],
+      "not_evidence_for": ["OCR 队列/进度/失败/取消态", "次级工具条右端 overflow", "精确像素宽度", "真实页面预览替代插画"],
+      "limitations": ["full desktop capture", "no bbox", "overflow 图标被裁"],
       "confidence": "high"
     },
     {
       "id": "R11",
       "path": "captures/raw/R11-stamp-panel.png",
       "legacy_intended_state": "stamp templates",
-      "observed_state": "Right-side stamp preset panel with a two-by-two preset area",
-      "classification": "raw",
-      "usable_for": ["stamp panel structure", "preset density"],
-      "not_evidence_for": ["custom stamp tab behavior", "stamp placement"],
-      "limitations": ["full desktop capture", "no bbox"],
+      "observed_state": "Right-side stamp panel with 标准/自定义 tab and a 2x2 preset grid; annotate toolbar above with pen button active",
+      "classification": "raw-Aminus",
+      "usable_for": ["StampPanel tab×2 + 2x2 preset 网格骨架", "AnnotationToolbar 工具条顺序", "工具 active 蓝色描边色"],
+      "not_evidence_for": ["custom stamp tab 内容", "stamp 落点行为", "工具条右端 overflow", "精确像素尺寸"],
+      "limitations": ["full desktop capture", "no bbox", "right edge cropped"],
       "confidence": "high"
     },
     {
       "id": "R12",
       "path": "captures/raw/R12-shape-panel-uncertain.png",
       "legacy_intended_state": "rectangle shape active",
-      "observed_state": "An annotation tool appears active; the exact meaning of the right-side presets is uncertain",
-      "classification": "raw",
-      "usable_for": ["possible shape-tool state"],
-      "not_evidence_for": ["six-section shape contract", "exact shape list", "drawing behavior"],
+      "observed_state": "Visually identical to R11 (stamp panel); does NOT show shape 6-section contract. Legacy intended state was mis-labelled.",
+      "classification": "raw-B-low-confidence",
+      "usable_for": ["negative evidence only: NOT shape panel"],
+      "not_evidence_for": ["six-section shape contract", "shape list", "shape drawing behavior", "任何 shape 布局"],
       "limitations": ["semantic uncertainty", "full desktop capture", "no bbox"],
       "confidence": "low"
     },
@@ -154,11 +210,11 @@
       "id": "R13",
       "path": "captures/raw/R13-multi-tab-edit-grid.png",
       "legacy_intended_state": "multi-tab",
-      "observed_state": "Two document tabs are visible while the active document is in page-edit grid mode with two page cards",
-      "classification": "raw",
-      "usable_for": ["multiple tabs", "edit toolbar", "page card appearance"],
-      "not_evidence_for": ["three-or-more tab overflow", "cross-tab drag", "fixed grid column count"],
-      "limitations": ["full desktop capture", "no bbox"],
+      "observed_state": "Three document tabs while the active document is in page-edit grid mode with two page cards (first selected, A4 210x297 mm metadata visible)",
+      "classification": "raw-Aminus",
+      "usable_for": ["EditModeGridView 次级工具条 7 项 (插入/附加/旋转/复制/粘贴/摘录/删除) 顺序", "页面卡片双行元数据布局", "3 tab 状态"],
+      "not_evidence_for": ["3+ tab overflow", "cross-tab drag", "固定 5 列", "drag 进行中/drop indicator", "卡片精确像素尺寸"],
+      "limitations": ["full desktop capture", "no bbox", "only 2 cards shown → column count not determined"],
       "confidence": "high"
     },
     {
@@ -166,21 +222,21 @@
       "path": "captures/raw/R14-welcome-not-annotation-summary.png",
       "legacy_intended_state": "annotation summary sidebar",
       "observed_state": "Welcome screen with conversion cards, open-PDF area and recent documents",
-      "classification": "raw",
-      "usable_for": ["welcome layout", "recent document area"],
-      "not_evidence_for": ["annotation summary", "left annotation panel"],
-      "limitations": ["full desktop capture", "no bbox"],
+      "classification": "raw-B",
+      "usable_for": ["Welcome 区段顺序 (转换 / 打开 / 最近)", "recent 缩略卡水平均分"],
+      "not_evidence_for": ["annotation summary sidebar (legacy intended 与实际不符)", "精确像素尺寸", "缩略卡精确高度", "区段间垂直间距"],
+      "limitations": ["full desktop capture", "no bbox", "legacy intended mis-target"],
       "confidence": "high"
     },
     {
       "id": "R15",
       "path": "captures/raw/R15-edit-grid-responsive.png",
       "legacy_intended_state": "edit grid",
-      "observed_state": "Five page cards; four cards on the first row and one on the second row at the captured app-window width",
-      "classification": "raw",
-      "usable_for": ["edit page-card appearance", "selected card", "responsive four-plus-one arrangement"],
-      "not_evidence_for": ["fixed five-column grid", "drag-in-progress", "drop indicator", "reorder persistence"],
-      "limitations": ["full desktop capture", "app-window crop and width not measured"],
+      "observed_state": "Five page cards in 4+1 layout (four on first row, one on second) at the captured app-window width",
+      "classification": "raw-Aminus",
+      "usable_for": ["EditModeGridView 4 列响应式 wrap (4+1)", "卡片等宽并排 + 单卡片换行", "选中蓝色边框"],
+      "not_evidence_for": ["精确卡片像素宽度", "卡片间距", "drag 进行中/drop indicator", "reorder persistence"],
+      "limitations": ["full desktop capture", "no bbox", "wrap breakpoint not determined"],
       "confidence": "high"
     }
   ]
