@@ -78,7 +78,7 @@ button {
 
 .toolbar {
   display: grid;
-  grid-template-columns: max-content max-content minmax(326px, 1fr) minmax(240px, 360px);
+  grid-template-columns: max-content max-content minmax(326px, 1fr) max-content minmax(240px, 360px);
   align-items: center;
   gap: 8px;
   min-height: 48px;
@@ -442,7 +442,7 @@ select.zoom-control {
   align-items: center;
   gap: 8px;
   min-height: 42px;
-  padding: 0 12px 0 300px;
+  padding: 0 12px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-strong);
 }
@@ -489,19 +489,9 @@ select.zoom-control {
 
 .workspace {
   display: grid;
-  grid-template-columns: 290px minmax(420px, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   flex: 1;
   min-height: 0;
-}
-
-.workspace--full {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-/* ISS-060：右栏（v0.2 骨架）。activeMode 决定是否渲染，宽 320px。 */
-.workspace--with-right-pane,
-.workspace--with-both {
-  grid-template-columns: 290px minmax(420px, 1fr) 320px;
 }
 
 .right-pane {
@@ -1437,7 +1427,7 @@ select.zoom-control {
 
 @media (max-width: 1500px) {
   .toolbar {
-    grid-template-columns: max-content max-content minmax(326px, 1fr) minmax(210px, 300px);
+    grid-template-columns: max-content max-content minmax(326px, 1fr) max-content minmax(210px, 300px);
   }
 
   .reader__start {
@@ -1452,20 +1442,12 @@ select.zoom-control {
   }
 
   .toolbar {
-    grid-template-columns: max-content max-content minmax(286px, 1fr) minmax(150px, 220px);
+    grid-template-columns: max-content max-content minmax(286px, 1fr) max-content minmax(150px, 220px);
     gap: 6px;
   }
 
   .toolbar__pager {
     min-width: 286px;
-  }
-
-  .workspace {
-    grid-template-columns: 236px minmax(360px, 1fr);
-  }
-
-  .workspace.workspace--full {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .toolbar__group[aria-label="文件操作"] .tool-button span {
@@ -1486,10 +1468,6 @@ select.zoom-control {
     padding: 0;
   }
 
-  .context-toolbar {
-    padding-left: 248px;
-  }
-
   .reader__start {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
@@ -1500,7 +1478,7 @@ select.zoom-control {
 
 @media (max-width: 920px) {
   .toolbar {
-    grid-template-columns: max-content max-content minmax(212px, 1fr) minmax(112px, 1fr);
+    grid-template-columns: max-content max-content minmax(212px, 1fr) max-content minmax(112px, 1fr);
     gap: 4px;
     padding: 0 8px;
   }
@@ -1535,15 +1513,4 @@ select.zoom-control {
     padding: 0 6px;
   }
 
-  .workspace {
-    grid-template-columns: 224px minmax(336px, 1fr);
-  }
-
-  .workspace.workspace--full {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .context-toolbar {
-    padding-left: 236px;
-  }
 }

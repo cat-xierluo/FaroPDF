@@ -22,6 +22,7 @@
     "typecheck": "tsc --noEmit --project config/tsconfig.json",
     "test": "vitest run --config config/vitest.config.ts",
     "test:watch": "vitest --config config/vitest.config.ts",
+    "verify:ui-layout": "node scripts/verify-pdf-expert-layout.mjs",
     "lint": "eslint . --config config/eslint.config.js",
     "preview": "vite preview --config config/vite.config.ts",
     "tauri": "tauri",

@@ -91,9 +91,8 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
   }
 
   function enterMode(mode: AppModeId) {
-    // 「A 批注」「T 编辑」按钮：复用现有 onModeChange；重复点击 toggle 回 read。
-    // 不新建 mode 注册 —— 现有 AppModeId 已含 "annotate"，edit mode 与 read 共用一组
-    //（v0.2 ISS-NEW-A 阶段 1 仅占位入口，详细行为交由后续阶段）。
+    // 「A 批注」「T 编辑」按钮复用现有 mode；当前页面编辑工作台的内部 id 是 pages。
+    // 重复点击同一 mode 回到 read，避免按钮与中央工作台语义脱节。
     onModeChange(activeMode === mode ? "read" : mode);
   }
 
@@ -293,11 +292,11 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onUtilityPanelCha
         </button>
         <button
           aria-label="T 编辑"
-          aria-pressed={activeMode === "forms"}
+          aria-pressed={activeMode === "pages"}
           className="tool-button tool-button--icon"
           data-toolbar-section="mode"
           data-mode-shortcut="T"
-          onClick={() => enterMode("forms")}
+          onClick={() => enterMode("pages")}
           title="T 编辑"
           type="button"
         >

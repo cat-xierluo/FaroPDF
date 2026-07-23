@@ -53,7 +53,7 @@ export function PendingDetachRestore({ reader }: { reader: ReaderController }): 
     }
     restoredRef.current = true;
 
-    let raw: string | null = null;
+    let raw: string | null;
     try {
       raw = window.localStorage.getItem(PENDING_DETACH_STORAGE_KEY);
     } catch (error) {
@@ -236,16 +236,6 @@ function App() {
     setActiveMode(nextMode);
     if (nextMode === "pages") {
       setUtilityPanel("none");
-      return;
-    }
-
-    if (nextMode === "annotate") {
-      setUtilityPanel("annotation");
-      return;
-    }
-
-    if (utilityPanel === "annotation" || utilityPanel === "none") {
-      setUtilityPanel("summary");
     }
   }
 

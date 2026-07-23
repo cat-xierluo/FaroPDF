@@ -59,6 +59,7 @@ tests/fixtures/ocr/*.bak
 
 # 排查临时文件(audit-screenshots / dev-server log 等)
 tmp/audit-screenshots/
+tmp/verification/
 tmp/dev-server.log
 tmp/*.log
 

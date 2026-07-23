@@ -160,8 +160,8 @@ describe("Toolbar ISS-NEW-A 阶段 1：A 批注 / T 编辑 按钮", () => {
     expect(screen.getByRole("button", { name: "T 编辑" })).toHaveAttribute("aria-pressed", "false");
   });
 
-  test("activeMode=forms 时 T 编辑按钮 aria-pressed=true,A 批注 false", () => {
-    render(<Harness activeMode="forms" />);
+  test("activeMode=pages 时 T 编辑按钮 aria-pressed=true,A 批注 false", () => {
+    render(<Harness activeMode="pages" />);
     expect(screen.getByRole("button", { name: "T 编辑" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "A 批注" })).toHaveAttribute("aria-pressed", "false");
   });
@@ -181,13 +181,13 @@ describe("Toolbar ISS-NEW-A 阶段 1：A 批注 / T 编辑 按钮", () => {
     expect(onModeChange).toHaveBeenCalledWith("annotate");
   });
 
-  test("点击 T 编辑 → onModeChange('forms')", async () => {
+  test("点击 T 编辑 → onModeChange('pages')", async () => {
     const user = userEvent.setup();
     const onModeChange = vi.fn();
     render(<Harness activeMode="read" onModeChange={onModeChange} />);
 
     await user.click(screen.getByRole("button", { name: "T 编辑" }));
-    expect(onModeChange).toHaveBeenCalledWith("forms");
+    expect(onModeChange).toHaveBeenCalledWith("pages");
   });
 
   test("再次点击同一 mode → toggle 回 read（不卡死在 mode 上）", async () => {

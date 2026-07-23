@@ -4,8 +4,8 @@
  * 5 段（与 data-section 一一对应）：
  *   sidebar-toggles | file | reading | mode | right
  *
- * 与全局 .toolbar (src/styles/app.css) 协作：保留原来的 4 列 grid，把
- * .toolbar__section 映射到对应的 grid column；不动其他模块的样式。
+ * 与全局 .toolbar (src/styles/app.css) 共享同一套 5 列定义；两处必须保持一致，
+ * 否则第 5 个 right section 会被 CSS Grid 自动换到第二行。
  */
 
 .toolbar {

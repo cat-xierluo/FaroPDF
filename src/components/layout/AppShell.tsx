@@ -8,7 +8,6 @@ import type { AppSettings } from "../../shared";
 import { setCurrentLanguage, useI18n } from "../../shared/i18n/useI18n";
 import { suggestOutputName } from "../../shared/naming";
 import { getCommandById, type AppCommandId, type AppCommandSignal } from "../../shared/app/commands";
-import { getModeTools } from "./toolbarRegistry";
 import type { ReaderController } from "../../modules/reader";
 import type { TextSearchController } from "../../modules/search";
 import {
@@ -71,6 +70,7 @@ import type {
   RightPanelId,
   UtilityPanelId,
 } from "./types";
+import { resolveWorkspaceLayout } from "./workspaceLayout";
 
 interface AppShellProps {
   activeMode: AppModeId;
@@ -115,10 +115,7 @@ const exportToolGroups = [
   },
 ] satisfies Array<{ label: string; tools: Array<{ commandId: AppCommandId; label: string }> }>;
 
-// ISS-NEW-E（2026-06-22 收口）：read 模式也作为 L4 二级工具条的一员，
-// aria-label 与其他模式对齐为「阅读模式工具」。
-const contextualToolbarLabels: Record<Exclude<AppModeId, "pages">, string> = {
-  read: "阅读模式工具",
+const contextualToolbarLabels: Record<Exclude<AppModeId, "read" | "pages">, string> = {
   annotate: "批注工具条",
   export: "导出工具条",
   forms: "填写和签名工具条",
@@ -159,9 +156,6 @@ export function AppShell({
       tabStore.openTab(doc.path ?? "", doc.name);
     }
   }, [reader.state.document, tabStore]);
-  // ISS-NEW-E（2026-06-22 收口）：showContextToolbar 改为 `activeMode !== "pages"`，
-  // read 模式也显示 L4 二级工具条（由 ContextToolbar mode === "read" 分支统一渲染）。
-  const showContextToolbar = activeMode !== "pages";
   // ISS-067 阶段 2：涂黑模式开关（先声明，再写 useEffect 依赖）
   const [redactActive, setRedactActive] = useState(false);
   // 离开 annotate 模式自动退出涂黑状态，避免 overlay 卡在非文档页。
@@ -224,6 +218,16 @@ export function AppShell({
   // annotate 模式默认走 stamps（保持原派生），不动既有行为。
   const rightPanelWithEditFallback: RightPanelId =
     rightPanel === "none" && activeMode === "forms" ? "shape" : rightPanel;
+  const showRightPanel =
+    activeMode !== "read" &&
+    activeMode !== "pages" &&
+    rightPanelWithEditFallback !== "none";
+  const workspaceLayout = resolveWorkspaceLayout({
+    leftWidth,
+    rightWidth,
+    showLeftPanel: showUtilityPanel,
+    showRightPanel,
+  });
   const [commandFeedback, setCommandFeedback] = useState<string | null>(null);
   // ISS-NEW-G（2026-06-22 收口）：把 settings.language 同步到 i18n runtime。
   // 任何 useI18n() 组件（StatusBar / WelcomeScreen / GeneralSection）均跟随重渲染。
@@ -974,7 +978,7 @@ export function AppShell({
         search={search}
         utilityPanel={utilityPanel}
       />
-      {showContextToolbar ? (
+      {activeMode !== "read" && activeMode !== "pages" ? (
         <ContextToolbar
           annotationDisabled={!hasDocument}
           annotationState={annotationState}
@@ -985,20 +989,13 @@ export function AppShell({
           onAnnotationStateChange={annotationArmed?.onStateChange ?? (() => undefined)}
           onUtilityPanelChange={onUtilityPanelChange}
           formController={formController}
-          reader={reader}
         />
       ) : null}
-      {/* ISS-NEW-A 阶段 2 / ISS-NEW-B 收口（2026-06-22）：L4 二级工具条接管 read-mode
-          工具（旋转 + 适合页面）。仅在 read 模式 + 有文档时显示，让 L3 reading 段
-          瘦身到 4 元素（页码 + 视图模式 4-icon toggle + 缩放% + -/+）。
-          ISS-NEW-E 收口（2026-06-22）：ReadModeToolbar 已并入 ContextToolbar（mode === "read" 分支），此独立 render 块删除。 */}
+      {/* ISS-NEW-M：L5 列只由实际可见 panel 决定，顺序固定为 left → main → right。 */}
       <div
-        className={showUtilityPanel ? "workspace" : "workspace workspace--full"}
-        style={{
-          gridTemplateColumns: showUtilityPanel
-            ? `${leftWidth}px minmax(420px, 1fr) ${rightWidth}px`
-            : `${leftWidth}px minmax(420px, 1fr)`,
-        }}
+        className="workspace"
+        data-layout={workspaceLayout.id}
+        style={{ gridTemplateColumns: workspaceLayout.gridTemplateColumns }}
       >
         {showUtilityPanel ? (
           <UtilityPanel
@@ -1016,78 +1013,6 @@ export function AppShell({
             search={search}
           />
         ) : null}
-        <RightPanel
-          activeMode={activeMode}
-          rightPanel={rightPanelWithEditFallback}
-          // ISS-NEW-C：文档摘要 + OCR 状态面板输入。来源在 Reader 派生，
-          // 当前实现给空（null / idle）。W2 / 后续 PM 收口时把 App.tsx 真值接进来。
-          docSummary={null}
-          ocrStatus={{ state: "idle", message: "尚未开始 OCR", progress: 0 }}
-          onStartOcr={() => undefined}
-          // ISS-NEW-C 阶段 2 后续（2026-06-22 收口）：导出预览 + OCR 队列。
-          exportPreview={{
-            activeTool: activeExportTool,
-            fileName: reader.state.document?.name ?? null,
-            pageCount: reader.state.document?.pageCount ?? null,
-          }}
-          ocrQueueJobs={ocr?.jobs ?? []}
-          onCancelOcrJob={(jobId) => {
-            const job = ocr?.jobs.find((j) => j.id === jobId);
-            if (job) {
-              void ocr?.cancelJob(job);
-            }
-          }}
-          onPanelChange={setRightPanelOverride}
-          shapeToolValue={shapeToolValue}
-          onShapeToolChange={setShapeToolValue}
-          searchQuery={search.state.query}
-          searchHits={searchHits}
-          searchActiveHitId={search.state.activeHitId ?? null}
-          onSearchQueryChange={search.setQuery}
-          onSearchSelectHit={search.selectHit}
-          onSearchJumpPrevious={search.selectPreviousHit}
-          onSearchJumpNext={search.selectNextHit}
-          onSearchClose={() => onUtilityPanelChange("none")}
-          onSelectCustomStamp={(stamp) => {
-            // DEC-112 ISS-060 阶段 2 + ISS-062 阶段 3：用户从右栏选自定义图章 →
-            // 把 stamp.image (base64) 写到 annotationArmed 让画布 stamp 工具立刻可用。
-            if (!annotationArmed) {
-              setCommandFeedback("请先打开 PDF 文档并进入批注模式。");
-              return;
-            }
-            annotationArmed.onStateChange({
-              ...annotationArmed.state,
-              activeToolType: "stamp",
-              stampName: "custom",
-              stampLabel: stamp.name,
-              stampImage: stamp.image,
-            });
-            setCommandFeedback(`已选中图章「${stamp.name}」，请在画布点按落点。`);
-          }}
-          onSelectSignature={(signature) => {
-            // DEC-113 ISS-060 阶段 2 + ISS-070 阶段 2：用户从右栏选签名 →
-            // 当 annotate 模式：把 signature.image 当 stamp 落点（与 customStamp 同套路）
-            // 当 forms 模式：暂只反馈，后续接入 formController.applySignature
-            if (activeMode === "annotate") {
-              if (!annotationArmed) {
-                setCommandFeedback("请先打开 PDF 文档并进入批注模式。");
-                return;
-              }
-              annotationArmed.onStateChange({
-                ...annotationArmed.state,
-                activeToolType: "stamp",
-                stampName: "custom",
-                stampLabel: signature.name,
-                stampImage: signature.image,
-              });
-              setCommandFeedback(`已选中签名「${signature.name}」，请在画布点按落点。`);
-            } else if (activeMode === "forms") {
-              setCommandFeedback(`已选中签名「${signature.name}」，下次接入填写签名字段后可直接落入。`);
-            } else {
-              setCommandFeedback(`已选中签名「${signature.name}」。`);
-            }
-          }}
-        />
         <div ref={workspaceMainRef} className="workspace__main" style={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, position: "relative" }}>
           {activeMode === "pages" ? (
             <EditModeGridView
@@ -1183,6 +1108,78 @@ export function AppShell({
             />
           ) : null}
         </div>
+        <RightPanel
+          activeMode={activeMode}
+          rightPanel={rightPanelWithEditFallback}
+          // ISS-NEW-C：文档摘要 + OCR 状态面板输入。来源在 Reader 派生，
+          // 当前实现给空（null / idle）。W2 / 后续 PM 收口时把 App.tsx 真值接进来。
+          docSummary={null}
+          ocrStatus={{ state: "idle", message: "尚未开始 OCR", progress: 0 }}
+          onStartOcr={() => undefined}
+          // ISS-NEW-C 阶段 2 后续（2026-06-22 收口）：导出预览 + OCR 队列。
+          exportPreview={{
+            activeTool: activeExportTool,
+            fileName: reader.state.document?.name ?? null,
+            pageCount: reader.state.document?.pageCount ?? null,
+          }}
+          ocrQueueJobs={ocr?.jobs ?? []}
+          onCancelOcrJob={(jobId) => {
+            const job = ocr?.jobs.find((j) => j.id === jobId);
+            if (job) {
+              void ocr?.cancelJob(job);
+            }
+          }}
+          onPanelChange={setRightPanelOverride}
+          shapeToolValue={shapeToolValue}
+          onShapeToolChange={setShapeToolValue}
+          searchQuery={search.state.query}
+          searchHits={searchHits}
+          searchActiveHitId={search.state.activeHitId ?? null}
+          onSearchQueryChange={search.setQuery}
+          onSearchSelectHit={search.selectHit}
+          onSearchJumpPrevious={search.selectPreviousHit}
+          onSearchJumpNext={search.selectNextHit}
+          onSearchClose={() => onUtilityPanelChange("none")}
+          onSelectCustomStamp={(stamp) => {
+            // DEC-112 ISS-060 阶段 2 + ISS-062 阶段 3：用户从右栏选自定义图章 →
+            // 把 stamp.image (base64) 写到 annotationArmed 让画布 stamp 工具立刻可用。
+            if (!annotationArmed) {
+              setCommandFeedback("请先打开 PDF 文档并进入批注模式。");
+              return;
+            }
+            annotationArmed.onStateChange({
+              ...annotationArmed.state,
+              activeToolType: "stamp",
+              stampName: "custom",
+              stampLabel: stamp.name,
+              stampImage: stamp.image,
+            });
+            setCommandFeedback(`已选中图章「${stamp.name}」，请在画布点按落点。`);
+          }}
+          onSelectSignature={(signature) => {
+            // DEC-113 ISS-060 阶段 2 + ISS-070 阶段 2：用户从右栏选签名 →
+            // 当 annotate 模式：把 signature.image 当 stamp 落点（与 customStamp 同套路）
+            // 当 forms 模式：暂只反馈，后续接入 formController.applySignature
+            if (activeMode === "annotate") {
+              if (!annotationArmed) {
+                setCommandFeedback("请先打开 PDF 文档并进入批注模式。");
+                return;
+              }
+              annotationArmed.onStateChange({
+                ...annotationArmed.state,
+                activeToolType: "stamp",
+                stampName: "custom",
+                stampLabel: signature.name,
+                stampImage: signature.image,
+              });
+              setCommandFeedback(`已选中签名「${signature.name}」，请在画布点按落点。`);
+            } else if (activeMode === "forms") {
+              setCommandFeedback(`已选中签名「${signature.name}」，下次接入填写签名字段后可直接落入。`);
+            } else {
+              setCommandFeedback(`已选中签名「${signature.name}」。`);
+            }
+          }}
+        />
       </div>
       <TextSelectionToolbar
         bounds={toolbarHidden ? null : selectionBounds}
@@ -1427,58 +1424,17 @@ function ContextToolbar({
   onCommand,
   onAnnotationStateChange,
   onUtilityPanelChange,
-  reader,
 }: {
   annotationDisabled: boolean;
   annotationState: AnnotationToolState;
   formController: import("../../modules/forms/useFormController").FormController;
   hasDocument: boolean;
-  // ISS-NEW-E（2026-06-22 收口）：read 模式也作为 L4 二级工具条的一员，
-  // 由 ContextToolbar mode === "read" 分支统一渲染（参见下方分支）。
-  mode: Exclude<AppModeId, "pages">;
+  mode: Exclude<AppModeId, "read" | "pages">;
   ocr?: OcrWorkspaceController;
   onCommand: (commandId: AppCommandId) => void;
   onAnnotationStateChange: (next: AnnotationToolState) => void;
   onUtilityPanelChange: (panel: UtilityPanelId) => void;
-  reader: ReaderController;
 }) {
-  // ISS-NEW-E（2026-06-22 收口）：read 模式 L4 二级工具条接管 read-mode 工具
-  // （旋转 + 适合页面，复用 registerReadModeTools 注册的 3 工具）。从原独立
-  // `<ReadModeToolbar>` 组件并入，让 ContextToolbar 真正按 activeMode 路由 5 模式。
-  if (mode === "read") {
-    const items = getModeTools("read")
-      .slice()
-      .sort((a, b) => a.order - b.order);
-    return (
-      <div
-        className="context-toolbar context-toolbar--read"
-        data-testid="read-mode-toolbar"
-        role="toolbar"
-        aria-label={contextualToolbarLabels[mode]}
-      >
-        {items.map((item) => {
-          const disabled =
-            item.isDisabled?.({ activeMode: "read", reader, search: undefined as never }) ?? false;
-          return (
-            <button
-              aria-pressed={item.isActive({ activeMode: "read", reader, search: undefined as never })}
-              className="tool-button tool-button--icon tool-button--reader"
-              data-toolbar-section="read-l4"
-              disabled={disabled}
-              key={item.id}
-              onClick={() => item.onClick({ activeMode: "read", reader, search: undefined as never })}
-              title={item.label}
-              type="button"
-            >
-              <item.icon size={16} />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
-
   if (mode === "annotate") {
     // stage 4 milestone 2：annotate 模式用真正的 AnnotationToolbar（受控），
     // 取代 milestone 1 之前 hardcoded 9 工具 + 6 色板 + stamp 模板按钮。
