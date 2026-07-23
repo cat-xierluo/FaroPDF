@@ -7133,3 +7133,93 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - 未来 Agent 无权从“文档已清理”推导“所有 UI 阶段都已解锁”；阶段并发权只看 `docs/TASKS.md`。
 - 本决策不改变产品代码和现有完成等级，只补足后续派工与验收上下文。
 
+## DEC-175 PDF Expert 参考 fixture 新建与中文局限（2026-07-23）
+
+- 时间：2026-07-23
+- 类型：证据前置 / 受控夹具 / M1 入仓资源
+- 关联：ISS-NEW-M、ISS-NEW-N、`tests/fixtures/expert/`
+- 状态：生效
+
+**问题**：M1 任务卡要求固定 PDF fixture 以保证每次复采同一基线。仓库内 `tests/fixtures/` 唯一的 PDF `ocr/scan-only-sample.pdf` 是无文字层、2 页、刻意设计成扫描件的夹具，无法支撑 read/thumbnails/annotate/edit 四状态共用的真实文字层需求；该项目还明确不进 `tests/fixtures/ocr/*.pdf` 入仓（`.gitignore`）。这意味着没有受控 fixture 任何 M1 采集都不可重复。
+
+**决策**：
+
+1. 新建 `tests/fixtures/expert/generate.mjs`：用项目已有 `pdf-lib` 内置 `StandardFonts.Helvetica` 生成 5 页 A4、纯英文虚构法律样例（合同/卷宗风格）、含真实 PDF 文字层、含矢量表格边框与签字线、未加密的 `reference.pdf`。
+2. 产物受版本控制（`tests/fixtures/expert/` 不在 `.gitignore` 范围内），保证任意 worker clone 后能复采到同一基线。
+3. 生成脚本沿用 `tests/fixtures/ocr/generate-scan-fixture.mjs` 的可重复运行模式，无随机种子、不引入外部工具。
+4. **已知局限**：Helvetica 不支持中文，本 fixture 不含 CJK 文字层；CJK 排版/搜索的视觉验证如需，可在 M2 另建一份中文 fixture。
+5. 任何 PDF 文字层包含的关键词（如 `Consideration`、`Breach`、`Indemnify`）便于搜索状态复现；页脚 `Reference Fixture · Page N of 5` 便于 thumbnails 五页区分与 edit 重排后核对顺序。
+
+**当前影响**：
+
+- M1 / M2 采集协议 `capture-protocol.md` 把 `tests/fixtures/expert/reference.pdf` 作为唯一受控 fixture。
+- 不修改 `src/`、`src-tauri/`、`package.json` 或全局样式；只新增 `tests/fixtures/expert/` 三个文件（脚本、产物、说明）。
+- CJK 视觉验证如需，需在 M2 显式补采另一份 fixture。
+
+## DEC-176 PDF Expert 实机版本更正：25.2.1 → 3.9.2（2026-07-23）
+
+- 时间：2026-07-23
+- 类型：证据版本校正 / manifest 一致性
+- 关联：ISS-NEW-M、ISS-NEW-N、`docs/reference/pdf-expert/manifest.json`
+- 状态：生效
+
+**问题**：`manifest.json` 的 `observed_version` 写为 `25.2.1`，但实机安装的 `/Applications/PDF Expert.app` 的 `CFBundleShortVersionString` 读取为 `3.9.2`。M1 每张采集图要求固化应用版本以保证可复采；版本不一致会导致后续 worker 拿 25.2.1 的图去实机 3.9.2 上复采失败。
+
+**决策**：
+
+1. 以实机可复采为准，将 `manifest.json` 的 `observed_version` 从 `25.2.1` 更正为 `3.9.2`。
+2. 在 `manifest.json` 的 `app` 块加入 `version_note` 说明：`25.2.1` 为历史误标；M1 / M2 后续采集均以实机 `3.9.2` 为准。
+3. 不重写 `CHANGELOG.md` 的历史条目；版本号更正属于现行事实纠正，不算用户可见变更。
+
+**当前影响**：
+
+- 所有新的 raw capture 与未来 accepted-golden 在 metadata 中记录 `PDF Expert 3.9.2`。
+- 历史 raw 图（R01–R15）的文件名未改（避免追溯破坏 state-matrix 引用），但它们的 `observed_version` 含义以新版 manifest 为准。
+- 任何 worker 复采时不得再以 `25.2.1` 为目标版本。
+
+## DEC-177 基于 raw 推进面板修正与 ISS-NEW-N 边界（2026-07-23）
+
+- 时间：2026-07-23
+- 类型：UI 修正范围 / 证据等级取舍 / 阶段并发权补充
+- 关联：ISS-NEW-M、ISS-NEW-N、DEC-174、`docs/reference/pdf-expert/manifest.json`、`state-matrix.md`
+- 状态：生效
+
+**问题**：DEC-174 明确 M1 仍是唯一可领取项、所有 UI 实现必须等 accepted-golden。但当前 15 张首批图片重新分级后发现：6 张 raw-Aminus（R08/R09/R10/R11/R13/R15）已足以支撑 6 处面板/对话框级骨架修正（精度为粗估，未 crop、未稳定性 diff），而 M1 全量重采存在真实工程阻碍（PDF Expert 会话恢复抢占 fixture、osascript 辅助功能权限被拒无法固定窗口），完整重采速度过慢。用户决策：从现有 raw 推进有限范围的面板修正；剩下缺图由其他 worker 后续补采。
+
+**决策**：
+
+1. 接受“基于 raw-Aminus 推进”策略，但**严限范围**：仅 6 处面板/对话框级（SignaturePanel / SetPasswordDialog / OcrPanelView / StampPanel / EditModeGridView / AnnotationToolbar）；不涉及 L2/L3 chrome 精确尺寸、缩略图、selection 浮条、shape 6 段合同。
+2. **禁止宣称 `visually-verified`**。基于 raw-Aminus 的最高交付等级为 `wired` + `geometry-coarse-verified`，对应 acceptance-contract 中“`geometry-verified` 只是验证标签，不是第五种完成状态”的旧条款扩展——本决策将其与 raw 等级直接绑定。
+3. raw-Aminus / raw-B / raw-B-low-confidence / raw-C 四级分级写进 `manifest.json` 的 `classification_rules` 与 `raw_rerating`；所有 capture 的 `classification` 同步更新；state-matrix 的 Mode × surface、交互证据、转换约束三表同步反映新等级。
+4. 新建 ISS-NEW-N 任务卡（大节 + 6 个面板修正子卡 + 4 个补采子卡），不替代 ISS-NEW-M；M1 全量重采仍按 ISS-NEW-M 推进。
+5. 每个面板修正子卡的 PR 描述必须引用 `manifest.json` 的 raw-Aminus 分级与对应 capture id；任何尺寸声明必须标注“粗估，未 crop、未稳定性 diff”。
+
+**当前影响**：
+
+- ISS-NEW-N 6 个面板修正子卡可被任意 worker 领取；每个子卡独立 allowed/forbidden files，互不重叠；全局布局文件（`AppShell`、`Toolbar` 全局样式）只允许同时被一个 owner 修改——`P03` 和 `P05` 共享 `AppShell.tsx` 写入，必须由同一 owner 串行或显式拆分 PR。
+- 4 个补采子卡（CROP / THUMB / SEL / SHAPE）归档为独立 P1 任务，由其他 worker 按 `capture-protocol.md` 流程执行；不阻塞面板修正子卡的实施。
+- 未来面板修正 PR 不得以“与 PDF Expert 视觉对齐”或“高保真复刻”作描述；最高只能称“基于 raw-Aminus 的 wired + geometry-coarse-verified 修正”。
+- ISS-NEW-M M1 不被本决策关闭；后续仍按 M1 完整证据链推进。
+
+## DEC-178 PDF Expert 4 块硬缺图归档为 ISS-NEW-N 补采子卡（2026-07-23）
+
+- 时间：2026-07-23
+- 类型：证据缺口归档 / 后续 worker 任务前置
+- 关联：ISS-NEW-N-CROP / THUMB / SEL / SHAPE、`coverage-gap.md`、`state-matrix.md`
+- 状态：生效
+
+**问题**：raw 重分级后发现 4 块 surface 在现有 15 张图里完全没有 A- 级图（或被 R12 那样误标），仅靠现有素材无法支撑任何可信修正实现：①PDF Expert 窗口 chrome 精确像素宽高（阻断 L3 自适应断点）；②左栏真实缩略图列表 + 当前页高亮；③text selection 浮动工具条；④shape 6 段合同的真参考（R12 实为 stamp 不是 shape）。
+
+**决策**：
+
+1. 在 `coverage-gap.md` 增设 “P0+：ISS-NEW-N 补采硬缺口” 小节；4 块缺图升级为 P0+，明确“无图就无法做对应修正”。
+2. 在 `manifest.json` 的 `pending_recapture` 块记录 4 张补采子卡（每张含 `id` / `surface` / `blocking_surfaces` / `closest_existing` / `required` 字段），为后续 worker 提供最小可执行前置。
+3. 在 `state-matrix.md` 的 Mode × surface / 正交状态 / 交互证据 / 转换约束四表里，凡依赖这 4 张补采的 surface / 交互 / 转换，全部加“（依赖 ISS-NEW-N-XXX）”标注，避免后续 worker 误以为已存在证据。
+4. 4 张补采子卡的 allowed files 与 ISS-NEW-M M1 相同（仅 `docs/reference/pdf-expert/` 内部文件 + 新建 `measurements.json` / `state-specs/`），不实现 UI、不动 `src/**`；唯一目的是把 raw-B / raw-C / missing 推进到 accepted-golden。
+5. 4 张补采子卡可与 ISS-NEW-N 6 个面板修正子卡并行：补采只动证据文件，面板修正只动产品代码；文件范围不重叠，符合 DEC-174 的并行条件。
+
+**当前影响**：
+
+- 后续 worker 可独立领取任意补采子卡；不必等 M1 全量 4 个 accepted-golden 完成。
+- 任何面板修正子卡在 PR 描述里提到受补采影响的尺寸 / 交互时，必须显式标注 “依赖 ISS-NEW-N-XXX 完成”。
+- 不修改任何产品代码或测试；本次新增/修改仅限证据与任务文档。

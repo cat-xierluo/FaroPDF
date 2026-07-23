@@ -1,3 +1,41 @@
+## 未发版 · 文档与证据治理（2026-07-23，ISS-NEW-N 启动）
+
+> 本节记录 2026-07-23 的 PDF Expert 证据治理与补采归档变更，**不涉及用户可见产品功能**；产品代码与现有完成等级保持不变。下游 release 由 v0.1.3 → v0.2 之间自行决定是否纳入本节。
+
+### PDF Expert 证据治理（DEC-175~178，关联 ISS-NEW-M / ISS-NEW-N）
+
+- **新建受控 fixture**（`tests/fixtures/expert/`）：用 pdf-lib 内置 Helvetica 生成 5 页 A4、纯英文虚构法律样例、含真实 PDF 文字层、未加密的 `reference.pdf`；脚本与产物受版本控制，保证任意 worker clone 后复采同一基线。已知局限：不含 CJK 文字层，CJK 排版/搜索视觉验证如需在 M2 另建。
+- **版本更正**：`docs/reference/pdf-expert/manifest.json` 的 `observed_version` 由历史误标 `25.2.1` 更正为实机 `3.9.2`（`/Applications/PDF Expert.app` CFBundleShortVersionString 实测）。
+- **采集协议**（`docs/reference/pdf-expert/capture-protocol.md`）：固化 fixture 路径、窗口位置 `{200,120}`、尺寸 `{1280,832}`、浅色主题、100% 缩放、`screencapture`+`sips` crop 流程、命名规范、人工 bbox 量测方法与 uncertainty 上限。
+- **15 张首批图片重新分级**（manifest.json `raw_rerating`）：
+  - `raw-Aminus` 6 张：R08 签名 / R09 密码模态 / R10 OCR / R11 图章 / R13 multi-tab edit / R15 edit 4+1（足以支撑面板/对话框级骨架修正，精度为粗估）。
+  - `raw-B` 4 张 + `raw-B-low-confidence` 1 张：R02 read / R04 outline / R06 search / R14 welcome / R12 shape（实为 stamp）。
+  - `raw-C` 4 张：R01 终端错 / R03 两页实单页 / R05 outline 重复 / R07 selection 实无。
+- **缺图硬归档**（manifest.json `pending_recapture` + `coverage-gap.md` P0+）：4 块 surface 在现有 raw 中无图，归档为 4 个 ISS-NEW-N 补采子卡，由其他 worker 后续执行：
+  - ISS-NEW-N-CROP：窗口已 crop 的 L3 工具栏全展开参考（解决 chrome 精确尺寸）
+  - ISS-NEW-N-THUMB：左栏缩略图列表 + 当前页高亮
+  - ISS-NEW-N-SEL：text selection 浮动工具条
+  - ISS-NEW-N-SHAPE：shape 6 段合同的真参考
+
+### ISS-NEW-N 任务卡（6 个面板修正子卡 + 4 个补采子卡）
+
+- 关联任务：`docs/TASKS.md` 新增 ISS-NEW-N（大节 + 6 个面板修正子卡 + 4 个补采子卡）；不替代 ISS-NEW-M M1。
+- 6 个面板修正子卡（基于 raw-Aminus，最高交付等级 `wired` + `geometry-coarse-verified`，**禁止 `visually-verified`**）：
+  - ISS-NEW-N-P01 SignaturePanel 竖排签名卡骨架（R08）
+  - ISS-NEW-N-P02 SetPasswordDialog center modal + 半透明遮罩（R09）
+  - ISS-NEW-N-P03 OcrPanelView 5 段结构 + L3 `扫描和文本识别` 次级工具条（R10）
+  - ISS-NEW-N-P04 StampPanel tab×2 + 2×2 preset 网格（R11）
+  - ISS-NEW-N-P05 EditModeGridView 4 列响应式 wrap + 次级工具条 7 项（R13+R15）
+  - ISS-NEW-N-P06 AnnotationToolbar 工具条顺序 + active 蓝描边色（R11）
+- 4 个补采子卡：见上节。
+- 每个面板修正子卡 PR 描述必须引用 `manifest.json` 的 raw-Aminus 分级与对应 capture id；任何尺寸声明必须标注"粗估，未 crop、未稳定性 diff"。
+
+### 影响
+
+- 任何 PDF Expert 面板/对话框实现 PR 不得以"与 PDF Expert 视觉对齐"或"高保真复刻"作描述；最高只能称"基于 raw-Aminus 的 wired + geometry-coarse-verified 修正"。
+- 历史 raw 图（R01–R15）的文件名未改（避免追溯破坏 state-matrix 引用），但 `observed_version` 含义以新版 manifest 为准。
+- 不修改任何产品代码或测试；本次新增/修改仅限证据、任务与决策文档。
+
 ## v0.1.3（草稿，2026-06-22 收口沉淀，未发版）
 
 > v0.1.x → v0.2 过渡版：5 ISS 收口（DEC-154~159）+ 13 commit（不含 catch-up）+ 累计 ~87 单测（i18n 4 + StatusBar 12 + WelcomeScreen 9 + GeneralSection 5 + ReaderCanvas 19 + AppShell ISS-NEW 子集 10 + commands.test 19 + ExportPreview 5 + OcrQueue 4）。typecheck ✅；vitest 受 pre-existing vitest 4.x + `html-encoding-sniffer`/`@exodus/bytes` ESM 冲突阻塞（main 仓库根也复现，与本次改动无关，详见 DEC-099）。

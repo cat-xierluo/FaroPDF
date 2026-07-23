@@ -1636,3 +1636,183 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 当前 raw captures 未统一 crop、窗口尺寸和触发步骤，不能直接生成精确 CSS。
 - `src/modules/reader/readerReducer.test.ts` 有用户未提交修改；本任务不改写、不归并该文件。
 - 历史 DEC、CHANGELOG 和进度日志只证明“当时做过什么”，不得覆盖本卡的当前状态。
+### ISS-NEW-N PDF Expert 面板修正批次（基于 raw，限定范围）+ 补采归档
+
+- 优先级：P1
+- 类型：UI 修正批次（面板/对话框级）+ 补采归档
+- 来源：2026-07-23 用户决策”用现有 raw 推进修正，剩下的缺图后续让其他 worker 补采后再归档”；独立 S4 反向审计评级：6 张 raw-Aminus + 5 张 raw-B（1 raw-B-low-confidence）+ 4 张 raw-C。
+- 状态：**待领取；6 个面板修正子卡（ISS-NEW-N-P01～P06）+ 4 个补采子卡（ISS-NEW-N-CROP/THUMB/SEL/SHAPE）全部未启动。**
+- 唯一证据入口：`docs/reference/pdf-expert/README.md`
+- 实现现状入口：`docs/reference/pdf-expert/implementation-map.md`
+- 协作文档：`docs/reference/pdf-expert/state-matrix.md`、`coverage-gap.md`、`manifest.json`
+
+#### 范围与边界（与 ISS-NEW-M 的关系）
+
+- ISS-NEW-N 是**ISS-NEW-M 的降级并行任务**：M1 全量重采 + 4 个 accepted-golden 仍按 ISS-NEW-M 推进，不被本卡替代。
+- 本卡所有面板修正子卡**禁止宣称 `visually-verified`**。最高交付等级为 `wired` + `geometry-coarse-verified`（基于 raw 粗估），对应 acceptance-contract 的”非第五种完成状态”。
+- 任何受 ISS-NEW-N-CROP / THUMB / SEL / SHAPE 补采子卡影响的实现项，必须在该子卡完成并 accepted-golden 准入后**单独复核**——不允许在 raw-Aminus 基础上声称”对齐 PDF Expert”。
+- 本卡不修改 `src-tauri/`、`package*.json`、全局样式、`src/modules/reader/readerReducer.test.ts`。
+
+#### 已确认根因（启动本卡的事实）
+
+1. 15 张首批图片重新分级：6 raw-Aminus（R08/R09/R10/R11/R13/R15）+ 4 raw-B（R02/R04/R06/R14）+ 1 raw-B-low-confidence（R12）+ 4 raw-C（R01/R03/R05/R07）；accepted-golden 仍为 0。
+2. raw-Aminus 6 张足以支撑 6 处的面板/对话框骨架修正（精度为粗估，未 crop、未稳定性 diff）。
+3. 4 块 surface（chrome 精确尺寸、缩略图、selection 浮条、shape 6 段合同）在现有 raw 中无图，必须补采。
+4. 重采速度过慢且环境存在真实阻碍（PDF Expert 会话恢复抢占 fixture；osascript 辅助功能权限被拒无法固定窗口），完整 M1 重采需独立 PR 与环境授权。
+
+#### ISS-NEW-N-P01 SignaturePanel 竖排签名卡骨架
+
+- Allowed files：`src/modules/signature/`（components、store）、`docs/reference/pdf-expert/`
+- Forbidden files：`src-tauri/**`、全局样式、`readerReducer.test.ts`
+- 证据：raw-Aminus R08
+- 事实：竖排 7 张签名卡 + 首张选中蓝描边；header `签名` + `+`；右栏 placement；面板粗宽度（占中央可视区 1/4–1/3）
+- 显式不推导：精确像素宽度、签名卡真实像素高度、empty state、insertion behavior、save/reopen
+- 交付等级：wired + geometry-coarse-verified（最高不允许 visually-verified）
+- 行为验证：组件存在、列表渲染、点击选中；不要求尺寸与 PDF Expert 像素对齐
+- 视觉验证：自截图与 R08 视觉对照，不报失败码
+- 验收：
+  - [ ] SignaturePanel 渲染 header + 竖排卡片
+  - [ ] 首张选中蓝描边
+  - [ ] 不声明”对齐 PDF Expert”
+  - [ ] PR 描述引用 R08 + manifest.json 的 raw-Aminus 分级
+
+#### ISS-NEW-N-P02 SetPasswordDialog center modal + 半透明遮罩
+
+- Allowed files：`src/modules/forms/` 或 `src/components/dialog/`、`docs/reference/pdf-expert/`
+- Forbidden files：同上
+- 证据：raw-Aminus R09
+- 事实：center modal + 半透明遮罩 + 2 row（label+input）+ 2 action；focus 蓝描边
+- 显式不推导：精确像素宽度、字体大小、validation error / loading / success 态
+- 交付等级：wired + geometry-coarse-verified
+- 行为验证：模态打开/关闭、2 行输入提交、取消动作
+- 视觉验证：自截图与 R09 视觉对照
+- 验收：
+  - [ ] 模态居中显示、半透明遮罩覆盖
+  - [ ] 2 row label+input，2 action
+  - [ ] focus 蓝描边
+  - [ ] PR 描述引用 R09
+
+#### ISS-NEW-N-P03 OcrPanelView 5 段结构 + L3 `扫描和文本识别` 次级工具条
+
+- Allowed files：`src/modules/ocr/`（OcrPanelView、OcrStatusPanelView、controller）、`src/components/layout/`（Toolbar 中 `扫描和文本识别` 段）、`docs/reference/pdf-expert/`
+- 证据：raw-Aminus R10
+- 事实：右面板 header / 预览 / 说明 / 语言下拉 / 主按钮 5 段；主工具栏 `扫描和文本识别` 段点击展开次级工具条 5 项（增强扫描 / 拆分页面 / 裁剪页面 / 清除空白边 / 识别文本）
+- 显式不推导：OCR 队列/进度/失败/取消态、次级工具条右端 overflow 真实内容、精确像素宽度、真实页面预览替代插画
+- 交付等级：wired + geometry-coarse-verified（OCR 完整闭环留给 M5）
+- 验收：
+  - [ ] OcrPanelView 5 段渲染
+  - [ ] 主工具栏 `扫描和文本识别` 段点击展开次级工具条
+  - [ ] onStartOcr 仍为 placeholder 时不宣称 behavior-complete
+  - [ ] PR 描述引用 R10
+
+#### ISS-NEW-N-P04 StampPanel tab × 2 + 2 × 2 preset 网格
+
+- Allowed files：`src/modules/stamp/`、`docs/reference/pdf-expert/`
+- 证据：raw-Aminus R11
+- 事实：右面板 `标准/自定义` tab + 2×2 preset 网格；首张蓝描边
+- 显式不推导：custom tab 内容、stamp 落点行为、精确像素尺寸
+- 交付等级：wired + geometry-coarse-verified
+- 验收：
+  - [ ] StampPanel 渲染 tab×2 + 2×2 preset
+  - [ ] 选中蓝描边
+  - [ ] PR 描述引用 R11
+
+#### ISS-NEW-N-P05 EditModeGridView 4 列响应式 wrap（4+1）+ 次级工具条 7 项
+
+- Allowed files：`src/modules/editor/EditModeGridView.tsx/.css`、`src/components/layout/AppShell.tsx`（仅次级工具条相关）、`docs/reference/pdf-expert/`
+- 证据：raw-Aminus R13（2 卡 + 次级工具条 7 项）+ raw-Aminus R15（4+1 响应式 wrap）
+- 事实：次级工具条顺序 `插入页 / 附加文件 / 旋转 / 复制 / 粘贴(灰) / 摘录 / 删除(红)`；卡片两行元数据（页码索引 + A4 尺寸）；4 列响应式 wrap
+- 显式不推导：固定 5 列、精确卡片像素宽度、drag 进行中/drop indicator、reorder persistence、save/export round-trip
+- 交付等级：wired + geometry-coarse-verified（M3 完整闭环另立任务）
+- 验收：
+  - [ ] EditModeGridView 渲染 4 列响应式 wrap（断点用 container query 或 minmax 而非固定列数）
+  - [ ] 次级工具条 7 项顺序正确
+  - [ ] `粘贴` 灰禁用、`删除` 红
+  - [ ] 卡片双行元数据
+  - [ ] 仍标注 `behavior-complete` 后续由 M3 闭环
+  - [ ] PR 描述引用 R13 + R15
+
+#### ISS-NEW-N-P06 AnnotationToolbar 工具条顺序 + active 蓝描边色
+
+- Allowed files：`src/modules/annotation/AnnotationToolbar.tsx/.css`、`docs/reference/pdf-expert/`
+- 证据：raw-Aminus R11 + raw-B-low-confidence R12（同样激活态）
+- 事实：工具条顺序（粗肉眼）`text-highlight/text-underline/text-strike/pen(blue active)/highlighter/textbox/note/more`；active 蓝描边色
+- 显式不推导：工具条右端 overflow、每项 hover/focus/disabled 四态、形状/形状样式（依赖 ISS-NEW-N-SHAPE）
+- 交付等级：wired + geometry-coarse-verified
+- 验收：
+  - [ ] AnnotationToolbar 8 项顺序（按 R11 观察）
+  - [ ] pen active 蓝描边色
+  - [ ] PR 描述引用 R11
+
+#### ISS-NEW-N-CROP 窗口已 crop 的 L3 工具栏全展开参考
+
+- 优先级：P1（补采）
+- 类型：证据补采
+- Allowed files：`docs/reference/pdf-expert/captures/`、`golden/`、`manifest.json`、`state-matrix.md`、`measurements.json`、`capture-protocol.md`
+- 证据基线：raw-B R06（含桌面背景，唯一 L3 全展开的图）
+- 目标：单张已 crop 到 PDF Expert 窗口、含完整 L3 工具栏全展开 + macOS 菜单栏；按 capture-protocol.md 流程复采 2 次做 reference-vs-reference 稳定性 diff
+- 阻塞 surface：L3 toolbar 自适应断点、窗口外边距、左右栏与中央分割线精确宽度
+- Forbidden files：`src/**`、`src-tauri/**`、全局样式
+- 验收：
+  - [ ] 图片只保留 PDF Expert 应用窗口
+  - [ ] capture-protocol.md 全部参数固化
+  - [ ] 2 次复采 + 稳定性 diff 通过
+  - [ ] `measurements.json` 含 bbox + uncertainty
+  - [ ] manifest `classification` 升级为 `accepted-golden`
+  - [ ] 不实现 UI；唯一目的是让后续 M4 worker 能用此图做 measured spec
+
+#### ISS-NEW-N-THUMB 左栏缩略图列表 + 当前页高亮
+
+- 优先级：P1（补采）
+- 类型：证据补采
+- Allowed files：同 ISS-NEW-N-CROP
+- 证据基线：raw-B R04（实为大纲，非缩略图）
+- 目标：缩略图模式打开左栏的稳定截图；至少 5 页可见、当前页高亮可见
+- 阻塞 surface：Sidebar thumbnails tab、缩略图卡片尺寸/间距、多页滚动当前页定位
+- 验收：
+  - [ ] 图片只保留 PDF Expert 应用窗口
+  - [ ] 至少 5 张缩略图、当前页蓝色高亮
+  - [ ] capture-protocol.md 流程完整
+  - [ ] manifest `classification` 升级为 `accepted-golden`
+
+#### ISS-NEW-N-SEL text selection 浮动工具条
+
+- 优先级：P1（补采）
+- 类型：证据补采
+- Allowed files：同 ISS-NEW-N-CROP
+- 证据基线：raw-C R07（无 selection 浮条）
+- 目标：在 read 模式下用真实文字层 fixture 框选一段，捕捉浮出工具条
+- 阻塞 surface：TextSelectionToolbar、选区可见性、翻译占位文案替换
+- 验收：
+  - [ ] 图片显示选区 + 浮动工具条
+  - [ ] capture-protocol.md 流程完整
+  - [ ] manifest `classification` 升级为 `accepted-golden`
+
+#### ISS-NEW-N-SHAPE shape 6 段合同的真参考
+
+- 优先级：P1（补采）
+- 类型：证据补采
+- Allowed files：同 ISS-NEW-N-CROP
+- 证据基线：raw-B-low-confidence R12（实为 stamp，误标）
+- 目标：形状工具激活态截图；右侧面板展示 6 段形状样式合同
+- 阻塞 surface：Shape panel、形状工具激活态与右栏样式、形状绘制行为
+- 验收：
+  - [ ] 图片只保留 PDF Expert 应用窗口
+  - [ ] 形状工具激活态可见
+  - [ ] 右栏展示 6 段形状样式合同
+  - [ ] capture-protocol.md 流程完整
+  - [ ] manifest `classification` 升级为 `accepted-golden`
+
+#### 当前只可声称的验证结果
+
+- 6 处面板/对话框级 raw-Aminus 骨架已存在，足以支撑 wired 修正交付。
+- 4 块硬缺口（chrome 精确尺寸、缩略图、selection 浮条、shape 6 段合同）已归档为补采子卡，由其他 worker 后续执行。
+- **没有**声称任何 PDF Expert surface 已达到 `visually-verified` 或 PDF Expert 视觉等价。
+
+#### 已知阻塞与边界
+
+- ISS-NEW-N 不替代 ISS-NEW-M M1；M1 全量重采仍按 ISS-NEW-M 推进。
+- 任何面板修正子卡升级到 `behavior-complete` 必须先有真实 PDF 结果（保存/导出/重开）；当前 raw 不足以证明。
+- 任何面板修正子卡升级到 `visually-verified` 必须先有对应 accepted-golden（当前 6 张全是 raw-Aminus，不可）。
+- 重采速度过慢的根因（会话恢复抢占 fixture、辅助功能权限被拒）仍存在；补采子卡执行时仍需你授权辅助功能或协助用 cliclick 拖动窗口。
+- `src/modules/reader/readerReducer.test.ts` 有你的未提交修改；本卡任何子卡都不触碰。
