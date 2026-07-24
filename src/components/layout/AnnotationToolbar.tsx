@@ -13,6 +13,7 @@ import {
   type AnnotationToolState,
 } from "../../modules/annotation";
 import type { PdfAnnotationType, PdfStampName } from "../../shared/pdf/annotation";
+import "./AnnotationToolbar.css";
 
 interface AnnotationToolbarProps {
   state: AnnotationToolState;

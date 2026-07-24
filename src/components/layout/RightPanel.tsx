@@ -1,6 +1,7 @@
 import { useId } from "react";
-import { CustomStampPanel } from "../../modules/annotation/ui/CustomStampPanel";
 import type { CustomStamp } from "../../modules/annotation/customStampStore";
+import type { PdfStampName } from "../../shared/pdf/annotation";
+import { StampPanel } from "../../modules/stamp/ui/StampPanel";
 import { SignaturePanel } from "../../modules/forms/ui/SignaturePanel";
 import type { SignatureRecord } from "../../modules/forms/signatureStore";
 import { ShapeToolPanel, type ShapeToolValue } from "./panels/ShapeToolPanel";
@@ -37,6 +38,10 @@ export interface RightPanelProps {
   rightPanel: RightPanelId;
   /** 用户从右栏选中自定义图章时的回调（接到 annotationArmed） */
   onSelectCustomStamp?: (stamp: CustomStamp) => void;
+  /** ISS-NEW-N-P04：用户从右栏统一图章面板选中标准模板时的回调 */
+  onSelectStandardStamp?: (name: PdfStampName) => void;
+  /** ISS-NEW-N-P04：当前已 arm 的标准图章 id（用于面板高亮），可选 */
+  activeStampName?: PdfStampName | null;
   /** 用户从右栏选中签名时的回调（接到 FormsPanel / annotationArmed） */
   onSelectSignature?: (signature: SignatureRecord) => void;
   /** ISS-060 阶段 2 后续：用户点击 tab 显式切换面板内容（annotate/forms 模式有效） */
@@ -156,6 +161,8 @@ export function RightPanel({
   activeMode,
   rightPanel,
   onSelectCustomStamp,
+  onSelectStandardStamp,
+  activeStampName,
   onSelectSignature,
   onPanelChange,
   docSummary,
@@ -262,7 +269,11 @@ export function RightPanel({
           <>
             <p className="right-pane__hint">{hint}</p>
             {showCustomStamp ? (
-              <CustomStampPanel onSelectStamp={onSelectCustomStamp ?? (() => undefined)} />
+              <StampPanel
+                onSelectCustomStamp={onSelectCustomStamp ?? (() => undefined)}
+                onSelectStandardStamp={onSelectStandardStamp ?? (() => undefined)}
+                selectedStandardName={activeStampName ?? null}
+              />
             ) : null}
             {showSignaturePanel ? (
               <SignaturePanel onSelectSignature={onSelectSignature ?? (() => undefined)} />

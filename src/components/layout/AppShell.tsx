@@ -19,6 +19,7 @@ import {
   armAnnotationTool,
   createInitialAnnotationToolState,
   disarmAnnotationTool,
+  STAMP_TEMPLATES,
 } from "../../modules/annotation";
 import type { AnnotationToolState } from "../../modules/annotation";
 import type { PdfAnnotationType } from "../../shared/pdf/annotation";
@@ -1152,6 +1153,24 @@ export function AppShell({
               stampImage: stamp.image,
             });
             setCommandFeedback(`已选中图章「${stamp.name}」，请在画布点按落点。`);
+          }}
+          activeStampName={annotationState.stampName}
+          onSelectStandardStamp={(name) => {
+            // ISS-NEW-N-P04：用户从右栏统一图章面板选标准模板 →
+            // arm stamp 工具 + 设 stampName 为模板 id（非 custom），清掉自定义 image。
+            if (!annotationArmed) {
+              setCommandFeedback("请先打开 PDF 文档并进入批注模式。");
+              return;
+            }
+            const template = STAMP_TEMPLATES[name];
+            annotationArmed.onStateChange({
+              ...annotationArmed.state,
+              activeToolType: "stamp",
+              stampName: name,
+              stampLabel: template.defaultLabel,
+              stampImage: undefined,
+            });
+            setCommandFeedback(`已选中图章「${template.label}」，请在画布点按落点。`);
           }}
           onSelectSignature={(signature) => {
             // DEC-113 ISS-060 阶段 2 + ISS-070 阶段 2：用户从右栏选签名 →

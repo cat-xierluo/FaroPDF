@@ -31,6 +31,16 @@ describe("SignaturePanel (ISS-070 阶段 2)", () => {
     expect(onSelectSignature).toHaveBeenCalledWith(expect.objectContaining({ id: record.id, name: "李四签名" }));
   });
 
+  test("点击缩略图后加 selected 蓝描边 className（ISS-NEW-N-P01）", () => {
+    saveSignature("王五签名", "data:image/png;base64,yyy");
+    render(<SignaturePanel onSelectSignature={() => undefined} />);
+    const btn = screen.getByRole("button", { name: /选择签名: 王五签名/ });
+    expect(btn).not.toHaveClass("signature-panel__thumbnail--selected");
+    fireEvent.click(btn);
+    expect(btn).toHaveClass("signature-panel__thumbnail--selected");
+    expect(btn).toHaveAttribute("aria-pressed", "true");
+  });
+
   test("删除按钮：从 store 移除 + UI 刷新", () => {
     saveSignature("待删", "data:image/png;base64,xxx");
     render(<SignaturePanel onSelectSignature={() => undefined} />);

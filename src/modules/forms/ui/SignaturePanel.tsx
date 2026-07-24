@@ -28,6 +28,7 @@ export function SignaturePanel({ onSelectSignature }: SignaturePanelProps) {
   const [records, setRecords] = useState<SignatureRecord[]>(() => listSignatures());
   const [isDrawing, setIsDrawing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // 跨 tab 同步
   useEffect(() => {
@@ -63,7 +64,18 @@ export function SignaturePanel({ onSelectSignature }: SignaturePanelProps) {
   const handleDelete = useCallback((id: string) => {
     deleteSignature(id);
     setRecords(listSignatures());
-  }, []);
+    if (selectedId === id) {
+      setSelectedId(null);
+    }
+  }, [selectedId]);
+
+  const handleSelect = useCallback(
+    (record: SignatureRecord) => {
+      setSelectedId(record.id);
+      onSelectSignature(record);
+    },
+    [onSelectSignature],
+  );
 
   const slotsAvailable = Math.max(0, MAX_USER_SIGNATURES - records.length);
 
@@ -88,8 +100,12 @@ export function SignaturePanel({ onSelectSignature }: SignaturePanelProps) {
           <div className="signature-panel__item" key={record.id} data-testid={`signature-${record.id}`}>
             <button
               aria-label={`选择签名: ${record.name}`}
-              className="signature-panel__thumbnail"
-              onClick={() => onSelectSignature(record)}
+              aria-pressed={selectedId === record.id}
+              className={
+                "signature-panel__thumbnail" +
+                (selectedId === record.id ? " signature-panel__thumbnail--selected" : "")
+              }
+              onClick={() => handleSelect(record)}
               type="button"
             >
               <img alt={record.name} src={record.image} />

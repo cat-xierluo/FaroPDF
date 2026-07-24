@@ -1,0 +1,87 @@
+/* ISS-NEW-N-P04 统一图章面板样式。
+ * 证据：raw-Aminus R11（标准/自定义 tab + preset 网格 + 首张蓝描边）。
+ * 响应式网格：默认 2 列，宽时 3 列；不固定 2×2（9 个标准模板，断点未测）。
+ */
+
+.stamp-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+
+.stamp-panel__tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.stamp-panel__tab {
+  padding: 6px 12px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.stamp-panel__tab:hover {
+  color: var(--fg);
+}
+
+.stamp-panel__tab--active {
+  color: var(--fg);
+  border-bottom-color: var(--selection, #55a3f8);
+}
+
+.stamp-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+/* 宽面板时 3 列；断点未测，仅避免单列过宽 */
+@media (min-width: 320px) {
+  .stamp-panel__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.stamp-panel__preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.stamp-panel__preset:hover {
+  border-color: var(--border-strong);
+}
+
+.stamp-panel__preset--selected {
+  border-color: var(--selection, #55a3f8);
+  box-shadow: 0 0 0 1px var(--selection, #55a3f8);
+}
+
+.stamp-panel__preview {
+  width: 100%;
+  height: 28px;
+}
+
+.stamp-panel__preset-label {
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
