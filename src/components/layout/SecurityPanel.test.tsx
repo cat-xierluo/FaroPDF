@@ -279,4 +279,23 @@ describe("SecurityPanel (ISS-064 阶段 1 + DEC-102 P1-4)", () => {
     fireEvent.click(screen.getByRole("button", { name: "关闭安全面板" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  test("ISS-NEW-N-P02：center modal + backdrop 形态 + 点击遮罩关闭", () => {
+    const onClose = vi.fn();
+    render(
+      <SecurityPanel
+        currentPdfPath="/tmp/sample.pdf"
+        onClose={onClose}
+        onFeedback={() => undefined}
+      />,
+    );
+    // dialog role + aria-modal
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    // backdrop 存在
+    const backdrop = screen.getByTestId("security-panel-backdrop");
+    // 点击遮罩关闭
+    fireEvent.click(backdrop);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

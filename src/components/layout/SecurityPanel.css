@@ -1,18 +1,45 @@
-/* ISS-064 文档安全面板（v0.1 skeleton）。
- * 样式与 FormsPanel 保持一致：48px header + 12px 间距 + 6px 圆角。
+/* ISS-064 文档安全面板；ISS-NEW-N-P02 改为 center modal + 半透明遮罩。
+ * 证据：raw-Aminus R09（center modal + 半透明遮罩 + 2 row + 2 action）。
+ * 保留 set/remove 双 mode（不破坏现有功能）。modal 用 position:fixed 脱离
+ * 右栏槽位覆盖视口；backdrop 半透明遮罩点击关闭。
  */
 
 .security-panel {
-  min-height: 0;
-  border-left: 1px solid var(--border);
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.security-panel__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.security-panel__dialog {
+  position: relative;
   background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  width: min(420px, 90vw);
+  max-height: 85vh;
+  overflow: auto;
   display: flex;
   flex-direction: column;
 }
 
 .security-panel[data-layout="bottom-sheet"] {
-  border-left: none;
-  border-top: 1px solid var(--border);
+  align-items: flex-end;
+}
+
+.security-panel[data-layout="bottom-sheet"] .security-panel__dialog {
+  width: 100vw;
+  max-width: 100vw;
+  border-radius: 8px 8px 0 0;
 }
 
 .security-panel__header {
@@ -126,8 +153,8 @@
 
 .security-panel__input-row input:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
+  border-color: var(--selection, #55a3f8);
+  box-shadow: 0 0 0 2px var(--selection, #55a3f8);
 }
 
 .security-panel__hint {

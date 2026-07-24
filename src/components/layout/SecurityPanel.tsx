@@ -162,12 +162,21 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
   }
 
   return (
-    <aside
+    <div
       aria-label="文档安全面板"
       className="security-panel"
-      data-layout={isNarrow ? "bottom-sheet" : "panel"}
+      data-layout={isNarrow ? "bottom-sheet" : "modal"}
       data-testid="security-panel"
+      role="dialog"
+      aria-modal="true"
     >
+      <div
+        className="security-panel__backdrop"
+        data-testid="security-panel-backdrop"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div className="security-panel__dialog">
       <header className="security-panel__header">
         <div>
           <h2>文档安全</h2>
@@ -300,6 +309,7 @@ export function SecurityPanel({ currentPdfPath, onClose, onFeedback }: SecurityP
           </button>
         </div>
       ) : null}
-    </aside>
+      </div>
+    </div>
   );
 }

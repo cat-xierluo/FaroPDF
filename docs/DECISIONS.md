@@ -7266,3 +7266,27 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - 未触碰 P02/P03/P05：P02 密码 modal 需架构决策（SecurityPanel 当前是右栏 aside，改成 modal 会丢失 set/remove 双 mode）；P03 OCR 5 段规格不清；P05 编辑网格已被补采推翻（"编辑"≠"页面管理"）。
 - 未触碰 `src-tauri/`、`package*.json`、`readerReducer.test.ts`。
 - 验证：typecheck ✓；聚焦测试 28 passed（SignaturePanel 10 + StampPanel 4 + AnnotationToolbar 14）；lint 唯一错误在 readerReducer.test.ts（用户私有修改，非本次）。
+
+## DEC-181 ISS-NEW-N-P02 SecurityPanel modal 化（2026-07-24）
+
+- 时间：2026-07-24
+- 类型：UI 架构 / modal 改造
+- 关联：ISS-NEW-N-P02、DEC-180、commit（本轮）
+- 状态：生效
+
+**问题**：DEC-180 标 P02"需架构决策"——SecurityPanel 当前是功能完整的右栏 `<aside>`（set/remove 双 mode + 真实 lopdf 加密 invoke），R09 目标是只含 set 的 center modal。直接新建独立 SetPasswordModal 会产生两个密码入口让用户困惑；整体改成只含 set 的 modal 会丢失 remove mode。
+
+**决策**：采用方案 A——SecurityPanel 整体加 modal 外壳，保留 set/remove 双 mode。
+
+1. 根元素从 `<aside>` 改为 `<div role="dialog" aria-modal="true">`，内部渲染 backdrop（半透明遮罩，点击触发 onClose）+ dialog 卡片。
+2. CSS：`.security-panel` 用 `position:fixed; inset:0` 覆盖视口 + flex 居中；`.security-panel__backdrop` 半透明黑；`.security-panel__dialog` 居中卡片（min(420px, 90vw)）+ box-shadow。
+3. 窄屏（<720px）保留 bottom-sheet 形态（原有 isNarrow 逻辑）。
+4. input:focus 改用 `--selection` 蓝（匹配 R09 的 focus 蓝描边），不再用 --accent 青绿。
+5. 不改 UtilityPanel/AppShell 渲染结构——modal 用 position:fixed 脱离右栏槽位覆盖视口，无需提升到顶层。
+6. 不新建独立 SetPasswordModal，避免两个密码入口。
+
+**当前影响**：
+
+- 密码设置/移除现在是居中 modal + 半透明遮罩，视觉匹配 R09。
+- set/remove 双 mode 全部保留，现有 14 个测试不受影响（+1 modal 形态测试，共 15 passed）。
+- 未触碰 `src-tauri/`、`package*.json`、`readerReducer.test.ts`。

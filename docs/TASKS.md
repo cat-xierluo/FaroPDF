@@ -1641,7 +1641,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P1
 - 类型：UI 修正批次（面板/对话框级）+ 补采归档
 - 来源：2026-07-23 用户决策”用现有 raw 推进修正，剩下的缺图后续让其他 worker 补采后再归档”；独立 S4 反向审计评级：6 张 raw-Aminus + 5 张 raw-B（1 raw-B-low-confidence）+ 4 张 raw-C。
-- 状态：**P01/P04/P06 已完成（2026-07-24 commit 658b512，wired + geometry-coarse-verified）。补采批次已落盘：CROP 的 window-only 机械流程与 SHAPE 已达到 `measured`，但 CROP 目标中的 L3 全展开状态仍待补采（均非 accepted-golden）；THUMB、SEL 仍缺图。剩余 P02（密码 modal，等架构决策）/P03（OCR，规格不清）/P05（编辑网格，已被补采推翻）未启动；M1 全量重采未启动。**
+- 状态：**P01/P02/P04/P06 已完成（2026-07-24，wired + geometry-coarse-verified）。补采批次已落盘：CROP 的 window-only 机械流程与 SHAPE 已达到 `measured`，但 CROP 目标中的 L3 全展开状态仍待补采（均非 accepted-golden）；THUMB、SEL 仍缺图。剩余 P03（OCR，规格不清）/P05（编辑网格，已被补采推翻）未启动；M1 全量重采未启动。**
 - 唯一证据入口：`docs/reference/pdf-expert/README.md`
 - 实现现状入口：`docs/reference/pdf-expert/implementation-map.md`
 - 协作文档：`docs/reference/pdf-expert/state-matrix.md`、`coverage-gap.md`、`manifest.json`
@@ -1681,19 +1681,22 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 #### ISS-NEW-N-P02 SetPasswordDialog center modal + 半透明遮罩
 
+- 状态：**已完成（2026-07-24）**；wired + geometry-coarse-verified。
 - Allowed files：`src/modules/forms/` 或 `src/components/dialog/`、`docs/reference/pdf-expert/`
-- Forbidden files：同上
+- 实际改动文件：`src/components/layout/SecurityPanel.tsx`（根元素 aside→modal dialog + backdrop）、`SecurityPanel.css`（position:fixed + 居中 + 半透明遮罩 + focus 蓝）、`SecurityPanel.test.tsx`（+1 modal 测试）
 - 证据：raw-Aminus R09
 - 事实：center modal + 半透明遮罩 + 2 row（label+input）+ 2 action；focus 蓝描边
-- 显式不推导：精确像素宽度、字体大小、validation error / loading / success 态
+- 实现决策：SecurityPanel 当前是功能完整的右栏 aside（set/remove 双 mode + 真实加密 invoke）。采用方案 A：整体加 modal 外壳（position:fixed + backdrop + 居中），保留 set/remove 双 mode（不破坏现有功能）。不新建独立 SetPasswordModal，避免两个密码入口。input:focus 改用 --selection 蓝匹配 R09。
+- 显式不推导：精确像素宽度、字体大小、validation error / loading / success 态的视觉
 - 交付等级：wired + geometry-coarse-verified
-- 行为验证：模态打开/关闭、2 行输入提交、取消动作
+- 行为验证：模态打开/关闭、set/remove 双 mode、backdrop 点击关闭、2 行输入提交
 - 视觉验证：自截图与 R09 视觉对照
 - 验收：
-  - [ ] 模态居中显示、半透明遮罩覆盖
-  - [ ] 2 row label+input，2 action
-  - [ ] focus 蓝描边
-  - [ ] PR 描述引用 R09
+  - [x] 模态居中显示、半透明遮罩覆盖（position:fixed + backdrop）
+  - [x] 保留 set/remove 双 mode + 2 row label+input + action 按钮
+  - [x] focus 蓝描边（input:focus 用 --selection）
+  - [x] backdrop 点击关闭（+1 测试）
+  - [x] PR 描述引用 R09
 
 #### ISS-NEW-N-P03 OcrPanelView 5 段结构 + L3 `扫描和文本识别` 次级工具条
 

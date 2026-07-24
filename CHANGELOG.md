@@ -47,6 +47,11 @@
 - **验证**：typecheck ✓；聚焦测试 28 passed（SignaturePanel 10 + StampPanel 4 + AnnotationToolbar 14）。
 - **跳过**：P02（密码 modal，需架构决策）、P03（OCR 5 段，规格不清）、P05（编辑网格，已被补采推翻）。
 
+## 未发版 · SecurityPanel modal 化（2026-07-24，ISS-NEW-N-P02）
+
+- **P02 密码 modal**：SecurityPanel 从右栏 `<aside>` 改为 center modal + 半透明遮罩（`position:fixed` + backdrop + 居中卡片）。保留 set/remove 双 mode（不破坏现有功能），不新建独立 SetPasswordModal（避免两个密码入口）。input:focus 改用 `--selection` 蓝匹配 R09。窄屏保留 bottom-sheet 形态。
+- **验证**：typecheck ✓；SecurityPanel 15 tests passed（+1 modal 形态测试：dialog role + backdrop 点击关闭）。
+
 ## 未发版 · PDF Expert 补采证据入库（2026-07-24）
 
 - 新增 5 组 PDF Expert 3.9.2 window-only crop：阅读默认、页面管理网格、批注、矩形工具、编辑画布；每组均保留 a/b 复采。
