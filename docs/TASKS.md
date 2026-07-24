@@ -42,16 +42,54 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 当前唯一推进序列（PDF Expert 高保真恢复）
 
-截至 2026-07-23，PDF Expert 高保真复刻是 UI 方向的 P0。执行只按 ISS-NEW-M 的下列阶段推进，不从旧 ISS 的“已完成”段、CHANGELOG 或历史 DEC 自行领取 UI 任务。
+截至 2026-07-24，PDF Expert 高保真复刻是 UI 方向的 P0。执行按 ISS-NEW-M 阶段推进，同时允许 ISS-NEW-N 基于 raw/measured 的有限面板修正并行。不从旧 ISS 的"已完成"段、CHANGELOG 或历史 DEC 自行领取 UI 任务。
 
 | 顺序 | 阶段 | 状态 | 进入条件 | 交付 |
 | --- | --- | --- | --- | --- |
 | M0 | 上下文纠偏 | 已完成 | 无 | raw capture 重新分类；DESIGN/ARCH/TASKS/DEC 统一；实现映射和门禁 |
-| M1 | 规范化重采集与量测 | **唯一下一项，待领取** | M0 完成 | 固定 fixture/主题/窗口；窗口 crop；bbox；accepted-golden |
-| M2 | 视觉验证器 | 阻塞于 M1 | 至少 read/thumbnail/annotate/edit 有 accepted-golden | 几何 JSON + 感知 diff + 非零失败码 |
-| M3 | `T 编辑` 纵向闭环 | 阻塞于 M1/M2 | edit spec 和 verifier 可用 | 真实缩略图 → 响应式网格 → 重排写回 → 导出副本 → 重开 |
+| M1 | 规范化重采集与量测 | 待领取 | M0 完成 | 固定 fixture/主题/窗口；窗口 crop；bbox；accepted-golden |
+| M2 | 视觉验证器 | **骨架已完成（2026-07-24，基于 measured reference）**；可继续扩展 | measured reference 可用 | 几何 JSON + bbox diff + 非零失败码 |
+| M3 | `T 编辑` 纵向闭环 | 阻塞于 M1/M2（P05 已登记为此处） | edit spec 和 verifier 可用 | 真实缩略图 → 响应式网格 → 重排写回 → 导出副本 → 重开 |
 | M4 | Shell / Sidebar / RightPanel 分域复刻 | 阻塞于 M2 | 目标 surface 有 accepted-golden | 每个 surface 独立 PR 和视觉/行为验收 |
-| M5 | forms/export/OCR/异常态补齐 | 阻塞于对应 capture | 状态矩阵证据完整 | 纵向工作流逐项 behavior-complete + visually-verified |
+| M5 | forms/export/OCR/异常态补齐 | 阻塞于对应 capture（P03 OCR 已登记为此处） | 状态矩阵证据完整 | 纵向工作流逐项 behavior-complete + visually-verified |
+
+### 待补齐清单（2026-07-24 盘点）
+
+以下是本会话推进过程中发现的所有未完成项，按类型集中标注。任何 worker/agent 接手前先读本清单确认自己领的不是已完成或被阻塞的项。
+
+**A. 补采集（缺图，需桌面 GUI）**
+
+| id | surface | 阻塞谁 | 入口 | 备注 |
+| --- | --- | --- | --- | --- |
+| ISS-NEW-N-THUMB | 左栏 Sidebar 缩略图列表 + 当前页高亮 | P05/M4 thumbnails | `docs/TASKS.md` ISS-NEW-N-THUMB 子卡 | G02 是整页页面管理网格，不是左栏缩略图，不能替代 |
+| ISS-NEW-N-SEL | text selection 浮动工具条 | TextSelectionToolbar 实现 | `docs/TASKS.md` ISS-NEW-N-SEL 子卡 | R07 与补采探索性框选均无浮条 |
+| ISS-NEW-N-CROP（L3 全展开） | L3 工具栏全展开 + 菜单栏 window crop | L3 自适应断点精确值 | `docs/TASKS.md` ISS-NEW-N-CROP 子卡 | window-only 机械流程已 measured，但 L3 全展开目标态仍缺 |
+| M1 全量重采 | read/thumbnails/annotate/edit 的 accepted-golden | M2 容差收紧、visually-verified 验收 | `docs/TASKS.md` ISS-NEW-M M1 | 当前 accepted-golden 为 0；M2 用 measured 暂代 |
+| OCR 专属采集 | OCR 右面板真实状态（非 R10 modal） | P03 OCR 5 段规格定义 | `docs/TASKS.md` ISS-NEW-N-P03 | G01-G05 未覆盖 OCR surface |
+
+**B. 补规格（目标态定义不清，不能直接写代码）**
+
+| id | 问题 | 阻塞谁 | 入口 | 备注 |
+| --- | --- | --- | --- | --- |
+| P03 OCR 5 段 | "5 段"具体哪 5 段、次级工具条挂哪个 L3 段都没定 | P03 实现 | `docs/TASKS.md` ISS-NEW-N-P03 | 代码库无对应交互（ModeSecondaryToolbar 是扁平按钮非 popover） |
+| P05 状态机拆分 | "编辑"（单页文本编辑画布）vs"页面管理"（5 卡片网格）是两个独立状态，但代码合成一个 `pages` mode | P05/M3 实现 | `docs/TASKS.md` ISS-NEW-N-P05 + `measurements.json` state_machine_note | EditModeGridView(skeleton) vs PageOrganizerWorkspace(未挂载) 方向待决策 |
+
+**C. 补代码（证据已足够，待实现）**
+
+| id | 问题 | 入口 | 备注 |
+| --- | --- | --- | --- |
+| M3 编辑闭环 | 真实缩略图渲染 + 响应式网格 + 重排写回 + 导出重开 | `docs/TASKS.md` ISS-NEW-M M3 | 依赖 ISS-NEW-N-THUMB 补图 + P05 状态机决策 |
+| M4 各 surface | L2/L3/L5/状态栏、左右栏各面板逐项实现 | `docs/TASKS.md` ISS-NEW-M M4 | 阻塞于 M2 accepted-golden |
+| M5 功能闭环 | forms/export/OCR/异常态行为闭环 | `docs/TASKS.md` ISS-NEW-M M5 | P03 OCR 归此 |
+
+**D. 补验证/复核（已有产出但需人工或独立审计）**
+
+| id | 问题 | 入口 | 备注 |
+| --- | --- | --- | --- |
+| measurements.json 3 处分歧 | 左栏 211 vs ~272、右栏 x800/w480 vs x900/w380、card.x 51 vs ~69 | `measurements.json` 各 surface 的 `measurement_review_2026_07_24` | PM 审计与 worker 记录值偏差，待 M1 独立复核裁决 |
+| M2 验证器扩展 | 当前只断言 toolbar 高度；左右栏宽度断言待 DOM 稳定 | `scripts/verify-pdf-expert-visual.mjs` | 已知 gap，DEC-182 已记 |
+| P01/P02/P04/P06 实机确认 | active 蓝/modal/网格视觉未做实机截图确认 | `npm run dev` 手动 | M2 验证器当前只覆盖 toolbar 高度，未覆盖这些面板 |
+| readerReducer.test.ts | 用户未提交修改（可选链 `?.`），lint 报 prefer-const | `src/modules/reader/readerReducer.test.ts` | 非本会话工作，ISS-NEW-M 明确不触碰；留用户处理 |
 
 ### PDF Expert 阶段并发权
 
@@ -65,7 +103,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | M4 | 条件式并行 | 仅目标 surface 已有 accepted-golden 且 allowed files 不重叠时拆分；全局布局只允许一个 owner |
 | M5 | 条件式 Wave | forms/export/OCR/异常态按独立工作流拆分；共享契约、AppShell 和写回链路不得并行争抢 |
 
-当前 M1 仍是唯一可领取项，因此此刻允许启动的是证据 worker，不是多个 UI 实现 worker。后续每次解锁并行前，由 PM 在本表和 ISS-NEW-M 中确认阶段状态、目标 surface、证据 ID、allowed/forbidden files 与验收命令。
+当前可领取项（2026-07-24 更新）：M1 全量重采（accepted-golden 仍为 0）+ ISS-NEW-N-THUMB/SEL 补采 + ISS-NEW-N-CROP 的 L3 全展开补采 + ISS-NEW-N-P03/P05 的规格决策（见顶部"待补齐清单"）。M2 验证器骨架已可用但可继续扩展。后续每次解锁并行前，由 PM 在本表和 ISS-NEW-M 中确认阶段状态、目标 surface、证据 ID、allowed/forbidden files 与验收命令。
 
 ### 状态词统一
 
@@ -1702,6 +1740,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 #### ISS-NEW-N-P03 OcrPanelView 5 段结构 + L3 `扫描和文本识别` 次级工具条
 
+> **⛔ 阻塞：规格不清，不可直接领取。** 见顶部"待补齐清单 B"。需先补 OCR 专属采集图（当前 G01-G05 未覆盖 OCR surface）并定义"5 段"具体清单 + 次级工具条挂载点。代码库无对应交互（ModeSecondaryToolbar 是扁平按钮非 popover）。归 M5。
+
 - Allowed files：`src/modules/ocr/`（OcrPanelView、OcrStatusPanelView、controller）、`src/components/layout/`（Toolbar 中 `扫描和文本识别` 段）、`docs/reference/pdf-expert/`
 - 证据：raw-Aminus R10
 - 事实：右面板 header / 预览 / 说明 / 语言下拉 / 主按钮 5 段；主工具栏 `扫描和文本识别` 段点击展开次级工具条 5 项（增强扫描 / 拆分页面 / 裁剪页面 / 清除空白边 / 识别文本）
@@ -1731,6 +1771,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [x] PR 描述引用 R11（commit 658b512）
 
 #### ISS-NEW-N-P05 EditModeGridView 4 列响应式 wrap（4+1）+ 次级工具条 7 项
+
+> **⛔ 阻塞：已被补采推翻 + 属 M3 范畴，不可直接领取。** 见顶部"待补齐清单 B/C"。补采 G05+G02 证明"编辑"（单页文本编辑画布）和"页面管理"（5 卡片网格）是两个独立状态，但代码合成一个 `pages` mode。EditModeGridView(skeleton) vs PageOrganizerWorkspace(未挂载) 方向待决策。原"4+1 wrap"事实已失效。需先做状态机拆分决策 + ISS-NEW-N-THUMB 补图，归 M3。
 
 - Allowed files：`src/modules/editor/EditModeGridView.tsx/.css`、`src/components/layout/AppShell.tsx`（仅次级工具条相关）、`docs/reference/pdf-expert/`
 - 证据：raw-Aminus R13（2 卡 + 次级工具条 7 项）+ raw-Aminus R15（4+1 响应式 wrap）
@@ -1763,6 +1805,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 #### ISS-NEW-N-CROP 窗口已 crop 的 L3 工具栏全展开参考
 
+> **🟡 部分完成：window-only 机械流程已 measured（N-CROP-READ-DEFAULT），但 L3 全展开目标态仍缺。** 见顶部"待补齐清单 A"。剩余：补一张 L3 工具栏全展开 + macOS 菜单栏的 window crop 图。
+
 - 优先级：P1（补采）
 - 类型：证据补采
 - Allowed files：`docs/reference/pdf-expert/captures/`、`golden/`、`manifest.json`、`state-matrix.md`、`measurements.json`、`capture-protocol.md`
@@ -1781,6 +1825,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 #### ISS-NEW-N-THUMB 左栏缩略图列表 + 当前页高亮
 
+> **🔴 未启动：完全缺图。** 见顶部"待补齐清单 A"。G02 是整页页面管理网格不是左栏缩略图，不能替代。阻塞 P05/M4 thumbnails。
+
 - 优先级：P1（补采）
 - 类型：证据补采
 - Allowed files：同 ISS-NEW-N-CROP
@@ -1795,6 +1841,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 #### ISS-NEW-N-SEL text selection 浮动工具条
 
+> **🔴 未启动：完全缺图。** 见顶部"待补齐清单 A"。R07 与补采探索性框选均无浮条。阻塞 TextSelectionToolbar 实现。
+
 - 优先级：P1（补采）
 - 类型：证据补采
 - Allowed files：同 ISS-NEW-N-CROP
@@ -1807,6 +1855,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [ ] manifest `classification` 升级为 `accepted-golden`
 
 #### ISS-NEW-N-SHAPE shape 6 段合同的真参考
+
+> **🟡 部分完成：矩形激活态已 measured（N-SHAPE-RECTANGLE），但其他形状/绘制落点/段名独立审计仍缺。** 见顶部"待补齐清单 A"。manifest 自标 "six-section wording is interpreted, no independent audit"。
 
 - 优先级：P1（补采）
 - 类型：证据补采
