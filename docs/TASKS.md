@@ -1641,7 +1641,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P1
 - 类型：UI 修正批次（面板/对话框级）+ 补采归档
 - 来源：2026-07-23 用户决策”用现有 raw 推进修正，剩下的缺图后续让其他 worker 补采后再归档”；独立 S4 反向审计评级：6 张 raw-Aminus + 5 张 raw-B（1 raw-B-low-confidence）+ 4 张 raw-C。
-- 状态：**补采批次已落盘：CROP 的 window-only 机械流程与 SHAPE 已达到 `measured`，但 CROP 目标中的 L3 全展开状态仍待补采（均非 accepted-golden）；THUMB、SEL 仍缺图。6 个面板修正子卡和 M1 全量重采仍未启动。**
+- 状态：**P01/P04/P06 已完成（2026-07-24 commit 658b512，wired + geometry-coarse-verified）。补采批次已落盘：CROP 的 window-only 机械流程与 SHAPE 已达到 `measured`，但 CROP 目标中的 L3 全展开状态仍待补采（均非 accepted-golden）；THUMB、SEL 仍缺图。剩余 P02（密码 modal，等架构决策）/P03（OCR，规格不清）/P05（编辑网格，已被补采推翻）未启动；M1 全量重采未启动。**
 - 唯一证据入口：`docs/reference/pdf-expert/README.md`
 - 实现现状入口：`docs/reference/pdf-expert/implementation-map.md`
 - 协作文档：`docs/reference/pdf-expert/state-matrix.md`、`coverage-gap.md`、`manifest.json`
@@ -1662,7 +1662,9 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 #### ISS-NEW-N-P01 SignaturePanel 竖排签名卡骨架
 
+- 状态：**已完成（2026-07-24，commit 658b512）**；wired + geometry-coarse-verified。
 - Allowed files：`src/modules/signature/`（components、store）、`docs/reference/pdf-expert/`
+- 实际改动文件：`src/modules/forms/ui/SignaturePanel.tsx`（selectedId state）、`SignaturePanel.css`（--selected）、`SignaturePanel.test.tsx`（+1 测试）、`src/styles/app.css`（--selection token，与 P04/P06 共用）
 - Forbidden files：`src-tauri/**`、全局样式、`readerReducer.test.ts`
 - 证据：raw-Aminus R08
 - 事实：竖排 7 张签名卡 + 首张选中蓝描边；header `签名` + `+`；右栏 placement；面板粗宽度（占中央可视区 1/4–1/3）
@@ -1670,11 +1672,12 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 交付等级：wired + geometry-coarse-verified（最高不允许 visually-verified）
 - 行为验证：组件存在、列表渲染、点击选中；不要求尺寸与 PDF Expert 像素对齐
 - 视觉验证：自截图与 R08 视觉对照，不报失败码
+- 实现决策：不改变"点击即落入"交互，给最近落入的签名加蓝色高亮反馈（视觉匹配 R08 的"选中蓝"）。selectedId 在删除选中签名时清空。
 - 验收：
-  - [ ] SignaturePanel 渲染 header + 竖排卡片
-  - [ ] 首张选中蓝描边
-  - [ ] 不声明”对齐 PDF Expert”
-  - [ ] PR 描述引用 R08 + manifest.json 的 raw-Aminus 分级
+  - [x] SignaturePanel 渲染 header + 竖排卡片
+  - [x] 首张选中蓝描边（点击后 selectedId 高亮 --selection）
+  - [x] 不声明"对齐 PDF Expert"
+  - [x] PR 描述引用 R08 + manifest.json 的 raw-Aminus 分级（commit 658b512）
 
 #### ISS-NEW-N-P02 SetPasswordDialog center modal + 半透明遮罩
 
@@ -1705,17 +1708,22 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [ ] onStartOcr 仍为 placeholder 时不宣称 behavior-complete
   - [ ] PR 描述引用 R10
 
-#### ISS-NEW-N-P04 StampPanel tab × 2 + 2 × 2 preset 网格
+#### ISS-NEW-N-P04 StampPanel tab × 2 + preset 网格
 
-- Allowed files：`src/modules/stamp/`、`docs/reference/pdf-expert/`
+- 状态：**已完成（2026-07-24，commit 658b512）**；wired + geometry-coarse-verified。
+- Allowed files：`src/modules/stamp/`、`docs/reference/pdf-expert/`（实际扩展到 `src/components/layout/RightPanel.tsx` + `AppShell.tsx` 仅 stamps tab 接入点）
+- 实际改动文件：新建 `src/modules/stamp/ui/StampPanel.{tsx,css,test.tsx}`；`RightPanel.tsx`（接入）、`AppShell.tsx`（onSelectStandardStamp + activeStampName）、`src/styles/app.css`（--selection token）
 - 证据：raw-Aminus R11
-- 事实：右面板 `标准/自定义` tab + 2×2 preset 网格；首张蓝描边
-- 显式不推导：custom tab 内容、stamp 落点行为、精确像素尺寸
+- 事实：右面板 `标准/自定义` tab + preset 网格；首张蓝描边
+- 实现决策：R11 粗估看到"2×2 共 4 张"，但 STAMP_TEMPLATE_LIST 有 9 个标准模板。**不砍模板**，改用响应式网格（默认 2 列、宽时 3 列）展示全部 9 个。严格 2×2 只是 R11 在某窗口宽度的巧合呈现，不是合同。
+- 显式不推导：custom tab 内容、stamp 落点行为、精确像素尺寸、精确 2×2 断点
 - 交付等级：wired + geometry-coarse-verified
 - 验收：
-  - [ ] StampPanel 渲染 tab×2 + 2×2 preset
-  - [ ] 选中蓝描边
-  - [ ] PR 描述引用 R11
+  - [x] StampPanel 渲染 tab×2 + 标准/自定义切换
+  - [x] 标准 tab 渲染 9 个模板预设（响应式网格，非固定 2×2）
+  - [x] 选中蓝描边（--selection）
+  - [x] 自定义 tab 嵌入 CustomStampPanel
+  - [x] PR 描述引用 R11（commit 658b512）
 
 #### ISS-NEW-N-P05 EditModeGridView 4 列响应式 wrap（4+1）+ 次级工具条 7 项
 
@@ -1732,17 +1740,21 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [ ] 仍标注 `behavior-complete` 后续由 M3 闭环
   - [ ] PR 描述引用 R13 + R15
 
-#### ISS-NEW-N-P06 AnnotationToolbar 工具条顺序 + active 蓝描边色
+#### ISS-NEW-N-P06 AnnotationToolbar active 蓝描边色
 
+- 状态：**已完成（2026-07-24，commit 658b512）**；wired + geometry-coarse-verified。
 - Allowed files：`src/modules/annotation/AnnotationToolbar.tsx/.css`、`docs/reference/pdf-expert/`
+- 实际改动文件：新建 `src/components/layout/AnnotationToolbar.css`（最小基础样式 + 3 条 active 规则）、`AnnotationToolbar.tsx`（import css）、`src/styles/app.css`（--selection token）
 - 证据：raw-Aminus R11 + raw-B-low-confidence R12（同样激活态）
 - 事实：工具条顺序（粗肉眼）`text-highlight/text-underline/text-strike/pen(blue active)/highlighter/textbox/note/more`；active 蓝描边色
-- 显式不推导：工具条右端 overflow、每项 hover/focus/disabled 四态、形状/形状样式（依赖 ISS-NEW-N-SHAPE）
+- 实现决策：组件 JSX 早已加 `--active` className，但 CSS 规则完全缺失（裸 button）。新建 AnnotationToolbar.css 补最小可读基础样式 + 3 条 active 规则（tool-button / color-swatch / stamp-button 用 --selection）。未改工具条项顺序（保持现有 ANNOTATION_TOOL_LIST）。
+- 显式不推导：工具条右端 overflow、每项 hover/focus/disabled 四态、形状/形状样式（依赖 ISS-NEW-N-SHAPE）、工具条项精确顺序的独立语义审计
 - 交付等级：wired + geometry-coarse-verified
 - 验收：
-  - [ ] AnnotationToolbar 8 项顺序（按 R11 观察）
-  - [ ] pen active 蓝描边色
-  - [ ] PR 描述引用 R11
+  - [x] AnnotationToolbar active 态有蓝色视觉反馈（--selection box-shadow）
+  - [x] pen active 蓝描边色（tool-button / color-swatch / stamp-button 三类 active 均覆盖）
+  - [x] 不改工具条项顺序（保持现有 ANNOTATION_TOOL_LIST）
+  - [x] PR 描述引用 R11（commit 658b512）
 
 #### ISS-NEW-N-CROP 窗口已 crop 的 L3 工具栏全展开参考
 

@@ -36,6 +36,17 @@
 - 历史 raw 图（R01–R15）的文件名未改（避免追溯破坏 state-matrix 引用），但 `observed_version` 含义以新版 manifest 为准。
 - 不修改任何产品代码或测试；本次新增/修改仅限证据、任务与决策文档。
 
+## 未发版 · PDF Expert 面板修正实现（2026-07-24，ISS-NEW-N-P01/P04/P06）
+
+基于 raw-Aminus 证据实现 3 个面板修正（commit 658b512）。最高交付等级 `wired` + `geometry-coarse-verified`，禁止 `visually-verified`。
+
+- **共享前置**：`src/styles/app.css` 新增 `--selection` token（light `#55a3f8` / dark `#6db5ff`），来源为补采 G02/G03/G04 实测 PDF Expert 选中蓝。P01/P04/P06 共用。
+- **P06 批注工具条 active 蓝**：新建 `AnnotationToolbar.css`，补最小可读基础样式 + 3 条 active 规则（tool-button / color-swatch / stamp-button）。此前组件 JSX 早已加 `--active` className 但 CSS 规则完全缺失，active 态无任何视觉反馈。
+- **P01 签名面板选中蓝**：`SignaturePanel` 加 `selectedId` state，点击签名后高亮蓝描边（`--selection` inset box-shadow）。不改变"点击即落入"交互，仅加视觉反馈。
+- **P04 统一图章面板**：新建 `src/modules/stamp/ui/StampPanel`（标准/自定义 tab + 响应式网格）。R11 粗估看到"2×2 共 4 张"，但代码有 9 个标准模板——不砍模板，改用响应式网格（默认 2 列、宽时 3 列）展示全部 9 个。自定义 tab 嵌入现有 CustomStampPanel。RightPanel stamps tab 从 CustomStampPanel 切换到 StampPanel。
+- **验证**：typecheck ✓；聚焦测试 28 passed（SignaturePanel 10 + StampPanel 4 + AnnotationToolbar 14）。
+- **跳过**：P02（密码 modal，需架构决策）、P03（OCR 5 段，规格不清）、P05（编辑网格，已被补采推翻）。
+
 ## 未发版 · PDF Expert 补采证据入库（2026-07-24）
 
 - 新增 5 组 PDF Expert 3.9.2 window-only crop：阅读默认、页面管理网格、批注、矩形工具、编辑画布；每组均保留 a/b 复采。

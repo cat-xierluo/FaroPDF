@@ -13,7 +13,7 @@
 | L5a sidebar | `Sidebar.tsx`、`AnnotationSidebar.tsx` | `wired`，部分行为已有 | reader thumbnail API 可用；大纲/批注等面板存在 | 真实缩略图状态、tab 顺序、宽度、懒加载和视觉 diff |
 | Read canvas | reader module / canvas components | `behavior-complete` 的部分能力 | PDF.js 阅读、页码、缩放等已存在 | 逐视图模式与 accepted-golden 对齐；两页态现无可靠参考 |
 | Search | search module、`SearchResultsPanel.tsx` | `wired`，部分行为已有 | 查询和结果组件存在 | 零结果/导航/关闭/状态保持 + 视觉验证 |
-| Annotate | annotation module、`AnnotationToolbar.tsx` | `wired`，部分工具 behavior-complete | overlay 和多种批注能力存在 | 可靠 annotate capture、工具/右栏联动、保存重开和视觉验证 |
+| Annotate | annotation module、`AnnotationToolbar.tsx`、`AnnotationToolbar.css` | `wired` + geometry-coarse-verified（ISS-NEW-N-P06） | overlay 和多种批注能力存在；active 态已有 --selection 蓝反馈 | 可靠 annotate capture、工具/右栏联动、保存重开和视觉验证 |
 | Text selection | `TextSelectionToolbar.tsx` | `skeleton/wired` 混合 | 部分动作接线；翻译仍为 placeholder 文本 | 可靠 selection 证据；所有按钮真实行为或显式 YAGNI |
 | Edit page grid | `EditModeGridView.tsx/.css`、`AppShell.tsx` | `skeleton` | 入口存在，但空白渐变、硬编码 A4、额外局部工具条、固定 5 列和 noop reorder 仍在 | 真实缩略图、响应式规则、真实尺寸、写回、导出和重开 |
 | Page organizer | `PageOrganizerWorkspace.tsx`、pages module | `wired/behavior-complete` 的部分能力 | 页面操作和导出底座已存在 | 与 `T 编辑` 的单一工作流整合；避免两套网格语义 |
@@ -21,8 +21,8 @@
 | Document summary | `RightPanel.tsx` | `skeleton` | AppShell 传入 `docSummary={null}` | 接真实文档数据和空/加载/错误态 |
 | OCR status panel | `RightPanel.tsx`、`OcrStatusPanelView.tsx` | `skeleton` | `onStartOcr={() => undefined}`，组件注释明确 placeholder | 接 OCR controller、队列、取消和结果 |
 | Shape panel | `RightPanel.tsx` | `skeleton/wired` | controlled placeholder 已存在 | 先校准 R12 语义，再接真实 shape state 和绘制 |
-| Signature panel | signature components/store | `wired`，部分 behavior-complete | 列表/存储/部分落点链路存在 | 参考状态、选择、落点、保存重开和视觉验证 |
-| Stamp panel | stamp components/store | `wired`，部分 behavior-complete | 内置/自定义图章能力部分存在 | 标准/自定义 tab、落点和视觉验证 |
+| Signature panel | `SignaturePanel.tsx`（forms/ui）、`signatureStore.ts` | `wired` + geometry-coarse-verified（ISS-NEW-N-P01） | 列表/存储/落点链路存在；点击后选中蓝描边（--selection） | 参考状态精确宽度、落点动画、保存重开和视觉验证 |
+| Stamp panel | `StampPanel.tsx`（stamp/ui）、`CustomStampPanel.tsx`、`stamps.ts` | `wired` + geometry-coarse-verified（ISS-NEW-N-P04） | 统一面板：标准/自定义 tab + 响应式网格（9 模板）+ 选中蓝 | stamp 落点几何、精确 2×2 断点、custom 上传完整闭环和视觉验证 |
 | Welcome | `WelcomeScreen.tsx`、`AppShell.tsx` | `skeleton/wired` 混合 | welcome UI 存在；图片/Word 转换入口曾是反馈占位 | 只保留真实入口；按 R14 重采规范化 golden |
 | Forms | forms module / `FormsPanel`、`AppShell.tsx` | `wired`，部分 behavior-complete | 字段读取/填写/扁平化底座存在；当前 forms→shape fallback 是旧 ISS-NEW-I 行为，不是 `T 编辑` 合同 | 移除/改正旧 fallback；补 forms 可靠参考图、状态矩阵和 round-trip |
 | Export | export module / `ExportDeliveryPanel` | `wired/behavior-complete` 的部分能力 | 多项导出能力存在 | export 参考态缺失；逐工具真实输出和视觉验证 |

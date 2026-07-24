@@ -7241,3 +7241,28 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 4. 本轮未修改 `src/**`、`src-tauri/**` 或用户已有测试改动；下游实现 Agent 只能引用观察事实和明确限制，不得据此声称 visually-verified。
 
 **限制**：ZAI bbox MCP 在本环境不可用，量测为人工复核（约 ±4pt）；本轮使用 ImageMagick 完成 crop 和 reference-vs-reference diff，未建立 FaroPDF-vs-reference 验证器。
+
+## DEC-180 ISS-NEW-N-P01/P04/P06 面板选中蓝与统一图章面板实现（2026-07-24）
+
+- 时间：2026-07-24
+- 类型：UI 实现 / raw-Aminus 驱动修正 / 色值 token 治理
+- 关联：ISS-NEW-N-P01/P04/P06、DEC-175（raw 推进边界）、DEC-177（禁止 visually-verified）、commit 658b512
+- 状态：生效
+
+**问题**：ISS-NEW-N 启动后，3 个面板存在 raw-Aminus 证据支撑但代码底座不匹配的修正机会：P01 签名面板无选中态；P06 批注工具条 active className 已写但 CSS 规则完全缺失（裸 button）；P04 图章能力分散在 AnnotationToolbar 内联与 CustomStampPanel 两处，无统一面板无 tab。同时项目无"蓝色" token（`--accent` 是青绿 `#276f76`），而补采实测 PDF Expert 选中蓝为 `#55A3F8`。
+
+**决策**：
+
+1. 新增 `--selection` token（light `#55a3f8` / dark `#6db5ff`）作为"选中态/active 态"统一色值，来源为补采 G02/G03/G04 实测 PDF Expert 蓝。P01/P04/P06 共用，避免各自硬编码。
+2. P06：新建 `AnnotationToolbar.css`，补最小可读基础样式 + 3 条 active 规则（tool-button / color-swatch / stamp-button 用 `--selection`）。不改组件 TSX（className 早已存在），只补 CSS。工具条项顺序保持现有 `ANNOTATION_TOOL_LIST`，不做独立语义审计（证据不足）。
+3. P01：SignaturePanel 加 `selectedId` state，点击签名后高亮蓝描边。**不改变"点击即落入"交互**（已有功能，改了影响用户流程），仅给最近落入的签名加视觉反馈。删除选中签名时清空 selectedId。
+4. P04：新建统一 `StampPanel`（标准/自定义 tab + 响应式网格）。R11 粗估看到"2×2 共 4 张"，但 `STAMP_TEMPLATE_LIST` 有 9 个标准模板——**不砍模板**，改用响应式网格（默认 2 列、宽时 3 列）展示全部 9 个。严格 2×2 只是 R11 在某窗口宽度的巧合呈现，不是合同。自定义 tab 嵌入现有 CustomStampPanel（复用 store + 上传逻辑，最小改动）。
+5. 所有交付最高等级 `wired` + `geometry-coarse-verified`，禁止 `visually-verified`（依据 raw-Aminus，未做 accepted-golden 验收）。
+
+**当前影响**：
+
+- 3 个面板的选中/active 态现在有一致的蓝色视觉反馈（`--selection` token）。
+- StampPanel 统一了图章入口（标准/自定义 tab），RightPanel stamps tab 从 CustomStampPanel 切换到 StampPanel。
+- 未触碰 P02/P03/P05：P02 密码 modal 需架构决策（SecurityPanel 当前是右栏 aside，改成 modal 会丢失 set/remove 双 mode）；P03 OCR 5 段规格不清；P05 编辑网格已被补采推翻（"编辑"≠"页面管理"）。
+- 未触碰 `src-tauri/`、`package*.json`、`readerReducer.test.ts`。
+- 验证：typecheck ✓；聚焦测试 28 passed（SignaturePanel 10 + StampPanel 4 + AnnotationToolbar 14）；lint 唯一错误在 readerReducer.test.ts（用户私有修改，非本次）。
