@@ -52,6 +52,13 @@
 - **P02 密码 modal**：SecurityPanel 从右栏 `<aside>` 改为 center modal + 半透明遮罩（`position:fixed` + backdrop + 居中卡片）。保留 set/remove 双 mode（不破坏现有功能），不新建独立 SetPasswordModal（避免两个密码入口）。input:focus 改用 `--selection` 蓝匹配 R09。窄屏保留 bottom-sheet 形态。
 - **验证**：typecheck ✓；SecurityPanel 15 tests passed（+1 modal 形态测试：dialog role + backdrop 点击关闭）。
 
+## 未发版 · M2 视觉验证器骨架（2026-07-24，ISS-NEW-M M2 / DEC-182）
+
+- **新增 `scripts/verify-pdf-expert-visual.mjs`**：PDF Expert reference bbox 几何对齐验证器。策略为几何结构 diff（DOM bbox 对比），不做感知像素 diff（PDF Expert 原生 vs FaroPDF web 像素 diff 必然失败）。从 measurements.json 读 reference bbox，Playwright 取 FaroPDF DOM boundingBox，超 ±12pt 容差返回 exit 1。
+- **新增 npm script** `verify:pdf-expert-visual`。与现有 `verify:ui-layout`（结构回归）分工：前者做 reference bbox 对齐，后者做 L3 五段/DOM 顺序/模式路由。
+- **当前 run 结果 FAIL（期望行为）**：read toolbar 48pt vs 61pt（差 13pt）、annotate/edit toolbar 48pt vs 94pt（差 46pt）。验证器如实报告 FaroPDF 与 PDF Expert 布局差距，这是交付价值。
+- **门禁处理**：用 measured reference（G01-G05）而非 accepted-golden（当前为 0）；M1 完成后换 reference 目录即可收紧容差。
+
 ## 未发版 · PDF Expert 补采证据入库（2026-07-24）
 
 - 新增 5 组 PDF Expert 3.9.2 window-only crop：阅读默认、页面管理网格、批注、矩形工具、编辑画布；每组均保留 a/b 复采。

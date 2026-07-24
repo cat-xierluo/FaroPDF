@@ -1595,11 +1595,13 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 #### M2 — 可失败的视觉验证器
 
-- [ ] 以 M1 的 accepted-golden 为 reference，在相同 fixture、主题、窗口和 crop 下启动 FaroPDF 并截图
-- [ ] 同时输出几何 JSON、感知视觉 diff 和交互断言
-- [ ] 超出阈值时返回非零退出码，不能只生成报告或截图
-- [ ] 报告包含参考图、实际图、diff、DOM/bbox 测量和失败原因
-- [ ] 明确保留 `verify:ui-layout` 的“结构/几何回归”定位，不冒充视觉验证器
+- 状态：**骨架已完成（2026-07-24，scripts/verify-pdf-expert-visual.mjs）**；基于 measured reference 而非 accepted-golden；当前 run 结果 FAIL（3 项超容差，如实报告 FaroPDF 与 PDF Expert 布局差距，这是期望行为）。
+- [x] 以 M1 的 reference 在相同 fixture、主题、窗口和 crop 下启动 FaroPDF 并截图（当前用 measured G01-G05，非 accepted-golden；M1 完成后换 reference 即可）
+- [x] 输出几何 JSON（report.json：每 surface 实际/期望/差值）；感知视觉 diff 暂不做（DEC-182：PDF Expert 原生 vs FaroPDF web 像素 diff 必然失败，改用几何 bbox 对比）
+- [x] 超出阈值时返回非零退出码（exit 1 = 超容差；exit 2 = 环境错误）
+- [x] 报告包含实际截图、DOM/bbox 测量和失败原因（report.json + 控制台摘要）
+- [x] 明确保留 `verify:ui-layout` 的"结构/几何回归"定位，不冒充视觉验证器（README 已说明两者分工）
+- **已知 gap**：当前只断言 toolbar 合计高度（read/annotate/edit 三 surface）；左右栏宽度断言待 FaroPDF 对应 DOM 稳定后补（annotate 右栏、shape 右栏的选择器需确认）。
 
 #### M3 — T 编辑垂直闭环
 

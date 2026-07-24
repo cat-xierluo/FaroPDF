@@ -54,6 +54,17 @@
 - `supplemental-analysis-2026-07-24.md`：补采状态机、观察事实、实现约束和仍缺失的 surface。
 - `s4-verification-report.md`：重建 Agent 反向审计结果。
 
+## 视觉验证器（M2）
+
+两个验证器分工，不重叠、不互相替代：
+
+| 验证器 | 命令 | 职责 | 退出码 |
+| --- | --- | --- | --- |
+| `verify:ui-layout` | `npm run verify:ui-layout` | 结构/几何回归：L3 五段、DOM 顺序（L5a→L5c→L5b）、模式路由、read 不渲染 L4 | 0 通过 / 非 0 失败 |
+| `verify:pdf-expert-visual` | `npm run verify:pdf-expert-visual` | PDF Expert reference bbox 对齐：从 `measurements.json` 读 reference bbox，Playwright 取 FaroPDF DOM boundingBox，超 ±12pt 容差 fail（DEC-182） | 0 全 pass / 1 超容差 / 2 环境错误 |
+
+`verify:pdf-expert-visual` 当前用 measured reference（G01-G05，非 accepted-golden）。策略是几何结构 diff（DOM bbox 对比），不做感知像素 diff——PDF Expert（原生）与 FaroPDF（web）渲染引擎本质不同，像素 diff 必然失败。M1 完成 accepted-golden 后换 reference 目录即可收紧容差。
+
 ## Agent 开工门禁
 
 处理 L2–L6、Toolbar、AppShell、Sidebar、RightPanel、EditModeGridView 或模式切换前必须：

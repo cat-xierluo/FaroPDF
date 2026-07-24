@@ -7290,3 +7290,28 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - 密码设置/移除现在是居中 modal + 半透明遮罩，视觉匹配 R09。
 - set/remove 双 mode 全部保留，现有 14 个测试不受影响（+1 modal 形态测试，共 15 passed）。
 - 未触碰 `src-tauri/`、`package*.json`、`readerReducer.test.ts`。
+
+## DEC-182 ISS-NEW-M M2 视觉验证器：几何 diff 策略与 measured reference 门禁（2026-07-24）
+
+- 时间：2026-07-24
+- 类型：验证器架构 / diff 策略 / 门禁处理
+- 关联：ISS-NEW-M M2、DEC-179（measured reference）、`scripts/verify-pdf-expert-visual.mjs`
+- 状态：生效
+
+**问题**：M2 任务卡要求"以 accepted-golden 为 reference 做感知视觉 diff"。但当前 accepted-golden 为 0（只有 5 个 measured G01-G05）。更根本的是：PDF Expert（macOS 原生应用）与 FaroPDF（web 应用）渲染引擎、字体、窗口 chrome 本质不同，像素级/感知级 diff 必然失败——两者本来就不可能视觉一致（FaroPDF 是"参照 PDF Expert 信息架构"，不是像素克隆）。
+
+**决策**：
+
+1. **diff 策略采用几何结构 diff（DOM bbox 对比）**，不做感知像素 diff。从 measurements.json 读 reference bbox（工具栏高度、栏宽等），在 FaroPDF 截图里用 Playwright 取对应 DOM 元素 boundingBox，断言两者在容差内一致。这验证的是"信息架构对齐"，符合 FaroPDF 复刻目标。
+2. **门禁张力处理**：用 measured reference（G01-G05）作为验证器输入，不等 accepted-golden。把"升级到 accepted-golden"作为可替换 reference 目录参数——M1 完成后换 reference 即可，不用改验证器代码。
+3. **容差 ±12pt**（measurements uncertainty ±4pt × 3 倍安全系数）。M1 产出 accepted-golden 后可收紧到 ±6pt。
+4. **退出码语义**：0 = 全 pass；1 = 超容差（附报告）；2 = 环境错误。fail-closed。
+5. **保留 verify:ui-layout 定位**：它继续做结构回归（L3 五段、DOM 顺序、模式路由），新验证器（verify:pdf-expert-visual）专注 reference bbox 对齐，两者不重叠。
+6. **当前 run 结果 FAIL 是期望行为**：FaroPDF 当前 toolbar 高度 48pt vs PDF Expert 61pt（read）/ 94pt（annotate/edit），如实报告差距。验证器的价值正在于暴露这些差距，不是假装通过。
+
+**当前影响**：
+
+- M2 验证器骨架可用：`npm run verify:pdf-expert-visual`。
+- 当前断言范围：read/annotate/edit 三 surface 的 toolbar 合计高度。左右栏宽度断言待 FaroPDF 对应 DOM 稳定后补。
+- 不改任何产品代码；只新增 scripts/ + package.json script + 文档。
+- measurements.json 3 处几何分歧（左栏 211 vs 272 等）不影响验证器——验证器读记录值，若 fail 差值与 PM 审计一致，恰好佐证需 M1 复核。
