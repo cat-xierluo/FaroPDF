@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-24",
+  "source": "PDF Expert 3.9.2 on macOS, tests/fixtures/expert/reference.pdf",
+  "window": {
+    "logical": {"x": 200, "y": 120, "width": 1280, "height": 832},
+    "retina_scale": 2,
+    "crop_physical": {"x": 400, "y": 240, "width": 2560, "height": 1664},
+    "theme": "dark"
+  },
+  "method": {
+    "bbox": "manual pixel read from window-only crop, divided by retina_scale",
+    "uncertainty_logical_pt": 4,
+    "automated_bbox": false,
+    "zai_mcp": "unavailable in this environment",
+    "stability_diff": "ImageMagick compare -metric AE; all listed a/b pairs returned 0 differing pixels",
+    "pm_review_2026_07_24": "PM 用 ImageMagick 像素分析（逐行/逐列 mean 亮度、颜色分类、区域像素计数）独立复核了 5 组 crop。几何一致性整体高；但发现 3 处与原记录值偏差较大的字段，见各 surface 的 measurement_review。审计方法与 worker 的人工 pixel-read 不同（边界判定可能不同），因此本字段不直接覆盖原值，而是并记分歧，留 M1 独立复核裁决。审计无法读出图标文字/段落标签，语义结论不背书。"
+  },
+  "state_machine_note_2026_07_24": {
+    "edit_vs_page_management": "G05 (N-EDIT-CANVAS) 与 G02 (N-PAGE-MANAGEMENT-GRID) 证明 PDF Expert 的 '编辑' 入口进入单页文本编辑画布（文本/图像/链接/隐藏工具条），'页面管理' 入口才产生 5 卡片单排网格。两者是独立状态，不可合并。FaroPDF 实现必须把 EditModeGridView 的页面卡片模式挂到'页面管理'入口，不能与'编辑'文本工具条混为一谈。1280pt 窗宽下页面管理为 5 卡同排无 wrap；wrap 断点未测（R15 的 4+1 和'固定 5 列'两个极端都不能直接采用）。"
+  },
+  "surfaces": [
+    {
+      "capture_id": "N-CROP-READ-DEFAULT",
+      "crop_bbox": {"x": 0, "y": 0, "width": 1280, "height": 832},
+      "layers": {
+        "titlebar": {"x": 0, "y": 0, "width": 1280, "height": 29},
+        "main_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 32},
+        "canvas": {"x": 211, "y": 61, "width": 1069, "height": 771},
+        "page_1": {"x": 293, "y": 94, "width": 398, "height": 721}
+      },
+      "notes": ["single-page read state", "left and right panes collapsed"]
+    },
+    {
+      "capture_id": "N-PAGE-MANAGEMENT-GRID",
+      "crop_bbox": {"x": 0, "y": 0, "width": 1280, "height": 832},
+      "layers": {
+        "main_toolbar": {"x": 0, "y": 0, "width": 1280, "height": 29},
+        "page_action_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 65},
+        "grid_canvas": {"x": 0, "y": 94, "width": 1280, "height": 738}
+      },
+      "page_cards": {
+        "count_visible": 5,
+        "layout": "single row",
+        "selected_index": 1,
+        "card_bbox_approx": {"x": 51, "y": 110, "width": 181, "height": 195},
+        "card_gap_approx": 62,
+        "metadata": "page number + A4 (210 × 297 毫米)",
+        "measurement_review_2026_07_24": {
+          "method": "ImageMagick 逐列 mean 亮度检测白色卡片块的起止列",
+          "findings": "实测 5 张卡片起始 x≈69（原 51）、宽度≈175（原 181）、间距≈66（原 62）。count=5、single row、page 1 蓝选中（2272 蓝像素）像素级证实。",
+          "divergence": "起始 x 偏差 +18pt（超 ±4pt 容差），宽度/间距偏差在容差边缘。建议 M1 复核。",
+          "action": "实现时如需精确卡片几何，以 M1 复核值为准；当前先用实测近似值 69/175/66。"
+        }
+      }
+    },
+    {
+      "capture_id": "N-ANNOTATE-TOOLBAR",
+      "crop_bbox": {"x": 0, "y": 0, "width": 1280, "height": 832},
+      "layers": {
+        "main_toolbar": {"x": 0, "y": 0, "width": 1280, "height": 29},
+        "annotation_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 65},
+        "left_outline_panel": {"x": 0, "y": 94, "width": 211, "height": 738},
+        "page_1": {"x": 293, "y": 94, "width": 398, "height": 721}
+      },
+      "notes": ["outline tab is active", "no right panel visible"],
+      "measurement_review_2026_07_24": {
+        "method": "ImageMagick 逐列 mean 亮度检测左栏深灰工具栏色与画布背景色的分界",
+        "findings": "左栏深灰工具栏色（mean≈25238）实测延伸到 log x≈270pt，在 log x≈275pt 才转入更深画布背景（mean 20238）。原记录 width=211 落在面板内部中点附近。",
+        "divergence": "left_outline_panel.width 实测≈272（原 211），偏差 +61pt，严重超 ±4pt 容差。",
+        "action": "实现批注模式左栏宽度时不应按 211pt 硬编码（会显著偏窄）；建议用 272pt 或等 M1 复核。211pt 同时出现在 N-CROP-READ-DEFAULT 的 canvas.x，可能源于同一测量基准混淆，需 M1 一并厘清。"
+      }
+    },
+    {
+      "capture_id": "N-SHAPE-RECTANGLE",
+      "crop_bbox": {"x": 0, "y": 0, "width": 1280, "height": 832},
+      "layers": {
+        "main_toolbar": {"x": 0, "y": 0, "width": 1280, "height": 29},
+        "annotation_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 65},
+        "left_outline_panel": {"x": 0, "y": 94, "width": 211, "height": 738},
+        "page_1": {"x": 293, "y": 94, "width": 398, "height": 721},
+        "right_shape_panel": {"x": 800, "y": 94, "width": 480, "height": 738}
+      },
+      "measurement_review_2026_07_24": {
+        "method": "ImageMagick 逐列 mean 亮度检测页面白区与右栏深灰的分界",
+        "findings": {
+          "left_outline_panel": "同 N-ANNOTATE-TOOLBAR，实测左栏宽≈272（原 211，偏差 +61pt）。",
+          "right_shape_panel": "页面白区（mean 65535）实测延伸到 log x≈895pt，在 log x≈900pt 骤降为深灰面板（mean 20046）。面板从 log 900pt 延伸到 1280pt = 实测宽≈380（原 480）。原记录 x=800 落在页面白区内部。"
+        },
+        "divergence": "right_shape_panel.x 实测≈900（原 800，+100pt）、width 实测≈380（原 480，-100pt），严重超容差。按原值硬编码右栏会压住页面。",
+        "action": "实现矩形右栏几何时以实测 900/380 为近似基线，或等 M1 复核。"
+      },
+      "shape_contract": [
+        "preview",
+        "shape selector (rectangle, ellipse, line, arrow, double-arrow)",
+        "stroke width",
+        "border type",
+        "opacity",
+        "stroke color",
+        "fill color",
+        "collapse footer"
+      ]
+    },
+    {
+      "capture_id": "N-EDIT-CANVAS",
+      "crop_bbox": {"x": 0, "y": 0, "width": 1280, "height": 832},
+      "layers": {
+        "main_toolbar": {"x": 0, "y": 0, "width": 1280, "height": 29},
+        "edit_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 65},
+        "canvas": {"x": 0, "y": 94, "width": 1280, "height": 738},
+        "page_1": {"x": 293, "y": 94, "width": 398, "height": 721}
+      },
+      "notes": ["edit toolbar shows 文本 / 图像 / 链接 / 隐藏", "this is not the page-management grid"]
+    }
+  ]
+}

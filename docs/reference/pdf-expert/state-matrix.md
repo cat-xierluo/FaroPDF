@@ -1,11 +1,12 @@
 # PDF Expert 状态矩阵
 
-本矩阵只记录当前受版本控制证据能够证明的事实。证据等级采用 manifest.json 的最新重分级（2026-07-23）：
+本矩阵只记录当前受版本控制证据能够证明的事实。证据等级采用 manifest.json 的最新重分级（2026-07-24）；补采 measured 仍不是 accepted-golden：
 
 - `raw-Aminus`：可作面板/对话框级实现 wireframe + 关键 bbox 粗估；仍未 crop 到窗口、未做 reference-vs-reference 稳定性 diff。
 - `raw-B`：只证实目标状态出现过或排除反例，不能给精确尺寸、间距或断点。
 - `raw-B-low-confidence`：B 级内容但语义不确定；仅可作负面证据。
 - `raw-C`：误标或与目标状态不符，不可作基线。
+- `measured`：已固定窗口并完成 window-only crop、人工量测和 a/b 稳定性 diff；仍需独立审计后才能 accepted-golden。
 - `missing`：现有 raw 不覆盖，必须补采（按 `coverage-gap.md` 的 ISS-NEW-N-* 子卡归档）。
 - `YAGNI`：用户明确决定不做。
 
@@ -13,14 +14,14 @@
 
 | mode | L3 模式区 | L4 | L5a 左栏 | L5c 中央区 | L5b 右栏 |
 | --- | --- | --- | --- | --- | --- |
-| read | `A 批注`、`T 编辑` 可见；raw-B R02 | 未见二级工具条；raw-B R02 | 默认折叠；raw-B R02。大纲展开：raw-B R04 | 单页阅读画面；raw-B R02 | 默认折叠；raw-B R02 |
+| read | `A 批注`、`T 编辑` 可见；measured N-CROP-READ-DEFAULT | 未见二级工具条；measured N-CROP-READ-DEFAULT | 默认折叠；measured N-CROP-READ-DEFAULT。大纲展开：measured N-ANNOTATE-TOOLBAR | 单页阅读画面；measured N-CROP-READ-DEFAULT | 默认折叠；measured N-CROP-READ-DEFAULT |
 | read + two-page | missing：R03 是 raw-C，未显示两页 | missing | missing | missing：需重新进入双页并规范化采集（ISS-NEW-N-CROP 顺带补） | missing |
-| read + thumbnails | missing：R04 实为大纲，无缩略图 | missing | missing：需真实缩略图列表、当前页和滚动态（ISS-NEW-N-THUMB） | page-flow 预期保留，但缺同屏证据 | missing |
-| annotate | missing：R05 是 raw-C，未进入批注态 | 工具条顺序粗证：raw-Aminus R11（pen active 蓝） | missing | missing：需 overlay 同屏 | missing：右栏真实布局未证 |
-| annotate + shape | **negative only**：raw-B-low-confidence R12（实为 stamp，不是 shape） | raw-B-low-confidence R12 | missing | 页面可见；raw-B-low-confidence R12 | missing：6 段合同无图（ISS-NEW-N-SHAPE） |
+| read + thumbnails | **missing：页面管理并非左栏缩略图**；measured N-PAGE-MANAGEMENT-GRID 仅证明整页网格 | missing | missing：需真实缩略图列表、当前页和滚动态（ISS-NEW-N-THUMB） | page-flow 预期保留，但缺同屏证据 | missing |
+| annotate | measured N-ANNOTATE-TOOLBAR | measured N-ANNOTATE-TOOLBAR：批注上下文工具条 | measured N-ANNOTATE-TOOLBAR：大纲面板 | measured N-ANNOTATE-TOOLBAR：单页 | missing：本状态无右栏 |
+| annotate + shape | measured N-SHAPE-RECTANGLE | measured N-SHAPE-RECTANGLE | measured N-SHAPE-RECTANGLE：大纲 | measured N-SHAPE-RECTANGLE | measured N-SHAPE-RECTANGLE：矩形工具 6 段样式控件 |
 | annotate + signature | raw-Aminus R08：右侧签名面板 header `签名` + `+`、竖排签名卡（首张蓝描边） | raw-Aminus R08 | missing | 页面可见；raw-Aminus R08 | raw-Aminus R08：竖排 7 张签名卡 |
 | annotate + stamp | raw-Aminus R11：右侧 `标准/自定义` tab + 2×2 preset 网格 | raw-Aminus R11 | missing | 页面可见；raw-Aminus R11 | raw-Aminus R11：tab×2 + 2×2 preset |
-| edit | 模式/编辑工具可见；raw-Aminus R13/R15 | 次级工具条 7 项（插入/附加/旋转/复制/粘贴/摘录/删除）：raw-Aminus R13/R15 | missing：未证明 edit 下左栏行为 | 响应式页面卡片网格 4+1：raw-Aminus R15（R15 在所捕获窗口中为 4+1，不是固定 5 列） | 默认未见；raw-Aminus R15 |
+| edit | measured N-EDIT-CANVAS：编辑入口可见 | measured N-EDIT-CANVAS：文本/图像/链接/隐藏 | missing：未证明 edit 下左栏行为 | measured N-EDIT-CANVAS：单页编辑画布；页面卡片网格另见 N-PAGE-MANAGEMENT-GRID | 默认未见；measured N-EDIT-CANVAS |
 | OCR | OCR 入口可见；raw-Aminus R10：`扫描和文本识别` 段展开次级工具条 5 项 | raw-Aminus R10：次级工具条（增强扫描/拆分/裁剪/清除/识别文本） | missing | 页面预览在 modal 背后；raw-Aminus R10 | raw-Aminus R10：5 段结构（header/预览/说明/语言下拉/主按钮） |
 | forms | missing | missing | missing | missing | missing |
 | export | missing | missing | missing | missing | missing |
@@ -36,7 +37,7 @@
 | right panel | 中央区使用右侧空间 | 右栏位于中央区右侧 | raw-B R02 / raw-B R06 / raw-Aminus R08 / raw-Aminus R11 / raw-B-low-confidence R12 |
 | both panels | missing | missing | 必须补同屏状态，不能用分别出现的两张图拼接推断（依赖 ISS-NEW-N-CROP） |
 | search keyword | 结果栏折叠 | 命中列表和页面高亮 | raw-B R02 / raw-B R06 |
-| text selection | 无浮层 | missing | raw-C R07 没有清晰可见的选区或浮动工具条（依赖 ISS-NEW-N-SEL） |
+| text selection | 无浮层 | missing | 本轮真实文字层框选未出现浮条；R07 与本轮探索图都不能证明目标状态（依赖 ISS-NEW-N-SEL） |
 | tabs | 单 tab | 多个 tab | raw-B R02 / raw-Aminus R13（3 tabs）/ raw-Aminus R15（4 tabs）；overflow、拖动均 missing |
 | modal | 无背板 | 居中 modal + 背板 | raw-Aminus R09（password）/ raw-Aminus R10（OCR） |
 | view mode | 单页可见 | two-page missing | raw-C R03 不能证明双页 |
@@ -55,7 +56,7 @@
 | 搜索导航 | raw-B | R06 证明面板存在；上一项、下一项、清空和零结果 missing |
 | 签名选择与落点 | raw-Aminus partial | R08 证竖排卡 + 首张选中蓝；插入行为、save/reopen missing |
 | 图章选择与落点 | raw-Aminus partial | R11 证 2×2 preset + tab×2；插入行为、custom tab 内容 missing |
-| 形状激活与右栏样式 | missing | R12 不可用；需 ISS-NEW-N-SHAPE 补采 |
+| 形状激活与右栏样式 | measured | N-SHAPE-RECTANGLE 证明矩形激活态和右栏控件顺序；绘制、保存和其他形状仍 missing |
 | OCR 开始 / 取消 / 队列 | raw-Aminus partial | R10 证设置面板 + 主按钮；loading/progress/failed/cancelled 全部 missing |
 | 密码模态完整闭环 | raw-Aminus partial | R09 证 UI；validation error / loading / success 态 missing |
 

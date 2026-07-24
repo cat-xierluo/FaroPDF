@@ -80,6 +80,19 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常阅读卷宗、证据�
 - `skeleton`、`wired`、`behavior-complete`、`visually-verified` 必须分开记录；只有最后一级可以关闭高保真 UI 任务。
 - 发现规范冲突时停止业务实现，先更新 `docs/TASKS.md` 并由 PM 决定是否补采或修订规范。
 
+### PDF Expert 多 Agent 并行解锁门禁
+
+上下文完整只能降低理解歧义，不能替代证据、实现能力或实机验收。不得因为文档已经整理完成，就直接让多个 worker 同时修改 PDF Expert UI。
+
+- M1 默认由单一证据 owner 完成规范化重采、量测和 accepted-golden 准入；M1 期间不得并行启动 UI 实现 worker。
+- M2 默认由单一 foundation owner 建立可失败的视觉验证器；验证器未能在超阈值时返回非零退出码前，不得用“已截图”或“肉眼相似”关闭视觉任务。
+- M3 由单一纵向闭环 owner 推进 `T 编辑` 的真实缩略图、重排、导出和重开验证，避免多个 worker 同时修改页面状态与写回链路。
+- M4/M5 只有在目标 surface 已有 accepted-golden、M2 验证器可用、allowed/forbidden files 不重叠时才可按 surface 或工作流并行。全局布局、共享状态、`src/App.tsx`、`AppShell`、全局样式和共享契约始终只允许一个 owner。
+- 每个 worker prompt 必须写明 ISS-NEW-M 阶段、目标 surface、capture/证据等级、allowed files、forbidden files、交付等级、行为验证和视觉验证；缺少任一项时不得启动。
+- PM 必须复核真实应用截图、DOM/bbox 量测、交互断言和 PDF round-trip 结果。worker 的自述、typecheck、单测或 build 不能单独构成完成证据。
+
+阶段并发权和当前唯一可领取项只以 `docs/TASKS.md` 为准；详细派工模板与停止条件见 `docs/reference/pdf-expert/rebuild-guide.md`。
+
 ## Skill 强制调用
 
 FaroPDF 的协作依赖 `.claude/skills/` 下的 Skill 统一协议、门禁和工作流规范。下面场景必须先调用对应 Skill 再行动，避免漏掉协议、提交门禁或交接约束：

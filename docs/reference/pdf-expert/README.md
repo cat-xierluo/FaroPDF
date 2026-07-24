@@ -6,10 +6,12 @@
 
 - 目标仍是高保真复刻 PDF Expert 的信息架构、可见布局、模式语义、面板联动和核心工作流。
 - 2026-07-23 复核发现：首批 15 张图片中存在多张误标、重复或自动化失败画面。它们已从 `golden/` 降级到 `captures/raw/`，并按实际画面重新命名。
-- 当前 accepted golden 数量为 0。任何 Agent 都不得使用“已有 15 张黄金图”作为视觉完成依据。
+- 2026-07-24 补采批次已入库：5 组 PDF Expert 3.9.2 window-only crop（阅读、页面管理、批注、矩形 shape、编辑画布），每组 a/b reference diff 为 0；量测见 `measurements.json`，分析见 `supplemental-analysis-2026-07-24.md`。
+- 当前 accepted golden 数量为 0；新增图片最高为 `measured`，任何 Agent 都不得使用“已有 15 张黄金图”或本批次 measured 图作为最终视觉完成依据。
 - `scripts/verify-pdf-expert-layout.mjs` 目前只证明少量几何不变量，不是视觉一致性测试。
 - 在完成规范化重采集、窗口裁剪、元素量测和视觉 diff 之前，相关 UI 的最高状态只能是 `behavior-complete`，不能是 `visually-verified`。
 - M0 上下文纠偏已完成；下一项只能领取 `docs/TASKS.md` ISS-NEW-M 的 M1 规范化重采集与量测。
+- 新文档能降低上下文歧义，但不会自动补足缺失证据、视觉判断或功能实现；当前不得把“多个 Agent 一起做”理解成“多个 Agent 一起改 UI”。
 
 ## 权威来源分工
 
@@ -48,6 +50,8 @@
 - `rebuild-guide.md`：后续 Agent 的阅读顺序、依赖顺序和交付格式；任务状态仍以 `docs/TASKS.md` 为准。
 - `completeness-checklist.md`：截图抽取完整度检查。
 - `coverage-gap.md`：必须补采、补量测或补运行时验证的缺口。
+- `measurements.json`：补采批次的固定窗口、Retina crop、人工 bbox 和 uncertainty。
+- `supplemental-analysis-2026-07-24.md`：补采状态机、观察事实、实现约束和仍缺失的 surface。
 - `s4-verification-report.md`：重建 Agent 反向审计结果。
 
 ## Agent 开工门禁
@@ -60,6 +64,20 @@
 4. 在交付说明中列出使用的 capture id、证据等级和不能从图片推断的内容。
 5. 明确交付等级：`skeleton`、`wired`、`behavior-complete` 或 `visually-verified`。
 6. 未达到 `visually-verified` 时不得把“高保真复刻”或对应 surface 标记为完成。
+
+## 多 Agent 启动判断
+
+先看 `docs/TASKS.md` 的“PDF Expert 阶段并发权”。当前 accepted-golden 为 0，M1 是唯一可领取项，所以只能启动规范化采集与量测 worker；Toolbar、Sidebar、RightPanel、EditModeGridView 等实现 worker 均继续阻塞。
+
+后续只有同时满足以下条件，才允许把工作拆给多个 Agent：
+
+1. 目标 surface 在 manifest 中已有 `accepted-golden`，且触发步骤和窗口条件可复现；
+2. M2 视觉验证器能在差异超阈值时返回非零退出码；
+3. 每个 worker 的 allowed/forbidden files 互不冲突，共享布局和状态只有一个 owner；
+4. 每个任务都有独立的行为闭环、视觉基线、实机截图和完成等级；
+5. PM 按真实运行证据验收，不以 worker 自述、测试通过或截图数量代替产品结果。
+
+这套规则提高的是方向一致性、可交接性和漏项可见性，不保证模型不会偏题。执行波动仍由窄任务、双层监测、独立 PR 和 PM 实机验收兜底。
 
 ## 明确保留的 FaroPDF 差异
 

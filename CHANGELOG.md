@@ -36,6 +36,12 @@
 - 历史 raw 图（R01–R15）的文件名未改（避免追溯破坏 state-matrix 引用），但 `observed_version` 含义以新版 manifest 为准。
 - 不修改任何产品代码或测试；本次新增/修改仅限证据、任务与决策文档。
 
+## 未发版 · PDF Expert 补采证据入库（2026-07-24）
+
+- 新增 5 组 PDF Expert 3.9.2 window-only crop：阅读默认、页面管理网格、批注、矩形工具、编辑画布；每组均保留 a/b 复采。
+- 新增 `docs/reference/pdf-expert/measurements.json` 与 `supplemental-analysis-2026-07-24.md`，记录固定窗口、Retina crop、人工 bbox、状态机和下游实现约束。
+- 明确页面管理网格不是左栏缩略图列表；文本选择浮动工具条仍未捕获；本批次保持 `measured`，不产生 accepted-golden 或 visually-verified 声明。
+
 ## v0.1.3（草稿，2026-06-22 收口沉淀，未发版）
 
 > v0.1.x → v0.2 过渡版：5 ISS 收口（DEC-154~159）+ 13 commit（不含 catch-up）+ 累计 ~87 单测（i18n 4 + StatusBar 12 + WelcomeScreen 9 + GeneralSection 5 + ReaderCanvas 19 + AppShell ISS-NEW 子集 10 + commands.test 19 + ExportPreview 5 + OcrQueue 4）。typecheck ✅；vitest 受 pre-existing vitest 4.x + `html-encoding-sniffer`/`@exodus/bytes` ESM 冲突阻塞（main 仓库根也复现，与本次改动无关，详见 DEC-099）。

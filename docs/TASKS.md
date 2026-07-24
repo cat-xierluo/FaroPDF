@@ -1641,7 +1641,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P1
 - 类型：UI 修正批次（面板/对话框级）+ 补采归档
 - 来源：2026-07-23 用户决策”用现有 raw 推进修正，剩下的缺图后续让其他 worker 补采后再归档”；独立 S4 反向审计评级：6 张 raw-Aminus + 5 张 raw-B（1 raw-B-low-confidence）+ 4 张 raw-C。
-- 状态：**待领取；6 个面板修正子卡（ISS-NEW-N-P01～P06）+ 4 个补采子卡（ISS-NEW-N-CROP/THUMB/SEL/SHAPE）全部未启动。**
+- 状态：**补采批次已落盘：CROP 的 window-only 机械流程与 SHAPE 已达到 `measured`，但 CROP 目标中的 L3 全展开状态仍待补采（均非 accepted-golden）；THUMB、SEL 仍缺图。6 个面板修正子卡和 M1 全量重采仍未启动。**
 - 唯一证据入口：`docs/reference/pdf-expert/README.md`
 - 实现现状入口：`docs/reference/pdf-expert/implementation-map.md`
 - 协作文档：`docs/reference/pdf-expert/state-matrix.md`、`coverage-gap.md`、`manifest.json`
@@ -1754,11 +1754,12 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 阻塞 surface：L3 toolbar 自适应断点、窗口外边距、左右栏与中央分割线精确宽度
 - Forbidden files：`src/**`、`src-tauri/**`、全局样式
 - 验收：
-  - [ ] 图片只保留 PDF Expert 应用窗口
-  - [ ] capture-protocol.md 全部参数固化
-  - [ ] 2 次复采 + 稳定性 diff 通过
-  - [ ] `measurements.json` 含 bbox + uncertainty
-  - [ ] manifest `classification` 升级为 `accepted-golden`
+  - [x] 已生成固定窗口的 window-only crop（`N-CROP-READ-DEFAULT`）；历史 raw 仍保留桌面背景
+  - [x] capture-protocol.md 的窗口、fixture、Retina crop 参数已写入 `measurements.json`
+  - [x] 2 次复采 + reference-vs-reference 稳定性 diff 通过（0 differing pixels）
+  - [x] `measurements.json` 含 bbox + uncertainty；ZAI MCP 不可用已记录
+  - [ ] manifest `classification` 升级为 `accepted-golden`（需独立审计和 M1 全量覆盖）
+  - [ ] 目标状态仍缺“L3 工具栏全展开 + 菜单栏”；当前 `N-CROP-READ-DEFAULT` 只证明 window-only crop 机械流程
   - [ ] 不实现 UI；唯一目的是让后续 M4 worker 能用此图做 measured spec
 
 #### ISS-NEW-N-THUMB 左栏缩略图列表 + 当前页高亮
@@ -1797,16 +1798,17 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 目标：形状工具激活态截图；右侧面板展示 6 段形状样式合同
 - 阻塞 surface：Shape panel、形状工具激活态与右栏样式、形状绘制行为
 - 验收：
-  - [ ] 图片只保留 PDF Expert 应用窗口
-  - [ ] 形状工具激活态可见
-  - [ ] 右栏展示 6 段形状样式合同
-  - [ ] capture-protocol.md 流程完整
-  - [ ] manifest `classification` 升级为 `accepted-golden`
+  - [x] 图片只保留 PDF Expert 应用窗口（`N-SHAPE-RECTANGLE`）
+  - [x] 矩形形状工具激活态可见
+  - [x] 右栏展示 preview / selector / stroke width / border / opacity / stroke+fill color / collapse 控件
+  - [x] capture-protocol.md 流程参数和 a/b 稳定性 diff 已记录
+  - [ ] manifest `classification` 升级为 `accepted-golden`（绘制行为、其他形状和独立审计仍缺）
 
 #### 当前只可声称的验证结果
 
 - 6 处面板/对话框级 raw-Aminus 骨架已存在，足以支撑 wired 修正交付。
-- 4 块硬缺口（chrome 精确尺寸、缩略图、selection 浮条、shape 6 段合同）已归档为补采子卡，由其他 worker 后续执行。
+- 5 组补采图已入库：read crop、页面管理网格、批注、矩形 shape、编辑画布；其中 crop/shape 已有 measured bbox 和稳定性 diff。
+- 左栏缩略图与 text selection 浮条仍是硬缺口；页面管理网格不能冒充缩略图列表。
 - **没有**声称任何 PDF Expert surface 已达到 `visually-verified` 或 PDF Expert 视觉等价。
 
 #### 已知阻塞与边界

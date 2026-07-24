@@ -7223,3 +7223,21 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - 后续 worker 可独立领取任意补采子卡；不必等 M1 全量 4 个 accepted-golden 完成。
 - 任何面板修正子卡在 PR 描述里提到受补采影响的尺寸 / 交互时，必须显式标注 “依赖 ISS-NEW-N-XXX 完成”。
 - 不修改任何产品代码或测试；本次新增/修改仅限证据与任务文档。
+
+## DEC-179 PDF Expert 补采批次入库与事实校准（2026-07-24）
+
+- 时间：2026-07-24
+- 类型：实机证据补采 / 状态语义校准 / 下游交接
+- 关联：ISS-NEW-N-CROP / THUMB / SEL / SHAPE、`manifest.json`、`measurements.json`、`state-matrix.md`
+- 状态：生效
+
+**事实**：在 PDF Expert 3.9.2、固定窗口 `{200,120,1280,832}`、受控 5 页 fixture 下，完成阅读默认、页面管理、批注、矩形工具和编辑画布五组 window-only crop；每组复采 a/b 的像素差为 0。页面管理实际是全宽五卡片网格，编辑模式实际显示文本/图像/链接/隐藏工具条；二者不能合并解释为“左栏缩略图列表”。
+
+**决策**：
+
+1. 将五组图片登记为 `manifest.json` 的 `measured`，补充 `measurements.json` 与状态分析；`accepted-golden_count` 保持 0。
+2. 将 CROP 的 window-only 机械流程和 `ISS-NEW-N-SHAPE` 的矩形面板结果标为 measured 交付；CROP 要求的 L3 全展开目标仍未完成，所有结果仍保留独立审计、M1 全量覆盖和 M2 回归门禁。
+3. `ISS-NEW-N-THUMB`、`ISS-NEW-N-SEL` 继续保持缺口；不能把页面管理网格或探索性截图当作缩略图/文本选区浮条证据。
+4. 本轮未修改 `src/**`、`src-tauri/**` 或用户已有测试改动；下游实现 Agent 只能引用观察事实和明确限制，不得据此声称 visually-verified。
+
+**限制**：ZAI bbox MCP 在本环境不可用，量测为人工复核（约 ±4pt）；本轮使用 ImageMagick 完成 crop 和 reference-vs-reference diff，未建立 FaroPDF-vs-reference 验证器。

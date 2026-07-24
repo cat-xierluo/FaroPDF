@@ -7,17 +7,18 @@
     "version_note": "observed_version 由 25.2.1 更正为实机版本 3.9.2（2026-07-23 ISS-NEW-M M1）。25.2.1 为历史误标，实机 mdls/PlistBuddy 读取均为 3.9.2；M1 每张采集图以实机可复采的 3.9.2 为准。"
   },
   "purpose": "FaroPDF high-fidelity evidence index",
-  "audit_date": "2026-07-23",
+  "audit_date": "2026-07-24",
   "evidence_status": {
     "accepted_golden_count": 0,
-    "measured_count": 0,
+    "measured_count": 5,
     "raw_count": 11,
     "rejected_count": 4,
     "raw_a_minus_count": 6,
     "raw_b_count": 5,
     "raw_c_count": 4,
-    "bbox_file_available": false,
-    "visual_diff_available": false
+    "bbox_file_available": true,
+    "visual_diff_available": true,
+    "visual_diff_note": "2026-07-24 supplemental batch: reference-vs-reference pixel diff was run with ImageMagick compare -metric AE and returned 0 for each a/b pair. This is not FaroPDF-vs-reference regression and does not promote any image to accepted-golden."
   },
   "raw_rerating": {
     "audit_date": "2026-07-23",
@@ -237,6 +238,76 @@
       "usable_for": ["EditModeGridView 4 列响应式 wrap (4+1)", "卡片等宽并排 + 单卡片换行", "选中蓝色边框"],
       "not_evidence_for": ["精确卡片像素宽度", "卡片间距", "drag 进行中/drop indicator", "reorder persistence"],
       "limitations": ["full desktop capture", "no bbox", "wrap breakpoint not determined"],
+      "confidence": "high"
+    },
+    {
+      "id": "N-CROP-READ-DEFAULT",
+      "path": "captures/cropped/G01-read-default-a.png",
+      "paired_path": "captures/cropped/G01-read-default-b.png",
+      "legacy_intended_state": "read default / normalized window crop",
+      "observed_state": "PDF Expert 3.9.2 fixed 1280x832 logical window crop; dark shell, single document tab, collapsed side panes, single-page canvas",
+      "classification": "measured",
+      "usable_for": ["window-only chrome reference", "L2/L3 shell ordering", "read-mode canvas placement"],
+      "not_evidence_for": ["two-page mode", "thumbnail sidebar", "text-selection floating toolbar", "FaroPDF visual equivalence"],
+      "limitations": ["manual bbox only", "no independent S4 audit", "accepted-golden remains 0"],
+      "capture_run": "2026-07-24 a/b",
+      "stability_diff": {"tool": "ImageMagick compare -metric AE", "result": "0 differing pixels"},
+      "confidence": "high"
+    },
+    {
+      "id": "N-PAGE-MANAGEMENT-GRID",
+      "path": "captures/cropped/G02-page-management-grid-a.png",
+      "paired_path": "captures/cropped/G02-page-management-grid-b.png",
+      "legacy_intended_state": "thumbnail sidebar / page management",
+      "observed_state": "页面管理 mode with five real page cards visible in one row, page 1 selected blue; secondary actions 插入页 / 附加文件 / 旋转 / 复制 / 粘贴(disabled) / 摘录 / 删除(red)",
+      "classification": "measured",
+      "usable_for": ["page-management result state", "page-card selection color", "secondary action order"],
+      "not_evidence_for": ["left thumbnail list", "fixed five-column edit grid", "reorder persistence", "drag indicator"],
+      "limitations": ["semantic state differs from ISS-NEW-N-THUMB target", "manual bbox only", "accepted-golden remains 0"],
+      "capture_run": "2026-07-24 a/b",
+      "stability_diff": {"tool": "ImageMagick compare -metric AE", "result": "0 differing pixels"},
+      "confidence": "high"
+    },
+    {
+      "id": "N-ANNOTATE-TOOLBAR",
+      "path": "captures/cropped/G03-annotate-a.png",
+      "paired_path": "captures/cropped/G03-annotate-b.png",
+      "legacy_intended_state": "annotate mode",
+      "observed_state": "批注 mode with contextual annotation toolbar; outline panel remains open on the left; page canvas remains visible; no right panel in this state",
+      "classification": "measured",
+      "usable_for": ["annotation toolbar placement and active-state treatment", "annotate + outline-panel composition"],
+      "not_evidence_for": ["shape settings", "right-panel width", "selection floating toolbar", "annotation save/reopen"],
+      "limitations": ["manual bbox only", "toolbar icon semantics are partly visual", "accepted-golden remains 0"],
+      "capture_run": "2026-07-24 a/b",
+      "stability_diff": {"tool": "ImageMagick compare -metric AE", "result": "0 differing pixels"},
+      "confidence": "high"
+    },
+    {
+      "id": "N-SHAPE-RECTANGLE",
+      "path": "captures/cropped/G04-shape-rectangle-a.png",
+      "paired_path": "captures/cropped/G04-shape-rectangle-b.png",
+      "legacy_intended_state": "rectangle shape active",
+      "observed_state": "矩形工具 active; right panel visibly contains preview, five shape selectors, 描边宽度, 边框类型, 不透明度, 描边颜色, 填充颜色 and 折叠 footer",
+      "classification": "measured",
+      "usable_for": ["shape panel section contract", "rectangle active state", "stroke/fill control ordering"],
+      "not_evidence_for": ["shape drawing geometry", "persisted annotation", "other shape panels", "FaroPDF visual equivalence"],
+      "limitations": ["manual bbox only", "six-section wording is interpreted from visible controls; no independent audit", "accepted-golden remains 0"],
+      "capture_run": "2026-07-24 a/b",
+      "stability_diff": {"tool": "ImageMagick compare -metric AE", "result": "0 differing pixels"},
+      "confidence": "high"
+    },
+    {
+      "id": "N-EDIT-CANVAS",
+      "path": "captures/cropped/G05-edit-grid-a.png",
+      "paired_path": "captures/cropped/G05-edit-grid-b.png",
+      "legacy_intended_state": "edit mode",
+      "observed_state": "编辑 mode contextual toolbar with 文本 / 图像 / 链接 / 隐藏; the page remains a single editable canvas and is not the 页面管理 card grid",
+      "classification": "measured",
+      "usable_for": ["edit-mode toolbar entry", "distinguishing edit canvas from page-management grid"],
+      "not_evidence_for": ["thumbnail card layout", "page reorder", "five-column grid"],
+      "limitations": ["manual bbox only", "capture was supplemental truth-finding, not an ISS-NEW-N accepted target", "accepted-golden remains 0"],
+      "capture_run": "2026-07-24 a/b",
+      "stability_diff": {"tool": "ImageMagick compare -metric AE", "result": "0 differing pixels"},
       "confidence": "high"
     }
   ]
