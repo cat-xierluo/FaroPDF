@@ -62,8 +62,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | id | surface | 阻塞谁 | 入口 | 备注 |
 | --- | --- | --- | --- | --- |
 | ISS-NEW-N-THUMB | 左栏 Sidebar 缩略图列表 + 当前页高亮 | P05/M4 thumbnails | `docs/TASKS.md` ISS-NEW-N-THUMB 子卡 | G02 是整页页面管理网格，不是左栏缩略图，不能替代 |
-| ISS-NEW-N-SEL | text selection 浮动工具条 | TextSelectionToolbar 实现 | `docs/TASKS.md` ISS-NEW-N-SEL 子卡 | R07 与补采探索性框选均无浮条 |
-| ISS-NEW-N-CROP（L3 全展开） | L3 工具栏全展开 + 菜单栏 window crop | L3 自适应断点精确值 | `docs/TASKS.md` ISS-NEW-N-CROP 子卡 | window-only 机械流程已 measured，但 L3 全展开目标态仍缺 |
+| ISS-NEW-N-SEL | text selection 浮动工具条 | TextSelectionToolbar 实现 | `docs/TASKS.md` ISS-NEW-N-SEL 子卡 | R07 与 2026-07-24 真实文字层拖选均无浮条，仍缺可复现触发路径 |
+| ISS-NEW-N-CROP（L3 全展开） | L3 工具栏全展开 + 菜单栏 window crop | L3 自适应断点精确值 | `docs/TASKS.md` ISS-NEW-N-CROP 子卡 | `N-CROP-L3-SEARCH` 已补完整 L3 + 搜索双栏 measured crop；菜单栏仅在含桌面背景的 raw 中可见，仍待 M1 统一 |
 | M1 全量重采 | read/thumbnails/annotate/edit 的 accepted-golden | M2 容差收紧、visually-verified 验收 | `docs/TASKS.md` ISS-NEW-M M1 | 当前 accepted-golden 为 0；M2 用 measured 暂代 |
 | OCR 专属采集 | OCR 右面板真实状态（非 R10 modal） | P03 OCR 5 段规格定义 | `docs/TASKS.md` ISS-NEW-N-P03 | G01-G05 未覆盖 OCR surface |
 
@@ -103,7 +103,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | M4 | 条件式并行 | 仅目标 surface 已有 accepted-golden 且 allowed files 不重叠时拆分；全局布局只允许一个 owner |
 | M5 | 条件式 Wave | forms/export/OCR/异常态按独立工作流拆分；共享契约、AppShell 和写回链路不得并行争抢 |
 
-当前可领取项（2026-07-24 更新）：M1 全量重采（accepted-golden 仍为 0）+ ISS-NEW-N-THUMB/SEL 补采 + ISS-NEW-N-CROP 的 L3 全展开补采 + ISS-NEW-N-P03/P05 的规格决策（见顶部"待补齐清单"）。M2 验证器骨架已可用但可继续扩展。后续每次解锁并行前，由 PM 在本表和 ISS-NEW-M 中确认阶段状态、目标 surface、证据 ID、allowed/forbidden files 与验收命令。
+当前可领取项（2026-07-24 更新）：M1 全量重采（accepted-golden 仍为 0）+ ISS-NEW-N-THUMB/SEL 补采 + ISS-NEW-N-CROP 的菜单栏/统一重采收口 + ISS-NEW-N-P03/P05 的规格决策（见顶部"待补齐清单"）。M2 验证器骨架已可用但可继续扩展。后续每次解锁并行前，由 PM 在本表和 ISS-NEW-M 中确认阶段状态、目标 surface、证据 ID、allowed/forbidden files 与验收命令。
 
 ### 状态词统一
 
@@ -1805,7 +1805,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 #### ISS-NEW-N-CROP 窗口已 crop 的 L3 工具栏全展开参考
 
-> **🟡 部分完成：window-only 机械流程已 measured（N-CROP-READ-DEFAULT），但 L3 全展开目标态仍缺。** 见顶部"待补齐清单 A"。剩余：补一张 L3 工具栏全展开 + macOS 菜单栏的 window crop 图。
+> **🟡 部分完成：window-only 机械流程与搜索态已 measured（N-CROP-READ-DEFAULT、N-CROP-L3-SEARCH），但菜单栏/统一 M1 目标态仍缺。** 见顶部"待补齐清单 A"。搜索态已证明完整 L3、左大纲与右搜索结果同屏；raw 才含菜单栏且带桌面背景，不能直接升 golden。
 
 - 优先级：P1（补采）
 - 类型：证据补采
@@ -1820,7 +1820,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [x] 2 次复采 + reference-vs-reference 稳定性 diff 通过（0 differing pixels）
   - [x] `measurements.json` 含 bbox + uncertainty；ZAI MCP 不可用已记录
   - [ ] manifest `classification` 升级为 `accepted-golden`（需独立审计和 M1 全量覆盖）
-  - [ ] 目标状态仍缺“L3 工具栏全展开 + 菜单栏”；当前 `N-CROP-READ-DEFAULT` 只证明 window-only crop 机械流程
+  - [x] 已补 `N-CROP-L3-SEARCH`：完整 L3、左大纲、右搜索结果、2 条命中高亮均在 window-only crop 中可见
+  - [ ] 目标状态仍缺“window-only crop 同时含菜单栏”的干净图；当前菜单栏只在带桌面背景的 raw 中可见
   - [ ] 不实现 UI；唯一目的是让后续 M4 worker 能用此图做 measured spec
 
 #### ISS-NEW-N-THUMB 左栏缩略图列表 + 当前页高亮
@@ -1841,7 +1842,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 #### ISS-NEW-N-SEL text selection 浮动工具条
 
-> **🔴 未启动：完全缺图。** 见顶部"待补齐清单 A"。R07 与补采探索性框选均无浮条。阻塞 TextSelectionToolbar 实现。
+> **🔴 未启动：完全缺图。** 见顶部"待补齐清单 A"。R07 与 2026-07-24 真实文字层安全拖选均无浮条；这只是负面验证，不构成目标状态证据。阻塞 TextSelectionToolbar 实现。
 
 - 优先级：P1（补采）
 - 类型：证据补采
@@ -1850,7 +1851,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 目标：在 read 模式下用真实文字层 fixture 框选一段，捕捉浮出工具条
 - 阻塞 surface：TextSelectionToolbar、选区可见性、翻译占位文案替换
 - 验收：
-  - [ ] 图片显示选区 + 浮动工具条
+  - [ ] 图片显示选区 + 浮动工具条（本轮固定坐标拖选未触发，需找到可复现原生路径）
   - [ ] capture-protocol.md 流程完整
   - [ ] manifest `classification` 升级为 `accepted-golden`
 
@@ -1874,7 +1875,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 #### 当前只可声称的验证结果
 
 - 6 处面板/对话框级 raw-Aminus 骨架已存在，足以支撑 wired 修正交付。
-- 5 组补采图已入库：read crop、页面管理网格、批注、矩形 shape、编辑画布；其中 crop/shape 已有 measured bbox 和稳定性 diff。
+- 6 组补采图已入库：read crop、页面管理网格、批注、矩形 shape、编辑画布、L3 搜索双栏；其中 crop/shape/search 已有 measured bbox，search 的 a/b 仅有 148 个 caret/IME 瞬态差异。
 - 左栏缩略图与 text selection 浮条仍是硬缺口；页面管理网格不能冒充缩略图列表。
 - **没有**声称任何 PDF Expert surface 已达到 `visually-verified` 或 PDF Expert 视觉等价。
 

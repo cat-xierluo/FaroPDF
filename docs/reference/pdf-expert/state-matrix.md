@@ -14,7 +14,7 @@
 
 | mode | L3 模式区 | L4 | L5a 左栏 | L5c 中央区 | L5b 右栏 |
 | --- | --- | --- | --- | --- | --- |
-| read | `A 批注`、`T 编辑` 可见；measured N-CROP-READ-DEFAULT | 未见二级工具条；measured N-CROP-READ-DEFAULT | 默认折叠；measured N-CROP-READ-DEFAULT。大纲展开：measured N-ANNOTATE-TOOLBAR | 单页阅读画面；measured N-CROP-READ-DEFAULT | 默认折叠；measured N-CROP-READ-DEFAULT |
+| read | `A 批注`、`T 编辑` 可见；measured N-CROP-READ-DEFAULT。搜索态完整 L3：measured N-CROP-L3-SEARCH | 未见二级工具条；measured N-CROP-READ-DEFAULT / N-CROP-L3-SEARCH | 默认折叠；大纲展开与搜索态同屏：measured N-CROP-L3-SEARCH | 单页阅读画面；measured N-CROP-READ-DEFAULT / N-CROP-L3-SEARCH | 默认折叠；搜索态结果栏：measured N-CROP-L3-SEARCH |
 | read + two-page | missing：R03 是 raw-C，未显示两页 | missing | missing | missing：需重新进入双页并规范化采集（ISS-NEW-N-CROP 顺带补） | missing |
 | read + thumbnails | **missing：页面管理并非左栏缩略图**；measured N-PAGE-MANAGEMENT-GRID 仅证明整页网格 | missing | missing：需真实缩略图列表、当前页和滚动态（ISS-NEW-N-THUMB） | page-flow 预期保留，但缺同屏证据 | missing |
 | annotate | measured N-ANNOTATE-TOOLBAR | measured N-ANNOTATE-TOOLBAR：批注上下文工具条 | measured N-ANNOTATE-TOOLBAR：大纲面板 | measured N-ANNOTATE-TOOLBAR：单页 | missing：本状态无右栏 |
@@ -33,10 +33,10 @@
 | state | absent | present | 证据与结论 |
 | --- | --- | --- | --- |
 | document | welcome | PDF shell | raw-B R14 / raw-B R02；均未规范裁剪 |
-| left panel | 中央区使用左侧空间 | 左栏位于中央区左侧 | raw-B R02 / raw-B R04；仅证明大纲面板，不证明缩略图（依赖 ISS-NEW-N-THUMB） |
-| right panel | 中央区使用右侧空间 | 右栏位于中央区右侧 | raw-B R02 / raw-B R06 / raw-Aminus R08 / raw-Aminus R11 / raw-B-low-confidence R12 |
-| both panels | missing | missing | 必须补同屏状态，不能用分别出现的两张图拼接推断（依赖 ISS-NEW-N-CROP） |
-| search keyword | 结果栏折叠 | 命中列表和页面高亮 | raw-B R02 / raw-B R06 |
+| left panel | 中央区使用左侧空间 | 左栏位于中央区左侧 | raw-B R02 / raw-B R04 / measured N-CROP-L3-SEARCH；仅证明大纲面板，不证明缩略图（依赖 ISS-NEW-N-THUMB） |
+| right panel | 中央区使用右侧空间 | 右栏位于中央区右侧 | raw-B R02 / raw-B R06 / measured N-CROP-L3-SEARCH / raw-Aminus R08 / raw-Aminus R11 / raw-B-low-confidence R12 |
+| both panels | missing | measured：大纲 + 搜索结果栏同屏 | N-CROP-L3-SEARCH 证明一个真实双栏组合；其他 annotate/shape 双栏仍 missing，不能泛化（依赖 ISS-NEW-N-CROP） |
+| search keyword | 结果栏折叠 | 命中列表和页面高亮 | measured N-CROP-L3-SEARCH；R06 仅 raw-B |
 | text selection | 无浮层 | missing | 本轮真实文字层框选未出现浮条；R07 与本轮探索图都不能证明目标状态（依赖 ISS-NEW-N-SEL） |
 | tabs | 单 tab | 多个 tab | raw-B R02 / raw-Aminus R13（3 tabs）/ raw-Aminus R15（4 tabs）；overflow、拖动均 missing |
 | modal | 无背板 | 居中 modal + 背板 | raw-Aminus R09（password）/ raw-Aminus R10（OCR） |
@@ -53,7 +53,7 @@
 | 页卡选择 | raw-Aminus | R15 有蓝色选中态；焦点和取消选择 missing |
 | 页卡拖动开始 / 进行中 | missing | 需要源卡透明态、drop indicator 和光标位置（依赖 ISS-NEW-N-THUMB/SHAPE） |
 | 页卡 drop 后 | raw result only | R15 不能证明顺序已写入 PDF；必须导出并重开 |
-| 搜索导航 | raw-B | R06 证明面板存在；上一项、下一项、清空和零结果 missing |
+| 搜索导航 | measured partial | N-CROP-L3-SEARCH 证明搜索字段、上一项/下一项控件、2 条结果和页面高亮；清空、零结果、稳定键盘导航仍 missing |
 | 签名选择与落点 | raw-Aminus partial | R08 证竖排卡 + 首张选中蓝；插入行为、save/reopen missing |
 | 图章选择与落点 | raw-Aminus partial | R11 证 2×2 preset + tab×2；插入行为、custom tab 内容 missing |
 | 形状激活与右栏样式 | measured | N-SHAPE-RECTANGLE 证明矩形激活态和右栏控件顺序；绘制、保存和其他形状仍 missing |

@@ -10,7 +10,7 @@
   "audit_date": "2026-07-24",
   "evidence_status": {
     "accepted_golden_count": 0,
-    "measured_count": 5,
+    "measured_count": 6,
     "raw_count": 11,
     "rejected_count": 4,
     "raw_a_minus_count": 6,
@@ -18,7 +18,7 @@
     "raw_c_count": 4,
     "bbox_file_available": true,
     "visual_diff_available": true,
-    "visual_diff_note": "2026-07-24 supplemental batch: reference-vs-reference pixel diff was run with ImageMagick compare -metric AE and returned 0 for each a/b pair. This is not FaroPDF-vs-reference regression and does not promote any image to accepted-golden."
+    "visual_diff_note": "2026-07-24 supplemental batch: reference-vs-reference pixel diff was run with ImageMagick compare -metric AE. The five original a/b pairs returned 0; N-CROP-L3-SEARCH returned 148 differing pixels caused by a transient search-field caret/IME bubble while the semantic layout remained stable. This is not FaroPDF-vs-reference regression and does not promote any image to accepted-golden."
   },
   "raw_rerating": {
     "audit_date": "2026-07-23",
@@ -308,6 +308,22 @@
       "limitations": ["manual bbox only", "capture was supplemental truth-finding, not an ISS-NEW-N accepted target", "accepted-golden remains 0"],
       "capture_run": "2026-07-24 a/b",
       "stability_diff": {"tool": "ImageMagick compare -metric AE", "result": "0 differing pixels"},
+      "confidence": "high"
+    },
+    {
+      "id": "N-CROP-L3-SEARCH",
+      "path": "captures/cropped/N-CROP-L3-search-a.png",
+      "paired_path": "captures/cropped/N-CROP-L3-search-b.png",
+      "raw_path": "captures/raw/N-CROP-L3-search-a.png",
+      "raw_paired_path": "captures/raw/N-CROP-L3-search-b.png",
+      "legacy_intended_state": "read search results / normalized L3 chrome crop",
+      "observed_state": "PDF Expert 3.9.2 fixed 1280x832 logical window with the full L3 toolbar, left outline panel, active Purpose search field, right result panel, two highlighted matches and page 1/page 2 result cards",
+      "classification": "measured",
+      "usable_for": ["full L3 toolbar ordering", "search field focus and result-panel placement", "simultaneous left outline + right search panels", "window-only crop geometry"],
+      "not_evidence_for": ["left thumbnail list", "text-selection floating toolbar", "zero-results state", "FaroPDF visual equivalence"],
+      "limitations": ["window-only crop excludes macOS menu bar; raw pair retains menu bar but also desktop background and a backup notification", "manual bbox only", "search caret/IME bubble produced 148 differing pixels", "accepted-golden remains 0"],
+      "capture_run": "2026-07-24 a/b",
+      "stability_diff": {"tool": "ImageMagick compare -metric AE", "result": "148 differing pixels; transient caret/IME bubble only, semantic state stable"},
       "confidence": "high"
     }
   ]

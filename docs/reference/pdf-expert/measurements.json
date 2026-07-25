@@ -111,6 +111,26 @@
         "page_1": {"x": 293, "y": 94, "width": 398, "height": 721}
       },
       "notes": ["edit toolbar shows 文本 / 图像 / 链接 / 隐藏", "this is not the page-management grid"]
+    },
+    {
+      "capture_id": "N-CROP-L3-SEARCH",
+      "crop_bbox": {"x": 0, "y": 0, "width": 1280, "height": 832},
+      "layers": {
+        "titlebar": {"x": 0, "y": 0, "width": 1280, "height": 29},
+        "main_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 32},
+        "left_outline_panel": {"x": 0, "y": 61, "width": 272, "height": 771},
+        "page_canvas": {"x": 272, "y": 61, "width": 528, "height": 771},
+        "right_search_panel": {"x": 800, "y": 61, "width": 480, "height": 771},
+        "search_field": {"x": 1040, "y": 29, "width": 236, "height": 32},
+        "search_results_header": {"x": 800, "y": 61, "width": 480, "height": 52}
+      },
+      "notes": [
+        "Purpose query is visible in the focused L3 search field",
+        "right panel reports 2 matches and highlights page 1/page 2",
+        "left panel is 大纲, not thumbnails",
+        "raw pair includes the macOS menu bar but also desktop background; cropped pair is window-only",
+        "manual bbox uncertainty remains ±4pt"
+      ]
     }
   ]
 }

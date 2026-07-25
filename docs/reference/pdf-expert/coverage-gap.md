@@ -7,11 +7,11 @@
 | 类别 | 缺口 | 下一动作 | 来源任务 |
 | --- | --- | --- | --- |
 | capture truth | 15 张首批图片重新分级：6 raw-Aminus + 5 raw-B（1 raw-B-low-confidence）+ 4 raw-C；accepted-golden 仍为 0 | 按 ISS-NEW-N / ISS-NEW-M 推进；M1 完整重采不阻塞当前面板修正批次 | ISS-NEW-N |
-| normalization | 2026-07-24 补采 5 组已按固定窗口生成 2560×1664 window-only crop；历史 raw 仍含桌面背景 | window-only 机械流程已有 measured 证据；CROP 要求的 L3 全展开目标仍待采集，M1 仍需全量统一 | ISS-NEW-N-CROP |
+| normalization | 2026-07-24 补采 6 组已按固定窗口生成 2560×1664 window-only crop；搜索态 raw 仍含桌面背景 | `N-CROP-L3-SEARCH` 已补完整 L3 + 搜索结果双栏的 measured crop；CROP 的菜单栏与 accepted-golden 门禁仍待 M1 统一 | ISS-NEW-N-CROP |
 | measurement | 新增 `measurements.json`，记录 1280×832 逻辑 bbox、人工误差 ±4pt；ZAI bbox MCP 不可用 | M1 独立复核并补自动量测 | ISS-NEW-N-CROP |
 | visual verdict | 现有脚本只测几何，无黄金图视觉 diff | M2 验证器（M1 完成后建立） | ISS-NEW-M M2 |
 | state | thumbnails（左栏真缩略图 + 当前页高亮）仍无可靠图；N-PAGE 是整页页面管理网格 | ISS-NEW-N-THUMB 补采；不得把 N-PAGE 当 Sidebar thumbnails | ISS-NEW-N-THUMB |
-| state | text selection 浮动工具条无图 | ISS-NEW-N-SEL 补采 | ISS-NEW-N-SEL |
+| state | text selection 浮动工具条无图；本轮真实文字层拖选仍未触发 | 找到可复现的原生选区触发路径后再补采 | ISS-NEW-N-SEL |
 | state | shape 右栏已补采矩形激活态；R12 仍是 stamp 负面证据 | N-SHAPE-RECTANGLE 可支撑 measured 面板合同；绘制/其他形状仍由 ISS-NEW-N-SHAPE 后续补齐 | ISS-NEW-N-SHAPE |
 | state | annotate 右栏真实布局、welcome 真目标状态、forms、export、L5a+L5b 同屏、OCR 运行态、双栏 | 当前 raw 不支持；归档为后续任务，由 ISS-NEW-N 子卡或 M4/M5 推进 | ISS-NEW-M M4/M5 |
 | interaction | edit 拖动开始、drop indicator、写回和导出重开无证据 | 采完整序列并做 PDF 顺序 round-trip（依赖 ISS-NEW-N-THUMB / SHAPE 等前置） | ISS-NEW-M M3 |
@@ -19,19 +19,19 @@
 
 ## P0+：ISS-NEW-N 补采硬缺口（无图就无法做对应修正）
 
-以下 2 个 surface 在本次补采后仍无可信图；另 2 个 surface 已有 measured 证据但尚未 accepted-golden。归档为 ISS-NEW-N 子卡，由后续 worker 执行：
+以下 2 个 surface 在本次补采后仍无可信图；CROP 已有搜索态 measured 证据但尚未满足菜单栏/accepted-golden 门禁，SHAPE 也已有 measured 证据。归档为 ISS-NEW-N 子卡，由后续 worker 执行：
 
 - **ISS-NEW-N-CROP**（窗口已 crop 的 L3 工具栏全展开参考）
   - 阻塞：`L3 toolbar 自适应断点`、`窗口外边距`、`左右栏与中央分割线精确宽度`
   - 最近现有图：R06（含桌面背景，唯一 L3 全展开的图）
-  - 当前：`N-CROP-READ-DEFAULT` 已完成 window-only crop 和 a/b diff；仍需 M1 全展开 L3、独立审计后才可 accepted-golden
+  - 当前：`N-CROP-READ-DEFAULT` + `N-CROP-L3-SEARCH` 已完成 window-only crop；搜索态证明完整 L3 与大纲+搜索双栏，但 raw 才含菜单栏，仍需 M1 统一重采和独立审计后才可 accepted-golden
 - **ISS-NEW-N-THUMB**（左栏缩略图列表 + 当前页高亮）
   - 阻塞：`Sidebar thumbnails tab`、缩略图卡片尺寸/间距、多页滚动当前页定位
   - 最近现有图：R03/R04/R05（都不是 thumbnail 实图）；N-PAGE 是整页页面管理网格，不能替代
   - 验收：缩略图模式打开左栏的稳定截图；至少 5 页可见、当前页高亮可见
 - **ISS-NEW-N-SEL**（text selection 浮动工具条）
   - 阻塞：`TextSelectionToolbar`、选区可见性、`TextSelectionToolbar` 翻译占位文案替换
-  - 最近现有图：R07 与本轮安全框选尝试（均无 selection 浮条）
+  - 最近现有图：R07 与 2026-07-24 本轮安全框选尝试（均无 selection 浮条）
   - 验收：在 read 模式下用真实文字层 fixture 框选一段，捕捉浮出工具条
 - **ISS-NEW-N-SHAPE**（shape 6 段合同的真参考）
   - 阻塞：`Shape panel`、形状工具激活态与右栏样式、形状绘制行为

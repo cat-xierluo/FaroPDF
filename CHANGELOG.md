@@ -1037,3 +1037,8 @@ v0.3 follow-ups（已在 `docs/RELEASE.md §4` 文档化，不阻塞 beta.1）�
   - **范围控制**：worker 不超 allowed files；PM 自身 docs 改动也走 TASKS / DECISIONS / CHANGELOG 闭环
 - 导火索：Wave 1 W1 (ISS-NEW-A 阶段 1) ship 后 PM 直接 `git merge --ff-only` 跳 PR 流程，违反 `multi-agent-orchestration` §8.0；git revert 链修复后落地本章
 - 不覆盖 subagent / Agent Teams / ACP 等其他执行模式（仅针对 `tmux + worktree`）
+# 未发版 · PDF Expert 搜索态补采与缺口复核（2026-07-24）
+
+- 新增 `N-CROP-L3-SEARCH` a/b raw 与 window-only crop：完整 L3 工具栏、左侧大纲、右侧搜索结果栏、`Purpose` 两页命中高亮。
+- 更新 `manifest.json`、`measurements.json`、状态矩阵、覆盖缺口和补采分析；该组保持 `measured`，不宣称 `accepted-golden`。
+- 记录真实文字层拖选未触发浮动工具栏、当前会话缩略图入口 disabled 的负面证据；`ISS-NEW-N-SEL` 与 `ISS-NEW-N-THUMB` 继续保持缺口。

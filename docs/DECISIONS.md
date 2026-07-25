@@ -7315,3 +7315,10 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - 当前断言范围：read/annotate/edit 三 surface 的 toolbar 合计高度。左右栏宽度断言待 FaroPDF 对应 DOM 稳定后补。
 - 不改任何产品代码；只新增 scripts/ + package.json script + 文档。
 - measurements.json 3 处几何分歧（左栏 211 vs 272 等）不影响验证器——验证器读记录值，若 fail 差值与 PM 审计一致，恰好佐证需 M1 复核。
+## DEC-183 PDF Expert 搜索态补采与选区浮条负面验证（2026-07-24）
+
+- 关联：ISS-NEW-N-CROP、ISS-NEW-N-SEL、`N-CROP-L3-SEARCH`。
+- 在 PDF Expert 3.9.2 固定 `{200,120}` / `1280×832` 窗口和受控 fixture 下，补采搜索态 a/b：完整 L3 主工具栏、左侧“大纲”、右侧搜索结果栏同屏，查询 `Purpose` 命中 2 页。window-only crop 与 raw 均入库，bbox 写入 `measurements.json`。
+- a/b `compare -metric AE` 为 148 个差异像素，定位为搜索 caret/IME 浮泡瞬态；语义布局稳定，证据等级为 `measured`，不升级 `accepted-golden`。raw 的菜单栏伴随桌面背景和备份通知，不能冒充干净 golden。
+- 真实文字层固定坐标拖选未出现选区浮动工具栏；这只记录为负面验证，`ISS-NEW-N-SEL` 继续 missing，不据此实现或关闭 TextSelectionToolbar。
+- View 菜单中的“缩略图/缩略图面板”在当前会话为 disabled，未形成左栏缩略图证据；页面管理网格仍不可替代该缺口。

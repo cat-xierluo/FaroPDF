@@ -51,3 +51,24 @@ read default
 ## 工具与限制
 
 本轮按 `capture-protocol.md` 固定窗口和 fixture，使用 macOS `screencapture` + ImageMagick 完成 Retina crop。环境未提供 ZAI bbox MCP，因此量测是人工复核，不是自动元素抽取；这也是本批次保持 `measured`、不升级 `accepted-golden` 的原因。
+
+## 追加补采：搜索态与选区浮条负面验证（2026-07-24）
+
+### 搜索态（`N-CROP-L3-SEARCH`）
+
+- 入库：`captures/raw/N-CROP-L3-search-a.png` / `-b.png`；`captures/cropped/N-CROP-L3-search-a.png` / `-b.png`。
+- 状态：固定 1280×832 logical window；完整 L3 主工具栏可见；左侧为“大纲”面板，右侧为搜索结果面板；查询 `Purpose`，显示“已找到：2”，第 1、2 页均有命中高亮。
+- 量测：标题栏 29pt、L3 32pt、左大纲约 272pt、右搜索栏约 480pt；详细 bbox 写入 `measurements.json`。
+- 稳定性：`compare -metric AE` 为 148 个差异像素；差异来自搜索字段 caret/IME 浮泡的瞬态变化，语义布局稳定，因此保持 `measured`，不升级 `accepted-golden`。
+- 限制：window-only crop 不含 macOS 菜单栏；raw 保留菜单栏但同时包含桌面背景和备份通知。raw 只能作为过程审计，不能作为 golden。
+
+### `ISS-NEW-N-SEL` 负面验证
+
+- 在 read 模式真实文字层（fixture 第 1 页）内完成一次固定坐标拖选，未出现可见选区或浮动工具栏。
+- 该结果与 R07 一致，只能证明“本次环境/触发方式没有产出目标浮条”，不能证明 PDF Expert 不支持文本选区浮条。
+- 因此 `ISS-NEW-N-SEL` 继续保持 missing；不得据此实现或关闭 `TextSelectionToolbar`。后续仍需找到可复现的原生选区触发路径后再采集 a/b。
+
+### 缩略图缺口复核
+
+- 本次通过 PDF Expert View 菜单检查“缩略图 / 缩略图面板”入口，当前 3.9.2 会话中对应菜单项为 disabled，未能打开左栏真实缩略图列表。
+- 现有 `N-PAGE-MANAGEMENT-GRID` 仍是页面管理整页网格，不能替代 `ISS-NEW-N-THUMB`；该缺口继续保留。
