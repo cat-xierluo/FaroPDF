@@ -7322,3 +7322,27 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - a/b `compare -metric AE` 为 148 个差异像素，定位为搜索 caret/IME 浮泡瞬态；语义布局稳定，证据等级为 `measured`，不升级 `accepted-golden`。raw 的菜单栏伴随桌面背景和备份通知，不能冒充干净 golden。
 - 真实文字层固定坐标拖选未出现选区浮动工具栏；这只记录为负面验证，`ISS-NEW-N-SEL` 继续 missing，不据此实现或关闭 TextSelectionToolbar。
 - View 菜单中的“缩略图/缩略图面板”在当前会话为 disabled，未形成左栏缩略图证据；页面管理网格仍不可替代该缺口。
+
+## DEC-184 基于补采 measured 的栏宽校准与 M2 验证器扩展（2026-07-25）
+
+- 时间：2026-07-25
+- 类型：UI 布局校准 / 验证器扩展
+- 关联：DEC-179（measured reference）、DEC-182（M2 验证器）、DEC-183（N-CROP-L3-SEARCH 补采）
+- 状态：生效
+
+**问题**：补采 N-CROP-L3-SEARCH 提供了精确 bbox（左大纲 272pt + 右搜索 480pt），且左栏 272pt 有 N-ANNOTATE-TOOLBAR PM 审计的双重佐证（原记录 211 经 PM ImageMagick 审计纠正为 ~272）。但 FaroPDF 的 panelWidthStore 默认栏宽是左 290 / 右 320——与 PDF Expert measured 有差距。同时 M2 验证器（DEC-182）只断言 toolbar 高度，左右栏宽度断言是 TODO gap。
+
+**决策**：
+
+1. **panelWidthStore 默认值校准**：DEFAULT_LEFT_WIDTH 290→272（双重 measured 佐证，最可靠）；DEFAULT_RIGHT_WIDTH 320→480（N-CROP-L3-SEARCH 的 right_search_panel measured）。注释标注来源与局限（480 是搜索面板宽度，签名/图章面板精确宽度仍待补 measured）。
+2. **verify:ui-layout 同步**：行 119 右栏断言 320→480（默认值改后必须同步，否则结构回归会误报）。
+3. **M2 验证器扩展**：verifyAnnotate 加右栏宽度断言（`.right-pane` bbox 对比 measured 480）。填补 DEC-182 记的 gap。左栏宽度断言暂不加——annotate 模式默认不显示左栏，强行打开会改变测试状态。
+4. **不动 read 模式互斥**：showRightPanel/showUtilityPanel 的 read/pages 互斥逻辑保留，不解除（避免 read 从纯净变双栏的交互模式变更）。
+
+**当前影响**：
+
+- FaroPDF 双栏默认宽对齐 PDF Expert measured（272/480）。1280pt 窗宽下中央区剩 528pt = PDF Expert page_canvas width，布局比例一致。
+- verify:ui-layout exit 0（两个视口 rightPanelWidth 均 480）。
+- M2 验证器：annotate 右栏宽度 480=480 差 0pt ✓；toolbar 高度 3 项仍 fail（已知差距，验证器如实报告）。
+- panelWidthStore 8 tests passed（测试用常量引用，自动跟随新值）。
+- 未触碰 read 模式交互、readerReducer.test.ts。

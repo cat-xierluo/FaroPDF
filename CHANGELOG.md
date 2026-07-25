@@ -1,3 +1,13 @@
+## 未发版 · 栏宽校准与 M2 验证器扩展（2026-07-25，DEC-184）
+
+基于补采 N-CROP-L3-SEARCH 的 measured bbox（左栏 272pt + 右栏 480pt）校准栏宽默认值并扩展 M2 验证器。
+
+- **栏宽校准**：`panelWidthStore` 默认值左 290→272（N-CROP-L3-SEARCH + N-ANNOTATE 双重 measured 佐证）、右 320→480（N-CROP-L3-SEARCH right_search_panel measured）。1280pt 窗宽下中央区剩 528pt = PDF Expert page_canvas width，布局比例一致。
+- **verify:ui-layout 同步**：右栏断言 320→480（默认值改后必须同步）。
+- **M2 验证器扩展**：verifyAnnotate 加右栏宽度断言（`.right-pane` bbox 对比 measured 480，差 0pt ✓）。填补 DEC-182 gap。
+- **验证**：typecheck ✓；panelWidthStore 8 tests passed；verify:ui-layout exit 0（两视口 rightPanelWidth=480）；M2 右栏 480=480 ✓（toolbar 高度仍 fail，已知差距）。
+- **不动 read 模式互斥**：保留 showRightPanel/showUtilityPanel 的 read/pages 互斥，不解除（避免交互模式变更）。
+
 ## 未发版 · 待补齐清单集中标注（2026-07-24）
 
 - 在 `docs/TASKS.md` 顶部"当前唯一推进序列"后新增**集中"待补齐清单"**小节，按类型归档所有未完成项：

@@ -86,8 +86,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 | id | 问题 | 入口 | 备注 |
 | --- | --- | --- | --- |
-| measurements.json 3 处分歧 | 左栏 211 vs ~272、右栏 x800/w480 vs x900/w380、card.x 51 vs ~69 | `measurements.json` 各 surface 的 `measurement_review_2026_07_24` | PM 审计与 worker 记录值偏差，待 M1 独立复核裁决 |
-| M2 验证器扩展 | 当前只断言 toolbar 高度；左右栏宽度断言待 DOM 稳定 | `scripts/verify-pdf-expert-visual.mjs` | 已知 gap，DEC-182 已记 |
+| measurements.json 3 处分歧 | 左栏 211 vs ~272、右栏 x800/w480 vs x900/w380、card.x 51 vs ~69 | `measurements.json` 各 surface 的 `measurement_review_2026_07_24` | PM 审计与 worker 记录值偏差，待 M1 复核。**左栏 272pt 已有第二个 measured 佐证**（N-CROP-L3-SEARCH 的 left_outline_panel.width=272），倾向采信 272；右栏/card 仍待复核 |
+| M2 验证器扩展 | 已加右栏宽度断言（DEC-184）；左栏宽度断言待 annotate 默认显示左栏后补 | `scripts/verify-pdf-expert-visual.mjs` | DEC-182 gap 部分填补；toolbar 高度断言仍 fail（已知差距） |
 | P01/P02/P04/P06 实机确认 | active 蓝/modal/网格视觉未做实机截图确认 | `npm run dev` 手动 | M2 验证器当前只覆盖 toolbar 高度，未覆盖这些面板 |
 | readerReducer.test.ts | 用户未提交修改（可选链 `?.`），lint 报 prefer-const | `src/modules/reader/readerReducer.test.ts` | 非本会话工作，ISS-NEW-M 明确不触碰；留用户处理 |
 

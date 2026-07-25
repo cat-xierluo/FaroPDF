@@ -141,8 +141,16 @@ async function verifyAnnotate(page, measurements) {
   const refToolbarHeight = titlebarH + toolbarH;
   const actualToolbar = await bbox(page, '[data-testid="app-toolbar"]', "annotate toolbar");
 
+  // 右栏宽度：annotate 模式默认显示右栏（stamps/signatures）。
+  // reference 用 N-CROP-L3-SEARCH 的 right_search_panel.width(480)——注意 PDF Expert
+  // 该宽度是搜索面板测得的，签名/图章面板精确宽度仍待补 measured，此处数值对齐仅供参考。
+  const searchSurface = findSurface(measurements, "N-CROP-L3-SEARCH");
+  const refRightWidth = searchSurface.layers.right_search_panel?.width ?? 480;
+  const actualRight = await bbox(page, ".right-pane", "annotate right panel");
+
   return [
     compare(Math.round(actualToolbar.height), refToolbarHeight, "annotate: toolbar+L4 合计高度"),
+    compare(Math.round(actualRight.width), refRightWidth, "annotate: 右栏宽度"),
   ];
 }
 

@@ -10,8 +10,13 @@
 
 const STORAGE_KEY = "faropdf-panel-widths";
 
-export const DEFAULT_LEFT_WIDTH = 290;
-export const DEFAULT_RIGHT_WIDTH = 320;
+// 默认栏宽对齐 PDF Expert 3.9.2 measured（DEC-183 / ISS-NEW-N）：
+// - 左栏 272pt：N-CROP-L3-SEARCH 的 left_outline_panel + N-ANNOTATE-TOOLBAR
+//   PM 审计双重佐证（原记录 211pt 经 PM ImageMagick 审计纠正为 ~272pt）。
+// - 右栏 480pt：N-CROP-L3-SEARCH 的 right_search_panel measured。
+//   注意：480 是搜索面板宽度，签名/图章面板精确宽度仍待补 measured。
+export const DEFAULT_LEFT_WIDTH = 272;
+export const DEFAULT_RIGHT_WIDTH = 480;
 const MIN_WIDTH = 160;
 const MAX_LEFT_WIDTH = 480;
 export const MAX_RIGHT_WIDTH = 560;

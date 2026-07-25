@@ -116,7 +116,8 @@ async function verifyViewport(browser, viewport) {
   const annotateRightRect = await rect(page.locator(".right-pane"), "annotate right");
   assert(near(annotateMainRect.x, readWorkspaceRect.x), `${viewportLabel} annotate main must start at workspace left`);
   assert(near(annotateMainRect.x + annotateMainRect.width, annotateRightRect.x), `${viewportLabel} L5b must follow L5c`);
-  assert(near(annotateRightRect.width, 320), `${viewportLabel} default L5b width must be 320px`);
+  // 480pt：DEC-183 对齐 PDF Expert N-CROP-L3-SEARCH measured right_search_panel.width
+  assert(near(annotateRightRect.width, 480), `${viewportLabel} default L5b width must be 480px (DEC-183 PDF Expert measured)`);
   assert((await page.getByRole("toolbar", { name: "批注工具条" }).count()) === 1, `${viewportLabel} annotate L4 missing`);
   await captureState(page, viewportLabel, "annotate");
 
