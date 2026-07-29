@@ -5,7 +5,11 @@ export {
   parseAnnotationSidecar,
   serializeAnnotationSidecar,
 } from "./sidecar";
-export { AnnotationRepository, createMemoryAnnotationStorage } from "./repository";
+export {
+  AnnotationRepository,
+  createLocalStorageAnnotationStorage,
+  createMemoryAnnotationStorage,
+} from "./repository";
 export { AnnotationService } from "./service";
 export {
   buildAnnotationSummary,

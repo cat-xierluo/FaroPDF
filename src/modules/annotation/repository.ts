@@ -85,3 +85,31 @@ export function createMemoryAnnotationStorage(initialFiles?: Record<string, stri
     },
   };
 }
+
+/**
+ * 应用内持久化批注 sidecar。键只保存 sidecar 路径的稳定哈希，避免把案件目录或文件名
+ * 暴露到 localStorage key；value 本身沿用已校验的 AnnotationSidecar JSON。
+ */
+export function createLocalStorageAnnotationStorage(
+  storage: Pick<Storage, "getItem" | "setItem">,
+  namespace = "faropdf:annotation-sidecar:v1:",
+): AnnotationStorage {
+  const storageKey = (path: string) => `${namespace}${hashStoragePath(path)}`;
+  return {
+    async readText(path: string) {
+      return storage.getItem(storageKey(path)) ?? undefined;
+    },
+    async writeText(path: string, content: string) {
+      storage.setItem(storageKey(path), content);
+    },
+  };
+}
+
+function hashStoragePath(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
