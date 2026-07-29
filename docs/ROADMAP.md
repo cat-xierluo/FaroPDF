@@ -1,6 +1,6 @@
 # FaroPDF 路线图
 
-> Last updated: 2026-07-28（M2.2 Shell 层级、密度与画布几何纠偏 DEC-186）
+> Last updated: 2026-07-30（功能框架优先，像素视觉降为可选 DEC-187）
 
 ## 项目愿景
 
@@ -12,19 +12,19 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 | --- | --- | --- |
 | v0.0 上下文初始化 | 固定项目名、定位、技术选型、文档体系 | 已完成 |
 | v0.1 完整基础版 | 快读、检索、批注、OCR/扫描、页面整理、常用导出、表单签署、设置 | 进行中（alpha.0 ~ 0.1.0-alpha.18 已封箱；详细子项审计留 follow-up，下一版起逐节刷新） |
-| v0.2 法律增强与界面恢复 | PDF Expert 高保真界面恢复、批注摘要、证据目录、材料拆合并、Bates 编号深化 | 进行中：M0 已完成；M1（规范化重采集）仍按 ISS-NEW-M 推进；ISS-NEW-N 启动基于 raw 的有限面板修正批次（6 个 P0x 子卡）+ 4 个补采子卡（CROP/THUMB/SEL/SHAPE），均与 M1 并行；法律能力逐项以 TASKS 为准 |
+| v0.2 法律增强与界面恢复 | PDF Expert 功能框架对应、批注摘要、证据目录、材料拆合并、Bates 编号深化 | 进行中：入口/模块/产物真实性为 P0；页面管理核心往返、中文水印和本地 OCR pipeline 已验证；像素视觉与 accepted-golden 为可选优化 |
 | v0.3 性能与发布 | 大卷宗性能、自动更新、跨平台打包、官网与文档站（迁出 personal-site） | 待开始 |
 
-## 当前 P0：PDF Expert 高保真界面恢复
+## 当前 P0：PDF Expert 功能框架与真实模块对应
 
 路线图只保留里程碑；可领取任务、状态和 allowed files 以 `docs/TASKS.md` 的“当前唯一推进序列”、ISS-NEW-M 与 ISS-NEW-N 为准。
 
 1. M0：纠正截图分类、冲突文档和完成状态。
-2. M1：按固定 fixture、主题和窗口重采、裁剪并量测参考状态（仍按 ISS-NEW-M 推进；不阻塞 ISS-NEW-N）。
+2. M1：按固定 fixture、主题和窗口重采、裁剪并量测参考状态；2026-07-30 起为可选视觉优化，不阻塞功能。
 3. M2：建立会以非零退出码失败的 measured 几何/语义验证器；M2.2 已覆盖 L3 横向层级、页面 bbox/单页计数和真实页卡 canvas，accepted-golden 图像 diff 待 M1。
-4. M3：页面管理真实缩略图与 1280px measured 网格已接入；继续闭环响应式断点、拖拽重排、导出和重开，`T 编辑` 的内容写回另按编辑引擎任务推进。
-5. M4：按 surface 分别恢复 Shell、左栏和右栏。
-6. M5：完成 forms、export、OCR 和错误状态的行为/视觉闭环。
+4. M3：页面管理真实缩略图、选择/多选、拖拽重排、旋转、删除、撤销、导出和重开解析已闭环；页面剪贴板和真实尺寸标签继续补齐。
+5. M4：按 surface 逐项接真实 state/controller；未实现入口必须显式禁用。
+6. M5：完成 forms、export、OCR 和错误状态的行为/产物闭环；视觉不再是功能完成门禁。
 
 并发旁支（ISS-NEW-N，2026-07-23 启动）：历史批次曾按 6 张 raw-Aminus 安排 SignaturePanel / SetPasswordDialog / OcrPanelView / StampPanel / AnnotationToolbar 与旧 `EditModeGridView` 修正，并安排窗口 crop / 缩略图 / selection 浮条 / shape 6 段合同补采；旧状态机决策已撤销 `EditModeGridView` 路线，现行 DEC-186 又取代旧几何基线，页面管理实现统一使用 `PageOrganizerWorkspace`。当前可领取状态与文件边界只以 `docs/TASKS.md` 为准；未有 accepted-golden 的 surface 禁止宣称 `visually-verified`。
 

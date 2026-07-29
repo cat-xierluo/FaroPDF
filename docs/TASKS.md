@@ -40,20 +40,20 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - `feat/app-distribution`：ISS-021
 - `feat/settings-page`：ISS-022、ISS-023
 
-## 当前唯一推进序列（PDF Expert 高保真恢复）
+## 当前唯一推进序列（PDF Expert 功能框架对应）
 
-截至 2026-07-28，PDF Expert 高保真复刻是 UI 方向的 P0。执行按 ISS-NEW-M 阶段推进，同时允许 ISS-NEW-N 基于 raw/measured 的有限面板修正并行。不从旧 ISS 的"已完成"段、CHANGELOG 或历史 DEC 自行领取 UI 任务。
+2026-07-30 用户明确调整验收目标：不要求像素级或一比一视觉复刻；PDF Expert 只作为信息架构和功能映射参考。P0 改为“入口与真实模块一一对应、写入结果可验证、未实现能力 fail-closed”。accepted-golden、截图补采和视觉 diff 保留为非阻塞质量项，不再阻塞 M3～M5 的功能推进。
 
 | 顺序 | 阶段 | 状态 | 进入条件 | 交付 |
 | --- | --- | --- | --- | --- |
 | M0 | 上下文纠偏 | 已完成 | 无 | raw capture 重新分类；DESIGN/ARCH/TASKS/DEC 统一；实现映射和门禁 |
-| M1 | 规范化重采集与量测 | 待领取 | M0 完成 | 固定 fixture/主题/窗口；窗口 crop；bbox；accepted-golden |
+| M1 | 规范化重采集与量测 | 可选/暂缓 | 用户不要求像素一致 | 固定 fixture/主题/窗口；窗口 crop；bbox；accepted-golden |
 | M2 | 视觉验证器 | **73 项 measured 几何/密度/语义门禁已完成（2026-07-28）**；accepted-golden 图像回归待 M1 | measured reference 可用 | 分层/横向/页面/G05 编辑大纲与中央画布/页卡/搜索双栏几何 JSON + surface 语义断言 + 非零失败码 |
 | M2.1 | 状态机与验证器纠偏 | **已完成（2026-07-28，Codex；独立 S4 PASS）** | G01–G05 measured 证据和失败基线可用 | `T 编辑`/页面管理已拆分；批注默认 panel、L2/L3/L4 与 surface 语义已校准 |
 | M2.2 | Shell 层级、密度与画布几何纠偏 | **已完成（2026-07-28，Codex；独立 S4 PASS）** | G01/G02/G03/G05 measured + 当前 actual 肉眼复核 | 重建 L3 分组；校准中性深色壳层、按钮间距、单页与编辑大纲几何；页面管理接真实缩略图；验证器新增横向/页面/页卡/搜索门禁 |
-| M3 | 页面管理纵向闭环 | 部分前置已完成，行为闭环阻塞于 M1/M2 | page-management spec 和 verifier 可用 | 真实缩略图已接入；仍需响应式断点 → 重排写回 → 导出副本 → 重开 |
-| M4 | Shell / Sidebar / RightPanel 分域复刻 | 阻塞于 M2 | 目标 surface 有 accepted-golden | 每个 surface 独立 PR 和视觉/行为验收 |
-| M5 | forms/export/OCR/异常态补齐 | 阻塞于对应 capture（P03 OCR 已登记为此处） | 状态矩阵证据完整 | 纵向工作流逐项 behavior-complete + visually-verified |
+| M3 | 页面管理纵向闭环 | **核心行为已闭环；剩余能力显式禁用** | 功能契约和真实 PDF fixture | 真实缩略图、选择/多选、拖拽、删除、旋转、撤销、导出与重开解析已通过；页面剪贴板待实现 |
+| M4 | Shell / Sidebar / RightPanel 分域接线 | 进行中 | 不依赖 accepted-golden | 每个可见入口接真实 state/controller；planned 入口显式禁用 |
+| M5 | forms/export/OCR/异常态补齐 | 进行中 | 不依赖 capture | forms/export/OCR 逐项以真实产物、round-trip 和错误态验收 |
 
 ### 待补齐清单（2026-07-24 盘点）
 
@@ -80,9 +80,9 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 | id | 问题 | 入口 | 备注 |
 | --- | --- | --- | --- |
-| M3 页面管理闭环 | 真实缩略图渲染 + 响应式网格 + 重排写回 + 导出重开 | `docs/TASKS.md` ISS-NEW-M M3 | G02 已提供页面管理 measured 参考；仍受 M1 accepted-golden 门禁约束。ISS-NEW-N-THUMB 是 M4 左侧栏缺图，不是 M3 前置 |
-| M4 各 surface | L2/L3/L5/状态栏、左右栏各面板逐项实现 | `docs/TASKS.md` ISS-NEW-M M4 | 阻塞于 M2 accepted-golden |
-| M5 功能闭环 | forms/export/OCR/异常态行为闭环 | `docs/TASKS.md` ISS-NEW-M M5 | P03 OCR 归此 |
+| M3 页面管理闭环 | 页面剪贴板复制/粘贴、真实页面尺寸标签和更多异常态 | `docs/TASKS.md` ISS-NEW-M M3 | 核心重排/旋转/删除/撤销/导出已闭环，剩余入口已 disabled，不再被截图门禁阻塞 |
+| M4 各 surface | bookmarks、shape-style 等尚未接线面板 | `docs/TASKS.md` ISS-NEW-M M4 | 用真实 state/controller 验收；视觉只作非阻塞优化 |
+| M5 功能闭环 | 表单真实 fixture round-trip、Tauri GUI 错误态 | `docs/TASKS.md` ISS-NEW-M M5 | OCR 本地真实 pipeline 与导出产物已验证；继续补表单和异常态 |
 
 **D. 补验证/复核（已有产出但需人工或独立审计）**
 
@@ -106,7 +106,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | M4 | 条件式并行 | 仅目标 surface 已有 accepted-golden 且 allowed files 不重叠时拆分；全局布局只允许一个 owner |
 | M5 | 条件式 Wave | forms/export/OCR/异常态按独立工作流拆分；共享契约、AppShell 和写回链路不得并行争抢 |
 
-当前可领取项（2026-07-28 更新）：M1 全量重采（accepted-golden 仍为 0）+ ISS-NEW-N-THUMB/SEL 补采 + ISS-NEW-N-CROP 的菜单栏/统一重采收口 + ISS-NEW-N-P03 的 OCR 规格决策（见顶部"待补齐清单"）。P05 状态机决策已由 M2.1 关闭，不再可领取；M2 measured 几何/语义验证器已完成，待 M1 后扩展 accepted-golden 图像回归。后续每次解锁并行前，由 PM 在本表和 ISS-NEW-M 中确认阶段状态、目标 surface、证据 ID、allowed/forbidden files 与验收命令。
+当前优先项（2026-07-30 更新）：继续做 M4/M5 功能接线与 round-trip；M1 和 ISS-NEW-N 的截图补采降为可选视觉优化。后续任务以 `ready / partial / planned` 功能状态和真实产物为主证据，不再因 accepted-golden 为 0 停止实现。
 
 ### 状态词统一
 
@@ -1147,7 +1147,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 历史冻结卡：ISS-NEW-A～J PDF Expert UI 旧拆解
 
-> **不可领取。** 本区只记录已提交组件、路由和测试的历史。所有未完成项、视觉结论和旧截图规格已由 ISS-NEW-M 接管；M0 完成后唯一下一项是 M1。后续 Agent 不得从 A～J 自选实现任务。
+> **不可领取。** 本区只记录已提交组件、路由和测试的历史。所有未完成项由 ISS-NEW-M 接管；“M1 是唯一下一项”是 DEC-173 时点的历史门禁，已被 DEC-187 的功能优先决策取代。
 
 > 立项依据：研究 `research/pdf-expert/FEATURE_CATALOG.md`（含 §0 顶层架构 5 层分层 + §1.2 tab 位置 + §1.3 toolbar 5 段 + §2 L4 二级工具条 + §3 L5b 右栏 + §4 菜单栏 + §7.1/7.2 批注工具 + §9 多 tab）后，发现 ISS-059 (DEC-142 / adcd8f0) 的 tab bar 位置错误 + 整个 Toolbar 偏离 PDF Expert 5 段布局，需要从 PDF Expert 视角重新拆分 v0.2 收口工作。
 
@@ -1591,7 +1591,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P0
 - 类型：UI 信息架构 / 上下文治理 / 视觉与行为验收
 - 来源：2026-07-23 用户反馈「多次要求完整复刻 PDF Expert，但截图研究没有转化为最终布局和功能」
-- 状态：**M0、M2.1、M2.2 已完成；M2.2 的 G05 假绿已整改，73 项本地实机门禁与独立 S4 均 PASS；M1 仍待单一证据 owner。accepted-golden 图像回归待 M1。M3 只完成真实缩略图前置，M3 行为闭环与 M4～M5 仍未完成。当前没有任何 PDF Expert surface 达到 `visually-verified`。**
+- 状态：**M0、M2.1、M2.2 已完成；2026-07-30 起不再以像素一致为交付目标。M3 核心行为已完成真实 PDF 往返；M4/M5 按功能真实性继续推进。M1/accepted-golden 降为可选视觉优化。**
 - 当前负责人：M2.2 由 Codex 于 2026-07-28 收口；未触碰 `src/modules/reader/readerReducer.test.ts`、`.zcode/**`、`src-tauri/**`。
 - 唯一证据入口：`docs/reference/pdf-expert/README.md`
 - 实现现状入口：`docs/reference/pdf-expert/implementation-map.md`
@@ -1621,9 +1621,9 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - [x] 完成独立 S4 三轮歧义审计与 doc-curator 一致性扫描
 - [x] 补充 DEC-174 多 Agent 阶段并发权：M1/M2/M3 单 owner，M4/M5 满足证据、验证器和文件隔离后才条件式并行
 
-#### M1 — 规范化重采集与量测
+#### M1 — 规范化重采集与量测（可选视觉优化）
 
-- 可领取状态：M0 完成后，本阶段是唯一下一项；不得跳到 M2～M5。
+- 可领取状态：不再是 M3～M5 前置；仅在需要视觉精修时领取。
 - 必须调用：`computer-use` 负责可复现采集，`feature-extract-from-screenshots` 负责状态矩阵、量测与 S4 反向验证。
 - Allowed files：`docs/reference/pdf-expert/captures/`、`golden/`、`manifest.json`、`state-matrix.md`、`coverage-gap.md`、`completeness-checklist.md`，以及新建 `measurements.json` / `state-specs/`；仅在认领和收口时更新本任务卡状态。
 - Forbidden files：`src/**`、`src-tauri/**`、`package*.json`、全局样式和历史 DEC/CHANGELOG；M1 不实现 UI。
@@ -1668,25 +1668,31 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - [x] 将 `T 编辑` 与 `pages` 状态拆分；`T 编辑` 保持单页画布，页面管理挂载 `PageOrganizerWorkspace`（M2.1）
 - [ ] 删除/归档已从运行时卸载的 `EditModeGridView` 历史 skeleton
 - [x] 运行时 `PageOrganizerWorkspace` 使用真实 PDF canvas 缩略图；1280×832 下五卡 bbox 与首卡选中态通过 measured 门禁（M2.2）
-- [ ] 删除 legacy `EditModeGridView` 的空白渐变/硬编码 A4，并清理页面管理剩余 placeholder 动作
+- [ ] 删除 legacy `EditModeGridView` 的空白渐变/硬编码 A4 历史文件
 - [ ] 用真实页面尺寸替换元数据占位，并按 M1 断点证据完成响应式卡片网格
-- [ ] 实现选择、多选、拖拽排序、插入、删除、旋转和撤销的真实状态
-- [ ] 重排结果写入导出 PDF；导出后重新打开，验证页序和页面数
-- [ ] 覆盖默认态、选择态、拖拽态、落点态的行为测试和视觉 diff
+- [x] 实现选择、多选、拖拽排序、插入、删除、旋转和撤销的真实状态
+- [x] 重排/旋转/删除结果写入 `*-organized.pdf`；Playwright 下载后用 `pdfinfo` 重开解析，确认 5 页且第一页旋转 90°
+- [x] 页面复制/粘贴在剪贴板实现前显式 disabled，不再用视觉计数冒充成功
+- [x] 覆盖选择、拖拽、删除、旋转、撤销和导出行为测试；像素视觉 diff 不再是功能完成前置
 
 #### M4 — Shell / Sidebar / RightPanel 分域复刻
 
 - [ ] 按 accepted-golden 依次验收 L2、L3、L5、状态栏，不并行争抢全局布局
 - [ ] 左栏分别完成 thumbnails、outline、annotations、bookmarks、search 的真实面板和状态
 - [ ] 右栏分别完成 signatures、stamps、shape-style、annotation-summary、forms、export、OCR
+- [x] 文档摘要使用当前 PDF bytes/metadata；OCR 状态和页码范围接真实 controller，不再传 null/noop
+- [x] “文档助手/共享”误导入口改为真实“摘要/导出与交付”路由
+- [x] command catalog 增加 `availability=planned`；未实现命令统一 fail-closed
 - [ ] 每个 surface 单独记录 `skeleton / wired / behavior-complete / visually-verified`
 - [ ] 不用相邻面板、重复画面或文字说明替代目标状态证据
 
 #### M5 — 功能闭环与错误状态
 
 - [ ] 表单填写、签名、导出、重新打开闭环
-- [ ] OCR 启动、进度、取消、产物和质量报告闭环
+- [x] OCR controller、页码范围、任务队列、取消/质量报告链路有单元覆盖；本机真实 `ocrmypdf 17.4.0 + pdftotext 26.02.0` E2E pipeline 通过
+- [x] 默认中文文字水印实际导出 5 页 PDF；字体 URL/fontkit interop 修复，浏览器下载产物可重开
 - [ ] 密码 PDF、文件损坏、权限不足、OCR 失败等错误态可复现并验收
+- [x] T 编辑、图片/Word 转换、翻译、页面复制/粘贴在真实引擎接入前显式禁用，不能产生假成功反馈
 - [ ] 所有写入型操作继续遵守“不覆盖原文件、可回退、可交接”的 FaroPDF 安全边界
 
 #### 当前只可声称的验证结果

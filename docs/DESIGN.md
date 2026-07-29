@@ -1,7 +1,7 @@
 # FaroPDF 设计系统
 
-> Last updated: 2026-07-23
-> 版本：3.0 — PDF Expert 证据分级与高保真门禁
+> Last updated: 2026-07-30
+> 版本：3.1 — PDF Expert 功能框架优先与真实性门禁
 
 ## 设计目标
 
@@ -71,9 +71,9 @@ FaroPDF 是一个 PDF 阅读器，不是 Markdown 编辑器，也不是全能文
 
 ## 3. 布局架构
 
-### PDF Expert 高保真复刻边界
+### PDF Expert 参考边界
 
-FaroPDF 以 PDF Expert 的 macOS 信息架构、可见几何、模式语义、面板联动和核心工作流作为高保真基线，不再只做松散的「信息架构参考」。受版本控制的证据、状态矩阵和完成门禁位于 `docs/reference/pdf-expert/`。
+FaroPDF 以 PDF Expert 的 macOS 信息架构、模式语义、面板联动和核心工作流作为功能参考。2026-07-30 用户明确不要求像素级或一比一视觉一致；颜色、间距和图标差异不阻塞功能完成。受版本控制的截图与量测仍用于可选视觉优化。
 
 允许差异仅限：
 
@@ -107,7 +107,7 @@ L2 tab bar 与 L3 toolbar 是两个独立的 40px 行。L3 严格使用 5 段：
 | 导航区 | 文档摘要、页面管理、视图设置 |
 | 缩放区 | 当前缩放百分比、缩小、放大 |
 | 核心工作流区 | `A 批注`、`T 编辑`、导出、填写和签名、扫描和文本识别、更多工具 |
-| 协作区 | 助手、分享 |
+| 协作区 | 摘要、导出与交付 |
 | 搜索区 | 常驻全文搜索输入框 |
 
 规则：
@@ -116,7 +116,8 @@ L2 tab bar 与 L3 toolbar 是两个独立的 40px 行。L3 严格使用 5 段：
 - 图标优先，短标签辅助；图标按钮使用 `title` 属性提供无障碍文本。
 - `A 批注`、`T 编辑`、导出、填写签名和 OCR 是 L3 直接入口；低频命令和设置由更多工具菜单承载。
 - read 模式不渲染 L4；annotate / edit / OCR / forms / export 按状态渲染对应 L4。
-- `T 编辑` 必须进入单页内容编辑画布并显示 `文本 / 图像 / 链接 / 隐藏` L4；内容写回引擎未接通前，按钮必须保持禁用并明确说明。
+- 内容编辑引擎接入后，`T 编辑` 必须进入单页内容编辑画布并显示 `文本 / 图像 / 链接 / 隐藏` L4；引擎未接通前，入口必须保持禁用并明确说明。
+- 所有命令分为 `ready / partial / planned`；`planned` 必须 disabled 或由执行层 fail-closed，禁止用 toast、计数或状态切换冒充成功。
 - 页面管理是左侧独立入口，进入页面卡片网格；不得与 `T 编辑` 复用 active mode。
 - 左右栏默认折叠；任一侧栏出现时只能压缩 L5c，不能改变 L5a → L5c → L5b 的顺序。
 
@@ -150,7 +151,7 @@ L2 tab bar 与 L3 toolbar 是两个独立的 40px 行。L3 严格使用 5 段：
 
 ### 完成等级
 
-UI 任务使用 `skeleton → wired → behavior-complete → visually-verified` 四级状态。只有通过真实应用的几何、截图和交互验收后才可记为完成；具体定义见 `docs/reference/pdf-expert/acceptance-contract.md`。
+UI 任务仍可记录 `skeleton → wired → behavior-complete → visually-verified`，但产品功能完成以 `behavior-complete` 为准：入口接真实模块、产物可重开、错误可见。`visually-verified` 是可选精修等级，不再阻塞功能交付。
 
 ## 4. 组件样式
 

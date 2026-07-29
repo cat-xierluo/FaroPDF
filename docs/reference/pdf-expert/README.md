@@ -1,16 +1,16 @@
-# PDF Expert 高保真复刻上下文
+# PDF Expert 功能框架与视觉参考上下文
 
-本目录是 FaroPDF 复刻 PDF Expert macOS 版时唯一有效的视觉证据入口。它保存证据、事实边界、实现映射和验收门禁，但不替代 `docs/TASKS.md` 的任务状态。
+本目录保存 FaroPDF 参考 PDF Expert macOS 版时的证据、事实边界、实现映射和验收门禁，但不替代 `docs/TASKS.md` 的任务状态。
 
 ## 当前结论
 
-- 目标仍是高保真复刻 PDF Expert 的信息架构、可见布局、模式语义、面板联动和核心工作流。
+- 2026-07-30 用户明确不要求像素级一比一复刻；当前目标是信息架构、模式语义、面板联动和核心工作流一一对应。视觉证据只用于可选精修。
 - 2026-07-23 复核发现：首批 15 张图片中存在多张误标、重复或自动化失败画面。它们已从 `golden/` 降级到 `captures/raw/`，并按实际画面重新命名。
 - 2026-07-24 补采批次已入库：5 组 PDF Expert 3.9.2 window-only crop（阅读、页面管理、批注、矩形 shape、编辑画布），每组 a/b reference diff 为 0；量测见 `measurements.json`，分析见 `supplemental-analysis-2026-07-24.md`。
 - 当前 accepted golden 数量为 0；新增图片最高为 `measured`，任何 Agent 都不得使用“已有 15 张黄金图”或本批次 measured 图作为最终视觉完成依据。
 - `scripts/verify-pdf-expert-layout.mjs` 证明结构不变量；`verify-pdf-expert-visual.mjs` 以 measured bbox 验证 L2/L3/L4、L3 横向分布、页面与页卡几何，并断言单页/缩略图/surface 语义。二者都不是 accepted-golden 像素一致性测试。
 - 在完成规范化重采集、窗口裁剪、元素量测和视觉 diff 之前，相关 UI 的最高状态只能是 `behavior-complete`，不能是 `visually-verified`。
-- M0、M2.1、M2.2 已完成；M2.2 的 G05 假绿已整改并通过独立 S4 三轮回验。M2 measured 几何/密度/语义门禁已扩展为 73 项，覆盖编辑大纲/中央画布、搜索双栏与状态栏可见性。M1 仍是下一项单一证据任务，M3 的真实缩略图子项已提前接入，但拖拽重排、写回、导出重开与 M4～M5 继续受相应证据门禁约束。
+- M0、M2.1、M2.2 已完成；M3 核心页面管理行为已接真实状态和 PDF 导出，M4/M5 按功能真实性继续推进。M1/accepted-golden 不再是功能前置。
 - 新文档能降低上下文歧义，但不会自动补足缺失证据、视觉判断或功能实现；当前不得把“多个 Agent 一起做”理解成“多个 Agent 一起改 UI”。
 
 ## 权威来源分工
@@ -72,20 +72,20 @@
 1. 阅读本文件、`acceptance-contract.md`、`manifest.json`、`state-matrix.md` 和 `implementation-map.md`。
 2. 在 `docs/TASKS.md` 找到明确的活跃子任务、依赖、允许文件和验收证据；没有任务卡不得自行挑一个历史 ISS 开工。
 3. 打开与任务有关的图片；不得只读文件名或历史 catalog。
-4. 在交付说明中列出使用的 capture id、证据等级和不能从图片推断的内容。
+4. 视觉任务在交付说明中列出 capture id、证据等级和不能从图片推断的内容；纯功能任务列真实 fixture、交互和产物证据。
 5. 明确交付等级：`skeleton`、`wired`、`behavior-complete` 或 `visually-verified`。
 6. 未达到 `visually-verified` 时不得把“高保真复刻”或对应 surface 标记为完成。
 
 ## 多 Agent 启动判断
 
-先看 `docs/TASKS.md` 的“PDF Expert 阶段并发权”。当前 accepted-golden 为 0，M1 是下一项单一证据任务；M2.1 纠偏已收口，但这不自动解锁 M3～M5 或多个共享 UI worker。
+先看 `docs/TASKS.md` 的阶段并发权。功能任务不再被 accepted-golden 阻塞，但共享 AppShell/状态/写回链路仍只能有一个 owner；视觉精修继续服从 M1/M2 门禁。
 
 后续只有同时满足以下条件，才允许把工作拆给多个 Agent：
 
-1. 目标 surface 在 manifest 中已有 `accepted-golden`，且触发步骤和窗口条件可复现；
-2. M2 视觉验证器能在差异超阈值时返回非零退出码；
-3. 每个 worker 的 allowed/forbidden files 互不冲突，共享布局和状态只有一个 owner；
-4. 每个任务都有独立的行为闭环、视觉基线、实机截图和完成等级；
+1. 每个 worker 的 allowed/forbidden files 互不冲突，共享布局和状态只有一个 owner；
+2. 每个功能任务都有独立的行为闭环、真实 fixture、产物重开和完成等级；
+3. 视觉任务额外要求 accepted-golden、可失败的 M2 验证器和实机截图；
+4. planned 入口必须 disabled/fail-closed，不得由其他 worker 暗中改成 toast-only；
 5. PM 按真实运行证据验收，不以 worker 自述、测试通过或截图数量代替产品结果。
 
 这套规则提高的是方向一致性、可交接性和漏项可见性，不保证模型不会偏题。执行波动仍由窄任务、双层监测、独立 PR 和 PM 实机验收兜底。

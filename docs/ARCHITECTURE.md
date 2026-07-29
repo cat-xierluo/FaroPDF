@@ -1,6 +1,6 @@
 # FaroPDF 架构文档
 
-> Last updated: 2026-07-23
+> Last updated: 2026-07-30
 
 ## 技术栈
 
@@ -83,7 +83,7 @@ macOS 原生菜单由 `src-tauri/src/lib.rs` 使用 Tauri v2 `MenuBuilder` / `Su
 
 ### 工具启动器与上下文工具条
 
-前端业务命令统一由 `src/shared/app/commands.ts` 描述。L3 顶栏固定为 5 段，并常驻 `A 批注` 与 `T 编辑` 两个主模式入口；export / forms / OCR 等低频工作流继续通过 `工具` 启动器进入。
+前端业务命令统一由 `src/shared/app/commands.ts` 描述。`availability` 把命令区分为 `ready` 与 `planned`；planned 命令在工具菜单 disabled，原生菜单进入执行层后也 fail-closed。L3 顶栏固定为 5 段；`T 编辑` 在内容引擎接入前保留功能地图位置但显式禁用。
 
 进入任务模式后，`AppShell` 按 `activeMode` 渲染第二行上下文工具条或独立工作台：
 
@@ -206,7 +206,7 @@ export interface PdfAnnotation {
 
 ### AnnotationSidecar
 
-批注第一版采用可编辑 sidecar，不直接写回原始 PDF。默认路径为原 PDF 所在目录下的 `.faropdf/annotations/<document-key>.annotations.json`：
+批注第一版采用可编辑 sidecar，不直接写回原始 PDF。当前 App 使用按文档 key 隔离的 `localStorage` adapter 持久化，并在存储不可用时回退到内存；未来桌面文件 adapter 可写入原 PDF 同目录的 `.faropdf/annotations/`：
 
 - 有 PDF fingerprint 时使用 fingerprint 派生安全文件名。
 - 无 fingerprint 时使用源路径哈希兜底，不把真实文件名写进 sidecar 文件名。
@@ -657,7 +657,7 @@ OCR 不直接内置到前端。前端 `src/modules/ocr/service/bridge.ts` 通过
 - Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有用户本次明确 consent、安全 apiKeyRef 和 HTTPS endpoint，本机调试仅允许 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback HTTP；真实密钥串、远端明文 HTTP、伪装成 `127.*` 的域名和非法 endpoint 不会调用 Tauri command。bridge 请求会携带脱敏 `privacyAuditRecord`。
 - 端到端覆盖：`tests/e2e/ocr-e2e.test.ts`（前端 fixture + 真实 ocrmypdf + 真实 pdftotext + 真实质量报告）+ `src-tauri/src/lib.rs` `mod ocr_bridge_tests`（Rust 集成测试 + 真实 OCR + 任务队列持久化）。缺工具时静默跳过。
 - 历史（不再适用）：`docs/ARCHITECTURE.md` 之前表述 "当前第一版只建立 bridge/stub，不执行真实 OCR"，与代码实情不符（ISS-007 E2E 联调 worker 已在 0.1.0-alpha.10 落实真实接入，DEC-050 / PR #27）。DEC-095 修订此处。
-- `src-tauri/src/lib.rs` 提供 `start_ocr_job` command stub，Rust 侧重复校验 provider、页码范围、输出策略、默认 `*-ocr.pdf` 新输出路径和云端 OCR 的 `privacyAuditRecord.consentStatus=granted`，返回 queued job。
+- `src-tauri/src/lib.rs` 提供真实 `start_ocr_job` command，Rust 侧重复校验 provider、页码范围、输出策略、默认 `*-ocr.pdf` 新输出路径和云端 OCR 的 `privacyAuditRecord.consentStatus=granted`，随后分发本地进程或云端 provider 并维护任务队列。
 - 错误信息不包含完整敏感 PDF 路径，带逗号或中文标点的 PDF 路径也会在展示前脱敏；API Key 只使用引用或脱敏占位，不写入日志或错误报告。
 
 外部 OCR provider 的 endpoint、模型参数和密钥引用由设置页管理。API Key 不写入公开仓库，不在 UI 中完整展示，不在日志或错误报告中输出。
@@ -670,7 +670,7 @@ OCR 不直接内置到前端。前端 `src/modules/ocr/service/bridge.ts` 通过
 - 错误原因或回退路径。
 - OCR 后搜索质量检查结果，包括阈值结果和问题页原因。
 
-后续真实执行阶段再接入本地 `ocrmypdf` / Legal Skills、PaddleOCR/MinerU 请求、双层 PDF 写入，并把真实 PDF 文本提取、文件体积和耗时统计接入 ISS-017 质量检查报告。
+本地 `ocrmypdf`、双层 PDF 输出、`pdftotext` 提取和质量报告已由真实 E2E 覆盖；PaddleOCR/MinerU 仍需在用户明确 consent 和有效 provider 配置下逐环境验收。
 
 ## PDF 算法来源
 
@@ -722,11 +722,11 @@ FaroPDF 可复用本机 `legal-skills` 中成熟 PDF 脚本的算法，但不直
 | Read | read 不渲染 L4；PDF.js 阅读能力存在 | 双页和主题缺可靠 reference |
 | Sidebar | 左栏容器和多个 panel 已存在；大纲参考态的图标标签栏、标题与空态层级已接线 | thumbnails/outline/annotation/bookmark 仍需 accepted-golden 逐态视觉和行为复核 |
 | Edit | `T 编辑` 进入独立 `edit` mode，保留 G05 measured 的 272px 大纲左栏、整窗居中的单页 ReaderCanvas 与编辑 L4 | 文本/图像/链接/隐藏写回引擎尚未接入，当前按钮显式禁用 |
-| Page management | 独立 `pages` mode 挂载 `PageOrganizerWorkspace`；5 张真实 PDF canvas 缩略图与 measured 页卡几何已接入 | 部分选择动作仍是 placeholder，完整拖拽重排/导出重开待 M3 |
-| RightPanel | mode-driven 容器和多个 panel component 已存在 | `docSummary=null`、OCR noop、shape placeholder 等仍在 |
+| Page management | 独立 `pages` mode；真实缩略图、选择/多选、拖拽、删除、旋转、撤销和 execute 导出已接入，产物已重开解析 | 页面剪贴板、真实尺寸标签和更多异常态 |
+| RightPanel | mode-driven 容器；文档摘要与 OCR 状态/页码范围已接真实数据和 controller | shape-style、bookmarks 等仍需接线 |
 | Search/Annotate | 业务模块和部分 UI 已接线 | 参考状态、转换、保存重开和视觉验收不完整 |
 | Forms/Export/OCR | 有独立业务模块和部分真实输出 | 不能从“底座存在”推导完整工作流或视觉完成 |
-| Validation | typecheck/test/build + 双视口 layout report + 73 项 measured 门禁（L2/L3/L4、L3 横向分组、页面 bbox/count、G05 编辑大纲/中央画布、页卡 bbox/真实 canvas、搜索双栏、状态栏与 surface 语义） | 缺 accepted-golden image diff、M3 PDF round-trip 和未覆盖 surface/interaction gates |
+| Validation | typecheck/test/build + Playwright 真实交互 + PDF 产物重开解析 + OCR 真 pipeline；73 项 measured 门禁继续保留 | accepted-golden image diff 为可选视觉优化；仍缺部分 surface/异常态 |
 
 逐组件等级与 placeholder 以 `docs/reference/pdf-expert/implementation-map.md` 为准。
 

@@ -7405,3 +7405,23 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - 独立 S4 三轮回验：严格 `PASS`。确认 G05 的 272pt 大纲、1008pt 中央区、整窗中心对齐、L3/原生菜单统一入口与 73 项 report 相互一致；未发现新的高/中风险冲突。
 
 边界：本轮最高等级为 `wired + geometry/density/semantic-verified`。它显著修复了用户指出的功能层级、按钮间隙和整体 UI，但不替代 M1 accepted-golden、像素视觉 diff、M3 重排写回或 M4/M5 的完整 surface/工作流验收。
+
+## DEC-187 PDF Expert 改为功能框架参考，未实现入口统一 fail-closed（2026-07-30）
+
+- 日期：2026-07-30
+- 状态：已采纳
+- 关联：ISS-NEW-M M3～M5、DEC-185/186、`implementation-map.md`
+
+用户明确不要求像素级或一比一视觉复刻，核心要求是 UI 入口与后端功能模块一一对应且可验证。此前 M1 accepted-golden 被设为 M3～M5 的前置，造成截图不完整时功能任务也无法推进；同时部分 toast-only/noop 入口制造了“UI 看起来存在、功能是否接好不明确”的假象。
+
+决策：
+
+1. PDF Expert 仅作为信息架构、模式语义和功能映射参考；accepted-golden、视觉 diff 和补截图降为非阻塞质量项。功能完成以 `behavior-complete` 为准。
+2. command catalog 增加 `availability`；planned 命令在 Web 工具菜单 disabled，在原生菜单执行层 fail-closed。T 编辑、图片/Word 转换、翻译和页面复制/粘贴均不得再用 toast、状态跳转或计数冒充成功。
+3. 页面管理由 UI 假计数改为真实 organizer state：选择/多选、拖拽、旋转、删除、撤销和 execute 导出。Playwright 对 `reference.pdf` 实测下载 `reference-organized.pdf`，`pdfinfo` 重开为 5 页、第一页旋转 90°。
+4. AppShell 的文档摘要和 OCR status 接真实数据/controller；OCR 页码范围传入真实请求。批注从 session memory 改为 localStorage sidecar adapter（失败时内存回退）。
+5. 修复中文导出的字体资产加载和 fontkit interop；默认中文水印实际生成 5 页有效 PDF。页面 execute 导出元数据区分 applied 与 plan-only。
+
+验证：`npm run typecheck`、相关聚焦测试和生产 build 通过；本机 `ocrmypdf 17.4.0 + pdftotext 26.02.0` 的真实 OCR E2E 通过；`cargo check` 通过（仅既有 warning）；Playwright 完成搜索 8 命中、矩形批注、摘要、页面管理、表单无字段态、中文/英文水印下载和 OCR 工作区巡检，console/page error 均为 0。全仓 lint 唯一错误仍是用户已有 `readerReducer.test.ts:244 prefer-const`，本次不修改该文件。
+
+边界：T 编辑、页面剪贴板、图片/Word 转换、翻译、bookmarks/部分批注辅助命令和若干错误态仍未实现，但都必须保持 planned/disabled，不得计为完成。表单仍需用真实 AcroForm fixture 做 UI round-trip；浏览器 Vite 无 Tauri `invoke`，OCR 原生路径由真实 E2E 与 Rust 编译验证覆盖。

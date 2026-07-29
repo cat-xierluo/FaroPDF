@@ -7,37 +7,37 @@
 | Surface / workflow | 主要代码 | 当前等级 | 已知事实 | 升级前必须完成 |
 | --- | --- | --- | --- | --- |
 | L2 tabs | `TitlebarTabs.tsx` | `wired` + `geometry/density-verified` | 40px 中性深色 titlebar、多 tab、关闭和新增入口已存在 | accepted-golden 图像比较；补 overflow、拖动和跨窗口证据 |
-| L3 toolbar | `Toolbar.tsx`、`Toolbar.css` | `wired` + `geometry/density-verified` | navigation/zoom/workflows/collaboration/search 五段的 x/width 与 40px 层高已验证 | accepted-golden 图标/字体/响应式视觉 diff；逐控件行为复核 |
+| L3 toolbar | `Toolbar.tsx`、`Toolbar.css` | `wired` + `geometry/density-verified` | 五段结构已验证；协作区只提供真实“摘要/导出与交付”；未实现 T 编辑显式禁用 | 继续逐控件行为复核；视觉 diff 为可选优化 |
 | L4 read | `AppShell.tsx` | `wired` + `geometry-verified` | read 不渲染 L4 | 补可靠 read golden；视图菜单真实动作单独验收 |
 | L5 column order | `workspaceLayout.ts`、`AppShell.tsx`、`app.css` | `wired` + `geometry-verified` | DOM 顺序和中央弹性列已验证；搜索态 273/767/240 双栏 measured | 其他双栏组合、精确宽度和动画仍 missing |
 | L5a sidebar | `Sidebar.tsx`、`AnnotationSidebar.tsx` | `wired`，部分行为已有 | reader thumbnail API 可用；大纲 measured 态的图标标签栏、标题、空态与 272px 宽度已接线 | 左栏 thumbnails/annotations/bookmarks 的完整状态与 accepted-golden 视觉 diff |
 | Read canvas | reader module / canvas components | `behavior-complete` 的部分能力 + `geometry/density-verified` | PDF.js 阅读、页码、缩放已存在；single 只渲染当前页，50% 运行态页面 bbox 对齐 48% reference | 两页态可靠参考；accepted-golden 页面内容与主题 diff |
 | Search | search module、`SearchResultsPanel.tsx` | `wired` + `geometry/density-verified`，部分行为已有 | L3 查询打开 240px L5b 结果栏；273/767/240 三列与按页分组结果已接线 | accepted-golden 字体/命中高亮；零结果/关闭/状态保持逐态复核 |
 | Annotate | annotation module、`AnnotationToolbar.tsx`、`AnnotationToolbar.css` | `wired` + geometry-coarse-verified（ISS-NEW-N-P06） | overlay 和多种批注能力存在；G03 大纲/L4/单页 measured 几何与 active 蓝反馈已接线 | accepted-golden、工具/可选右栏联动、保存重开和视觉验证 |
-| Text selection | `TextSelectionToolbar.tsx` | `skeleton/wired` 混合 | 部分动作接线；翻译仍为 placeholder 文本 | 可靠 selection 证据；所有按钮真实行为或显式 YAGNI |
-| Edit canvas | `AppShell.tsx`、`Sidebar.tsx`、ReaderCanvas | `skeleton` + M2 geometry/semantic-verified | L3 与原生菜单统一进入独立 `edit` mode；G05 的 272px 大纲、1008px 中央区、整窗居中单页和文本/图像/链接/隐藏 L4 已验证；未接通工具显式禁用 | 接 PDF 内容编辑引擎、选择态、撤销、写回副本和重开验证 |
-| Page organizer | `PageOrganizerWorkspace.tsx`、pages module | `wired/behavior-complete` 的部分能力 + `geometry/density-verified` | 独立 `pages` mode；5 张 PDF canvas 缩略图、首卡选中与 measured 卡片 bbox 已验证 | 拖拽重排写回、完整 undo、导出和重开；禁用/移除剩余 placeholder 动作 |
+| Text selection | `TextSelectionToolbar.tsx` | `wired`，部分能力 planned | 批注、复制、朗读有真实动作；翻译服务未接入并显式 disabled | 接真实翻译 provider，或维持 planned |
+| Edit canvas | `AppShell.tsx`、`Sidebar.tsx`、ReaderCanvas | `planned` + M2 geometry/semantic-verified | 内容编辑引擎未接入；L3 和原生命令均 fail-closed，不再进入假编辑态 | 接 PDF 内容编辑引擎、选择态、撤销、写回副本和重开验证 |
+| Page organizer | `PageOrganizerWorkspace.tsx`、pages module | `behavior-complete`（核心）+ `geometry/density-verified` | 真实缩略图、选择/多选、拖拽、旋转、删除、撤销和 execute 导出已接线；产物重开确认 5 页/90° | 页面复制粘贴、真实尺寸标签和更多异常态 |
 | Legacy edit grid | `EditModeGridView.tsx/.css` | `deprecated skeleton` | 已从 AppShell 运行时卸载；仍保留空白渐变、硬编码 A4 和 noop callback 的历史组件 | M3 确认无调用方后删除，不能再作为 edit/pages 规格源 |
 | Right panel shell | `RightPanel.tsx` | `skeleton/wired` 混合 | mode-driven 容器和多个 panel 组件存在 | 按 panel 逐项验收，不能以容器存在代表内容完成 |
-| Document summary | `RightPanel.tsx` | `skeleton` | AppShell 传入 `docSummary={null}` | 接真实文档数据和空/加载/错误态 |
-| OCR status panel | `RightPanel.tsx`、`OcrStatusPanelView.tsx` | `skeleton` | `onStartOcr={() => undefined}`，组件注释明确 placeholder | 接 OCR controller、队列、取消和结果 |
+| Document summary | `RightPanel.tsx` | `wired` | AppShell 从当前 PDF bytes、页数和 metadata 派生摘要 | 补更丰富 metadata 与错误态 |
+| OCR status panel | `RightPanel.tsx`、`OcrStatusPanelView.tsx` | `wired` | 当前任务状态、进度、错误和页码范围接真实 OCR controller | Tauri GUI 下继续验收 provider/权限错误态 |
 | Shape panel | `RightPanel.tsx` | `skeleton/wired` | controlled placeholder 已存在 | 先校准 R12 语义，再接真实 shape state 和绘制 |
 | Signature panel | `SignaturePanel.tsx`（forms/ui）、`signatureStore.ts` | `wired` + geometry-coarse-verified（ISS-NEW-N-P01） | 列表/存储/落点链路存在；点击后选中蓝描边（--selection） | 参考状态精确宽度、落点动画、保存重开和视觉验证 |
 | Stamp panel | `StampPanel.tsx`（stamp/ui）、`CustomStampPanel.tsx`、`stamps.ts` | `wired` + geometry-coarse-verified（ISS-NEW-N-P04） | 统一面板：标准/自定义 tab + 响应式网格（9 模板）+ 选中蓝 | stamp 落点几何、精确 2×2 断点、custom 上传完整闭环和视觉验证 |
-| Welcome | `WelcomeScreen.tsx`、`AppShell.tsx` | `skeleton/wired` 混合 | welcome UI 存在；图片/Word 转换入口曾是反馈占位 | 只保留真实入口；按 R14 重采规范化 golden |
+| Welcome | `WelcomeScreen.tsx`、`AppShell.tsx` | `wired` + planned 子项 | 打开/拖放 PDF 真实；图片/Word 转换引擎未接入，卡片明确 disabled | 接转换引擎后再启用 |
 | Forms | forms module / `FormsPanel`、`AppShell.tsx` | `wired`，部分 behavior-complete | 字段读取/填写/扁平化底座存在；无证据的 forms→shape 默认 fallback 已移除 | 补 forms 可靠参考图、状态矩阵和 round-trip |
-| Export | export module / `ExportDeliveryPanel` | `wired/behavior-complete` 的部分能力 | 多项导出能力存在 | export 参考态缺失；逐工具真实输出和视觉验证 |
+| Export | export module / `ExportDeliveryPanel` | `wired/behavior-complete` 的部分能力 | 多项导出能力存在；默认中文文字水印实际输出 5 页有效 PDF | 继续逐工具 round-trip 与错误态 |
 
-## 明确的 placeholder / noop
+## 明确的 planned / 未完成项
 
 以下内容在清理当日仍能从代码直接检出，任何相关任务不得标记完成：
 
 - `EditModeGridView.tsx`：已卸载的历史 skeleton，仍含空白缩略图、硬编码 A4、placeholder 回调说明。
-- `AppShell.tsx`：内容编辑 L4 明确禁用；`docSummary={null}`；`onStartOcr={() => undefined}`。
-- `PageOrganizerWorkspace.tsx`：真实插入/合并/提取等能力与若干视觉计数 placeholder 并存，不能整体标记 behavior-complete。
-- `RightPanel.tsx` / `OcrStatusPanelView.tsx`：OCR placeholder；shape controlled placeholder。
-- `TextSelectionToolbar.tsx`：翻译占位文本。
-- Welcome 图片/Word 转换若仍只设置 command feedback，则属于 toast-only。
+- `AppShell.tsx` / command catalog：内容编辑、部分批注辅助命令、独立缩放工具、重新载入、书签和 OCR 批量增强标记 `availability=planned`，执行层 fail-closed。
+- `PageOrganizerWorkspace.tsx`：复制/粘贴在页面剪贴板实现前 disabled；不再增加假计数。
+- `RightPanel.tsx`：shape controlled panel 仍需真实绘制样式闭环。
+- `TextSelectionToolbar.tsx`：翻译 disabled，不再把原文包装成“翻译结果”写入剪贴板。
+- Welcome 图片/Word 转换入口 disabled，不再触发 toast-only feedback。
 
 ## 验证器能力
 

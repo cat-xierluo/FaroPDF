@@ -1075,3 +1075,11 @@ v0.3 follow-ups（已在 `docs/RELEASE.md §4` 文档化，不阻塞 beta.1）�
 - 新增 `N-CROP-L3-SEARCH` a/b raw 与 window-only crop：完整 L3 工具栏、左侧大纲、右侧搜索结果栏、`Purpose` 两页命中高亮。
 - 更新 `manifest.json`、`measurements.json`、状态矩阵、覆盖缺口和补采分析；该组保持 `measured`，不宣称 `accepted-golden`。
 - 记录真实文字层拖选未触发浮动工具栏、当前会话缩略图入口 disabled 的负面证据；`ISS-NEW-N-SEL` 与 `ISS-NEW-N-THUMB` 继续保持缺口。
+## 未发版 · 功能框架真实性与页面/OCR/导出闭环（2026-07-30，DEC-187）
+
+- **验收目标调整**：PDF Expert 改为功能框架参考，不再把像素一致、accepted-golden 或截图补采作为 M3～M5 的功能前置；完成标准改为入口接真实模块、产物可重开、未实现能力 fail-closed。
+- **页面管理**：真实选择/多选、拖拽重排、旋转、删除、撤销和 `*-organized.pdf` 导出接线；Playwright 下载后重开确认 5 页且第一页旋转 90°。复制/粘贴显式禁用。
+- **功能真实性**：T 编辑、图片/Word 转换、翻译及 planned 原生命令不再产生假状态/假反馈；“文档助手/共享”改为真实“摘要/导出与交付”。
+- **右栏与批注**：文档摘要接当前 PDF bytes/metadata；OCR 状态与页码范围接真实 controller；批注 sidecar 使用 localStorage 持久化并在不可用时回退内存。
+- **中文导出修复**：修复 Vite 字体 URL、Node 测试 fallback 和 `@pdf-lib/fontkit` CJS interop，默认中文文字水印可实际导出有效 5 页 PDF。
+- **产物元数据**：页面 execute 导出写入 `faropdf:page-operations-applied`，不再错误标成 `plan-only`。

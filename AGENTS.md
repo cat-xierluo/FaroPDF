@@ -84,12 +84,14 @@ FaroPDF 是一个独立 PDF 阅读器，面向律师日常阅读卷宗、证据�
 
 上下文完整只能降低理解歧义，不能替代证据、实现能力或实机验收。不得因为文档已经整理完成，就直接让多个 worker 同时修改 PDF Expert UI。
 
+2026-07-30 用户明确不要求像素级一比一复刻：以下 accepted-golden/视觉门禁仅约束明确的视觉精修任务，不再阻塞功能接线、真实 PDF 往返和错误态修复。功能任务以 `behavior-complete` 为完成线，未实现入口必须 fail-closed。
+
 - M1 默认由单一证据 owner 完成规范化重采、量测和 accepted-golden 准入；M1 期间不得并行启动 UI 实现 worker。
 - M2 默认由单一 foundation owner 建立可失败的视觉验证器；验证器未能在超阈值时返回非零退出码前，不得用“已截图”或“肉眼相似”关闭视觉任务。
-- M3 由单一纵向闭环 owner 推进 `T 编辑` 的真实缩略图、重排、导出和重开验证，避免多个 worker 同时修改页面状态与写回链路。
-- M4/M5 只有在目标 surface 已有 accepted-golden、M2 验证器可用、allowed/forbidden files 不重叠时才可按 surface 或工作流并行。全局布局、共享状态、`src/App.tsx`、`AppShell`、全局样式和共享契约始终只允许一个 owner。
-- 每个 worker prompt 必须写明 ISS-NEW-M 阶段、目标 surface、capture/证据等级、allowed files、forbidden files、交付等级、行为验证和视觉验证；缺少任一项时不得启动。
-- PM 必须复核真实应用截图、DOM/bbox 量测、交互断言和 PDF round-trip 结果。worker 的自述、typecheck、单测或 build 不能单独构成完成证据。
+- M3 由单一纵向闭环 owner 推进独立“页面管理”的真实缩略图、重排、导出和重开验证，避免多个 worker 同时修改页面状态与写回链路；`T 编辑` 是单页内容编辑模式，不得再与页面管理合并。
+- M4/M5 功能任务在 allowed/forbidden files 不重叠时可按工作流推进；只有视觉精修任务才要求 accepted-golden 和 M2 视觉验证器。全局布局、共享状态、`src/App.tsx`、`AppShell`、全局样式和共享契约始终只允许一个 owner。
+- 每个 worker prompt 必须写明 ISS-NEW-M 阶段、目标 surface、allowed files、forbidden files、交付等级和行为验证；视觉任务还必须写 capture/证据等级与视觉验证。
+- PM 必须复核真实交互断言和 PDF round-trip 结果；视觉任务再附截图与 DOM/bbox。worker 的自述、typecheck、单测或 build 不能单独构成完成证据。
 
 阶段并发权和当前唯一可领取项只以 `docs/TASKS.md` 为准；详细派工模板与停止条件见 `docs/reference/pdf-expert/rebuild-guide.md`。
 
