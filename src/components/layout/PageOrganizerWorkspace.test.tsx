@@ -78,10 +78,11 @@ describe("PageOrganizerWorkspace 多选 / 撤销 / 风险", () => {
     expect(screen.getByText("打开 PDF 后管理页面")).toBeInTheDocument();
   });
 
-  test("默认选中当前页，除粘贴外的页面动作可用", () => {
+  test("默认选中当前页，真实页面动作可用，未接入的复制/粘贴明确禁用", () => {
     render(<PageOrganizerWorkspace reader={makeReader(makeState())} />);
     expect(screen.getByRole("button", { name: "删除" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "旋转" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "复制" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "粘贴" })).toBeDisabled();
     expect(screen.getByTestId("page-organizer-save-as")).toBeInTheDocument();
   });
@@ -121,17 +122,65 @@ describe("PageOrganizerWorkspace 多选 / 撤销 / 风险", () => {
     const undoButton = screen.getByTestId("page-organizer-undo");
     expect(undoButton).toBeEnabled();
     expect(undoButton.textContent).toContain("(1)");
+    expect(screen.queryByRole("button", { name: /第 1 页/ })).not.toBeInTheDocument();
+    await user.click(undoButton);
+    expect(screen.getByRole("button", { name: /第 1 页/ })).toBeInTheDocument();
+  });
+
+  test("旋转选中页写入页面整理状态，撤销后恢复", async () => {
+    const user = userEvent.setup();
+    render(<PageOrganizerWorkspace reader={makeReader(makeState())} />);
+    const pageOne = screen.getByRole("button", { name: /第 1 页/ });
+    expect(pageOne).toHaveAttribute("data-rotation", "0");
+    await user.click(screen.getByRole("button", { name: "旋转" }));
+    expect(pageOne).toHaveAttribute("data-rotation", "90");
+    await user.click(screen.getByTestId("page-organizer-undo"));
+    expect(pageOne).toHaveAttribute("data-rotation", "0");
+  });
+
+  test("拖拽页面会真实改变页面整理顺序", () => {
+    const { container } = render(<PageOrganizerWorkspace reader={makeReader(makeState())} />);
+    const pageOne = screen.getByRole("button", { name: /第 1 页/ });
+    const pageThree = screen.getByRole("button", { name: /第 3 页/ });
+    const transfer = new Map<string, string>();
+    const dataTransfer = {
+      effectAllowed: "move",
+      setData: (type: string, value: string) => transfer.set(type, value),
+      getData: (type: string) => transfer.get(type) ?? "",
+    };
+    fireEvent.dragStart(pageOne, { dataTransfer });
+    fireEvent.dragOver(pageThree, { dataTransfer });
+    fireEvent.drop(pageThree, { dataTransfer });
+
+    const order = Array.from(container.querySelectorAll<HTMLElement>(".page-card")).map(
+      (card) => Number(card.dataset.pageNumber),
+    );
+    expect(order).toEqual([2, 1, 3, 4, 5]);
   });
 
   test("另存为新 PDF 弹风险提示对话框", async () => {
     const user = userEvent.setup();
-    render(<PageOrganizerWorkspace reader={makeReader(makeState())} />);
+    const sourceBytes = await createPdfBytes(5);
+    const saveUpdatedBytes: (bytes: Uint8Array, name: string) => Promise<void> = vi.fn(async () => undefined);
+    render(
+      <PageOrganizerWorkspace
+        reader={makeReader(makeState(), { getFileBytes: async () => sourceBytes, saveUpdatedBytes })}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "旋转" }));
     await openMorePageTools(user);
     await user.click(screen.getByRole("menuitem", { name: "另存为新 PDF" }));
     const dialog = screen.getByRole("dialog", { name: "导出风险提示" });
     expect(within(dialog).getByText(/不会覆盖原始文件/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "我已了解，继续" }));
+    await vi.waitFor(() => expect(saveUpdatedBytes).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const calls = (saveUpdatedBytes as unknown as { mock: { calls: Array<[Uint8Array, string]> } }).mock.calls;
+    const [savedBytes, fileName] = calls[0]!;
+    expect(fileName).toBe("y-organized.pdf");
+    const output = await PDFDocument.load(savedBytes!);
+    expect(output.getPageCount()).toBe(5);
+    expect(output.getPage(0).getRotation().angle).toBe(90);
   });
 
   test("清除选择按钮清空所有已选", async () => {

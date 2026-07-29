@@ -85,6 +85,8 @@ describe("pageOrganizer export - execute mode 真实改写 PDF", () => {
     // summary 标记为 applied
     expect(result.summary.pageOperationPlan?.mode).toBe("execute");
     expect(result.summary.pageOperationPlan?.entries.every((entry) => entry.status === "applied")).toBe(true);
+    expect(outputPdf.getKeywords()).toContain("faropdf:page-operations-applied");
+    expect(outputPdf.getKeywords()).not.toContain("faropdf:page-operations-plan-only");
   });
 
   test("空状态：没有 rotate/delete/reorder 时只输出空操作，PDF 内容不变", async () => {
@@ -139,6 +141,8 @@ describe("pageOrganizer export - execute mode 真实改写 PDF", () => {
     expect(outputPdf.getPage(0).getRotation().angle).toBe(0);
     expect(result.summary.pageOperationPlan?.mode).toBe("plan-only");
     expect(result.summary.warnings).toContain("页面操作当前仅生成导出计划，尚未改写页面几何或顺序。");
+    expect(outputPdf.getKeywords()).toContain("faropdf:page-operations-plan-only");
+    expect(outputPdf.getKeywords()).not.toContain("faropdf:page-operations-applied");
   });
 
   test("execute 模式：源 PDF 缺页（index 越界）时导出引擎明确报错", async () => {

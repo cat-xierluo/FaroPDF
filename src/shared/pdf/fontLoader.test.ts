@@ -1,8 +1,8 @@
 import { PDFDocument, type PDFFont } from "pdf-lib";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("../../../assets/fonts/SourceHanSansSC-Regular.otf?arraybuffer", () => ({
-  default: new ArrayBuffer(0),
+vi.mock("../../../assets/fonts/SourceHanSansSC-Regular.otf?url", () => ({
+  default: "/assets/SourceHanSansSC-Regular.otf",
 }));
 
 import {
@@ -11,6 +11,7 @@ import {
   embedChineseFont,
   getFontkit,
   loadChineseFontBytes,
+  normalizeFontkitModule,
   registerFontkitForDocument,
   resetFontkitCache,
   type FontBytesLoader,
@@ -65,6 +66,16 @@ describe("fontLoader", () => {
     resetFontkitCache();
     const after = await getFontkit();
     expect(after).toBe(before);
+  });
+
+  test("normalizeFontkitModule supports Vite default-export interop", () => {
+    const create = vi.fn();
+    expect(normalizeFontkitModule({ default: { create } }).create).toBe(create);
+    expect(normalizeFontkitModule({ create }).create).toBe(create);
+  });
+
+  test("normalizeFontkitModule rejects invalid module shapes", () => {
+    expect(() => normalizeFontkitModule({ default: {} })).toThrow("缺少 create()");
   });
 
   test("registerFontkitForDocument accepts a fontkit instance without throwing", () => {

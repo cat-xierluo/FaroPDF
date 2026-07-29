@@ -1,8 +1,8 @@
 import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("../../../assets/fonts/SourceHanSansSC-Regular.otf?arraybuffer", () => ({
-  default: new ArrayBuffer(0),
+vi.mock("../../../assets/fonts/SourceHanSansSC-Regular.otf?url", () => ({
+  default: "/assets/SourceHanSansSC-Regular.otf",
 }));
 
 import {

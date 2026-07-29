@@ -4,8 +4,8 @@ import type { AnnotationSidecar, PdfAnnotation, PdfPageOperation } from "../../s
 import { createPdfOperationEngine } from "./pdfOperationEngine";
 import { resetFontkitCache } from "../../shared/pdf/fontLoader";
 
-vi.mock("../../../assets/fonts/SourceHanSansSC-Regular.otf?arraybuffer", () => ({
-  default: new ArrayBuffer(0),
+vi.mock("../../../assets/fonts/SourceHanSansSC-Regular.otf?url", () => ({
+  default: "/assets/SourceHanSansSC-Regular.otf",
 }));
 
 afterEach(() => {

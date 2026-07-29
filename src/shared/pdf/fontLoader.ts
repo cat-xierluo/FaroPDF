@@ -1,6 +1,6 @@
 import type { PDFDocument, PDFFont } from "pdf-lib";
 import * as FontkitModule from "@pdf-lib/fontkit";
-import shsFontArrayBuffer from "../../../assets/fonts/SourceHanSansSC-Regular.otf?arraybuffer";
+import shsFontUrl from "../../../assets/fonts/SourceHanSansSC-Regular.otf?url";
 
 export const DEFAULT_CHINESE_FONT_PATH = "SourceHanSansSC-Regular.otf" as const;
 
@@ -8,25 +8,38 @@ export interface FontBytesLoader {
   loadFontBytes: (relativePath: string) => Promise<Uint8Array>;
 }
 
-export type FontkitInstance = typeof FontkitModule;
+export type FontkitInstance = Parameters<PDFDocument["registerFontkit"]>[0];
+
+interface FontkitInteropModule {
+  create?: FontkitInstance["create"];
+  default?: {
+    create?: FontkitInstance["create"];
+  };
+}
 
 const defaultLoader: FontBytesLoader = {
   async loadFontBytes(relativePath) {
     if (relativePath !== DEFAULT_CHINESE_FONT_PATH) {
       throw new Error(`未识别的字体路径：${relativePath}`);
     }
-    // vitest 1.x 默认不解析 Vite `?arraybuffer` 资源，会返回空 ArrayBuffer；
-    // 兜底从源文件读真实 OTF。
-    if (shsFontArrayBuffer.byteLength < 1_000_000) {
-      const { readFileSync } = await import("node:fs");
-      const { fileURLToPath } = await import("node:url");
-      const nodePath = await import("node:path");
-      const here = nodePath.dirname(fileURLToPath(import.meta.url));
-      const filePath = nodePath.resolve(here, "../../../assets/fonts/SourceHanSansSC-Regular.otf");
-      const buf = readFileSync(filePath);
-      return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+    // Vite 不提供 `?arraybuffer` 资源查询；浏览器构建必须先拿 `?url`，再 fetch 真字节。
+    const isJsdom = typeof navigator !== "undefined" && navigator.userAgent.toLowerCase().includes("jsdom");
+    if (typeof window !== "undefined" && typeof window.fetch === "function" && !isJsdom) {
+      const response = await window.fetch(shsFontUrl);
+      if (!response.ok) {
+        throw new Error(`中文字体加载失败：HTTP ${response.status}`);
+      }
+      return new Uint8Array(await response.arrayBuffer());
     }
-    return new Uint8Array(shsFontArrayBuffer);
+
+    // Vitest/Node 环境没有浏览器资源服务器，直接从仓库字体文件读取。
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const nodePath = await import("node:path");
+    const here = nodePath.dirname(fileURLToPath(import.meta.url));
+    const filePath = nodePath.resolve(here, "../../../assets/fonts/SourceHanSansSC-Regular.otf");
+    const buf = readFileSync(filePath);
+    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
   },
 };
 
@@ -36,11 +49,25 @@ export function resetFontkitCache(): void {
   cachedFontkit = null;
 }
 
+/**
+ * `@pdf-lib/fontkit` 在 Vitest/Node 中暴露为具名导出，在 Vite 浏览器构建里则可能
+ * 被 CommonJS interop 包成 `{ default: fontkit }`。统一归一化，避免中文水印在
+ * 浏览器运行时报 `fontkit.create is not a function`。
+ */
+export function normalizeFontkitModule(moduleValue: unknown): FontkitInstance {
+  const interop = moduleValue as FontkitInteropModule;
+  const candidate = typeof interop.create === "function" ? interop : interop.default;
+  if (!candidate || typeof candidate.create !== "function") {
+    throw new Error("fontkit 模块加载失败：缺少 create()。");
+  }
+  return candidate as FontkitInstance;
+}
+
 export async function getFontkit(_loader?: FontBytesLoader): Promise<FontkitInstance> {
   if (cachedFontkit) {
     return cachedFontkit;
   }
-  cachedFontkit = FontkitModule;
+  cachedFontkit = normalizeFontkitModule(FontkitModule);
   return cachedFontkit;
 }
 

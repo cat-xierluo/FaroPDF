@@ -868,7 +868,11 @@ function applyExportMetadata(pdf: PDFDocument, summary: PdfExportSummary): void 
   }
 
   if (summary.pageOperationPlan) {
-    keywords.push("faropdf:page-operations-plan-only");
+    keywords.push(
+      summary.pageOperationPlan.mode === "execute"
+        ? "faropdf:page-operations-applied"
+        : "faropdf:page-operations-plan-only",
+    );
   }
 
   if (summary.outputToolPlan) {
