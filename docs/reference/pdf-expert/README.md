@@ -8,9 +8,9 @@
 - 2026-07-23 复核发现：首批 15 张图片中存在多张误标、重复或自动化失败画面。它们已从 `golden/` 降级到 `captures/raw/`，并按实际画面重新命名。
 - 2026-07-24 补采批次已入库：5 组 PDF Expert 3.9.2 window-only crop（阅读、页面管理、批注、矩形 shape、编辑画布），每组 a/b reference diff 为 0；量测见 `measurements.json`，分析见 `supplemental-analysis-2026-07-24.md`。
 - 当前 accepted golden 数量为 0；新增图片最高为 `measured`，任何 Agent 都不得使用“已有 15 张黄金图”或本批次 measured 图作为最终视觉完成依据。
-- `scripts/verify-pdf-expert-layout.mjs` 目前只证明少量几何不变量，不是视觉一致性测试。
+- `scripts/verify-pdf-expert-layout.mjs` 证明结构不变量；`verify-pdf-expert-visual.mjs` 以 measured bbox 验证 L2/L3/L4、L3 横向分布、页面与页卡几何，并断言单页/缩略图/surface 语义。二者都不是 accepted-golden 像素一致性测试。
 - 在完成规范化重采集、窗口裁剪、元素量测和视觉 diff 之前，相关 UI 的最高状态只能是 `behavior-complete`，不能是 `visually-verified`。
-- M0 上下文纠偏已完成；下一项只能领取 `docs/TASKS.md` ISS-NEW-M 的 M1 规范化重采集与量测。
+- M0、M2.1、M2.2 已完成；M2.2 的 G05 假绿已整改并通过独立 S4 三轮回验。M2 measured 几何/密度/语义门禁已扩展为 73 项，覆盖编辑大纲/中央画布、搜索双栏与状态栏可见性。M1 仍是下一项单一证据任务，M3 的真实缩略图子项已提前接入，但拖拽重排、写回、导出重开与 M4～M5 继续受相应证据门禁约束。
 - 新文档能降低上下文歧义，但不会自动补足缺失证据、视觉判断或功能实现；当前不得把“多个 Agent 一起做”理解成“多个 Agent 一起改 UI”。
 
 ## 权威来源分工
@@ -60,14 +60,14 @@
 
 | 验证器 | 命令 | 职责 | 退出码 |
 | --- | --- | --- | --- |
-| `verify:ui-layout` | `npm run verify:ui-layout` | 结构/几何回归：L3 五段、DOM 顺序（L5a→L5c→L5b）、模式路由、read 不渲染 L4 | 0 通过 / 非 0 失败 |
-| `verify:pdf-expert-visual` | `npm run verify:pdf-expert-visual` | PDF Expert reference bbox 对齐：从 `measurements.json` 读 reference bbox，Playwright 取 FaroPDF DOM boundingBox，超 ±12pt 容差 fail（DEC-182） | 0 全 pass / 1 超容差 / 2 环境错误 |
+| `verify:ui-layout` | `npm run verify:ui-layout` | 双视口结构回归：L3 五段、DOM 顺序、read/annotate/edit/pages 模式路由与互斥 | 0 通过 / 非 0 失败 |
+| `verify:pdf-expert-visual` | `npm run verify:pdf-expert-visual` | 73 项 measured 门禁：L2/L3/L4、L3 横向分布、页面 bbox/单页计数、G05 编辑大纲/中央画布、页卡 bbox/真实 canvas、搜索双栏、状态栏与 surface 语义 | 0 全 pass / 1 超容差或语义错误 / 2 环境错误 |
 
-`verify:pdf-expert-visual` 当前用 measured reference（G01-G05，非 accepted-golden）。策略是几何结构 diff（DOM bbox 对比），不做感知像素 diff——PDF Expert（原生）与 FaroPDF（web）渲染引擎本质不同，像素 diff 必然失败。M1 完成 accepted-golden 后换 reference 目录即可收紧容差。
+`verify:pdf-expert-visual` 当前用 measured reference（G01-G05，非 accepted-golden）。策略是分层/横向几何 diff + surface-specific DOM 断言，不比较页面内容像素。M1 完成 accepted-golden 后再增加图像回归并收紧容差。
 
 ## Agent 开工门禁
 
-处理 L2–L6、Toolbar、AppShell、Sidebar、RightPanel、EditModeGridView 或模式切换前必须：
+处理 L2–L6、Toolbar、AppShell、Sidebar、RightPanel、PageOrganizerWorkspace、EditModeGridView 或模式切换前必须：
 
 1. 阅读本文件、`acceptance-contract.md`、`manifest.json`、`state-matrix.md` 和 `implementation-map.md`。
 2. 在 `docs/TASKS.md` 找到明确的活跃子任务、依赖、允许文件和验收证据；没有任务卡不得自行挑一个历史 ISS 开工。
@@ -78,7 +78,7 @@
 
 ## 多 Agent 启动判断
 
-先看 `docs/TASKS.md` 的“PDF Expert 阶段并发权”。当前 accepted-golden 为 0，M1 是唯一可领取项，所以只能启动规范化采集与量测 worker；Toolbar、Sidebar、RightPanel、EditModeGridView 等实现 worker 均继续阻塞。
+先看 `docs/TASKS.md` 的“PDF Expert 阶段并发权”。当前 accepted-golden 为 0，M1 是下一项单一证据任务；M2.1 纠偏已收口，但这不自动解锁 M3～M5 或多个共享 UI worker。
 
 后续只有同时满足以下条件，才允许把工作拆给多个 Agent：
 

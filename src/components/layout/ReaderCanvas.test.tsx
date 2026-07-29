@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ReaderState } from "../../modules/reader/readerState";
 import type { PdfDocumentState } from "../../shared/pdf/types";
-import { ReaderCanvas, type RenderPageToCanvasFn } from "./ReaderCanvas";
+import { PDF_EXPERT_FIXED_ZOOM_SCALE, ReaderCanvas, type RenderPageToCanvasFn } from "./ReaderCanvas";
 
 const baseDocument: PdfDocumentState = {
   documentId: "doc-1",
@@ -79,7 +79,7 @@ describe("ReaderCanvas 阅读深化", () => {
   test("single 模式只渲染当前页", () => {
     const state = makeState({
       document: { ...baseDocument, viewMode: "single", currentPage: 2 },
-      renderRange: { endPage: 2, pageNumbers: [2], startPage: 2 },
+      renderRange: { endPage: 5, pageNumbers: [1, 2, 3, 4, 5], startPage: 1 },
     });
     render(<ReaderCanvas readerState={state} />);
 
@@ -134,7 +134,7 @@ describe("ReaderCanvas 阅读深化", () => {
     return new Promise<void>((resolve) => {
       setTimeout(() => {
         expect(renderPageToCanvas).toHaveBeenCalled();
-        expect(renderPageToCanvas.mock.calls[0]?.[2]).toBeCloseTo(1.5);
+        expect(renderPageToCanvas.mock.calls[0]?.[2]).toBeCloseTo(1.5 * PDF_EXPERT_FIXED_ZOOM_SCALE);
         resolve();
       }, 0);
     });
@@ -169,6 +169,12 @@ describe("ReaderCanvas 阅读深化", () => {
     render(<ReaderCanvas readerState={state} />);
     const footer = screen.getByTestId("reader-status-footer");
     expect(within(footer).getByText("x.pdf")).toBeInTheDocument();
+  });
+
+  test("single 模式不渲染连续阅读状态页", () => {
+    const state = makeState({ document: { ...baseDocument, viewMode: "single" } });
+    render(<ReaderCanvas readerState={state} />);
+    expect(screen.queryByTestId("reader-status-footer")).not.toBeInTheDocument();
   });
 
   test("ocrStatus=needed 时显示 OCR-needed 提示条，onRequestOcr 回调被调用", async () => {
@@ -210,7 +216,7 @@ describe("ReaderCanvas 阅读深化", () => {
   });
 
   test("active hit 对应页加 data-active-hit=true，其他页不加", () => {
-    const state = makeState({ document: { ...baseDocument, viewMode: "single", currentPage: 2 } });
+    const state = makeState({ document: { ...baseDocument, viewMode: "continuous", currentPage: 2 } });
     const searchState = {
       query: "foo",
       normalizedQuery: "foo",

@@ -1,6 +1,6 @@
 # FaroPDF 路线图
 
-> Last updated: 2026-07-23（PDF Expert 高保真复刻上下文纠偏 DEC-173 + 证据治理与补采归档 DEC-175~178 + ISS-NEW-N 启动）
+> Last updated: 2026-07-28（M2.2 Shell 层级、密度与画布几何纠偏 DEC-186）
 
 ## 项目愿景
 
@@ -21,12 +21,12 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 1. M0：纠正截图分类、冲突文档和完成状态。
 2. M1：按固定 fixture、主题和窗口重采、裁剪并量测参考状态（仍按 ISS-NEW-M 推进；不阻塞 ISS-NEW-N）。
-3. M2：建立会以非零退出码失败的几何 + 感知 diff 验证器。
-4. M3：先闭环 `T 编辑` 的真实缩略图、响应式网格、重排、导出和重开。
+3. M2：建立会以非零退出码失败的 measured 几何/语义验证器；M2.2 已覆盖 L3 横向层级、页面 bbox/单页计数和真实页卡 canvas，accepted-golden 图像 diff 待 M1。
+4. M3：页面管理真实缩略图与 1280px measured 网格已接入；继续闭环响应式断点、拖拽重排、导出和重开，`T 编辑` 的内容写回另按编辑引擎任务推进。
 5. M4：按 surface 分别恢复 Shell、左栏和右栏。
 6. M5：完成 forms、export、OCR 和错误状态的行为/视觉闭环。
 
-并发旁支（ISS-NEW-N，2026-07-23 启动）：基于 6 张 raw-Aminus 的面板修正批次（SignaturePanel / SetPasswordDialog / OcrPanelView / StampPanel / EditModeGridView / AnnotationToolbar）+ 4 张补采子卡（窗口 crop / 缩略图 / selection 浮条 / shape 6 段合同）。允许面板修正子卡在 M1 全量重采未完成时推进，但禁止宣称 `visually-verified`，最高交付等级为 `wired` + `geometry-coarse-verified`（基于 raw 粗估，未 crop、未稳定性 diff）；详见 DEC-177。
+并发旁支（ISS-NEW-N，2026-07-23 启动）：历史批次曾按 6 张 raw-Aminus 安排 SignaturePanel / SetPasswordDialog / OcrPanelView / StampPanel / AnnotationToolbar 与旧 `EditModeGridView` 修正，并安排窗口 crop / 缩略图 / selection 浮条 / shape 6 段合同补采；旧状态机决策已撤销 `EditModeGridView` 路线，现行 DEC-186 又取代旧几何基线，页面管理实现统一使用 `PageOrganizerWorkspace`。当前可领取状态与文件边界只以 `docs/TASKS.md` 为准；未有 accepted-golden 的 surface 禁止宣称 `visually-verified`。
 
 当前 accepted-golden 为 0；既有 `verify:ui-layout` 只证明结构与几何，不表示视觉完成。历史进度日志保留为事实记录，但不覆盖 DEC-173 / DEC-177 / ISS-NEW-M / ISS-NEW-N。
 

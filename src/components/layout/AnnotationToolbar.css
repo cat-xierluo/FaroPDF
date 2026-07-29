@@ -1,40 +1,41 @@
-/**
- * AnnotationToolbar 样式（ISS-NEW-N-P06）。
- *
- * 此前该组件在 src 内无任何 CSS 规则（裸 button 渲染）。
- * 本文件只补「让 active 态有可见反馈」所需的最小基础样式 + active 蓝，
- * 不追求完整视觉规格——完整工具条视觉等待 accepted-golden（M1/M2）。
- *
- * 证据：raw-Aminus R11（pen active 蓝描边）；active 色用 --selection token
- * （补采 G02/G03/G04 实测 PDF Expert 选中蓝 #55A3F8）。
- */
+/* M2.2：G03 measured L4，图标优先、单行居中、无常驻色板。 */
 
 .annotation-toolbar-options {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  justify-content: center;
+  width: 100%;
+  height: 42px;
+  gap: 0;
+  padding: 0;
 }
 
 .annotation-toolbar-tools {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 
 .annotation-tool-button {
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
   color: var(--fg);
   cursor: pointer;
   font-size: 12px;
 }
 
 .annotation-tool-button:hover:not(:disabled) {
-  border-color: var(--border-strong);
+  background: var(--surface-soft);
 }
 
 .annotation-tool-button:disabled {
@@ -43,9 +44,16 @@
 }
 
 .annotation-tool-button--active {
-  border-color: var(--selection);
-  box-shadow: 0 0 0 1px var(--selection);
   background: var(--surface-strong);
+  color: var(--fg);
+}
+
+.annotation-tool-button__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
 .annotation-tool-button--disarm {
@@ -53,7 +61,7 @@
 }
 
 .annotation-toolbar-swatches {
-  display: flex;
+  display: none;
   gap: 4px;
 }
 
@@ -77,10 +85,20 @@
 }
 
 .annotation-toolbar-stamp {
+  position: absolute;
+  top: 43px;
+  left: 50%;
+  z-index: 25;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 100%;
+  width: min(760px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 28%);
 }
 
 .annotation-toolbar-stamp__templates {

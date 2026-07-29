@@ -1,4 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
+import {
+  ClipboardPaste,
+  Copy,
+  FileOutput,
+  FilePlus2,
+  Files,
+  MoreVertical,
+  RotateCw,
+  Save,
+  Trash2,
+  Undo2,
+} from "lucide-react";
 import type { ReaderController } from "../../modules/reader";
 import { createPdfOperationEngine } from "../../modules/export";
 import { splitPagesByGrid } from "../../modules/pages/scanSplit";
@@ -18,6 +30,16 @@ import "./PageOrganizerWorkspace.css";
 const ACTION_LABELS = ["插入页", "附加文件", "旋转", "复制", "粘贴", "摘录", "删除"] as const;
 type ActionLabel = (typeof ACTION_LABELS)[number];
 
+const ACTION_ICONS: Record<ActionLabel, typeof FilePlus2> = {
+  插入页: FilePlus2,
+  附加文件: Files,
+  旋转: RotateCw,
+  复制: Copy,
+  粘贴: ClipboardPaste,
+  摘录: FileOutput,
+  删除: Trash2,
+};
+
 const RISKY_ACTIONS: ReadonlySet<ActionLabel> = new Set(["删除"]);
 
 interface PageOrganizerWorkspaceProps {
@@ -31,7 +53,9 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
     [pageCount],
   );
 
-  const [selectedPageNumbers, setSelectedPageNumbers] = useState<ReadonlySet<number>>(() => new Set());
+  const [selectedPageNumbers, setSelectedPageNumbers] = useState<ReadonlySet<number>>(
+    () => new Set(reader.state.document ? [reader.state.document.currentPage] : []),
+  );
   const [appliedActionCount, setAppliedActionCount] = useState(0);
   const [pendingRiskAction, setPendingRiskAction] = useState<ActionLabel | null>(null);
   const [exportRiskOpen, setExportRiskOpen] = useState(false);
@@ -42,13 +66,13 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
   const [extractDialogOpen, setExtractDialogOpen] = useState(false);
   const [splitDialogOpen, setSplitDialogOpen] = useState(false);
   const [trimDialogOpen, setTrimDialogOpen] = useState(false);
-  const lastClickedPageRef = useRef<number | null>(null);
+  const lastClickedPageRef = useRef<number | null>(reader.state.document?.currentPage ?? null);
   // 引擎单例：与 useFormController 同模式（每次渲染创建浪费，但 createPdfOperationEngine 轻量）
   const engineRef = useRef(createPdfOperationEngine());
 
   // 文档切换时清空选择
   useEffect(() => {
-    setSelectedPageNumbers(new Set());
+    setSelectedPageNumbers(new Set(reader.state.document ? [reader.state.document.currentPage] : []));
     setAppliedActionCount(0);
     setPendingRiskAction(null);
     setExportRiskOpen(false);
@@ -57,7 +81,7 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
     setMergeDialogOpen(false);
     setExtractDialogOpen(false);
     setSplitDialogOpen(false);
-    lastClickedPageRef.current = null;
+    lastClickedPageRef.current = reader.state.document?.currentPage ?? null;
   }, [reader.state.document?.documentId]);
 
   const togglePage = useCallback((pageNumber: number, shiftKey: boolean) => {
@@ -232,7 +256,7 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
 
   if (!reader.state.document) {
     return (
-      <main className="page-organizer" aria-label="页面管理工作台">
+      <main className="page-organizer" data-testid="page-organizer-workspace" aria-label="页面管理工作台">
         <section className="page-organizer__empty" aria-label="页面管理空态">
           <div className="open-dropzone__sheet" aria-hidden="true" />
           <h2>打开 PDF 后管理页面</h2>
@@ -246,11 +270,12 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
   const hasSelection = selectedPageNumbers.size > 0;
 
   return (
-    <main className="page-organizer" aria-label="页面管理工作台">
+    <main className="page-organizer" data-testid="page-organizer-workspace" aria-label="页面管理工作台">
       <div className="page-organizer__toolbar" role="toolbar" aria-label="页面管理工具条">
         <div className="page-organizer__actions" role="group" aria-label="页面操作">
           {ACTION_LABELS.map((action) => {
             const isDisabled = action === "粘贴" || !hasSelection;
+            const Icon = ACTION_ICONS[action];
             return (
               <button
                 aria-pressed={action === "删除" && hasSelection ? "true" : undefined}
@@ -264,75 +289,31 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
                 onClick={() => handleAction(action)}
                 type="button"
               >
-                {action}
+                <Icon size={19} />
+                <span>{action}</span>
               </button>
             );
           })}
         </div>
         <div className="page-organizer__actions page-organizer__actions--right" role="group" aria-label="历史与导出">
-          <button
-            className="context-tool"
-            data-testid="page-organizer-undo"
-            disabled={appliedActionCount === 0}
-            onClick={() => setAppliedActionCount((count) => Math.max(0, count - 1))}
-            type="button"
-          >
-            撤销 {appliedActionCount > 0 ? `(${appliedActionCount})` : ""}
-          </button>
-          <button
-            className="context-tool"
-            data-testid="page-organizer-insert-pdf"
-            disabled={rewriteBusy}
-            onClick={openInsertDialog}
-            type="button"
-          >
-            插入 PDF
-          </button>
-          <button
-            className="context-tool"
-            data-testid="page-organizer-merge-pdfs"
-            disabled={rewriteBusy}
-            onClick={openMergeDialog}
-            type="button"
-          >
-            合并多份 PDF
-          </button>
-          <button
-            className="context-tool"
-            data-testid="page-organizer-extract-pages"
-            disabled={rewriteBusy}
-            onClick={openExtractDialog}
-            type="button"
-          >
-            提取页码范围
-          </button>
-          <button
-            className="context-tool"
-            data-testid="page-organizer-split-pages"
-            disabled={rewriteBusy}
-            onClick={openSplitDialog}
-            type="button"
-          >
-            扫描拆页
-          </button>
-          <button
-            className="context-tool"
-            data-testid="page-organizer-trim-margins"
-            disabled={rewriteBusy}
-            onClick={openTrimDialog}
-            type="button"
-          >
-            裁边切
-          </button>
-          <button
-            className="context-tool context-tool--primary"
-            onClick={handleSaveAs}
-            type="button"
-          >
-            另存为新 PDF
-          </button>
+          <details className="page-organizer__more">
+            <summary aria-label="更多页面工具" title="更多页面工具"><MoreVertical size={19} /></summary>
+            <div className="page-organizer__more-menu" role="menu" aria-label="更多页面工具">
+              <button className="context-tool" data-testid="page-organizer-undo" disabled={appliedActionCount === 0} onClick={() => setAppliedActionCount((count) => Math.max(0, count - 1))} role="menuitem" type="button">
+                <Undo2 size={17} /><span>撤销 {appliedActionCount > 0 ? `(${appliedActionCount})` : ""}</span>
+              </button>
+              <button className="context-tool" data-testid="page-organizer-insert-pdf" disabled={rewriteBusy} onClick={openInsertDialog} role="menuitem" type="button">插入 PDF</button>
+              <button className="context-tool" data-testid="page-organizer-merge-pdfs" disabled={rewriteBusy} onClick={openMergeDialog} role="menuitem" type="button">合并多份 PDF</button>
+              <button className="context-tool" data-testid="page-organizer-extract-pages" disabled={rewriteBusy} onClick={openExtractDialog} role="menuitem" type="button">提取页码范围</button>
+              <button className="context-tool" data-testid="page-organizer-split-pages" disabled={rewriteBusy} onClick={openSplitDialog} role="menuitem" type="button">扫描拆页</button>
+              <button className="context-tool" data-testid="page-organizer-trim-margins" disabled={rewriteBusy} onClick={openTrimDialog} role="menuitem" type="button">裁边切</button>
+              <button aria-label="另存为新 PDF" className="context-tool" data-testid="page-organizer-save-as" onClick={handleSaveAs} role="menuitem" type="button">
+                <Save size={17} /><span>另存为新 PDF</span>
+              </button>
+            </div>
+          </details>
         </div>
-        {hasSelection ? (
+        {selectedPageNumbers.size > 1 ? (
           <div className="page-organizer__selection" aria-live="polite">
             <span>已选 {selectedPageNumbers.size} 页</span>
             <button className="context-tool context-tool--ghost" onClick={clearSelection} type="button">
@@ -349,9 +330,10 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
       <ol className="page-grid" aria-label="页面网格">
         {pages.map((page) => (
           <PageCard
-            key={page}
+            key={`${reader.state.document?.documentId ?? "none"}:${page}`}
             onToggle={togglePage}
             pageNumber={page}
+            renderThumbnail={reader.renderThumbnail}
             selected={selectedPageNumbers.has(page)}
           />
         ))}
@@ -449,25 +431,61 @@ interface PageCardProps {
   pageNumber: number;
   selected: boolean;
   onToggle: (pageNumber: number, shiftKey: boolean) => void;
+  renderThumbnail: ReaderController["renderThumbnail"];
 }
 
-function PageCard({ pageNumber, selected, onToggle }: PageCardProps) {
+function PageCard({ pageNumber, selected, onToggle, renderThumbnail }: PageCardProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const renderPromiseRef = useRef<Promise<void> | null>(null);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || typeof renderThumbnail !== "function") {
+      setThumbnailFailed(true);
+      return;
+    }
+    let cancelled = false;
+    setThumbnailFailed(false);
+    const renderPromise = renderPromiseRef.current ?? renderThumbnail(pageNumber - 1, canvas, 174);
+    renderPromiseRef.current = renderPromise;
+    void renderPromise
+      .then(() => {
+        if (!cancelled) {
+          canvas.dataset.rendered = "true";
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          renderPromiseRef.current = null;
+          console.error(`[FaroPDF] 页面管理第 ${pageNumber} 页缩略图渲染失败:`, error);
+          setThumbnailFailed(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pageNumber, renderThumbnail]);
+
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     onToggle(pageNumber, event.shiftKey);
   };
   return (
     <li className="page-card-grid-item">
       <button
+        aria-label={`第 ${pageNumber} 页，A4 (210 x 297 毫米)`}
         aria-pressed={selected}
         className={"page-card" + (selected ? " page-card--selected" : "")}
         data-page-number={pageNumber}
         onClick={handleClick}
         type="button"
       >
-        <div className="page-card__sheet" aria-hidden="true" />
-        <span>第 {pageNumber} 页</span>
+        <div className="page-card__sheet" aria-hidden="true">
+          <canvas data-testid={`page-thumbnail-${pageNumber}`} ref={canvasRef} />
+          {thumbnailFailed ? <span className="page-card__thumbnail-error">缩略图不可用</span> : null}
+        </div>
+        <span>{pageNumber}</span>
         <small>A4 (210 x 297 毫米)</small>
-        {selected ? <span className="page-card__check" aria-hidden="true">✓</span> : null}
       </button>
     </li>
   );
@@ -698,8 +716,9 @@ function InsertPdfDialog({
             <button className="context-tool" disabled={busy} onClick={onClose} type="button">
               取消
             </button>
-            <button
-              className="context-tool context-tool--primary"
+          <button
+            aria-label="另存为新 PDF"
+            className="context-tool context-tool--primary"
               data-testid="insert-pdf-confirm"
               disabled={busy}
               type="submit"

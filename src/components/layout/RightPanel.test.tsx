@@ -10,11 +10,10 @@ describe("RightPanel (ISS-060 skeleton)", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  test("annotate 模式 + stamps → 渲染「图章」 + 接入 CustomStampPanel（DEC-112）", () => {
+  test("annotate 模式 + stamps → 渲染「图章」 + 接入统一 StampPanel", () => {
     render(<RightPanel activeMode="annotate" rightPanel="stamps" />);
     expect(screen.getByRole("heading", { name: "图章" })).toBeTruthy();
-    // ISS-060 阶段 2 接入 CustomStampPanel
-    expect(screen.getByTestId("custom-stamp-panel")).toBeTruthy();
+    expect(screen.getByTestId("stamp-panel")).toBeTruthy();
     expect(screen.queryByTestId("right-pane-placeholder")).toBeNull();
   });
 
@@ -29,9 +28,9 @@ describe("RightPanel (ISS-060 skeleton)", () => {
     expect(screen.getByTestId("signature-panel")).toBeTruthy();
   });
 
-  test("forms 模式 + stamps → 也渲染 CustomStampPanel（让表单签字时也能盖业务章）", () => {
+  test("forms 模式 + stamps → 也渲染统一 StampPanel（让表单签字时也能盖业务章）", () => {
     render(<RightPanel activeMode="forms" rightPanel="stamps" />);
-    expect(screen.getByTestId("custom-stamp-panel")).toBeTruthy();
+    expect(screen.getByTestId("stamp-panel")).toBeTruthy();
   });
 
   test("非 annotate / forms / export 模式不渲染 CustomStampPanel / SignaturePanel", () => {
@@ -65,6 +64,11 @@ describe("RightPanel (ISS-060 skeleton)", () => {
     // P2-7：read / pages 模式不应展示模式驱动栏，即便 rightPanel 字段被错传
     const { container } = render(<RightPanel activeMode="read" rightPanel="stamps" />);
     expect(container.firstChild).toBeNull();
+  });
+
+  test("none 或 edit 默认组合始终折叠", () => {
+    expect(render(<RightPanel activeMode="annotate" rightPanel="none" />).container).toBeEmptyDOMElement();
+    expect(render(<RightPanel activeMode="edit" rightPanel="shape" />).container).toBeEmptyDOMElement();
   });
 
   test("pages 模式 + ocr-queue → 强制折叠", () => {

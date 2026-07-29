@@ -1,18 +1,25 @@
-export type AppModeId = "read" | "annotate" | "export" | "forms" | "ocr" | "pages";
+/**
+ * 顶层工作模式。
+ *
+ * `edit` 是单页 PDF 内容编辑画布；`pages` 是独立的页面管理网格。
+ * 两者由 PDF Expert 3.9.2 的 N-EDIT-CANVAS / N-PAGE-MANAGEMENT-GRID
+ * measured 证据明确区分，不得再次合并。
+ */
+export type AppModeId = "read" | "annotate" | "edit" | "export" | "forms" | "ocr" | "pages";
 
-/** ISS-NEW-A 阶段 1：Toolbar 5 段 id（与 Toolbar.tsx data-section 一一对应）。
- *  - sidebar-toggles: 侧栏切换 4 个按钮（摘要 / 页面 / 视图设置 / 书签）
- *  - file:           打开按钮（隐藏 file input）
- *  - reading:        页码导航 + 缩放 +/- + 视图模式 4-icon toggle
- *  - mode:           A 批注 / T 编辑 按钮
- *  - right:          搜索框 + 工具 launcher + 设置
+/** M2.2：Toolbar 5 个语义段（与 Toolbar.tsx data-section 一一对应）。
+ *  - navigation:    摘要 / 页面管理 / 视图设置
+ *  - zoom:          当前缩放 + +/-
+ *  - workflows:     批注 / 编辑 / 导出 / 填写签名 / OCR / 更多工具
+ *  - collaboration: 文档助手 / 共享
+ *  - search:        全文搜索
  */
 export type AppToolbarSectionId =
-  | "sidebar-toggles"
-  | "file"
-  | "reading"
-  | "mode"
-  | "right";
+  | "navigation"
+  | "zoom"
+  | "workflows"
+  | "collaboration"
+  | "search";
 
 export type UtilityPanelId =
   | "summary"

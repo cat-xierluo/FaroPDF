@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Bookmark, Files, ListTree, MessageSquareText, Plus } from "lucide-react";
 import type { PdfAnnotation, PdfAnnotationType } from "../../shared/pdf/annotation";
 import type { PdfViewMode, ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
@@ -11,7 +12,13 @@ export type RenderThumbnailFn = (
 ) => Promise<void>;
 
 const summaryTabs = ["书签", "大纲", "批注列表", "缩略图"] as const;
-type SummaryTab = (typeof summaryTabs)[number];
+export type SummaryTab = (typeof summaryTabs)[number];
+const summaryTabIcons = {
+  书签: Bookmark,
+  大纲: ListTree,
+  批注列表: MessageSquareText,
+  缩略图: Files,
+} as const;
 const viewModeOptions: Array<{ id: PdfViewMode; label: string }> = [
   { id: "continuous", label: "连续" },
   { id: "single", label: "单页" },
@@ -77,6 +84,8 @@ interface DocumentSummaryPanelProps {
   pagesWithHits?: Set<number>;
   /** 是否需要 OCR（来自 document.ocrStatus === "needed"） */
   ocrNeeded?: boolean;
+  /** 进入特定工作流时应显示的参考 tab；变化时同步一次，用户仍可继续切换。 */
+  preferredTab?: SummaryTab;
 }
 
 export function DocumentSummaryPanel({
@@ -88,23 +97,35 @@ export function DocumentSummaryPanel({
   renderThumbnail,
   pagesWithHits,
   ocrNeeded,
+  preferredTab,
 }: DocumentSummaryPanelProps) {
-  const [activeTab, setActiveTab] = useState<SummaryTab>("缩略图");
+  const [activeTab, setActiveTab] = useState<SummaryTab>(preferredTab ?? "缩略图");
+
+  useEffect(() => {
+    if (preferredTab) {
+      setActiveTab(preferredTab);
+    }
+  }, [preferredTab]);
 
   return (
     <aside className="utility-panel document-summary" aria-label="文档摘要">
       <div className="summary-tabs" role="tablist" aria-label="文档摘要视图">
-        {summaryTabs.map((tab) => (
-          <button
-            aria-selected={activeTab === tab}
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            role="tab"
-            type="button"
-          >
-            {tab}
-          </button>
-        ))}
+        {summaryTabs.map((tab) => {
+          const TabIcon = summaryTabIcons[tab];
+          return (
+            <button
+              aria-label={tab}
+              aria-selected={activeTab === tab}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              role="tab"
+              title={tab}
+              type="button"
+            >
+              <TabIcon aria-hidden="true" size={15} strokeWidth={1.7} />
+            </button>
+          );
+        })}
       </div>
 
       {activeTab === "缩略图" ? (
@@ -124,6 +145,31 @@ export function DocumentSummaryPanel({
           annotations={annotations}
           onSelectPage={onSelectPage}
         />
+      ) : activeTab === "大纲" || activeTab === "书签" ? (
+        <div className="summary-outline" role="tabpanel" aria-label={activeTab}>
+          <header className="summary-outline__header">
+            <h2>{activeTab}</h2>
+            <button aria-label={`添加${activeTab}项目`} title={`添加${activeTab}项目`} type="button">
+              <Plus aria-hidden="true" size={16} />
+            </button>
+          </header>
+          <div className="summary-outline__empty">
+            <div className="summary-outline__illustration" aria-hidden="true">
+              <span className="summary-outline__sheet summary-outline__sheet--back" />
+              <span className="summary-outline__sheet summary-outline__sheet--front">
+                <i />
+                <i />
+                <i />
+                <i />
+              </span>
+            </div>
+            <p>
+              {activeTab === "大纲"
+                ? "右击文本并从菜单选择 添加大纲项目。"
+                : "点击上方加号，为当前页面添加书签。"}
+            </p>
+          </div>
+        </div>
       ) : (
         <div className="summary-empty" role="tabpanel">
           <p>{activeTab}会在打开 PDF 后显示。</p>

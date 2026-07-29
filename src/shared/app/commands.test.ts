@@ -169,6 +169,22 @@ describe("app command catalog", () => {
     expect(markup).toContain("forms-sign-handwrite");
   });
 
+  test("PDF 内容编辑五个原生命令统一进入独立 edit mode", () => {
+    for (const id of [
+      "pdf-edit-content",
+      "pdf-add-image",
+      "pdf-add-link",
+      "pdf-add-text",
+      "pdf-redact",
+    ] as const) {
+      const command = getCommandById(id);
+      expect(command?.group).toBe("mode");
+      expect(command?.targetMode).toBe("edit");
+      expect(command?.requiresDocument).toBe(true);
+      expect(command?.entryPoints).toContain("native-menu");
+    }
+  });
+
   test("native menu entries are backed by the same command definitions", () => {
     const nativeIds = getNativeMenuCommands().map((command) => command.id);
     expect(nativeIds).toEqual(expect.arrayContaining<AppCommandId>([

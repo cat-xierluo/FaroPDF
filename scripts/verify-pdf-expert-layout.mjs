@@ -14,6 +14,7 @@ const viewports = [
   { width: 1500, height: 900 },
   { width: 1280, height: 800 },
 ];
+const currentRunStates = ["read", "annotate", "left-panel-annotate", "edit", "page-management"];
 
 let devServer = null;
 
@@ -87,7 +88,11 @@ async function verifyViewport(browser, viewport) {
 
   await page.goto(baseUrl, { waitUntil: "networkidle" });
   await page.locator('input[type="file"][aria-label="选择本地 PDF 文件"]').setInputFiles(fixturePath);
-  await page.locator(".page-control").filter({ hasText: "1 / 5" }).waitFor();
+  await page.locator('.pdf-page[data-page-number="1"]').waitFor();
+  await page.getByRole("button", { name: "视图设置", exact: true }).click();
+  await page.locator('[data-testid="view-mode-grid"] button[data-view-mode="single"]').click();
+  await page.getByRole("button", { name: "视图设置", exact: true }).click();
+  await page.keyboard.press("Home");
   await page.locator(".workspace[data-layout='main-only']").waitFor();
 
   const workspace = page.locator(".workspace");
@@ -101,6 +106,12 @@ async function verifyViewport(browser, viewport) {
   );
   assert(toolbarColumnCount === 5, `${viewportLabel} computed L3 grid must contain five columns`);
   assert(toolbarRect.height <= 52, `${viewportLabel} L3 must remain one row, got ${toolbarRect.height}px`);
+  const toolbarSectionIds = await toolbarSections.evaluateAll((sections) => sections.map((section) => section.getAttribute("data-section")));
+  assert(
+    toolbarSectionIds.join("|") === "navigation|zoom|workflows|collaboration|search",
+    `${viewportLabel} L3 semantic order mismatch: ${toolbarSectionIds.join("|")}`,
+  );
+  assert((await page.locator('.pdf-page[data-page-number]').count()) === 1, `${viewportLabel} single mode must render exactly one PDF page`);
   assert((await page.locator(".context-toolbar").count()) === 0, `${viewportLabel} read must not render L4`);
   assert((await page.locator(".right-pane").count()) === 0, `${viewportLabel} read must not render L5b`);
 
@@ -111,54 +122,66 @@ async function verifyViewport(browser, viewport) {
   await captureState(page, viewportLabel, "read");
 
   await page.getByRole("button", { name: "A 批注", exact: true }).click();
-  await page.locator(".workspace[data-layout='main-right']").waitFor();
+  await page.locator(".workspace[data-layout='main-only']").waitFor();
   const annotateMainRect = await rect(main, "annotate main");
-  const annotateRightRect = await rect(page.locator(".right-pane"), "annotate right");
   assert(near(annotateMainRect.x, readWorkspaceRect.x), `${viewportLabel} annotate main must start at workspace left`);
-  assert(near(annotateMainRect.x + annotateMainRect.width, annotateRightRect.x), `${viewportLabel} L5b must follow L5c`);
-  // 480pt：DEC-183 对齐 PDF Expert N-CROP-L3-SEARCH measured right_search_panel.width
-  assert(near(annotateRightRect.width, 480), `${viewportLabel} default L5b width must be 480px (DEC-183 PDF Expert measured)`);
+  assert(near(annotateMainRect.width, readMainRect.width), `${viewportLabel} annotate default must not reserve an unproven right panel`);
+  assert((await page.locator(".right-pane").count()) === 0, `${viewportLabel} annotate default L5b must be collapsed`);
   assert((await page.getByRole("toolbar", { name: "批注工具条" }).count()) === 1, `${viewportLabel} annotate L4 missing`);
   await captureState(page, viewportLabel, "annotate");
 
   await page.getByRole("button", { name: "文档摘要", exact: true }).click();
   await page.getByRole("button", { name: "A 批注", exact: true }).click();
-  await page.locator(".workspace[data-layout='left-main-right']").waitFor();
+  await page.locator(".workspace[data-layout='left-main']").waitFor();
   const leftRect = await rect(page.locator(".utility-panel"), "left panel");
   const bothMainRect = await rect(main, "both main");
-  const bothRightRect = await rect(page.locator(".right-pane"), "both right");
   assert(near(leftRect.x + leftRect.width, bothMainRect.x), `${viewportLabel} L5c must follow L5a`);
-  assert(near(bothMainRect.x + bothMainRect.width, bothRightRect.x), `${viewportLabel} L5b must follow L5c`);
   const childClasses = await workspace.locator(":scope > *").evaluateAll((children) =>
     children.map((child) => child.className),
   );
   assert(
     childClasses[0].includes("utility-panel") &&
       childClasses[1].includes("workspace__main") &&
-      childClasses[2].includes("right-pane"),
-    `${viewportLabel} DOM order must be L5a → L5c → L5b, got ${childClasses.join(" | ")}`,
+      childClasses.length === 2,
+    `${viewportLabel} DOM order must be L5a → L5c with collapsed L5b, got ${childClasses.join(" | ")}`,
   );
-  await captureState(page, viewportLabel, "both-panels");
+  await captureState(page, viewportLabel, "left-panel-annotate");
 
   await page.getByRole("button", { name: "T 编辑", exact: true }).click();
-  await page.locator(".workspace[data-layout='main-only']").waitFor();
+  await page.locator(".workspace[data-layout='left-main']").waitFor();
+  await page.locator('[role="tab"][aria-label="大纲"][aria-selected="true"]').waitFor();
   assert(
-    (await page.getByRole("main", { name: "编辑模式网格" }).count()) === 1,
-    `${viewportLabel} T 编辑 must open the edit grid`,
+    (await page.getByRole("main", { name: "PDF 阅读区" }).count()) === 1,
+    `${viewportLabel} T 编辑 must keep the single-page reader canvas`,
   );
+  assert((await page.getByRole("toolbar", { name: "编辑工具条" }).count()) === 1, `${viewportLabel} edit L4 missing`);
+  assert(
+    (await page.getByRole("tab", { name: "大纲", exact: true }).getAttribute("aria-selected")) === "true",
+    `${viewportLabel} edit must preserve the measured G05 outline sidebar`,
+  );
+  assert((await page.locator('[data-testid="page-organizer-workspace"]').count()) === 0, `${viewportLabel} edit must not render page management`);
   assert(
     (await page.getByRole("button", { name: "T 编辑", exact: true }).getAttribute("aria-pressed")) === "true",
     `${viewportLabel} T 编辑 must be pressed in edit mode`,
   );
   await captureState(page, viewportLabel, "edit");
 
+  await page.getByRole("button", { name: "页面管理", exact: true }).click();
+  await page.locator('[data-testid="page-organizer-workspace"]').waitFor();
+  assert((await page.getByRole("main", { name: "页面管理工作台" }).count()) === 1, `${viewportLabel} page management workspace missing`);
+  assert((await page.getByRole("toolbar", { name: "编辑工具条" }).count()) === 0, `${viewportLabel} pages must not render edit L4`);
+  assert(
+    (await page.getByRole("button", { name: "T 编辑", exact: true }).getAttribute("aria-pressed")) === "false",
+    `${viewportLabel} T 编辑 must not be pressed in pages mode`,
+  );
+  await captureState(page, viewportLabel, "page-management");
+
   await context.close();
   return {
     viewport: viewportLabel,
     readMainWidth: Math.round(readMainRect.width),
     annotateMainWidth: Math.round(annotateMainRect.width),
-    bothMainWidth: Math.round(bothMainRect.width),
-    rightPanelWidth: Math.round(annotateRightRect.width),
+    leftPanelMainWidth: Math.round(bothMainRect.width),
   };
 }
 
@@ -172,7 +195,18 @@ try {
   for (const viewport of viewports) {
     results.push(await verifyViewport(browser, viewport));
   }
-  process.stdout.write(`${JSON.stringify({ ok: true, artifacts: artifactRoot, results }, null, 2)}\n`);
+  const report = {
+    ok: true,
+    timestamp: new Date().toISOString(),
+    scope: "Two-viewport L3 structure, L5 DOM order, annotate default/left-panel behavior, G05 edit outline, and edit/pages route separation",
+    artifacts: currentRunStates.flatMap((state) =>
+      viewports.map((viewport) => `${viewport.width}x${viewport.height}-${state}.png`),
+    ),
+    ignored_existing_files: "Files not listed in artifacts belong to earlier runs and are not current evidence.",
+    results,
+  };
+  await writeFile(resolve(artifactRoot, "report.json"), JSON.stringify(report, null, 2) + "\n");
+  process.stdout.write(`${JSON.stringify({ ...report, report: resolve(artifactRoot, "report.json") }, null, 2)}\n`);
 } finally {
   await browser.close();
   if (devServer) {

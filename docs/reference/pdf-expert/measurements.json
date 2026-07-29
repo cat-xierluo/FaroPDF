@@ -1,12 +1,13 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "captured_at": "2026-07-24",
   "source": "PDF Expert 3.9.2 on macOS, tests/fixtures/expert/reference.pdf",
   "window": {
     "logical": {"x": 200, "y": 120, "width": 1280, "height": 832},
     "retina_scale": 2,
     "crop_physical": {"x": 400, "y": 240, "width": 2560, "height": 1664},
-    "theme": "dark"
+    "theme": "dark",
+    "zoom_percent_observed": 48
   },
   "method": {
     "bbox": "manual pixel read from window-only crop, divided by retina_scale",
@@ -14,20 +15,37 @@
     "automated_bbox": false,
     "zai_mcp": "unavailable in this environment",
     "stability_diff": "ImageMagick compare -metric AE; all listed a/b pairs returned 0 differing pixels",
-    "pm_review_2026_07_24": "PM 用 ImageMagick 像素分析（逐行/逐列 mean 亮度、颜色分类、区域像素计数）独立复核了 5 组 crop。几何一致性整体高；但发现 3 处与原记录值偏差较大的字段，见各 surface 的 measurement_review。审计方法与 worker 的人工 pixel-read 不同（边界判定可能不同），因此本字段不直接覆盖原值，而是并记分歧，留 M1 独立复核裁决。审计无法读出图标文字/段落标签，语义结论不背书。"
+    "pm_review_2026_07_24": "PM 用 ImageMagick 像素分析（逐行/逐列 mean 亮度、颜色分类、区域像素计数）独立复核了 5 组 crop。2026-07-28 二次校准将层高、页面 bbox、页卡 canvas 和栏宽写回 canonical 字段；旧层高仅在 read.disputed_original 和 method.layer_normalization 追溯，旧页卡值保存在 page_cards.disputed_original。M1 仍需独立复核裁决。",
+    "layer_normalization_2026_07_28": "2026-07-28 第二次逐行像素取色推翻了早先的 29/32/33 归一化：1280×832 window-only crop 的稳定边界为 L2 titlebar=40pt、L3 main_toolbar=40pt、L4 contextual toolbar≈43pt；read 无 L4 时 canvas 从 y=80 开始，annotate/edit/pages 的内容从 y=123/124 开始。旧值保留在各 surface 的 disputed_original，禁止验证器继续按错误的 61/94pt 总边界自证通过。",
+    "density_audit_2026_07_28": "ImageMagick 将 2560×1664 retina crop 缩至 1280×832 后，抽取 y=39/40、79/80、122/123 相邻行颜色确认层边界；白页和页卡再以 fuzz=4% 白色连通域复核。人工量测不替代 M1 accepted-golden。"
   },
   "state_machine_note_2026_07_24": {
-    "edit_vs_page_management": "G05 (N-EDIT-CANVAS) 与 G02 (N-PAGE-MANAGEMENT-GRID) 证明 PDF Expert 的 '编辑' 入口进入单页文本编辑画布（文本/图像/链接/隐藏工具条），'页面管理' 入口才产生 5 卡片单排网格。两者是独立状态，不可合并。FaroPDF 实现必须把 EditModeGridView 的页面卡片模式挂到'页面管理'入口，不能与'编辑'文本工具条混为一谈。1280pt 窗宽下页面管理为 5 卡同排无 wrap；wrap 断点未测（R15 的 4+1 和'固定 5 列'两个极端都不能直接采用）。"
+    "edit_vs_page_management": "G05 (N-EDIT-CANVAS) 与 G02 (N-PAGE-MANAGEMENT-GRID) 证明 PDF Expert 的 '编辑' 入口进入单页文本编辑画布（文本/图像/链接/隐藏工具条），'页面管理' 入口才产生 5 卡片单排网格。两者是独立状态，不可合并。FaroPDF 的页面卡片模式由 pages / PageOrganizerWorkspace 承载；已卸载的 EditModeGridView 不是规格源。1280pt 窗宽下页面管理为 5 卡同排无 wrap；wrap 断点未测（R15 的 4+1 和'固定 5 列'两个极端都不能直接采用）。"
   },
   "surfaces": [
     {
       "capture_id": "N-CROP-READ-DEFAULT",
       "crop_bbox": {"x": 0, "y": 0, "width": 1280, "height": 832},
       "layers": {
-        "titlebar": {"x": 0, "y": 0, "width": 1280, "height": 29},
-        "main_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 32},
-        "canvas": {"x": 211, "y": 61, "width": 1069, "height": 771},
-        "page_1": {"x": 293, "y": 94, "width": 398, "height": 721}
+        "titlebar": {"x": 0, "y": 0, "width": 1280, "height": 40},
+        "main_toolbar": {"x": 0, "y": 40, "width": 1280, "height": 40},
+        "canvas": {"x": 0, "y": 80, "width": 1280, "height": 752},
+        "page_1": {"x": 382, "y": 91, "width": 514, "height": 729}
+      },
+      "toolbar_groups": {
+        "navigation": {"x": 8, "y": 44, "width": 108, "height": 28},
+        "zoom": {"x": 128, "y": 44, "width": 150, "height": 28},
+        "workflows": {"x": 314, "y": 40, "width": 618, "height": 40},
+        "collaboration": {"x": 946, "y": 44, "width": 96, "height": 28},
+        "search": {"x": 1053, "y": 44, "width": 219, "height": 28}
+      },
+      "disputed_original": {
+        "layers": {
+          "titlebar": {"x": 0, "y": 0, "width": 1280, "height": 29},
+          "main_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 32},
+          "canvas": {"x": 211, "y": 61, "width": 1069, "height": 771},
+          "page_1": {"x": 293, "y": 94, "width": 398, "height": 721}
+        }
       },
       "notes": ["single-page read state", "left and right panes collapsed"]
     },
@@ -35,22 +53,29 @@
       "capture_id": "N-PAGE-MANAGEMENT-GRID",
       "crop_bbox": {"x": 0, "y": 0, "width": 1280, "height": 832},
       "layers": {
-        "main_toolbar": {"x": 0, "y": 0, "width": 1280, "height": 29},
-        "page_action_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 65},
-        "grid_canvas": {"x": 0, "y": 94, "width": 1280, "height": 738}
+        "titlebar": {"x": 0, "y": 0, "width": 1280, "height": 40},
+        "main_toolbar": {"x": 0, "y": 40, "width": 1280, "height": 40},
+        "page_action_toolbar": {"x": 0, "y": 80, "width": 1280, "height": 44},
+        "grid_canvas": {"x": 0, "y": 124, "width": 1280, "height": 708}
       },
       "page_cards": {
         "count_visible": 5,
         "layout": "single row",
         "selected_index": 1,
-        "card_bbox_approx": {"x": 51, "y": 110, "width": 181, "height": 195},
-        "card_gap_approx": 62,
+        "thumbnail_canvas_bbox_approx": {"x": 70, "y": 148, "width": 174, "height": 247},
+        "thumbnail_canvas_x_positions": [70, 311, 553, 794, 1036],
+        "thumbnail_canvas_gap_approx": 67,
+        "disputed_original": {
+          "card_bbox_approx": {"x": 51, "y": 110, "width": 181, "height": 195},
+          "card_gap_approx": 62,
+          "measurement_review_value": {"card_bbox_approx": {"x": 69, "y": 110, "width": 175, "height": 195}, "card_gap_approx": 66}
+        },
         "metadata": "page number + A4 (210 × 297 毫米)",
         "measurement_review_2026_07_24": {
           "method": "ImageMagick 逐列 mean 亮度检测白色卡片块的起止列",
-          "findings": "实测 5 张卡片起始 x≈69（原 51）、宽度≈175（原 181）、间距≈66（原 62）。count=5、single row、page 1 蓝选中（2272 蓝像素）像素级证实。",
-          "divergence": "起始 x 偏差 +18pt（超 ±4pt 容差），宽度/间距偏差在容差边缘。建议 M1 复核。",
-          "action": "实现时如需精确卡片几何，以 M1 复核值为准；当前先用实测近似值 69/175/66。"
+          "findings": "二次白色连通域复核确认 5 张 thumbnail canvas 的 x≈70/311/553/794/1036、y≈148、width≈174、height≈247；count=5、single row、page 1 蓝选中像素均可复算。",
+          "divergence": "旧值测到了卡片容器/错误纵向区间，而不是实际白色页面 canvas；canonical 已改用 thumbnail canvas bbox。",
+          "action": "1280×832 measured 验证使用 70/148/174/247 与五个 x 位置；响应式断点和 accepted-golden 仍由 M1/M3 补齐。"
         }
       }
     },
@@ -58,12 +83,14 @@
       "capture_id": "N-ANNOTATE-TOOLBAR",
       "crop_bbox": {"x": 0, "y": 0, "width": 1280, "height": 832},
       "layers": {
-        "main_toolbar": {"x": 0, "y": 0, "width": 1280, "height": 29},
-        "annotation_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 65},
-        "left_outline_panel": {"x": 0, "y": 94, "width": 211, "height": 738},
-        "page_1": {"x": 293, "y": 94, "width": 398, "height": 721}
+        "titlebar": {"x": 0, "y": 0, "width": 1280, "height": 40},
+        "main_toolbar": {"x": 0, "y": 40, "width": 1280, "height": 40},
+        "annotation_toolbar": {"x": 0, "y": 80, "width": 1280, "height": 43},
+        "left_outline_panel": {"x": 0, "y": 123, "width": 272, "height": 709},
+        "page_1": {"x": 382, "y": 123, "width": 514, "height": 729}
       },
       "notes": ["outline tab is active", "no right panel visible"],
+      "disputed_original": {"left_outline_panel_width": 211},
       "measurement_review_2026_07_24": {
         "method": "ImageMagick 逐列 mean 亮度检测左栏深灰工具栏色与画布背景色的分界",
         "findings": "左栏深灰工具栏色（mean≈25238）实测延伸到 log x≈270pt，在 log x≈275pt 才转入更深画布背景（mean 20238）。原记录 width=211 落在面板内部中点附近。",
@@ -75,12 +102,14 @@
       "capture_id": "N-SHAPE-RECTANGLE",
       "crop_bbox": {"x": 0, "y": 0, "width": 1280, "height": 832},
       "layers": {
-        "main_toolbar": {"x": 0, "y": 0, "width": 1280, "height": 29},
-        "annotation_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 65},
-        "left_outline_panel": {"x": 0, "y": 94, "width": 211, "height": 738},
-        "page_1": {"x": 293, "y": 94, "width": 398, "height": 721},
-        "right_shape_panel": {"x": 800, "y": 94, "width": 480, "height": 738}
+        "titlebar": {"x": 0, "y": 0, "width": 1280, "height": 40},
+        "main_toolbar": {"x": 0, "y": 40, "width": 1280, "height": 40},
+        "annotation_toolbar": {"x": 0, "y": 80, "width": 1280, "height": 43},
+        "left_outline_panel": {"x": 0, "y": 123, "width": 272, "height": 709},
+        "page_1": {"x": 382, "y": 123, "width": 514, "height": 729},
+        "right_shape_panel": {"x": 900, "y": 123, "width": 380, "height": 709}
       },
+      "disputed_original": {"left_outline_panel_width": 211, "right_shape_panel": {"x": 800, "width": 480}},
       "measurement_review_2026_07_24": {
         "method": "ImageMagick 逐列 mean 亮度检测页面白区与右栏深灰的分界",
         "findings": {
@@ -105,24 +134,27 @@
       "capture_id": "N-EDIT-CANVAS",
       "crop_bbox": {"x": 0, "y": 0, "width": 1280, "height": 832},
       "layers": {
-        "main_toolbar": {"x": 0, "y": 0, "width": 1280, "height": 29},
-        "edit_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 65},
-        "canvas": {"x": 0, "y": 94, "width": 1280, "height": 738},
-        "page_1": {"x": 293, "y": 94, "width": 398, "height": 721}
+        "titlebar": {"x": 0, "y": 0, "width": 1280, "height": 40},
+        "main_toolbar": {"x": 0, "y": 40, "width": 1280, "height": 40},
+        "edit_toolbar": {"x": 0, "y": 80, "width": 1280, "height": 43},
+        "left_outline_panel": {"x": 0, "y": 123, "width": 272, "height": 709},
+        "page_canvas": {"x": 272, "y": 123, "width": 1008, "height": 709},
+        "page_1": {"x": 382, "y": 123, "width": 514, "height": 729}
       },
-      "notes": ["edit toolbar shows 文本 / 图像 / 链接 / 隐藏", "this is not the page-management grid"]
+      "alignment": {"window_center_x": 640, "page_center_x_approx": 639, "implementation_note": "L5c begins after the 272pt sidebar, but the page is offset by half the sidebar width so it remains aligned to the full-window center."},
+      "notes": ["edit toolbar shows 文本 / 图像 / 链接 / 隐藏", "this is not the page-management grid", "page_canvas is the visible L5c bbox; it must not be confused with the full-window page-alignment frame"]
     },
     {
       "capture_id": "N-CROP-L3-SEARCH",
       "crop_bbox": {"x": 0, "y": 0, "width": 1280, "height": 832},
       "layers": {
-        "titlebar": {"x": 0, "y": 0, "width": 1280, "height": 29},
-        "main_toolbar": {"x": 0, "y": 29, "width": 1280, "height": 32},
-        "left_outline_panel": {"x": 0, "y": 61, "width": 272, "height": 771},
-        "page_canvas": {"x": 272, "y": 61, "width": 528, "height": 771},
-        "right_search_panel": {"x": 800, "y": 61, "width": 480, "height": 771},
-        "search_field": {"x": 1040, "y": 29, "width": 236, "height": 32},
-        "search_results_header": {"x": 800, "y": 61, "width": 480, "height": 52}
+        "titlebar": {"x": 0, "y": 0, "width": 1280, "height": 40},
+        "main_toolbar": {"x": 0, "y": 40, "width": 1280, "height": 40},
+        "left_outline_panel": {"x": 0, "y": 80, "width": 273, "height": 752},
+        "page_canvas": {"x": 273, "y": 80, "width": 767, "height": 752},
+        "right_search_panel": {"x": 1040, "y": 80, "width": 240, "height": 752},
+        "search_field": {"x": 1052, "y": 44, "width": 220, "height": 30},
+        "search_results_header": {"x": 1040, "y": 80, "width": 240, "height": 52}
       },
       "notes": [
         "Purpose query is visible in the focused L3 search field",

@@ -234,7 +234,12 @@ function App() {
 
   function handleModeChange(nextMode: AppModeId) {
     setActiveMode(nextMode);
-    if (nextMode === "pages") {
+    if (nextMode === "edit") {
+      // G05 measured reference shows the outline sidebar alongside the edit canvas.
+      // Keep that state explicit instead of inheriting whichever utility panel happened
+      // to be open in read/annotate mode.
+      setUtilityPanel("summary");
+    } else if (nextMode === "pages") {
       setUtilityPanel("none");
     }
   }

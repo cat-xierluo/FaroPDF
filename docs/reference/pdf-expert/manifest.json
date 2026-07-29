@@ -7,7 +7,7 @@
     "version_note": "observed_version 由 25.2.1 更正为实机版本 3.9.2（2026-07-23 ISS-NEW-M M1）。25.2.1 为历史误标，实机 mdls/PlistBuddy 读取均为 3.9.2；M1 每张采集图以实机可复采的 3.9.2 为准。"
   },
   "purpose": "FaroPDF high-fidelity evidence index",
-  "audit_date": "2026-07-24",
+  "audit_date": "2026-07-28",
   "evidence_status": {
     "accepted_golden_count": 0,
     "measured_count": 6,
@@ -213,7 +213,7 @@
       "legacy_intended_state": "multi-tab",
       "observed_state": "Three document tabs while the active document is in page-edit grid mode with two page cards (first selected, A4 210x297 mm metadata visible)",
       "classification": "raw-Aminus",
-      "usable_for": ["EditModeGridView 次级工具条 7 项 (插入/附加/旋转/复制/粘贴/摘录/删除) 顺序", "页面卡片双行元数据布局", "3 tab 状态"],
+      "usable_for": ["页面管理次级工具条 7 项 (插入/附加/旋转/复制/粘贴/摘录/删除) 顺序", "页面卡片双行元数据布局", "3 tab 状态"],
       "not_evidence_for": ["3+ tab overflow", "cross-tab drag", "固定 5 列", "drag 进行中/drop indicator", "卡片精确像素尺寸"],
       "limitations": ["full desktop capture", "no bbox", "only 2 cards shown → column count not determined"],
       "confidence": "high"
@@ -235,7 +235,7 @@
       "legacy_intended_state": "edit grid",
       "observed_state": "Five page cards in 4+1 layout (four on first row, one on second) at the captured app-window width",
       "classification": "raw-Aminus",
-      "usable_for": ["EditModeGridView 4 列响应式 wrap (4+1)", "卡片等宽并排 + 单卡片换行", "选中蓝色边框"],
+      "usable_for": ["页面管理工作台在该 raw 捕获窗口内的 4+1 wrap 现象", "卡片等宽并排 + 单卡片换行", "选中蓝色边框"],
       "not_evidence_for": ["精确卡片像素宽度", "卡片间距", "drag 进行中/drop indicator", "reorder persistence"],
       "limitations": ["full desktop capture", "no bbox", "wrap breakpoint not determined"],
       "confidence": "high"
@@ -249,7 +249,8 @@
       "classification": "measured",
       "usable_for": ["window-only chrome reference", "L2/L3 shell ordering", "read-mode canvas placement"],
       "not_evidence_for": ["two-page mode", "thumbnail sidebar", "text-selection floating toolbar", "FaroPDF visual equivalence"],
-      "limitations": ["manual bbox only", "no independent S4 audit", "accepted-golden remains 0"],
+      "limitations": ["manual bbox only", "accepted-golden remains 0"],
+      "independent_audit": {"date": "2026-07-28", "scope": "M2.1 state semantics and geometry verifier", "result": "pass"},
       "capture_run": "2026-07-24 a/b",
       "stability_diff": {"tool": "ImageMagick compare -metric AE", "result": "0 differing pixels"},
       "confidence": "high"
@@ -301,11 +302,11 @@
       "path": "captures/cropped/G05-edit-grid-a.png",
       "paired_path": "captures/cropped/G05-edit-grid-b.png",
       "legacy_intended_state": "edit mode",
-      "observed_state": "编辑 mode contextual toolbar with 文本 / 图像 / 链接 / 隐藏; the page remains a single editable canvas and is not the 页面管理 card grid",
+      "observed_state": "编辑 mode contextual toolbar with 文本 / 图像 / 链接 / 隐藏; 272pt 大纲左栏保持展开且大纲 tab 激活; the page remains a single editable canvas and is not the 页面管理 card grid",
       "classification": "measured",
-      "usable_for": ["edit-mode toolbar entry", "distinguishing edit canvas from page-management grid"],
+      "usable_for": ["edit-mode toolbar entry", "edit outline sidebar result state", "distinguishing edit canvas from page-management grid"],
       "not_evidence_for": ["thumbnail card layout", "page reorder", "five-column grid"],
-      "limitations": ["manual bbox only", "capture was supplemental truth-finding, not an ISS-NEW-N accepted target", "accepted-golden remains 0"],
+      "limitations": ["manual bbox only", "proves the outline-present result state but not every possible read-to-edit transition", "capture was supplemental truth-finding, not an ISS-NEW-N accepted target", "accepted-golden remains 0"],
       "capture_run": "2026-07-24 a/b",
       "stability_diff": {"tool": "ImageMagick compare -metric AE", "result": "0 differing pixels"},
       "confidence": "high"

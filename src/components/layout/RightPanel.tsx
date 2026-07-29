@@ -74,6 +74,8 @@ export interface RightPanelProps {
   onSearchSelectHit?: (hitId: string) => void;
   onSearchJumpPrevious?: () => void;
   onSearchJumpNext?: () => void;
+  searchOcrHint?: { visible: boolean; message: string; actionLabel: string };
+  onSearchRequestOcr?: () => void;
   onSearchClose?: () => void;
 }
 
@@ -93,6 +95,16 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
     "ocr-status": { title: "OCR 状态", hint: "当前 OCR 任务状态 + 页码范围 + 开始按钮（placeholder）" },
     shape: { title: "形状", hint: "批注时插入矩形/椭圆/箭头/直线/铅笔，含线宽/不透明度/边框/填充色。" },
     search: { title: "搜索", hint: "批注文档的全文搜索命中导航与高亮。" },
+  },
+  edit: {
+    stamps: { title: "图章", hint: "内容编辑默认态不显示右栏" },
+    signatures: { title: "签名", hint: "内容编辑默认态不显示右栏" },
+    "export-preview": { title: "导出预览", hint: "内容编辑默认态不显示右栏" },
+    "ocr-queue": { title: "OCR 队列", hint: "内容编辑默认态不显示右栏" },
+    summary: { title: "文档摘要", hint: "内容编辑默认态不显示右栏" },
+    "ocr-status": { title: "OCR 状态", hint: "内容编辑默认态不显示右栏" },
+    shape: { title: "形状", hint: "内容编辑默认态不显示右栏" },
+    search: { title: "搜索", hint: "内容编辑默认态不显示右栏" },
   },
   export: {
     stamps: { title: "图章", hint: "在导出过程中复用已保存的图章模板" },
@@ -154,7 +166,6 @@ const READ_INACTIVE_IDS: ReadonlyArray<RightPanelId> = [
   "summary",
   "ocr-status",
   "shape",
-  "search",
 ];
 
 export function RightPanel({
@@ -180,12 +191,18 @@ export function RightPanel({
   onSearchSelectHit,
   onSearchJumpPrevious,
   onSearchJumpNext,
+  searchOcrHint,
+  onSearchRequestOcr,
   onSearchClose,
 }: RightPanelProps) {
   const headingId = useId();
 
-  if (activeMode === "read" || activeMode === "pages") {
-    if (rightPanel === "none" || READ_INACTIVE_IDS.includes(rightPanel)) {
+  if (rightPanel === "none") {
+    return null;
+  }
+
+  if (activeMode === "read" || activeMode === "edit" || activeMode === "pages") {
+    if (READ_INACTIVE_IDS.includes(rightPanel)) {
       return null;
     }
   }
@@ -214,7 +231,7 @@ export function RightPanel({
 
   return (
     <aside aria-labelledby={headingId} className="right-pane" data-active-mode={activeMode} data-panel={rightPanel}>
-      <header className="right-pane__header">
+      <header className={"right-pane__header" + (showSearchPanel ? " right-pane__header--search" : "")}>
         <h2 id={headingId} className="right-pane__title">{title}</h2>
         <span aria-hidden="true" className="right-pane__mode-pill">{activeMode}</span>
       </header>
@@ -252,6 +269,8 @@ export function RightPanel({
             onSelectHit={onSearchSelectHit}
             onJumpPrevious={onSearchJumpPrevious}
             onJumpNext={onSearchJumpNext}
+            ocrHint={searchOcrHint}
+            onRequestOcr={onSearchRequestOcr}
             onClose={onSearchClose}
           />
         ) : rightPanel === "summary" ? (

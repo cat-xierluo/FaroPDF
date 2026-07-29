@@ -89,7 +89,8 @@ macOS 原生菜单由 `src-tauri/src/lib.rs` 使用 Tauri v2 `MenuBuilder` / `Su
 
 - `read`：不渲染 L4，L5c 使用所有未被显式侧栏占用的空间。
 - `annotate`：显示批注上下文工具条和批注 overlay。
-- `pages`：作为当前 `T 编辑` 的内部 mode，L5c 切换为响应式页面卡片网格。现有固定 5 列实现是待修缺陷，不属于架构合同。
+- `edit`：由 `T 编辑` 进入；L5c 保持单页 ReaderCanvas，L4 为文本/图像/链接/隐藏。直接内容编辑未接通时工具显式禁用。
+- `pages`：由独立“页面管理”入口进入；L5c 挂载 `PageOrganizerWorkspace`，不激活 `T 编辑`。
 - `export`：显示导出上下文工具条，并挂右侧 `ExportDeliveryPanel`。
 - `forms`：显示填写和签名上下文工具条，扁平化等低频动作进入 FormsPanel。
 - `ocr`：独占主工作区，显示 OCR 工具条和 OCR 任务 / 质量报告工作台。
@@ -711,28 +712,30 @@ FaroPDF 可复用本机 `legal-skills` 中成熟 PDF 脚本的算法，但不直
 - `captures/raw/` 保存原始采集；其中存在误标和失败画面。
 - `manifest.json` 记录 observed state、可信度和禁止推论。
 - `golden/` 当前没有 accepted 图片。
-- bbox、规范化窗口 crop、视觉 diff 和完整状态覆盖尚未建立。
+- G01–G05 已建立固定 `1280×832` window-only crop、人工 bbox 与 reference a/b 稳定性 diff；accepted-golden、FaroPDF 对参考图的图像回归和完整状态覆盖仍未建立。
 
 ### UI 运行时
 
 | 模块 | 当前架构事实 | 未完成 |
 | --- | --- | --- |
-| Shell | L2/L3 分行；L3 五个语义区；L5 DOM 固定左/中/右 | 只通过几何门禁，未视觉对齐 |
+| Shell | L2/L3 各 40px 分行；L3 为 navigation/zoom/workflows/collaboration/search 五区；L5 DOM 固定左/中/右 | measured 几何/密度门禁通过，accepted-golden 视觉对齐仍缺 |
 | Read | read 不渲染 L4；PDF.js 阅读能力存在 | 双页和主题缺可靠 reference |
-| Sidebar | 左栏容器和多个 panel 已存在 | thumbnails/outline/annotation/bookmark 需逐态视觉和行为复核 |
-| Edit | `T 编辑` 进入 `EditModeGridView` | 当前是固定 5 列、空白缩略图、硬编码 A4 和 noop reorder |
+| Sidebar | 左栏容器和多个 panel 已存在；大纲参考态的图标标签栏、标题与空态层级已接线 | thumbnails/outline/annotation/bookmark 仍需 accepted-golden 逐态视觉和行为复核 |
+| Edit | `T 编辑` 进入独立 `edit` mode，保留 G05 measured 的 272px 大纲左栏、整窗居中的单页 ReaderCanvas 与编辑 L4 | 文本/图像/链接/隐藏写回引擎尚未接入，当前按钮显式禁用 |
+| Page management | 独立 `pages` mode 挂载 `PageOrganizerWorkspace`；5 张真实 PDF canvas 缩略图与 measured 页卡几何已接入 | 部分选择动作仍是 placeholder，完整拖拽重排/导出重开待 M3 |
 | RightPanel | mode-driven 容器和多个 panel component 已存在 | `docSummary=null`、OCR noop、shape placeholder 等仍在 |
 | Search/Annotate | 业务模块和部分 UI 已接线 | 参考状态、转换、保存重开和视觉验收不完整 |
 | Forms/Export/OCR | 有独立业务模块和部分真实输出 | 不能从“底座存在”推导完整工作流或视觉完成 |
-| Validation | typecheck/test/build + L3/L5 geometry script | 缺 L2/L3 顺序断言、accepted-golden visual diff 和 PDF round-trip gate |
+| Validation | typecheck/test/build + 双视口 layout report + 73 项 measured 门禁（L2/L3/L4、L3 横向分组、页面 bbox/count、G05 编辑大纲/中央画布、页卡 bbox/真实 canvas、搜索双栏、状态栏与 surface 语义） | 缺 accepted-golden image diff、M3 PDF round-trip 和未覆盖 surface/interaction gates |
 
 逐组件等级与 placeholder 以 `docs/reference/pdf-expert/implementation-map.md` 为准。
 
 ### 不变量与待量测项
 
 - 当前代码不变量：L5a → L5c → L5b，中央列始终是弹性列。
-- 目标不变量：`T 编辑` 使用响应式页面卡片网格，不固定列数。
-- 待量测：参考窗口尺寸、左右栏宽度、页卡最小宽度、gap、断点、字体、颜色、图标和动画。
+- 目标不变量：`edit` 与 `pages` 是独立状态；`T 编辑` 不得进入页面卡片网格。
+- 页面管理网格必须响应式且使用真实缩略图；当前 1280px measured 状态为五卡同排，未量测断点不得解释为全局固定五列。
+- 已量测：`1280×832` 参考窗口、L2/L3/L4 高度、outline/search/shape 栏宽与页面卡片近似尺寸；待 M1 复核或补量测：accepted-golden crop 一致性、页面卡片断点、其他面板、字体、颜色、图标和动画。
 - 架构变更不得先于证据校准；下一步顺序由 `docs/TASKS.md` ISS-NEW-M 定义。
 
 ## 文档健康监控（doc-curator）

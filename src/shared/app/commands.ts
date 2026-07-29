@@ -13,7 +13,7 @@ export type AppCommandGroup =
   | "settings"
   | "help";
 
-export type AppCommandTargetMode = "read" | "annotate" | "export" | "forms" | "ocr" | "pages";
+export type AppCommandTargetMode = "read" | "annotate" | "edit" | "export" | "forms" | "ocr" | "pages";
 
 export type AppCommandTargetUtilityPanel =
   | "summary"
@@ -569,51 +569,56 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     requiresDocument: true,
   },
   // ISS-NEW-D 阶段 1（2026-06-22）：编辑 PDF 菜单 5 动作。
-  // 全部 tertiary / native-menu / export group，v0.2 占位（真实 PDF 内容编辑由后续 worker 接入）。
+  // 全部 tertiary / native-menu / edit mode，真实 PDF 内容编辑由后续阶段接入。
   {
     id: "pdf-edit-content",
     label: "编辑",
     description: "v0.2 占位：直接编辑 PDF 文字 / 图像内容。",
     layer: "tertiary",
-    group: "export",
+    group: "mode",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    targetMode: "edit",
   },
   {
     id: "pdf-add-image",
     label: "添加图像",
     description: "v0.2 占位：在 PDF 当前页插入外部图像。",
     layer: "tertiary",
-    group: "export",
+    group: "mode",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    targetMode: "edit",
   },
   {
     id: "pdf-add-link",
     label: "添加链接",
     description: "v0.2 占位：在 PDF 选中区域添加超链接。",
     layer: "tertiary",
-    group: "export",
+    group: "mode",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    targetMode: "edit",
   },
   {
     id: "pdf-add-text",
     label: "添加文字",
     description: "v0.2 占位：在 PDF 当前页插入文本框。",
     layer: "tertiary",
-    group: "export",
+    group: "mode",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    targetMode: "edit",
   },
   {
     id: "pdf-redact",
     label: "隐藏",
     description: "v0.2 占位：选中区域涂抹遮蔽（ISS-067 已有遮蔽 UI）。",
     layer: "tertiary",
-    group: "export",
+    group: "mode",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    targetMode: "edit",
   },
   // ISS-NEW-D 阶段 1（2026-06-22）：前往菜单 5 顶层 + 5 历史 submenu 项。
   // 全部 tertiary / native-menu / view group（导航类）。

@@ -7328,7 +7328,7 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - 时间：2026-07-25
 - 类型：UI 布局校准 / 验证器扩展
 - 关联：DEC-179（measured reference）、DEC-182（M2 验证器）、DEC-183（N-CROP-L3-SEARCH 补采）
-- 状态：生效
+- 状态：部分被 DEC-185 取代（左栏 272pt 仍有效；全局右栏 480pt、annotate 默认右栏和合并 toolbar 断言已撤销）
 
 **问题**：补采 N-CROP-L3-SEARCH 提供了精确 bbox（左大纲 272pt + 右搜索 480pt），且左栏 272pt 有 N-ANNOTATE-TOOLBAR PM 审计的双重佐证（原记录 211 经 PM ImageMagick 审计纠正为 ~272）。但 FaroPDF 的 panelWidthStore 默认栏宽是左 290 / 右 320——与 PDF Expert measured 有差距。同时 M2 验证器（DEC-182）只断言 toolbar 高度，左右栏宽度断言是 TODO gap。
 
@@ -7346,3 +7346,62 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - M2 验证器：annotate 右栏宽度 480=480 差 0pt ✓；toolbar 高度 3 项仍 fail（已知差距，验证器如实报告）。
 - panelWidthStore 8 tests passed（测试用常量引用，自动跟随新值）。
 - 未触碰 read 模式交互、readerReducer.test.ts。
+
+## DEC-185 拆分内容编辑与页面管理，并按 surface 重建 M2 门禁（2026-07-28）
+
+- 日期：2026-07-28
+- 状态：部分被 DEC-186 取代（第 3 项 29/32/33pt、搜索 480pt 及 24 项验证结果失效；状态机与其他 surface 决策继续有效）
+- 关联：ISS-NEW-M M2.1、DEC-179、DEC-182、DEC-184
+
+问题：补采 G02/G03/G04/G05 与最新 M2 失败基线表明，当前推进同时存在三类错误：`T 编辑` 与页面管理共用 `pages` 状态；批注默认图章右栏没有目标证据；验证器把 L2/L3/L4 合并绑定到单个 DOM，并拿搜索面板 480pt 宽度验证批注图章栏。这些错误会让真实差异与假失败混在一起，也会继续误导 M3 的任务命名。
+
+决策：
+
+1. `AppModeId` 新增 `edit`。`T 编辑` 进入单页 ReaderCanvas + `文本 / 图像 / 链接 / 隐藏` L4；直接内容写回尚未实现，四个工具显式禁用。独立“页面管理”进入 `pages` 并挂载 `PageOrganizerWorkspace`。历史 `EditModeGridView` 从 AppShell 运行时卸载，暂留作待清理 skeleton。
+2. annotate 默认 `RightPanelId=none`；移除无证据的 forms→shape fallback。右栏基础默认值恢复 320pt；搜索 480pt、形状约 380pt 作为 surface-specific 宽度。此项明确纠正 DEC-184 将搜索 480pt 全局化、再用于 annotate 断言的错误；DEC-184 的左栏 272pt 结论继续有效。
+3. 同批次 G01–G05 的共享边界规范化为 L2 titlebar=29pt、L3 main toolbar=32pt、L4 contextual toolbar=33pt；原 G02–G05 的 29+65 记录是层级合并，不改变总边界 94pt。采集协议修正为现有画面真实显示的 dark + 48%，不再写成 100%。
+4. M2 改为逐层 bbox + surface-specific DOM 语义：read 无 L4/右栏；annotate 有批注 L4 且默认无右栏；edit 有四项编辑 L4、单页画布且无页面网格；pages 有独立页面管理工作台且 T 编辑未激活。没有目标 evidence 的 panel 宽度不做跨 surface 验证。
+5. 原 M3“`T 编辑` 缩略图/重排闭环”更名为“页面管理纵向闭环”。内容编辑引擎和页面重排不再混在同一个任务状态里。
+
+验证：
+
+- `npm run typecheck`：通过。
+- 聚焦单测：Toolbar/RightPanel/commands/panelWidth 72 项、App 15 项、M2.1 新增 AppShell 4 项通过。
+- `npm run verify:ui-layout`：1500×900、1280×800 两视口 exit 0。
+- `npm run verify:pdf-expert-visual`：read/annotate/edit/pages 共 24/24 几何与语义断言通过，exit 0；actual 统一为深色、单页、第 1 页、50%（FaroPDF 最接近参考 48% 的 UI 步进），G03 真实打开左侧大纲，G02 选中第 1 页；实际截图和 `report.json` 已生成。
+- 独立 S4 反向复审：首轮发现九项实现/证据口径问题，复审再发现三处架构/路线图旧口径；全部修正后最终严格 `PASS`。M2/M2.1 仅按 geometry/semantic 门禁闭环，M1/M3 保持未完成。
+
+边界：当前 reference 仍是 measured，accepted-golden 为 0；本决策只把这些 surface 升到 geometry/semantic-verified，不是 `visually-verified`。页面管理截图仍能看到空白页面卡和硬编码 A4，真实缩略图、拖拽、写回与重开继续属于 M3，不能被本次 PASS 掩盖。
+
+验证基础设施边界：全量 `npm test -- --run --reporter=dot` 在大量用例持续输出且未见失败后，超过 90 秒无新输出并不退出，人工中止为 exit 130；本决策只引用有明确 exit 0 的聚焦回归。全仓 lint 唯一错误位于用户既有 `readerReducer.test.ts` 的 `prefer-const`，本任务未修改该文件；本次改动文件的 ESLint 单独通过。
+
+## DEC-186 二次像素校准并重建 Shell 层级、页面密度与页卡门禁（2026-07-28）
+
+- 日期：2026-07-28
+- 状态：已采纳（独立 S4 三轮回验 PASS）
+- 关联：ISS-NEW-M M2/M2.2、DEC-179、DEC-182、DEC-185、`measurements.json`
+
+问题：DEC-185 的验证器已经拆开状态机和 L2/L3/L4，但仍只检查纵向层高。其 29/32/33pt 基线来自错误的边界归一化；旧 run 即使 24/24 PASS，也没有检查 L3 横向功能层级、按钮间距、页面 bbox、single 可见页数或页面管理真实缩略图。实际截图因此仍与 reference 有显著肉眼差异。
+
+决策：
+
+1. 用 ImageMagick 将 Retina crop 还原为 1280×832 logical 后逐行取色，canonical 层高改为 L2=40pt、L3=40pt、annotate/edit L4=43pt、page-management L4=44pt。read 页面 bbox 为约 `382/91/514/729`，annotate/edit 为约 `382/123/514/729`。本项 supersede DEC-185 第 3 项的 29/32/33pt。
+2. L3 从旧 `sidebar/file/reading/mode/right` 重建为 `navigation/zoom/workflows/collaboration/search`。1280px reference 的五段语义 bbox 作为 measured 门禁；核心工作流直接呈现批注、编辑、导出、填写签名与 OCR，设置和低频命令进入更多菜单。
+3. `ReaderCanvas` 的 single 模式只渲染当前页，不再把虚拟化 overscan 暴露为第二页；固定缩放使用 display-density calibration，使 FaroPDF 50% 运行态与参考 48% 页面 bbox 可比较。连续模式继续保留虚拟化。
+4. `PageOrganizerWorkspace` 通过 `reader.renderThumbnail` 渲染真实 PDF canvas，并用 per-canvas promise 避免 React StrictMode 重复启动 PDF.js render。第一页默认选中；五张 thumbnail canvas 的 bbox 和渲染完成状态进入门禁。拖拽/写回/导出重开不在 M2.2 范围。
+5. 大纲 measured 态补齐图标标签栏、标题行、添加入口和居中空态；read/annotate/edit/pages 不显示无 reference 依据的底部状态栏，OCR 等需要工作流状态的 mode 保留状态栏。
+6. 独立 S4 首轮发现 G05 参考图、触发协议、state matrix、measurements、实现与验证器互相冲突，导致 edit surface 假绿。以可见 measured 画面为准：`T 编辑` 进入时恢复 272pt 大纲左栏并激活“大纲”tab，页面继续以整窗中心线对齐；协议、矩阵、量测和验证器同步修正。回验又发现原生 `pdf-edit-*` 命令会二次折叠左栏，现已统一请求 summary，避免 L3 与原生菜单产生两个 edit 结果态。
+7. 搜索不再在 L3 下方弹出独立浮层；聚焦/输入 L3 搜索框时打开 L5b `SearchResultsPanel`。二次复核的 search right panel 为 240pt，不是 DEC-184/185 沿用的 480pt；read 只为 search 例外开放右栏，默认态仍折叠。结果列表按页分组并保留 OCR 提示与命中导航。
+8. `verify:pdf-expert-visual` 扩展为 73 项可失败断言：L2/L3/L4、L3 五段 x/width、页面 bbox、single 计数、G05 编辑大纲与中央画布、页卡 bbox/真实 canvas、搜索 273/767/240 三列、参考态状态栏与 surface 语义。reference 仍是 measured、容差仍为 ±12pt；accepted-golden 为 0 时不得声明 `visually-verified`。
+
+验证：
+
+- `npm run typecheck`：exit 0。
+- 聚焦回归：App/Sidebar/Toolbar/ReaderCanvas/PageOrganizerWorkspace/RightPanel/SearchResultsPanel/search UI 共 118 项通过；存在 React `act(...)` warning，但无失败。
+- `npm run build`：exit 0；只有既有 Vite externalization/chunk-size warning。
+- `npm run verify:ui-layout`：1500×900、1280×800 两视口 exit 0。
+- `npm run verify:pdf-expert-visual`：73/73 PASS，exit 0；G05 左栏/中央画布 x/width 差值 0pt、页面差值最大 2pt，L3 横向差值最大 2pt，page-management 页卡差值最大 1pt，搜索三列最大差值 1pt。
+- 全仓 lint：唯一错误为用户已有 `src/modules/reader/readerReducer.test.ts:244` 的 `prefer-const`；M2.2 不修改该文件。本轮相关文件 ESLint exit 0，AppShell edit/native 2 项定向测试通过；AppShell 全文件 Vitest 的既有 open-handle 人工中止结果不计入 PASS。
+- 独立 S4 三轮回验：严格 `PASS`。确认 G05 的 272pt 大纲、1008pt 中央区、整窗中心对齐、L3/原生菜单统一入口与 73 项 report 相互一致；未发现新的高/中风险冲突。
+
+边界：本轮最高等级为 `wired + geometry/density/semantic-verified`。它显著修复了用户指出的功能层级、按钮间隙和整体 UI，但不替代 M1 accepted-golden、像素视觉 diff、M3 重排写回或 M4/M5 的完整 surface/工作流验收。

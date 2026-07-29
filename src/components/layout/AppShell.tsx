@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { getPanelWidth } from "../../shared/panelWidthStore";
+import { EyeOff, Image as ImageIcon, Link2, Type } from "lucide-react";
+import {
+  getPanelWidth,
+  SEARCH_RIGHT_PANEL_WIDTH,
+  SHAPE_RIGHT_PANEL_WIDTH,
+} from "../../shared/panelWidthStore";
 import type { AnnotationSidecar, PdfAnnotation } from "../../shared";
 import type { ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
@@ -32,7 +37,7 @@ import { ReaderCanvas } from "./ReaderCanvas";
 import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
 import { AnnotationSidebar, type AnnotationFlattenResult } from "./AnnotationSidebar";
 import { AnnotationToolbar } from "./AnnotationToolbar";
-import { EditModeGridView } from "./EditModeGridView";
+import { PageOrganizerWorkspace } from "./PageOrganizerWorkspace";
 import { RightPanel } from "./RightPanel";
 import { SecurityPanel } from "./SecurityPanel";
 import type { ShapeToolValue } from "./panels/ShapeToolPanel";
@@ -118,6 +123,7 @@ const exportToolGroups = [
 
 const contextualToolbarLabels: Record<Exclude<AppModeId, "read" | "pages">, string> = {
   annotate: "批注工具条",
+  edit: "编辑工具条",
   export: "导出工具条",
   forms: "填写和签名工具条",
   ocr: "OCR 工具条",
@@ -166,7 +172,10 @@ export function AppShell({
     }
   }, [activeMode, redactActive]);
   // ocr 模式独占主区域（OcrWorkspace 包含任务列表 + 质量报告），隐藏 utility panel
-  const showUtilityPanel = utilityPanel !== "none" && activeMode !== "pages" && activeMode !== "ocr";
+  const showUtilityPanel =
+    utilityPanel !== "none" &&
+    activeMode !== "pages" &&
+    activeMode !== "ocr";
   const isOcrMode = activeMode === "ocr";
   const isAnnotateMode = activeMode === "annotate";
   // stage 4 批注 armed 状态：App.tsx 持有单一真相源；未传时回退到初始 state，保证既有测试不破
@@ -201,27 +210,30 @@ export function AppShell({
   // ISS-060 阶段 2 后续：左右栏宽度持久化（panelWidthStore 提供 localStorage 读写）。
   // 当前 ship：mount 时读 localStorage 注入 inline style；用户拖拽 divider 留后续 session。
   const [leftWidth] = useState<number>(() => getPanelWidth("left"));
-  const [rightWidth] = useState<number>(() => getPanelWidth("right"));
+  const [storedRightWidth] = useState<number>(() => getPanelWidth("right"));
   // ISS-060：右栏驱动 — 默认按 mode 派生；用户 tab override 优先。
   // P2-6 修复：之前用 useState(() => initial) 只在 mount 时算一次，read→annotate
   // 切换后 rightPanel 永远 stuck 在 mount 时的 "none"，导致右栏永不显示。
   const defaultRightPanel = useMemo<RightPanelId>(() => {
-    if (activeMode === "annotate") return "stamps";
     if (activeMode === "ocr") return "ocr-queue";
     if (activeMode === "export") return "export-preview";
     return "none";
   }, [activeMode]);
   // override 优先（用户 tab 显式切换），否则用 mode 默认派生
   const rightPanel: RightPanelId = rightPanelOverride ?? defaultRightPanel;
-  // 历史 ISS-NEW-I fallback：forms 在无右栏时会派生 shape。
-  // 这不是现行“T 编辑”合同（T 编辑实际是 pages），也未经过可靠证据验收；
-  // 保留为 implementation-map 中的待修行为，M1 前不在上下文里合理化它。
-  const rightPanelWithEditFallback: RightPanelId =
-    rightPanel === "none" && activeMode === "forms" ? "shape" : rightPanel;
+  // 搜索与形状是两个已量测且宽度不同的 surface；不能再把搜索的 240pt
+  // 当成所有右栏的全局默认值。其余未量测 panel 保留用户/基础默认宽度。
+  const rightWidth =
+    rightPanel === "search"
+      ? SEARCH_RIGHT_PANEL_WIDTH
+      : rightPanel === "shape"
+        ? SHAPE_RIGHT_PANEL_WIDTH
+        : storedRightWidth;
   const showRightPanel =
-    activeMode !== "read" &&
+    rightPanel !== "none" &&
+    activeMode !== "edit" &&
     activeMode !== "pages" &&
-    rightPanelWithEditFallback !== "none";
+    (activeMode !== "read" || rightPanel === "search");
   const workspaceLayout = resolveWorkspaceLayout({
     leftWidth,
     rightWidth,
@@ -776,7 +788,11 @@ export function AppShell({
       command.id === "pdf-add-text" ||
       command.id === "pdf-redact"
     ) {
-      setCommandFeedback(`${command.label}功能待后续 worker 接入 PDF 直接编辑链路；当前可用 L4 批注 / 导出工具条。`);
+      onModeChange("edit");
+      // 原生菜单与 L3 的 T 编辑入口必须落到同一 G05 结果态：
+      // 272px 大纲左栏 + 单页内容编辑画布，不能在 mode 切换后再次折叠左栏。
+      onUtilityPanelChange("summary");
+      setCommandFeedback(`${command.label}工具已定位到内容编辑模式；直接写回引擎尚未接入，因此工具保持禁用。`);
       return;
     }
 
@@ -955,7 +971,7 @@ export function AppShell({
   }, [commandSignal?.id, commandSignal?.nonce, executeCommand]);
 
   return (
-    <div className="app-shell" role="application" aria-label="FaroPDF PDF 工作台">
+    <div className="app-shell" data-active-mode={activeMode} role="application" aria-label="FaroPDF PDF 工作台">
       <TitlebarTabs
         onRequestNewTab={() => {
           // + 号：触发 Toolbar 的隐藏 file input，复用"打开"按钮
@@ -971,6 +987,7 @@ export function AppShell({
         activeMode={activeMode}
         onCommand={executeCommand}
         onModeChange={onModeChange}
+        onRightPanelChange={setRightPanelOverride}
         onUtilityPanelChange={onUtilityPanelChange}
         reader={reader}
         search={search}
@@ -993,7 +1010,11 @@ export function AppShell({
       <div
         className="workspace"
         data-layout={workspaceLayout.id}
-        style={{ gridTemplateColumns: workspaceLayout.gridTemplateColumns }}
+        style={{
+          gridTemplateColumns: workspaceLayout.gridTemplateColumns,
+          "--left-pane-width": `${showUtilityPanel ? leftWidth : 0}px`,
+          "--right-pane-width": `${showRightPanel ? rightWidth : 0}px`,
+        } as CSSProperties}
       >
         {showUtilityPanel ? (
           <UtilityPanel
@@ -1001,27 +1022,21 @@ export function AppShell({
             annotations={annotations}
             currentPdfPath={document?.path ?? null}
             formController={formController}
+            key={activeMode === "edit" ? "edit-outline" : "utility-panel"}
             onAnnotationClick={setActiveAnnotationId}
             annotationViewSignal={annotationViewSignal}
             onFlattenAnnotations={handleFlattenAnnotations}
             onSecurityClose={() => onUtilityPanelChange("none")}
             onSecurityFeedback={(message) => setCommandFeedback(message)}
             panel={utilityPanel}
+            preferredSummaryTab={activeMode === "edit" ? "大纲" : undefined}
             reader={reader}
             search={search}
           />
         ) : null}
         <div ref={workspaceMainRef} className="workspace__main" style={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, position: "relative" }}>
           {activeMode === "pages" ? (
-            <EditModeGridView
-              reader={reader}
-              onSelectPage={(pageNumber) => reader.setCurrentPage(pageNumber)}
-              onReorder={() => {
-                // TODO：真实重排（reader.reorderPages）由后续 worker 接入；
-                // 当前 stage 只占位反馈，避免静默吞掉用户操作意图。
-                setCommandFeedback("编辑模式重排已触发，等待后续 worker 接入真实重排。");
-              }}
-            />
+            <PageOrganizerWorkspace reader={reader} />
           ) : isOcrMode ? (
             ocr ? (
               <OcrWorkspace
@@ -1108,7 +1123,7 @@ export function AppShell({
         </div>
         <RightPanel
           activeMode={activeMode}
-          rightPanel={rightPanelWithEditFallback}
+          rightPanel={rightPanel}
           // ISS-NEW-C：文档摘要 + OCR 状态面板输入。来源在 Reader 派生，
           // 当前实现给空（null / idle）。W2 / 后续 PM 收口时把 App.tsx 真值接进来。
           docSummary={null}
@@ -1137,7 +1152,9 @@ export function AppShell({
           onSearchSelectHit={search.selectHit}
           onSearchJumpPrevious={search.selectPreviousHit}
           onSearchJumpNext={search.selectNextHit}
-          onSearchClose={() => onUtilityPanelChange("none")}
+          searchOcrHint={search.state.ocrHint ?? undefined}
+          onSearchRequestOcr={search.requestOcr}
+          onSearchClose={() => setRightPanelOverride("none")}
           onSelectCustomStamp={(stamp) => {
             // DEC-112 ISS-060 阶段 2 + ISS-062 阶段 3：用户从右栏选自定义图章 →
             // 把 stamp.image (base64) 写到 annotationArmed 让画布 stamp 工具立刻可用。
@@ -1303,6 +1320,7 @@ function UtilityPanel({
   onSecurityClose,
   onSecurityFeedback,
   panel,
+  preferredSummaryTab,
   reader,
   search,
 }: {
@@ -1314,6 +1332,7 @@ function UtilityPanel({
   onSecurityClose: () => void;
   onSecurityFeedback: (message: string | null) => void;
   panel: Exclude<UtilityPanelId, "none">;
+  preferredSummaryTab?: "书签" | "大纲" | "批注列表" | "缩略图";
   reader: ReaderController;
   search: TextSearchController;
   annotations?: PdfAnnotation[];
@@ -1394,6 +1413,7 @@ function UtilityPanel({
       onSelectPage={reader.setCurrentPage}
       pageCount={reader.state.document?.pageCount}
       pagesWithHits={collectPagesWithSearchHits(search.state.hits)}
+      preferredTab={preferredSummaryTab}
       renderThumbnail={reader.renderThumbnail}
     />
   );
@@ -1458,6 +1478,33 @@ function ContextToolbar({
     return (
       <div className="context-toolbar context-toolbar--annotation" role="toolbar" aria-label={contextualToolbarLabels[mode]}>
         <AnnotationToolbar disabled={annotationDisabled} state={annotationState} onStateChange={onAnnotationStateChange} />
+      </div>
+    );
+  }
+
+  if (mode === "edit") {
+    const editTools = [
+      { label: "文本", icon: Type },
+      { label: "图像", icon: ImageIcon },
+      { label: "链接", icon: Link2 },
+      { label: "隐藏", icon: EyeOff },
+    ] as const;
+    return (
+      <div
+        className="context-toolbar context-toolbar--edit"
+        data-testid="edit-context-toolbar"
+        role="toolbar"
+        aria-label={contextualToolbarLabels[mode]}
+      >
+        {editTools.map(({ label, icon: Icon }) => (
+          <button aria-label={label} className="context-tool" disabled key={label} title={`${label}编辑引擎尚未接入`} type="button">
+            <Icon size={19} />
+            <span>{label}</span>
+          </button>
+        ))}
+        <span className="context-toolbar__status" role="status">
+          内容编辑引擎待接入
+        </span>
       </div>
     );
   }

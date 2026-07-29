@@ -17,6 +17,13 @@ function createTestAnnotation(overrides: Partial<PdfAnnotation> & { id: string; 
 }
 
 describe("DocumentSummaryPanel 批注列表", () => {
+  test("preferredTab 可让编辑态直接显示大纲", () => {
+    render(<DocumentSummaryPanel hasDocument={true} preferredTab="大纲" />);
+
+    expect(screen.getByRole("tab", { name: "大纲" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: "大纲" })).toBeInTheDocument();
+  });
+
   test("未打开文档时，批注列表标签显示占位文本", async () => {
     const user = userEvent.setup();
     render(<DocumentSummaryPanel hasDocument={false} />);

@@ -45,6 +45,46 @@
 
 现行结论：M0 已关闭；M1“规范化重采集与量测”是唯一可领取下一项。整体高保真复刻仍不能跳过 M1/M2 自动推进实现。
 
+## Pass 4 — 2026-07-28
+
+独立 S4 Agent 对 M2.1 状态机、截图证据、实现映射、两套验证器及其 actual/report 做只读反向审计，首轮判定为 `fail`。发现的核心问题包括：
+
+1. `T 编辑` 与页面管理仍在旧文档中混用；annotate 基础态被误写成需要右栏。
+2. DESIGN、measurements、coverage gap 和 accepted-golden 清单保留旧尺寸或旧依赖。
+3. visual/layout report 的状态语义、产物范围和 stale artifact 排除不足以审计。
+4. `ARCHITECTURE.md` 与 `ROADMAP.md` 仍保留旧验证能力和 `EditModeGridView` 路线。
+
+上述问题已逐项修正。第一次复审确认九项核心整改均已落地，但因架构和路线图仍有三处旧口径，按严格标准继续判为 `fail`，未提前关闭文档闭环。
+
+## Pass 5 — 2026-07-28
+
+同一独立 S4 Agent 对最后三处规范漂移及九项核心整改再次只读复核：
+
+- verdict：`pass`
+- `T 编辑` / `pages` 状态独立，annotate 默认无右栏。
+- canonical 量测统一为 L2/L3/L4 `29/32/33pt`、outline `272pt`、shape right panel 约 `380pt`、page card `x=69 / width=175 / gap=66pt`。
+- `verify:pdf-expert-visual` 最新结果为 24/24 pass；`verify:ui-layout` 产物含 timestamp、scope、artifact 白名单和 stale exclusion。
+- doc-curator working-tree context-sync 为 `hard=0 / adaptive=0 / soft=0`。
+
+阶段判定：M2 measured 几何/语义门禁和 M2.1 可以闭环；这不等于 accepted-golden 图像回归或 `visually-verified`。M1 accepted-golden 仍为 0；M3 的真实缩略图、响应式网格、重排写回、导出副本和重开验证仍未完成。
+
+## Pass 6 — 2026-07-28
+
+独立 S4 Agent 对 M2.2 的 reference、触发协议、state matrix、manifest、measurements、实现、两套验证器、actual/report 与协作文档完成三轮只读回验。
+
+首轮判定 `fail`，发现 G05 reference 明确显示 272pt 大纲左栏，但协议、矩阵、量测、实现和验证器仍按折叠左栏处理，造成 edit surface 假绿。整改后回验又发现两个分支问题：
+
+1. 原生 `pdf-edit-*` 命令在进入 edit 后二次请求 `none`，与 L3 `T 编辑` 产生两个结果态；现已统一请求 summary。
+2. G05 measurements 同时写 272pt 左栏与 1280pt canvas，bbox 语义重叠；现已改为真实 `page_canvas x=272 / width=1008`，另记整窗 center=640/page center≈639，并把中央区 x/width 纳入门禁。
+
+最终结论：
+
+- verdict：`pass`
+- G05 统一为 272pt 大纲左栏、1008pt 中央区、页面按整窗中心线对齐、编辑 L4 为文本/图像/链接/隐藏。
+- L3 与原生 PDF 编辑命令进入同一结果态；最新 `verify:pdf-expert-visual` 为 73/73 PASS，双视口 layout report PASS。
+- 文档统一为 73 项门禁；doc-curator context-sync / decision-sync 均 exit 0，hard/adaptive/soft 为 0。
+- accepted-golden 仍为 0；本结论只关闭 M2.2 的 `wired + geometry/density/semantic-verified`，不升级为 `visually-verified`。
+
 ## Termination
 
-上下文歧义审计已达到本轮终止条件；证据完整度仍未达到复刻终止条件。accepted-golden 为 0，必须继续执行 M1。
+M2.1 与 M2.2 的状态机、Shell 几何/密度和 measured 门禁歧义审计已达到本轮终止条件；证据完整度和页面管理行为仍未达到复刻终止条件。accepted-golden 为 0，必须继续执行 M1；M3 仅真实缩略图前置完成，响应式重排、写回、导出与重开仍未完成。

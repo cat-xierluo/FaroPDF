@@ -165,7 +165,7 @@ function renderAppShell(args: RenderArgs = {}) {
 }
 
 function renderShell(
-  activeMode: "read" | "annotate" | "export" | "forms" | "ocr" | "pages",
+  activeMode: "read" | "annotate" | "edit" | "export" | "forms" | "ocr" | "pages",
   options: {
     ocr?: OcrWorkspaceController;
     settings?: AppSettings;
@@ -318,22 +318,27 @@ describe("AppShell modes 上下文工具条", () => {
   test("empty read toolbar hides document-only helpers", () => {
     renderAppShell({ utilityPanel: "none" });
 
-    expect(screen.getByText("- / -")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "A 批注" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "导出" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "逆时针" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "顺时针" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "适合页面" })).not.toBeInTheDocument();
   });
 
-  test("workflow mode switches live in the tool launcher instead of the top toolbar", async () => {
+  test("核心工作流在 L3 直接可达，完整命令仍由工具菜单承载", async () => {
     const user = userEvent.setup();
     const onModeChange = vi.fn();
-    renderAppShell({ onModeChange, utilityPanel: "none" });
+    renderAppShell({ onModeChange, reader: makeReadyReader(), utilityPanel: "none" });
 
     const toolbar = screen.getByRole("banner");
-    expect(within(toolbar).queryByRole("button", { name: "OCR" })).not.toBeInTheDocument();
-    expect(within(toolbar).queryByRole("button", { name: "批注" })).not.toBeInTheDocument();
-    expect(within(toolbar).queryByRole("button", { name: "填写和签名" })).not.toBeInTheDocument();
-    expect(within(toolbar).queryByRole("button", { name: "导出" })).not.toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: "扫描和文本识别" })).toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: "A 批注" })).toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: "填写和签名" })).toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: "导出" })).toBeInTheDocument();
+
+    await user.click(within(toolbar).getByRole("button", { name: "导出" }));
+    expect(onModeChange).toHaveBeenCalledWith("export");
 
     await user.click(within(toolbar).getByRole("button", { name: "工具" }));
     const menu = screen.getByRole("menu", { name: "PDF 工具菜单" });
@@ -342,8 +347,7 @@ describe("AppShell modes 上下文工具条", () => {
     expect(within(menu).getByRole("menuitem", { name: "填写和签名" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "OCR" })).toBeInTheDocument();
 
-    await user.click(within(menu).getByRole("menuitem", { name: "导出" }));
-    expect(onModeChange).toHaveBeenCalledWith("export");
+    expect(within(menu).getByRole("menuitem", { name: "设置" })).toBeInTheDocument();
   });
 
   test("read toolbar keeps document tools inside a grouped tool launcher", async () => {
@@ -437,6 +441,23 @@ describe("AppShell modes 上下文工具条", () => {
     });
     expect(onModeChange).toHaveBeenCalledWith("forms");
     expect(screen.getByText("已进入填写和签名面板，请在面板内读取字段并确认扁平化导出。")).toBeInTheDocument();
+  });
+
+  test("native PDF 内容编辑命令进入 edit，而不是误入 pages/export", async () => {
+    const onModeChange = vi.fn();
+    const onUtilityPanelChange = vi.fn();
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "pdf-edit-content", nonce: 1 },
+      onModeChange,
+      onUtilityPanelChange,
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+
+    await waitFor(() => expect(onModeChange).toHaveBeenCalledWith("edit"));
+    expect(onUtilityPanelChange).toHaveBeenCalledWith("summary");
+    expect(screen.getByText(/工具已定位到内容编辑模式/)).toBeInTheDocument();
   });
 
   test("native annotation flatten command enters annotate mode and requests annotation panel", async () => {
@@ -637,6 +658,31 @@ describe("AppShell modes 上下文工具条", () => {
     expect(screen.getByRole("toolbar", { name: "批注工具条" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "高亮" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "图章" })).toBeInTheDocument();
+  });
+
+  test("annotate 默认态不凭空打开右栏", () => {
+    const { container } = renderAppShell({ activeMode: "annotate", utilityPanel: "none" });
+    expect(container.querySelector(".workspace")).toHaveAttribute("data-layout", "main-only");
+    expect(container.querySelector(".right-pane")).toBeNull();
+  });
+
+  test("edit 使用左侧大纲、单页阅读画布和独立编辑 L4，不再渲染页面网格", () => {
+    const { container } = renderAppShell({ activeMode: "edit", reader: makeReadyReader(), utilityPanel: "summary" });
+    const toolbar = screen.getByRole("toolbar", { name: "编辑工具条" });
+    for (const label of ["文本", "图像", "链接", "隐藏"]) {
+      expect(within(toolbar).getByRole("button", { name: label })).toBeDisabled();
+    }
+    expect(screen.getByRole("main", { name: "PDF 阅读区" })).toBeInTheDocument();
+    expect(container.querySelector(".workspace")).toHaveAttribute("data-layout", "left-main");
+    expect(screen.getByRole("tab", { name: "大纲" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: "大纲" })).toBeInTheDocument();
+    expect(screen.queryByRole("main", { name: "页面管理工作台" })).not.toBeInTheDocument();
+  });
+
+  test("pages 使用独立页面管理工作台，不渲染编辑 L4", () => {
+    renderAppShell({ activeMode: "pages", reader: makeReadyReader(), utilityPanel: "none" });
+    expect(screen.getByRole("main", { name: "页面管理工作台" })).toBeInTheDocument();
+    expect(screen.queryByRole("toolbar", { name: "编辑工具条" })).not.toBeInTheDocument();
   });
 
   test("read mode 不渲染批注工具条", () => {
@@ -1374,8 +1420,8 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
   });
 });
 
-describe("AppShell ISS-NEW-A 阶段 1：Toolbar 5 段骨架 + L2 tab 上移", () => {
-  test("Toolbar 包含 5 段（data-section=sidebar-toggles|file|reading|mode|right）且 DOM 严格 5 段", () => {
+describe("AppShell M2.2：Toolbar 5 段层级 + L2 tab", () => {
+  test("Toolbar 包含 navigation|zoom|workflows|collaboration|search 且 DOM 严格 5 段", () => {
     const { container } = renderAppShell({ utilityPanel: "none" });
 
     const toolbar = container.querySelector('[data-testid="app-toolbar"]');
@@ -1386,19 +1432,19 @@ describe("AppShell ISS-NEW-A 阶段 1：Toolbar 5 段骨架 + L2 tab 上移", ()
 
     const sectionIds = sections.map((el) => el.dataset.section);
     expect(sectionIds).toEqual([
-      "sidebar-toggles",
-      "file",
-      "reading",
-      "mode",
-      "right",
+      "navigation",
+      "zoom",
+      "workflows",
+      "collaboration",
+      "search",
     ]);
 
     // DOM 顺序与 contract 一致；任何插入 / 调换 / 缺段会让测试红。
-    expect(sections[0]).toHaveAttribute("aria-label", "侧栏切换");
-    expect(sections[1]).toHaveAttribute("aria-label", "文件操作");
-    expect(sections[2]).toHaveAttribute("aria-label", "阅读控制");
-    expect(sections[3]).toHaveAttribute("aria-label", "模式切换");
-    expect(sections[4]).toHaveAttribute("aria-label", "搜索和设置");
+    expect(sections[0]).toHaveAttribute("aria-label", "导航与视图");
+    expect(sections[1]).toHaveAttribute("aria-label", "缩放");
+    expect(sections[2]).toHaveAttribute("aria-label", "核心工作流");
+    expect(sections[3]).toHaveAttribute("aria-label", "协作与交付");
+    expect(sections[4]).toHaveAttribute("aria-label", "全文搜索");
   });
 
   test("TitlebarTabs 渲染在 Toolbar 上方（独立行，不嵌在 Toolbar 内）", () => {
@@ -1464,14 +1510,14 @@ describe("AppShell ISS-NEW-A 阶段 1：Toolbar 5 段骨架 + L2 tab 上移", ()
     expect(relation & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  test("5 段中每个段至少含一个可访问按钮（contract sanity）", () => {
+  test("5 段中每个段至少含一个可访问控件（contract sanity）", () => {
     const { container } = renderAppShell({ utilityPanel: "none" });
     const toolbar = container.querySelector('[data-testid="app-toolbar"]');
     const sections = Array.from(toolbar?.querySelectorAll<HTMLElement>("[data-section]") ?? []);
 
     for (const section of sections) {
-      const buttons = section.querySelectorAll("button");
-      expect(buttons.length).toBeGreaterThan(0);
+      const controls = section.querySelectorAll("button, input, select");
+      expect(controls.length).toBeGreaterThan(0);
     }
   });
 });
