@@ -243,7 +243,7 @@ describe("ReaderCanvas 阅读深化", () => {
 });
 
 describe("ReaderCanvas Welcome 屏转换卡接线（ISS-NEW-G 2026-06-22 收口）", () => {
-  test("空态下「图片转 PDF」卡点击触发 onConvertFromImages", async () => {
+  test("空态下「图片转 PDF」未接入时禁用", async () => {
     const user = userEvent.setup();
     const onConvertFromImages = vi.fn();
     render(
@@ -257,10 +257,11 @@ describe("ReaderCanvas Welcome 屏转换卡接线（ISS-NEW-G 2026-06-22 收口�
     expect(card).toBeInTheDocument();
     await user.click(card);
 
-    expect(onConvertFromImages).toHaveBeenCalledTimes(1);
+    expect(card).toBeDisabled();
+    expect(onConvertFromImages).not.toHaveBeenCalled();
   });
 
-  test("空态下「Word 转 PDF」卡点击触发 onConvertFromWord", async () => {
+  test("空态下「Word 转 PDF」未接入时禁用", async () => {
     const user = userEvent.setup();
     const onConvertFromWord = vi.fn();
     render(
@@ -274,7 +275,8 @@ describe("ReaderCanvas Welcome 屏转换卡接线（ISS-NEW-G 2026-06-22 收口�
     expect(card).toBeInTheDocument();
     await user.click(card);
 
-    expect(onConvertFromWord).toHaveBeenCalledTimes(1);
+    expect(card).toBeDisabled();
+    expect(onConvertFromWord).not.toHaveBeenCalled();
   });
 
   test("空态不传 onConvert 回调时，转换卡仍渲染但点击不崩溃", async () => {

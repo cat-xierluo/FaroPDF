@@ -11,7 +11,7 @@ export type AppModeId = "read" | "annotate" | "edit" | "export" | "forms" | "ocr
  *  - navigation:    摘要 / 页面管理 / 视图设置
  *  - zoom:          当前缩放 + +/-
  *  - workflows:     批注 / 编辑 / 导出 / 填写签名 / OCR / 更多工具
- *  - collaboration: 文档助手 / 共享
+ *  - collaboration: 摘要 / 导出与交付
  *  - search:        全文搜索
  */
 export type AppToolbarSectionId =

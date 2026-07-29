@@ -211,17 +211,17 @@ describe("app command catalog", () => {
     expect(getCommandById("help-about")?.targetUtilityPanel).toBe("settings");
   });
 
-  test("ISS-NEW-H: 视图菜单 submenu 补全注册 10 个新 command id（缩放 5 + 缩略图 2 + 3 顶层占位）", () => {
-    const zoomIds: AppCommandId[] = [
+  test("ISS-NEW-H: 视图菜单命令显式区分 ready 与 planned", () => {
+    const readyZoomIds: AppCommandId[] = [
       "view-zoom-in",
       "view-zoom-out",
       "view-actual-size",
       "view-fit-page",
-      "view-zoom-tool",
     ];
     const thumbnailIds: AppCommandId[] = ["view-thumbnails-single", "view-thumbnails-double"];
-    const placeholderIds: AppCommandId[] = ["view-go-current-page", "view-reload", "view-add-bookmark"];
-    const allNewIds: AppCommandId[] = [...zoomIds, ...thumbnailIds, ...placeholderIds];
+    const readyIds: AppCommandId[] = [...readyZoomIds, ...thumbnailIds, "view-go-current-page"];
+    const plannedIds: AppCommandId[] = ["view-zoom-tool", "view-reload", "view-add-bookmark"];
+    const allNewIds: AppCommandId[] = [...readyIds, ...plannedIds];
 
     for (const id of allNewIds) {
       const command = getCommandById(id);
@@ -232,15 +232,13 @@ describe("app command catalog", () => {
       expect(command?.requiresDocument, `${id} requiresDocument`).toBe(true);
     }
 
-    // 缩放 / 缩略图命令不携带 feedback（直接走 reader API）。
-    for (const id of [...zoomIds, ...thumbnailIds]) {
+    for (const id of readyIds) {
       expect(getCommandById(id)?.feedback, `${id} should not declare feedback`).toBeUndefined();
+      expect(getCommandById(id)?.availability, `${id} should default to ready`).not.toBe("planned");
     }
 
-    // 3 顶层占位命令必须自带 ISS-NEW-G 占位反馈文案。
-    const expectedPlaceholderFeedback = "视图功能开发中，等待后续 worker 接入。";
-    for (const id of placeholderIds) {
-      expect(getCommandById(id)?.feedback, `${id} should carry placeholder feedback`).toBe(expectedPlaceholderFeedback);
+    for (const id of plannedIds) {
+      expect(getCommandById(id)?.availability, `${id} must fail closed`).toBe("planned");
     }
 
     // native-menu 视图命令必须包含全部 10 个新 id（与 lib.rs 视图 SubmenuBuilder 对齐）。

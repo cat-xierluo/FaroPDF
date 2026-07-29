@@ -146,14 +146,15 @@ describe("Toolbar M2.2：5 段语义层级", () => {
 });
 
 describe("Toolbar ISS-NEW-A 阶段 1：A 批注 / T 编辑 按钮", () => {
-  test("workflows 段包含 A 批注 + T 编辑两个按钮", () => {
+  test("workflows 段保留 T 编辑功能地图，但在引擎接入前明确禁用", () => {
     const { container } = render(<Harness />);
     const modeSection = container.querySelector('[data-section="workflows"]');
     expect(modeSection).not.toBeNull();
     if (!modeSection) return;
 
     expect(within(modeSection as HTMLElement).getByRole("button", { name: "A 批注" })).toBeInTheDocument();
-    expect(within(modeSection as HTMLElement).getByRole("button", { name: "T 编辑" })).toBeInTheDocument();
+    expect(within(modeSection as HTMLElement).getByRole("button", { name: "T 编辑" })).toBeDisabled();
+    expect(within(modeSection as HTMLElement).getByRole("button", { name: "T 编辑" })).toHaveAttribute("title", "内容编辑引擎尚未接入");
   });
 
   test("activeMode=annotate 时 A 批注按钮 aria-pressed=true,T 编辑 false", () => {
@@ -189,13 +190,13 @@ describe("Toolbar ISS-NEW-A 阶段 1：A 批注 / T 编辑 按钮", () => {
     expect(onModeChange).toHaveBeenCalledWith("annotate");
   });
 
-  test("点击 T 编辑 → onModeChange('edit')", async () => {
+  test("点击禁用的 T 编辑不会伪装成已进入 edit", async () => {
     const user = userEvent.setup();
     const onModeChange = vi.fn();
     render(<Harness activeMode="read" onModeChange={onModeChange} reader={makeReadyReader()} />);
 
     await user.click(screen.getByRole("button", { name: "T 编辑" }));
-    expect(onModeChange).toHaveBeenCalledWith("edit");
+    expect(onModeChange).not.toHaveBeenCalled();
   });
 
   test("再次点击同一 mode → toggle 回 read（不卡死在 mode 上）", async () => {
@@ -238,6 +239,29 @@ describe("Toolbar M2.2：密度与入口收口", () => {
     expect(within(navigation).queryByRole("button", { name: "书签" })).not.toBeInTheDocument();
   });
 
+  test("协作段入口名称与真实路由一致，不再把摘要/导出伪装成助手/共享", async () => {
+    const user = userEvent.setup();
+    const onModeChange = vi.fn();
+    const onUtilityPanelChange = vi.fn();
+    render(
+      <Harness
+        onModeChange={onModeChange}
+        onUtilityPanelChange={onUtilityPanelChange}
+        reader={makeReadyReader()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "文档助手" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "共享" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "摘要面板" }));
+    expect(onModeChange).toHaveBeenCalledWith("read");
+    expect(onUtilityPanelChange).toHaveBeenCalledWith("summary");
+
+    await user.click(screen.getByRole("button", { name: "导出与交付" }));
+    expect(onModeChange).toHaveBeenCalledWith("export");
+  });
+
   test("聚焦或输入搜索时打开 measured 右侧搜索面板", async () => {
     const user = userEvent.setup();
     const onRightPanelChange = vi.fn();
@@ -250,5 +274,15 @@ describe("Toolbar M2.2：密度与入口收口", () => {
 
     expect(onRightPanelChange).toHaveBeenCalledWith("search");
     expect(search.setQuery).toHaveBeenCalledWith("P");
+  });
+
+  test("工具菜单把未接入翻译标为禁用，而不是给出假动作", async () => {
+    const user = userEvent.setup();
+    render(<Harness reader={makeReadyReader()} />);
+
+    await user.click(screen.getByRole("button", { name: "工具" }));
+    const translate = screen.getByRole("menuitem", { name: "翻译" });
+    expect(translate).toBeDisabled();
+    expect(translate).toHaveAttribute("title", "翻译尚未接入真实功能");
   });
 });

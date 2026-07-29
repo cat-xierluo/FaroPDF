@@ -6,8 +6,7 @@ import { useId, useState, type ReactElement } from "react";
  *  - progress: 0..1（仅在 running / completed 显式渲染）
  *  - error: 仅 failed 显示
  *
- *  本视图不发起真实 OCR 调用；onStart 由调用方实现，当前为 placeholder。
- *  目标状态与真实 controller 接线分别等待 M1 与 M5。 */
+ *  本视图通过 onStart 把页码范围交给 AppShell 的 OCR controller。 */
 export type OcrJobStatusState = "idle" | "running" | "completed" | "failed";
 
 export interface OcrJobStatus {

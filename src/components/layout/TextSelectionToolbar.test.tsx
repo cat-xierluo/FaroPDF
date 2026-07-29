@@ -37,7 +37,7 @@ describe("TextSelectionToolbar (ISS-061 stage 1: render contract)", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  test("bounds 提供时渲染 7 个动作：全部 enabled（v0.2 起翻译/朗读真接入）", () => {
+  test("bounds 提供时渲染 7 个动作，未接入的翻译明确 disabled", () => {
     const handler = () => undefined;
     render(
       <TextSelectionToolbar
@@ -55,12 +55,12 @@ describe("TextSelectionToolbar (ISS-061 stage 1: render contract)", () => {
       "对选中文本应用删除线批注",
       "在选中文本旁添加便签",
       "复制选中文本到剪贴板",
-      "对选中文本请求翻译占位",
+      "翻译服务尚未接入",
       "朗读选中文本",
     ]);
-    // v0.2 翻译/朗读都真接入，不再 disabled
     const disabled = buttons.filter((b) => b.hasAttribute("disabled"));
-    expect(disabled).toHaveLength(0);
+    expect(disabled).toHaveLength(1);
+    expect(screen.getByText("翻译").closest("button")).toBeDisabled();
   });
 
   test("点击启用动作后回调正确（高亮）", () => {
@@ -177,7 +177,7 @@ describe("TextSelectionToolbar (ISS-061 stage 2: 自动 draft)", () => {
 });
 
 describe("TextSelectionToolbar (ISS-061 stage 2: 翻译 / 朗读)", () => {
-  test("翻译点击：调用 navigator.clipboard.writeText 写翻译占位文本 + 触发 toast", () => {
+  test("翻译未接入时不会写入伪翻译或触发 toast", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -196,12 +196,8 @@ describe("TextSelectionToolbar (ISS-061 stage 2: 翻译 / 朗读)", () => {
         />,
       );
       screen.getByText("翻译").click();
-      expect(writeText).toHaveBeenCalledTimes(1);
-      const writtenArg = writeText.mock.calls[0][0] as string;
-      expect(writtenArg).toContain("待翻译段落");
-      expect(writtenArg.length).toBeGreaterThan("待翻译段落".length); // 翻译占位文本包含原文 + 说明
-      expect(onToast).toHaveBeenCalledTimes(1);
-      expect(onToast.mock.calls[0][0]).toMatch(/翻译/);
+      expect(writeText).not.toHaveBeenCalled();
+      expect(onToast).not.toHaveBeenCalled();
     } finally {
       restore();
     }

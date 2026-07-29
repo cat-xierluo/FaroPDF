@@ -1,7 +1,6 @@
 import {
   FileOutput,
   LayoutGrid,
-  MessageSquare,
   Minus,
   PanelLeft,
   PanelTop,
@@ -10,7 +9,6 @@ import {
   ScanLine,
   Search,
   Settings,
-  Share2,
   StickyNote,
 } from "lucide-react";
 import "./Toolbar.css";
@@ -173,9 +171,8 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onRightPanelChang
           className="tool-button tool-button--icon"
           data-toolbar-section="workflows"
           data-mode-shortcut="T"
-          disabled={!document}
-          onClick={() => enterMode("edit")}
-          title="T 编辑"
+          disabled
+          title="内容编辑引擎尚未接入"
           type="button"
         >
           <PencilLine size={16} />
@@ -209,11 +206,11 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onRightPanelChang
         role="group"
         aria-label="协作与交付"
       >
-        <button aria-label="文档助手" aria-pressed={utilityPanel === "summary"} className="tool-button tool-button--assistant" data-toolbar-section="collaboration" onClick={() => openUtilityPanel("summary")} type="button">
-          <MessageSquare size={15} /><span>助手</span>
+        <button aria-label="摘要面板" aria-pressed={utilityPanel === "summary"} className="tool-button tool-button--assistant" data-toolbar-section="collaboration" onClick={() => openUtilityPanel("summary")} type="button">
+          <PanelLeft size={15} /><span>摘要</span>
         </button>
-        <button aria-label="共享" className="tool-button tool-button--icon tool-button--share" data-toolbar-section="collaboration" disabled={!document} onClick={() => enterMode("export")} type="button">
-          <Share2 size={16} />
+        <button aria-label="导出与交付" className="tool-button tool-button--icon tool-button--share" data-toolbar-section="collaboration" disabled={!document} onClick={() => enterMode("export")} title="导出与交付" type="button">
+          <FileOutput size={16} />
         </button>
       </div>
       <div className="toolbar__section toolbar__section--search" data-section="search" role="group" aria-label="全文搜索">
@@ -261,7 +258,8 @@ function ToolLauncherMenu({
             </header>
             <div className="tool-launcher-section__commands">
               {section.commands.map((command) => {
-                const disabled = command.requiresDocument && !hasDocument;
+                const planned = command.availability === "planned";
+                const disabled = planned || (command.requiresDocument && !hasDocument);
                 return (
                   <button
                     className="tool-launcher-command"
@@ -269,7 +267,7 @@ function ToolLauncherMenu({
                     key={command.id}
                     onClick={() => onCommand(command.id)}
                     role="menuitem"
-                    title={command.description}
+                    title={planned ? `${command.label}尚未接入真实功能` : command.description}
                     type="button"
                   >
                     <span>{command.label}</span>

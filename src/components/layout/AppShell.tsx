@@ -42,6 +42,8 @@ import { RightPanel } from "./RightPanel";
 import { SecurityPanel } from "./SecurityPanel";
 import type { ShapeToolValue } from "./panels/ShapeToolPanel";
 import type { SearchHitItem } from "./panels/SearchResultsPanel";
+import type { DocSummary } from "./panels/DocSummaryPanelView";
+import type { OcrJobStatus } from "./panels/OcrStatusPanelView";
 import {
   TextSelectionToolbar,
   usePdfTextSelection,
@@ -328,6 +330,74 @@ export function AppShell({
   );
   const document = reader.state.document;
   const hasDocument = document !== null;
+  const [rightPanelDocSummary, setRightPanelDocSummary] = useState<DocSummary | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!document) {
+      setRightPanelDocSummary(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (typeof reader.getFileBytes !== "function") {
+      setRightPanelDocSummary(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void reader.getFileBytes().then(async (bytes) => {
+      if (!bytes) {
+        if (!cancelled) setRightPanelDocSummary(null);
+        return;
+      }
+      const metadata = await readPdfMetadata(new Uint8Array(bytes));
+      if (cancelled) return;
+      setRightPanelDocSummary({
+        fileName: typeof reader.getCurrentFileName === "function"
+          ? reader.getCurrentFileName() ?? document.name
+          : document.name,
+        pageCount: document.pageCount,
+        fileSizeBytes: bytes.byteLength,
+        metadata: {
+          ...(metadata.title ? { title: metadata.title } : {}),
+          ...(metadata.author ? { author: metadata.author } : {}),
+          ...(metadata.producer ? { producer: metadata.producer } : {}),
+          ...(metadata.creator ? { creator: metadata.creator } : {}),
+          ...(metadata.creationDate ? { createdAt: metadata.creationDate } : {}),
+        },
+      });
+    }).catch(() => {
+      if (!cancelled) setRightPanelDocSummary(null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [document?.documentId, document?.name, document?.pageCount, reader.getCurrentFileName, reader.getFileBytes]);
+  const rightPanelOcrStatus = useMemo<OcrJobStatus>(() => {
+    if (ocr?.errorMessage) {
+      return { state: "failed", message: "OCR 任务失败", progress: 0, error: ocr.errorMessage };
+    }
+    const job = ocr?.currentJob;
+    if (!job) {
+      return { state: "idle", message: "尚未开始 OCR", progress: 0 };
+    }
+    const totalPages = job.progress.totalPages;
+    const progress = totalPages > 0 ? job.progress.completedPages / totalPages : 0;
+    if (job.status === "completed") {
+      return { state: "completed", message: job.progress.message ?? "OCR 已完成", progress: 1 };
+    }
+    if (job.status === "failed" || job.status === "cancelled") {
+      return {
+        state: "failed",
+        message: job.status === "cancelled" ? "OCR 已取消" : "OCR 任务失败",
+        progress,
+        ...(job.errorMessage ? { error: job.errorMessage } : {}),
+      };
+    }
+    return { state: "running", message: job.progress.message ?? "OCR 正在处理", progress };
+  }, [ocr?.currentJob, ocr?.errorMessage]);
   useEffect(() => {
     if (hasDocument && commandFeedback === "请先打开 PDF 文档。") {
       setCommandFeedback(null);
@@ -619,6 +689,11 @@ export function AppShell({
 
     if (command.requiresDocument && !hasDocument) {
       setCommandFeedback("请先打开 PDF 文档。");
+      return;
+    }
+
+    if (command.availability === "planned") {
+      setCommandFeedback(`「${command.label}」尚未接入真实功能，当前不可用。`);
       return;
     }
 
@@ -1124,11 +1199,12 @@ export function AppShell({
         <RightPanel
           activeMode={activeMode}
           rightPanel={rightPanel}
-          // ISS-NEW-C：文档摘要 + OCR 状态面板输入。来源在 Reader 派生，
-          // 当前实现给空（null / idle）。W2 / 后续 PM 收口时把 App.tsx 真值接进来。
-          docSummary={null}
-          ocrStatus={{ state: "idle", message: "尚未开始 OCR", progress: 0 }}
-          onStartOcr={() => undefined}
+          // 文档摘要由当前 PDF bytes/metadata 派生；OCR 状态与启动动作复用同一 controller。
+          docSummary={rightPanelDocSummary}
+          ocrStatus={rightPanelOcrStatus}
+          onStartOcr={(options) => {
+            void ocr?.startOcr(options);
+          }}
           // ISS-NEW-C 阶段 2 后续（2026-06-22 收口）：导出预览 + OCR 队列。
           exportPreview={{
             activeTool: activeExportTool,

@@ -443,7 +443,7 @@ describe("AppShell modes 上下文工具条", () => {
     expect(screen.getByText("已进入填写和签名面板，请在面板内读取字段并确认扁平化导出。")).toBeInTheDocument();
   });
 
-  test("native PDF 内容编辑命令进入 edit，而不是误入 pages/export", async () => {
+  test("native PDF 内容编辑命令在引擎未接入时 fail-closed", async () => {
     const onModeChange = vi.fn();
     const onUtilityPanelChange = vi.fn();
     renderAppShell({
@@ -455,9 +455,9 @@ describe("AppShell modes 上下文工具条", () => {
       utilityPanel: "none",
     });
 
-    await waitFor(() => expect(onModeChange).toHaveBeenCalledWith("edit"));
-    expect(onUtilityPanelChange).toHaveBeenCalledWith("summary");
-    expect(screen.getByText(/工具已定位到内容编辑模式/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/「编辑」尚未接入真实功能/)).toBeInTheDocument());
+    expect(onModeChange).not.toHaveBeenCalled();
+    expect(onUtilityPanelChange).not.toHaveBeenCalled();
   });
 
   test("native annotation flatten command enters annotate mode and requests annotation panel", async () => {
@@ -1197,14 +1197,12 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
     });
   });
 
-  test("ISS-NEW-H: native view-zoom-tool 命令复用 setZoomPreset('1') + 给出占位 feedback", async () => {
+  test("ISS-NEW-H: native view-zoom-tool 未接入时 fail-closed", async () => {
     const reader = makeReadyReader();
     renderAppShell({ activeMode: "read", commandSignal: { id: "view-zoom-tool", nonce: 1 }, reader, utilityPanel: "none" });
 
-    await waitFor(() => {
-      expect(reader.setZoomPreset).toHaveBeenCalledWith("1");
-    });
-    expect(await screen.findByText("缩放工具待后续 worker 接入；当前已切到实际大小。")).toBeInTheDocument();
+    expect(await screen.findByText(/「缩放工具」尚未接入真实功能/)).toBeInTheDocument();
+    expect(reader.setZoomPreset).not.toHaveBeenCalled();
   });
 
   // 缩略图 2 个命令直接调 reader.setViewMode。
@@ -1251,7 +1249,7 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
     expect(await screen.findByText(/当前已在第/)).toBeInTheDocument();
   });
 
-  test("ISS-NEW-H 第 3 阶段：view-reload 实质接通（window.location.reload 触发）", async () => {
+  test("ISS-NEW-H 第 3 阶段：view-reload 未实现磁盘重读时 fail-closed", async () => {
     const reloadSpy = vi.fn();
     const originalLocation = window.location;
     Object.defineProperty(window, "location", {
@@ -1264,8 +1262,8 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
       reader: makeReadyReader(),
       utilityPanel: "none",
     });
-    expect(await screen.findByText(/重新载入整个 webview/)).toBeInTheDocument();
-    expect(reloadSpy).toHaveBeenCalled();
+    expect(await screen.findByText(/「重新载入」尚未接入真实功能/)).toBeInTheDocument();
+    expect(reloadSpy).not.toHaveBeenCalled();
     Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
   });
 
@@ -1362,7 +1360,7 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
     expect(await screen.findByText(/浏览历史只有 2 项/)).toBeInTheDocument();
   });
 
-  test("ISS-NEW-H 第 3 阶段：view-add-bookmark 实质接通 → onSettingsChange 更新 recentFiles[].lastPage", async () => {
+  test("ISS-NEW-H 第 3 阶段：view-add-bookmark 不再伪装成 lastPage 更新", async () => {
     const onSettingsChange = vi.fn();
     const reader = makeReadyReader();
     const recentFile = {
@@ -1379,10 +1377,8 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
       settings: baseSettings,
       utilityPanel: "none",
     });
-    expect(await screen.findByText(/已在第 1 页添加书签/)).toBeInTheDocument();
-    expect(onSettingsChange).toHaveBeenCalled();
-    const updated = onSettingsChange.mock.calls.at(-1)?.[0] as AppSettings | undefined;
-    expect(updated?.recentFiles[0]?.lastPage).toBe(1);
+    expect(await screen.findByText(/「添加书签」尚未接入真实功能/)).toBeInTheDocument();
+    expect(onSettingsChange).not.toHaveBeenCalled();
   });
 
   // view-zoom-tool / view-thumbnails-* / view-zoom-in / view-zoom-out 在无文档时被挡掉。
@@ -1522,8 +1518,8 @@ describe("AppShell M2.2：Toolbar 5 段层级 + L2 tab", () => {
   });
 });
 
-describe("AppShell ISS-NEW-G 2026-06-22 收口：Welcome 屏转换卡接线", () => {
-  test("空态下「图片转 PDF」卡点击触发占位 command feedback", async () => {
+describe("AppShell ISS-NEW-G 2026-06-22 收口：Welcome 屏转换入口真实性", () => {
+  test("空态下「图片转 PDF」卡在引擎接入前禁用", async () => {
     const user = userEvent.setup();
     // reader 状态: document=null → 进入空态 → 渲染 WelcomeScreen
     renderAppShell({
@@ -1537,11 +1533,11 @@ describe("AppShell ISS-NEW-G 2026-06-22 收口：Welcome 屏转换卡接线", ()
 
     await user.click(card);
 
-    const feedback = await screen.findByTestId("command-feedback");
-    expect(feedback).toHaveTextContent(/图片转 PDF.*功能开发中/);
+    expect(card).toBeDisabled();
+    expect(screen.queryByTestId("command-feedback")).not.toBeInTheDocument();
   });
 
-  test("空态下「Word 转 PDF」卡点击触发占位 command feedback", async () => {
+  test("空态下「Word 转 PDF」卡在引擎接入前禁用", async () => {
     const user = userEvent.setup();
     renderAppShell({
       activeMode: "read",
@@ -1554,8 +1550,8 @@ describe("AppShell ISS-NEW-G 2026-06-22 收口：Welcome 屏转换卡接线", ()
 
     await user.click(card);
 
-    const feedback = await screen.findByTestId("command-feedback");
-    expect(feedback).toHaveTextContent(/Word 转 PDF.*功能开发中/);
+    expect(card).toBeDisabled();
+    expect(screen.queryByTestId("command-feedback")).not.toBeInTheDocument();
   });
 
   test("非空态（有 document）不渲染 Welcome 屏转换卡", () => {
