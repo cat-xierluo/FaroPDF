@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 import { PDFDocument } from "pdf-lib";
@@ -421,5 +421,48 @@ describe("PageOrganizerWorkspace 页面剪贴板（ISS-NEW-M M3）", () => {
     expect(screen.getAllByRole("button", { name: /第 \d+ 页/ })).toHaveLength(6);
     await user.click(screen.getByRole("menuitem", { name: /撤销/ }));
     expect(screen.getAllByRole("button", { name: /第 \d+ 页/ })).toHaveLength(5);
+  });
+});
+
+describe("PageOrganizerWorkspace 插入空白页（ISS-NEW-M M3）", () => {
+  test("切换到空白页模式 + 填数量 + 确认 → 调 saveUpdatedBytes", async () => {
+    const user = userEvent.setup();
+    const sourceBytes = await createPdfBytes(5);
+    const saveUpdatedBytes = vi.fn(async () => undefined);
+    render(
+      <PageOrganizerWorkspace
+        reader={makeReader(makeState(), { getFileBytes: async () => sourceBytes, saveUpdatedBytes })}
+      />,
+    );
+
+    await user.click(screen.getByTestId("page-organizer-insert-pdf"));
+    const dialog = await screen.findByRole("dialog");
+    // 切换到空白页模式
+    await user.click(within(dialog).getByTestId("insert-mode-blank"));
+    // 文件输入应消失，数量输入出现
+    expect(within(dialog).queryByTestId("insert-pdf-file")).not.toBeInTheDocument();
+    await user.clear(within(dialog).getByTestId("insert-blank-count"));
+    await user.type(within(dialog).getByTestId("insert-blank-count"), "2");
+    await user.click(within(dialog).getByTestId("insert-pdf-confirm"));
+    await waitFor(() => expect(saveUpdatedBytes).toHaveBeenCalledTimes(1));
+  });
+
+  test("空白页模式数量为 0 时显示错误，不调 saveUpdatedBytes", async () => {
+    const user = userEvent.setup();
+    const sourceBytes = await createPdfBytes(5);
+    const saveUpdatedBytes = vi.fn(async () => undefined);
+    render(
+      <PageOrganizerWorkspace
+        reader={makeReader(makeState(), { getFileBytes: async () => sourceBytes, saveUpdatedBytes })}
+      />,
+    );
+
+    await user.click(screen.getByTestId("page-organizer-insert-pdf"));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByTestId("insert-mode-blank"));
+    fireEvent.change(within(dialog).getByTestId("insert-blank-count"), { target: { value: "0" } });
+    await user.click(within(dialog).getByTestId("insert-pdf-confirm"));
+    // count=0 应被拦截，不调 saveUpdatedBytes（错误文案在 localError 显示）
+    expect(saveUpdatedBytes).not.toHaveBeenCalled();
   });
 });
