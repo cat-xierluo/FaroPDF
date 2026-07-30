@@ -7672,3 +7672,21 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - lint 我的文件干净（唯一 lint 错误在 readerReducer.test.ts:244，pre-existing）。
 
 后续 M5 剩余项：权限不足（需 Rust `read_pdf_file_from_path` 迁移 AppError 区分 NotFound/Permission，受 src-tauri 约束）、OCR 失败（Rust OcrDispatchError 失败路径单测，同样受约束）。这两项需解除 src-tauri 禁令或改为纯前端 mock 路径才能推进。
+
+## DEC-194 M5 收尾：权限不足 + OCR 失败，异常态四项全部 behavior-complete（2026-07-30）
+
+- 日期：2026-07-30
+- 状态：已采纳
+- 关联：ISS-NEW-M M5、DEC-192（损坏）、DEC-193（密码）、PR #73/#74
+
+问题：M5 剩余两项「权限不足」「OCR 失败」均依赖 `src-tauri/**`，前两轮（DEC-192/193）严格避开了它。本轮经用户明确解除 src-tauri 禁令，用独立 worktree 隔离并行推进两项，完成 M5 异常态主线。
+
+决策（两条独立 PR，文件零重叠，worktree 隔离）：
+
+**PR #73 OCR 失败（commit 6a5c06c）**：纯加 Rust 单测，零业务改动。`OcrDispatchError` 7 个失败变体（ToolMissing/SpawnFailed/WaitFailed/ProcessFailed/NetworkFailed/CredentialMissing/ResponseDecodeFailed）此前零测试覆盖，E2E 工具缺失时只跳过不断言失败。补 8 个纯构造单测（7 变体 short_message 关键词断言 + 1 个全部变体文案互异防回归），不依赖真实 ocrmypdf/curl，CI 无工具环境稳定通过。OCR 失败链路（Rust 7 类错误 → 落库 → 轮询 → 前端 error 段）至此完整可验证。
+
+**PR #74 权限不足（commit 928cd49）**：`read_pdf_file_from_path` 签名 `Result<_,String>` → `Result<_,AppError>`，`fs::read` 用 `From<io::Error>` 自动映射（NotFound→FileNotFound, PermissionDenied→PermissionDenied, 其他→IoError），路径脱敏进 context。前端 App.tsx 两处 catch（file-open / pending-detach）从「吞掉 / 只 console.error」改为接 `normalizeError+friendlyMessageForCode`，新增 `reader.reportOpenError` 复用 DEC-192 错误卡片。本轮走 Rust io::Error → From → AppError → Tauri 序列化 → 前端 normalizeError 路径，与前两轮（PDF.js error.name / PasswordException）在前端汇合到同一个 friendlyMessageForCode，schema 一致。
+
+验证：cargo test read_pdf_file_command_tests 4 passed + ocr_dispatch::tests 11 passed；typecheck 通过（除 pre-existing readerReducer.test.ts）；前端 errorMessages 11 passed；vite build 成功。
+
+M5 异常态最终状态：文件损坏 ✅、密码 PDF ✅、权限不足 ✅、OCR 失败 ✅，四项全部 behavior-complete 并合并。PermissionDenied 的纯文件系统端到端（chmod 000）未做自动化（跨平台 flaky），靠 Rust 单测 + 归一化集成测试 + error.rs From<io::Error> 映射测试三层保证。安全边界全程遵守：corrupt/encrypted fixture 入仓、密码不存储、路径脱敏、权限错误不泄露完整路径。
