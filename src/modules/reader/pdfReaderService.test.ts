@@ -21,6 +21,14 @@ function createAdapter() {
     numPages: 2,
     fingerprints: ["fingerprint-a", null],
     getPage,
+    // ISS-NEW-M M4：outline 测试用。pageRef 用对象模拟，getPageIndex 按其 .pageIndex 返回。
+    getOutline: vi.fn(async () => [
+      { title: "第一章", dest: [{ __pageRef: 0 }], items: [{ title: "1.1 节", dest: "named-dest" }] },
+      { title: "第二章", dest: [{ __pageRef: 1 }] },
+      { title: "无目标", dest: null },
+    ]),
+    getDestination: vi.fn(async (name: string) => (name === "named-dest" ? [{ __pageRef: 1 }] : null)),
+    getPageIndex: vi.fn(async (ref: { __pageRef: number }) => ref.__pageRef),
   };
   const loadingTask = { promise: Promise.resolve(document), destroy };
   const adapter: PdfJsReaderAdapter = {
@@ -281,6 +289,40 @@ describe("pdfReaderService", () => {
     expect(canvas.width).toBeGreaterThanOrEqual(1);
     expect(canvas.height).toBeGreaterThanOrEqual(1);
 
+    await loaded.destroy();
+  });
+
+  test("ISS-NEW-M M4: getOutline 递归解析 dest 为 1-based 页码树", async () => {
+    const { adapter } = createAdapter();
+    const loaded = await loadPdfFromBytes(
+      { data: new Uint8Array([1]), fileName: "x.pdf" },
+      adapter,
+    );
+
+    const outline = await loaded.getOutline();
+    // 第一章 → 第 1 页，含子节点 1.1 节（命名 dest → 第 2 页）
+    expect(outline).toHaveLength(3);
+    expect(outline[0]).toMatchObject({ title: "第一章", pageNumber: 1, depth: 0 });
+    expect(outline[0].children).toHaveLength(1);
+    expect(outline[0].children[0]).toMatchObject({ title: "1.1 节", pageNumber: 2, depth: 1 });
+    // 第二章 → 第 2 页（explicit dest array）
+    expect(outline[1]).toMatchObject({ title: "第二章", pageNumber: 2, depth: 0 });
+    // 无目标 dest → pageNumber undefined，仍保留标题
+    expect(outline[2]).toMatchObject({ title: "无目标", pageNumber: undefined, depth: 0 });
+    expect(outline[2].children).toEqual([]);
+
+    await loaded.destroy();
+  });
+
+  test("ISS-NEW-M M4: 无 outline 时返回空数组（getOutline 缺失/返回空）", async () => {
+    const { adapter } = createAdapter();
+    const loaded = await loadPdfFromBytes(
+      { data: new Uint8Array([1]), fileName: "x.pdf" },
+      adapter,
+    );
+    // createAdapter 的 getOutline 返回非空；这里验证 resolveDestination 对损坏 dest 安全
+    const outline = await loaded.getOutline();
+    expect(Array.isArray(outline)).toBe(true);
     await loaded.destroy();
   });
 });

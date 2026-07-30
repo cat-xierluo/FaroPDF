@@ -1642,6 +1642,8 @@ function UtilityPanel({
       onRemoveBookmark={onRemoveBookmark}
       onSelectBookmarkPage={reader.setCurrentPage}
       onSelectPage={reader.setCurrentPage}
+      onSelectOutlinePage={reader.setCurrentPage}
+      outline={reader.outline}
       pageCount={reader.state.document?.pageCount}
       pagesWithHits={collectPagesWithSearchHits(search.state.hits)}
       preferredTab={preferredSummaryTab}

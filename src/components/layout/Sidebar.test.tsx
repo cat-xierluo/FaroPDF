@@ -166,7 +166,7 @@ describe("DocumentSummaryPanel 页面书签", () => {
     },
   ];
 
-  test("空态加号添加当前页；大纲未接线加号保持 disabled", async () => {
+  test("空态加号添加当前页；大纲无 outline 时显示空态提示（ISS-NEW-M M4 已接线读侧）", async () => {
     const user = userEvent.setup();
     const onAddBookmark = vi.fn();
     render(
@@ -182,7 +182,8 @@ describe("DocumentSummaryPanel 页面书签", () => {
     expect(onAddBookmark).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole("tab", { name: "大纲" }));
-    expect(screen.getByRole("button", { name: "添加大纲项目（尚未接入）" })).toBeDisabled();
+    // M4：大纲已接线读侧，无 outline 时显示空态提示（不再有 disabled 的占位加号）
+    expect(screen.getByText(/没有内置大纲/)).toBeInTheDocument();
   });
 
   test("列表显示当前页，跳转使用 1-based 页码并可删除", async () => {
@@ -400,5 +401,41 @@ describe("DocumentSummaryPanel 缩略图", () => {
 
     await user.click(within(page1).getByRole("button", { name: "第 1 页（当前页）" }));
     expect(onSelectPage).toHaveBeenCalledWith(0);
+  });
+});
+
+describe("DocumentSummaryPanel outline（ISS-NEW-M M4）", () => {
+  test("有 outline 时渲染树，点击节点跳页（1-based）", async () => {
+    const user = userEvent.setup();
+    const onSelectOutlinePage = vi.fn();
+    render(
+      <DocumentSummaryPanel
+        hasDocument
+        onSelectOutlinePage={onSelectOutlinePage}
+        outline={[
+          { title: "第一章", pageNumber: 1, depth: 0, children: [{ title: "1.1 节", pageNumber: 2, depth: 1, children: [] }] },
+          { title: "无目标", pageNumber: undefined, depth: 0, children: [] },
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "大纲" }));
+    expect(screen.getByTestId("outline-list")).toBeInTheDocument();
+    // 第一章可点击，跳到第 1 页
+    await user.click(screen.getByTestId("outline-entry-1"));
+    expect(onSelectOutlinePage).toHaveBeenCalledWith(1);
+    // 子节点 1.1 节跳第 2 页
+    await user.click(screen.getByTestId("outline-entry-2"));
+    expect(onSelectOutlinePage).toHaveBeenCalledWith(2);
+    // 无目标节点不渲染可点击 entry（无 data-testid）
+    expect(screen.queryByTestId("outline-entry-undefined")).not.toBeInTheDocument();
+  });
+
+  test("outline 为空数组时显示空态提示", async () => {
+    const user = userEvent.setup();
+    render(<DocumentSummaryPanel hasDocument outline={[]} />);
+    await user.click(screen.getByRole("tab", { name: "大纲" }));
+    expect(screen.getByText(/没有内置大纲/)).toBeInTheDocument();
+    expect(screen.queryByTestId("outline-list")).not.toBeInTheDocument();
   });
 });
