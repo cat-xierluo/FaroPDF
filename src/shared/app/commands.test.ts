@@ -219,8 +219,13 @@ describe("app command catalog", () => {
       "view-fit-page",
     ];
     const thumbnailIds: AppCommandId[] = ["view-thumbnails-single", "view-thumbnails-double"];
-    const readyIds: AppCommandId[] = [...readyZoomIds, ...thumbnailIds, "view-go-current-page"];
-    const plannedIds: AppCommandId[] = ["view-zoom-tool", "view-reload", "view-add-bookmark"];
+    const readyIds: AppCommandId[] = [
+      ...readyZoomIds,
+      ...thumbnailIds,
+      "view-go-current-page",
+      "view-add-bookmark",
+    ];
+    const plannedIds: AppCommandId[] = ["view-zoom-tool", "view-reload"];
     const allNewIds: AppCommandId[] = [...readyIds, ...plannedIds];
 
     for (const id of allNewIds) {

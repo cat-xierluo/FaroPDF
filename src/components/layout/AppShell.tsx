@@ -31,13 +31,14 @@ import {
 import type { AnnotationShapeToolType, AnnotationToolState } from "../../modules/annotation";
 import type { PdfAnnotationType } from "../../shared/pdf/annotation";
 import { useFormController } from "../../modules/forms/useFormController";
+import { useBookmarkController } from "../../modules/bookmarks";
 import { setActiveFormController } from "../../modules/forms/activeFormController";
 import { FormsPanel } from "../../modules/forms/ui/FormsPanel";
 import { decodeSignatureDataUrl } from "../../modules/forms/signatureImage";
 import { createPdfOperationEngine } from "../../modules/export";
 import { ExportDeliveryPanel, type ExportDeliveryTool } from "../../modules/export/ui/ExportDeliveryPanel";
 import { ReaderCanvas } from "./ReaderCanvas";
-import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
+import { BookmarkPanel, DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
 import { AnnotationSidebar, type AnnotationFlattenResult } from "./AnnotationSidebar";
 import { AnnotationToolbar } from "./AnnotationToolbar";
 import { PageOrganizerWorkspace } from "./PageOrganizerWorkspace";
@@ -363,6 +364,32 @@ export function AppShell({
   );
   const document = reader.state.document;
   const hasDocument = document !== null;
+  const bookmarkDocument = useMemo(() => document ? {
+    path: document.path,
+    ...(document.fingerprint ? { fingerprint: document.fingerprint } : {}),
+    pageCount: document.pageCount,
+    currentPage: document.currentPage,
+  } : null, [document?.currentPage, document?.fingerprint, document?.pageCount, document?.path]);
+  const bookmarkController = useBookmarkController(bookmarkDocument);
+  const handleAddCurrentPageBookmark = useCallback(() => {
+    const result = bookmarkController.addCurrentPage();
+    if (result.status === "added") {
+      setCommandFeedback(`已添加${result.bookmark.label}书签。`);
+    } else if (result.status === "exists") {
+      setCommandFeedback(`${result.bookmark.label}已有书签。`);
+    } else if (result.status === "no-document") {
+      setCommandFeedback("请先打开 PDF 文档。");
+    } else {
+      setCommandFeedback(result.message);
+    }
+  }, [bookmarkController.addCurrentPage]);
+  const handleRemoveBookmark = useCallback((bookmarkId: string) => {
+    if (bookmarkController.removeBookmark(bookmarkId)) {
+      setCommandFeedback("已删除页面书签。");
+    } else if (bookmarkController.errorMessage) {
+      setCommandFeedback(bookmarkController.errorMessage);
+    }
+  }, [bookmarkController.errorMessage, bookmarkController.removeBookmark]);
   const [rightPanelDocSummary, setRightPanelDocSummary] = useState<DocSummary | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -1033,18 +1060,10 @@ export function AppShell({
       }
       return;
     }
-    // view-add-bookmark 实质接通（v0.2 简化为把 currentPage 写回 recentFiles[].lastPage，
-    // 真实 outline 持久化留 v0.2 polish）。
+    // 页面书签写入独立 sidecar，不改原始 PDF，也不再借 recentFiles.lastPage 冒充。
     if (command.id === "view-add-bookmark" && reader.state.document) {
-      onSettingsChange?.({
-        ...settings,
-        recentFiles: settings.recentFiles.map((file) =>
-          file.path === reader.state.document?.path
-            ? { ...file, lastPage: reader.state.document.currentPage }
-            : file,
-        ),
-      });
-      setCommandFeedback(`已在第 ${reader.state.document.currentPage} 页添加书签（lastPage 已更新）。`);
+      handleAddCurrentPageBookmark();
+      onUtilityPanelChange("bookmark");
       return;
     }
     // ISS-NEW-H 第 3 阶段：滚动 / 翻页 / 适合屏幕。
@@ -1121,12 +1140,18 @@ export function AppShell({
     if (command.feedback) {
       setCommandFeedback(command.feedback);
     }
-  }, [activeMode, document?.name, hasDocument, onModeChange, onUtilityPanelChange, reader]);
+  }, [activeMode, document?.name, handleAddCurrentPageBookmark, hasDocument, onModeChange, onUtilityPanelChange, reader]);
 
+  const processedCommandSignalRef = useRef<string | null>(null);
   useEffect(() => {
     if (!commandSignal || commandSignal.id === "file-open") {
       return;
     }
+    const signalKey = `${commandSignal.id}:${commandSignal.nonce}`;
+    if (processedCommandSignalRef.current === signalKey) {
+      return;
+    }
+    processedCommandSignalRef.current = signalKey;
     void executeCommand(commandSignal.id);
     // P1-2：依赖加 commandSignal?.id 以支持同 nonce 不同 id 的边界（理论上 App 层
     // 通过 nonce 递增控制重发，但 effect 列出全部源以满足 react-hooks/exhaustive-deps）。
@@ -1182,12 +1207,16 @@ export function AppShell({
           <UtilityPanel
             activeAnnotationId={activeAnnotationId}
             annotations={annotations}
+            bookmarkError={bookmarkController.errorMessage}
+            bookmarks={bookmarkController.bookmarks}
             currentPdfPath={document?.path ?? null}
             formController={formController}
             key={activeMode === "edit" ? "edit-outline" : "utility-panel"}
             onAnnotationClick={setActiveAnnotationId}
+            onAddBookmark={handleAddCurrentPageBookmark}
             annotationViewSignal={annotationViewSignal}
             onFlattenAnnotations={handleFlattenAnnotations}
+            onRemoveBookmark={handleRemoveBookmark}
             onSecurityClose={() => onUtilityPanelChange("none")}
             onSecurityFeedback={(message) => setCommandFeedback(message)}
             panel={utilityPanel}
@@ -1491,11 +1520,15 @@ function OcrWorkspaceUnavailable() {
 function UtilityPanel({
   activeAnnotationId,
   annotations,
+  bookmarkError,
+  bookmarks,
   currentPdfPath,
   formController,
   annotationViewSignal,
   onAnnotationClick,
+  onAddBookmark,
   onFlattenAnnotations,
+  onRemoveBookmark,
   onSecurityClose,
   onSecurityFeedback,
   panel,
@@ -1504,10 +1537,14 @@ function UtilityPanel({
   search,
 }: {
   activeAnnotationId: string | null;
+  bookmarkError: string | null;
+  bookmarks: import("../../shared/pdf/bookmark").PdfPageBookmark[];
   annotationViewSignal: { view: "list" | "summary"; nonce: number };
   currentPdfPath: string | null;
   onAnnotationClick: (annotationId: string) => void;
+  onAddBookmark: () => void;
   onFlattenAnnotations: () => Promise<AnnotationFlattenResult>;
+  onRemoveBookmark: (bookmarkId: string) => void;
   onSecurityClose: () => void;
   onSecurityFeedback: (message: string | null) => void;
   panel: Exclude<UtilityPanelId, "none">;
@@ -1577,35 +1614,37 @@ function UtilityPanel({
     );
   }
 
-  // ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏「书签」面板占位。
-  // 当前 stage 不接 PDF outline 解析 / 持久化 / 跳转，由后续 worker 接入。
   if (panel === "bookmark") {
-    return <BookmarkPanelPlaceholder />;
+    return (
+      <BookmarkPanel
+        bookmarks={bookmarks}
+        currentPage={reader.state.document?.currentPage}
+        errorMessage={bookmarkError}
+        hasDocument={reader.state.document !== null}
+        onAddBookmark={onAddBookmark}
+        onRemoveBookmark={onRemoveBookmark}
+        onSelectPage={reader.setCurrentPage}
+      />
+    );
   }
 
   return (
     <DocumentSummaryPanel
       annotations={annotations}
+      bookmarkError={bookmarkError}
+      bookmarks={bookmarks}
       currentPage={reader.state.document?.currentPage}
       hasDocument={reader.state.document !== null}
       ocrNeeded={reader.state.document?.ocrStatus === "needed"}
+      onAddBookmark={onAddBookmark}
+      onRemoveBookmark={onRemoveBookmark}
+      onSelectBookmarkPage={reader.setCurrentPage}
       onSelectPage={reader.setCurrentPage}
       pageCount={reader.state.document?.pageCount}
       pagesWithHits={collectPagesWithSearchHits(search.state.hits)}
       preferredTab={preferredSummaryTab}
       renderThumbnail={reader.renderThumbnail}
     />
-  );
-}
-
-/** ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏书签面板占位。
- *  真实能力（outline 解析 / 添加 / 跳转 / 持久化）留后续 worker。 */
-function BookmarkPanelPlaceholder() {
-  return (
-    <aside className="bookmark-panel" aria-label="书签面板" data-testid="bookmark-panel">
-      <h2 className="bookmark-panel__title">书签</h2>
-      <p className="bookmark-panel__empty">书签功能开发中，等待后续 worker 接入 PDF outline 解析与持久化。</p>
-    </aside>
   );
 }
 

@@ -1,4 +1,10 @@
 export type {
+  BookmarkDocumentRef,
+  BookmarkSidecar,
+  BookmarkSidecarDocumentRef,
+  PdfPageBookmark,
+} from "./pdf/bookmark";
+export type {
   OcrStatus,
   PdfDocumentState,
   PdfExportJob,

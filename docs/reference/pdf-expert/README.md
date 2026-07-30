@@ -10,7 +10,7 @@
 - 当前 accepted golden 数量为 0；新增图片最高为 `measured`，任何 Agent 都不得使用“已有 15 张黄金图”或本批次 measured 图作为最终视觉完成依据。
 - `scripts/verify-pdf-expert-layout.mjs` 证明结构不变量；`verify-pdf-expert-visual.mjs` 以 measured bbox 验证 L2/L3/L4、L3 横向分布、页面与页卡几何，并断言单页/缩略图/surface 语义。二者都不是 accepted-golden 像素一致性测试。
 - 在完成规范化重采集、窗口裁剪、元素量测和视觉 diff 之前，相关 UI 的最高状态只能是 `behavior-complete`，不能是 `visually-verified`。
-- M0、M2.1、M2.2 已完成；M3 核心页面管理行为已接真实状态和 PDF 导出，M4/M5 按功能真实性继续推进。M1/accepted-golden 不再是功能前置。
+- M0、M2.1、M2.2 已完成；M3 核心页面管理行为已接真实状态和 PDF 导出，M4 shape-style 与页面书签已完成行为闭环，M4 其余 surface / M5 异常态按功能真实性继续推进。M1/accepted-golden 不再是功能前置。
 - 新文档能降低上下文歧义，但不会自动补足缺失证据、视觉判断或功能实现；当前不得把“多个 Agent 一起做”理解成“多个 Agent 一起改 UI”。
 
 ## 权威来源分工

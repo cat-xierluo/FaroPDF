@@ -52,7 +52,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | M2.1 | 状态机与验证器纠偏 | **已完成（2026-07-28，Codex；独立 S4 PASS）** | G01–G05 measured 证据和失败基线可用 | `T 编辑`/页面管理已拆分；批注默认 panel、L2/L3/L4 与 surface 语义已校准 |
 | M2.2 | Shell 层级、密度与画布几何纠偏 | **已完成（2026-07-28，Codex；独立 S4 PASS）** | G01/G02/G03/G05 measured + 当前 actual 肉眼复核 | 重建 L3 分组；校准中性深色壳层、按钮间距、单页与编辑大纲几何；页面管理接真实缩略图；验证器新增横向/页面/页卡/搜索门禁 |
 | M3 | 页面管理纵向闭环 | **核心行为已闭环；剩余能力显式禁用** | 功能契约和真实 PDF fixture | 真实缩略图、选择/多选、拖拽、删除、旋转、撤销、导出与重开解析已通过；页面剪贴板待实现 |
-| M4 | Shell / Sidebar / RightPanel 分域接线 | 进行中 | 不依赖 accepted-golden | 每个可见入口接真实 state/controller；planned 入口显式禁用 |
+| M4 | Shell / Sidebar / RightPanel 分域接线 | **shape-style、页面书签已 behavior-complete；其余 surface 继续推进** | 不依赖 accepted-golden | 每个可见入口接真实 state/controller；planned 入口显式禁用 |
 | M5 | forms/export/OCR/异常态补齐 | 进行中 | 不依赖 capture | forms/export/OCR 逐项以真实产物、round-trip 和错误态验收 |
 
 ### 待补齐清单（2026-07-24 盘点）
@@ -81,7 +81,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | id | 问题 | 入口 | 备注 |
 | --- | --- | --- | --- |
 | M3 页面管理闭环 | 页面剪贴板复制/粘贴、真实页面尺寸标签和更多异常态 | `docs/TASKS.md` ISS-NEW-M M3 | 核心重排/旋转/删除/撤销/导出已闭环，剩余入口已 disabled，不再被截图门禁阻塞 |
-| M4 各 surface | bookmarks、shape-style 等尚未接线面板 | `docs/TASKS.md` ISS-NEW-M M4 | 用真实 state/controller 验收；视觉只作非阻塞优化 |
+| M4 剩余 surface | thumbnails / outline / annotations 与 signatures / stamps 等仍需逐项行为复核；shape-style、bookmarks 已完成行为闭环 | `docs/TASKS.md` ISS-NEW-M M4 | 用真实 state/controller 验收；视觉只作非阻塞优化 |
 | M5 功能闭环 | 表单真实 fixture round-trip、Tauri GUI 错误态 | `docs/TASKS.md` ISS-NEW-M M5 | OCR 本地真实 pipeline 与导出产物已验证；继续补表单和异常态 |
 
 **D. 补验证/复核（已有产出但需人工或独立审计）**
@@ -106,7 +106,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | M4 | 条件式并行 | 仅目标 surface 已有 accepted-golden 且 allowed files 不重叠时拆分；全局布局只允许一个 owner |
 | M5 | 条件式 Wave | forms/export/OCR/异常态按独立工作流拆分；共享契约、AppShell 和写回链路不得并行争抢 |
 
-当前优先项（2026-07-30 更新）：继续做 M4/M5 功能接线与 round-trip；M1 和 ISS-NEW-N 的截图补采降为可选视觉优化。后续任务以 `ready / partial / planned` 功能状态和真实产物为主证据，不再因 accepted-golden 为 0 停止实现。
+当前优先项（2026-07-30 更新）：M4 页面书签已收口；下一轮优先领取 M5 密码 PDF、文件损坏、权限不足或 OCR 失败中的单一可复现异常态。M1 和 ISS-NEW-N 的截图补采降为可选视觉优化。后续任务以 `ready / partial / planned` 功能状态和真实产物为主证据，不再因 accepted-golden 为 0 停止实现。
 
 ### 状态词统一
 
@@ -1476,64 +1476,15 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## 进度日志
 
-> 本节只记录历史动作，不是当前状态或任务入口。凡涉及 PDF Expert UI，2026-07-23 之前的“完成”“对齐”“黄金图”“固定 5 列”和 read L4 记录均由 ISS-NEW-M / DEC-173 重新解释；领取任务只看本文件顶部的 M0～M5 与 ISS-NEW-M。
+> 依照 AGENTS.md 与 doc-curator 门禁，本节只保留最近 5 条摘要；它不是任务入口。领取任务只看本文件顶部的 M0～M5 与 ISS-NEW-M，完整历史见 `docs/DECISIONS.md`。
 
-- 2026-06-22：完成 ISS-NEW-E 第 1 步收口（DEC-156）：L4 二级工具条统一抽象 — read 模式并入 `ContextToolbar`，`ContextToolbar` 接受 `mode: Exclude<AppModeId, "pages">`（含 `"read"`） + `reader` prop；`mode === "read"` 分支从 `getModeTools("read")` 拿 3 工具（旋转 + 适合页面）；`showContextToolbar` 改 `activeMode !== "pages"`（read 模式也显示 L4）；`contextualToolbarLabels` 加 `"read": "阅读模式工具"`；删除独立 `<ReadModeToolbar>` 组件（50 行）和 AppShell 中独立 render 块。`ContextToolbar` 真正按 `activeMode` 路由 5 模式（read / annotate / ocr / export / forms）。`pages` 模式仍不渲染 L4。typecheck ✅ + AppShell 7/7（ISS-NEW-A 子集，更新 1 个空态测试）✅ + Toolbar 24/24 ✅ + readerModeTools 7/7 ✅。
-- 2026-06-22：完成 ISS-NEW-A 阶段 2 + ISS-NEW-B 收口（DEC-155）2 块 ship：
-  - **侧栏 4 toggle 加「书签」按钮**：`UtilityPanelId` 加 `"bookmark"` 枚举；`Toolbar.tsx` 侧栏 4 toggle 段新增 lucide `<Bookmark size={16}>` 按钮（`data-testid="toolbar-sidebar-bookmark"`）；`AppShell.tsx` 加 `<BookmarkPanelPlaceholder>`（占位）。+5 Toolbar test + 2 AppShell test。
-  - **旋转 + 适合页面按钮下移 L4 二级工具条（`<ReadModeToolbar>`）**：`Toolbar.tsx` 移除 L3 reading 段 2 个旋转按钮（DEC-152 阶段恢复的）；`ModeActiveTools` 内部 filter 改为 `activeMode !== "read" && hasDocument`；`AppShell.tsx` 加 `<ReadModeToolbar>` 组件（`getModeTools("read")` 取注册工具，order 排序，`isDisabled` 委托给工具本身）— 仅在 `activeMode === "read" && hasDocument` 时显示，复用 `reader.rotateClockwise` / `rotateCounterClockwise` / `setZoomPreset("fit-page")`（readerModeTools.ts 已 ship 的 3 工具）。清理未用 imports。+5 AppShell test。
-  - **Wave 4 multi-agent retry 失败降级**：spawn 成功但 claude + GLM-5.2 settings 启动后 API 400「模型不存在」（settings.json 中 opus/sonnet 是 `glm-5.2[1M]`，GLM 端不存在；改成本地 `config/glm-5.2.settings.json` 全部 3 model = `glm-5.2` + .gitignore 仍 400）。推断 GLM 配额耗尽（memory `Wave 3 W2 撞 GLM 配额耗尽 2056`）。按 skill §2.1 门禁失败降级到 PM 单 session 串行推进，清理 `feat/iss-new-a-stage2-iss-new-b` worktree + 分支。
-  - **测试汇总**：typecheck ✅ + Toolbar 24/24 ✅ + AppShell ISS-NEW-A 阶段 2 子集 7/7 ✅ + readerModeTools 7/7 ✅。
-  - **关联**：CHANGELOG.md Unreleased 顶部 / DEC-155 / ISS-NEW-A 任务卡勾选 [x] 阶段 2 + ISS-NEW-B 状态「✅ 已完成」。
-- 2026-06-22：完成 ISS-NEW-G 二次收口（DEC-154）4 块 ship：
-  - **Welcome 屏「图片转 PDF / Word 转 PDF」入口接通**：`ReaderCanvas` 加 `onConvertFromImages / onConvertFromWord` props 透传；`AppShell` 提供占位 handler（`setCommandFeedback` 反馈开发中）。真实流程依赖 OCR pipeline / merge engine，留后续 worker。
-  - **全量 UI 字符串 i18n 基础**：新建 `src/shared/i18n/`（dictionaries + useI18n），zh-CN + en 两套字典；`StatusBar` / `WelcomeScreen` / `GeneralSection` 27 个查表点全切；`AppShell` + `StatusBar` 双重 useEffect 同步 settings.language → i18n runtime。包含 2 套字典键集合一致性断言防漂移。
-  - **OCR 模式底部状态栏**：`StatusBar` 加 `activeMode?` + `ocrState?` props；切「光标位置 + 5 状态枚举 + idle」布局；`AppShell` 算 cursorPage + jobStatus（OcrCommandJob.status narrow 5 枚举后回退 busy 派生）。
-  - **Preferences 4 字段补齐**：AppSettings 加 `defaultPdfViewer` / `pdfExpertOpenMode` / `resumeLastPage` / `pageNumberIndicator`，加 defaults + normalize narrow + GeneralSection 4 控件（input + 2 select + checkbox）。"关闭文档时保存方式"已对应现有 `defaultSavePolicy` 不重复加。
-  - **测试汇总**：i18n 4/4 + StatusBar 12/12 + WelcomeScreen 9/9 + GeneralSection 5/5 + ReaderCanvas 19/19 + AppShell ISS-NEW-G 子集 3/3 + contracts.test.ts 加 3 字段默认值。typecheck ✅。
-  - **out of scope**：`defaultPdfViewer` 真实 LaunchServices 读写 / `pdfExpertOpenMode` 真实双击路由 / `resumeLastPage` 真实 reader 接线 / `pageNumberIndicator` StatusBar 实际按 3 枚举渲染 / 「图片转 PDF / Word 转 PDF」真实流程 / 剩余 30+ 组件硬编码字符串 i18n 化。
-  - **关联**：CHANGELOG.md Unreleased 顶部 / DEC-154 / ISS-NEW-G 任务卡勾选 [x] 9/10。
-- 2026-06-23：完成 ISS-NEW-D 阶段 4 收口（DEC-168）：扫描菜单 4 档质量 + 3 顶层动作（扫描至可搜索 / OCR 文字 / 调整为可搜索）从 v0.2 占位反馈改为实质接通 — 调 `ocr.startOcr()` 启动 OCR 任务 + 反馈。4 档质量档当前都触发 startOcr（OcrWorkspaceController.startOcr 暂无 quality 参数，差异 v0.2 polish）。`ocr-enhance-all` 留 v0.2 占位（需 reader controller 加 batch OCR 接入）。commit + typecheck ✅。
-- 2026-06-23：完成 App.test.tsx ISS-NEW-I 同步修复（DEC-169）：`uses contextual toolbars and task workspaces` 测试断言从 PageOrganizerWorkspace 时代的 `页面管理工作台 / 页面管理空态 / 页面管理工具条` 同步到 ISS-NEW-I（DEC-147）后 `EditModeGridView` 实际暴露的 aria-label（`编辑模式网格 / 打开 PDF 后进入 T 编辑 / 编辑模式工具条`）。行为契约不变（点击 页面管理 → pages mode → 编辑模式网格），仅同步测试期望到 ISS-NEW-I 的实现现状。commit `bdc0469` + App.test 6/6 ✅ + typecheck ✅。
-- 2026-06-24：完成 ISS-NEW-F 第 3 步 3 块 ship（DEC-170）：跨窗口 detach 状态共享闭环 — 第 1 块 `tabStore.PdfTab.lastPage` 字段 + `setLastPage` API（commit `c6b31cb`，tabStore 17/17 ✅）；第 2 块 `App.tsx` `ActiveTabPageSync` 内层组件同步 `reader.currentPage` → active tab.lastPage（commit `4729231`，App 10/10 ✅）；第 3 块 `TitlebarTabs.handleDragEnd` 写 localStorage `faropdf:pending-detach` + `App.tsx` `PendingDetachRestore` 内层组件新窗口 mount 读 key → 调 `readPdfFileFromPath` + `openNativeFile` + `setCurrentPage` → finally 清 key（commit `7a565ea`，TitlebarTabs 10/10 + App 15/15 ✅）。test/setup.ts 加 testing-library auto-cleanup 受益全 suite。任务卡状态更新为「✅ 第 1+2+3 步收口」，4 验收项中 2/4 ship（tab 拖离 + 新窗口读文档）；跨 tab 拖页 + 多窗口共享 recentFiles/annotations 留后续。
-- 2026-06-25：完成 ISS-NEW-D 阶段 5（DEC-171）：前往浏览历史栈实质接通 3 块 ship — 第 1 块 `ReaderState.history` 字段 + `setCurrentPage` push 旧页 + `goBack` action + `loadSucceeded` 清空（commit `48e1684`，readerReducer 19/19 ✅）；第 2 块 `useReaderController` 暴露 `goBack()` + `goToHistory(N)` API，`setCurrentPage` payload 加可选 `skipHistoryPush` 避免循环（commit `e64b4d8`，useReaderController 历史栈 5 测全过 ✅）；第 3 块 `AppShell` 路由 `go-back` + `go-history-1..5` 共 6 个命令从 v0.2 占位改为实质接通（commit `8725724`，AppShell ISS-NEW-D 5 测全过 ✅）。ISS-NEW-D 任务卡「前往浏览历史栈（5 历史 + 1 返回）」勾 [x]，前往菜单 5 顶层 + 5 历史 submenu 全部真实接通。
-- 2026-06-23：完成 ISS-NEW-D 阶段 3 收口（DEC-167）：批注形状 submenu 6 项从 v0.2 占位反馈改为实质 arm — `PDF_ANNOTATION_TYPES` 扩 3 类型（`ellipse` / `double-arrow` / `line`）+ `ANNOTATION_TOOL_LIST` 加 3 descriptor + 6 个相关 dict 同步扩 3 类型 + AppShell 形状 submenu 路由 `armAnnotationTool` 真实接通。AnnotationOverlay 渲染保持 v0.2 占位（drawEllipse / drawLine / drawDoubleArrow 后续 worker 接入）。commit `dae...` + typecheck ✅ + 127/127 annotation 测。
-- 2026-06-23：完成 ISS-NEW-H 第 3 阶段收口（DEC-166）：视图菜单补 7 command id（滚动模式 / 翻页模式 / 工具栏 toggle / 左侧边栏 toggle / 适合屏幕）+ 2 真实行为接通（view-reload 简化为 window.location.reload() / view-add-bookmark 写回 recentFiles[].lastPage）。commit `da4305b` + 14/14 ISS-NEW-H 测。
-- 2026-06-23：完成 ISS-NEW-E 任务卡收口（DEC-164）：5 模式 L4 + `pages` mode PageOrganizerWorkspace 全部 ship，8 验收项勾选 [x]。任务卡状态由"第 1 步完成"更新为"✅ 已完成（阶段 1+2）"。原计划"按需触发 edit 模式 L4"已通过 pages mode PageOrganizerWorkspace（ISS-046 / DEC-152）满足。
-- 2026-06-23：完成 ISS-NEW-F 第 2 步收口（DEC-163）：Tauri `WebviewWindow` create IPC 公开 — `src-tauri/src/lib.rs` `create_faropdf_window` 加 `#[tauri::command]` 注解（`AppHandle` owned）+ `invoke_handler!` 注册 + macOS 菜单 `tab-detach-new-window` event handler arm；`TitlebarTabs.handleDragEnd` 拖离时 `invoke('create_faropdf_window')` 开空新窗口 + `console.error` 兜底。v0.2 占位：文档句柄表留 ISS-NEW-F 第 3 步。commit `54e32da` + cargo check ✅ + typecheck ✅ + TitlebarTabs 7/7 ✅。
-- 2026-06-22：完成 ISS-NEW-F 第 1 步收口（DEC-162）：tab drag detach 手势 DOM 端检测 — `TitlebarTabs.handleDragEnd` 加 viewport 边界检查（`event.clientX/Y` 在 `document.documentElement.getBoundingClientRect()` 外 = detach candidate）；v0.2 占位 `console.warn` 留 trace，真实 Tauri `WebviewWindow.create()` IPC 接入留 ISS-NEW-F 第 2 步。commit `5641049`。
-- 2026-06-22：完成 ISS-NEW-H 第 2 阶段收口（DEC-161）：视图菜单 3 占位改真实行为 — `view-go-current-page` 实质接通（`reader.setCurrentPage(currentPage)` + 反馈「当前已在第 X 页」）；`view-reload` / `view-add-bookmark` 留 v0.2 占位反馈（需 reader controller 加新 API）。commit `a0e9d2e` + 3 测更新。
-- 2026-06-22：完成 ISS-NEW-D 阶段 2 收尾（DEC-160）：批注菜单补 9 辅助 command（链接 / 内容表 / 删除 / 删除全部 / 跳到批注 / 上一项 / 下一项 / 全部折叠 / 全部展开），全部 v0.2 占位反馈。ISS-NEW-D 阶段 1+2 共 4 commit + 46 command id 收口。commit `0adc932`。
-- 2026-06-22：完成 ISS-NEW-H 阶段 1 收口（DEC-157，Wave 4e minimax + PM 收口）：macOS 视图菜单 submenu 深度补全 — 11 个 command id（缩放 5 + 缩略图 2 + 占位 3）；5 files / +396 / -0；commit 8cd98b2；FF merge 到 main。typecheck ✅。**Wave 4e 教训**：minimax worker 端到端能跑（确认 6 次失败的 silent exit 不是 minimax 模型本身，根因是 `bash -lc "cd ... && exec claude ..."` 包装与 env 透传冲突；简单 `claude --permission-mode bypassPermissions` 成功 inherit PM env），但 verification 阶段 26m+ 不更新 STATUS（silent worker 模式重现）。PM 介入收口路径：typecheck PM 验证 + 帮 commit + FF merge。Wave 5 启动前应改进 worker prompt 加「verification 10m 内未 commit → 自降级 PM 介入」触发条件。
-- 2026-06-17：完成 review follow-up 修复（DEC-140）：ISS-067 `regionsScreenToPdf` 透传 `color`，补回归测试防止白 / 灰遮蔽最终回退为默认黑色；ISS-064 `SecurityPanel` 用户密码留空文案改成"无需密码即可打开副本"，不再暗示可沿用旧用户密码。
-- 2026-06-17：完成 ISS-067 阶段 2 后续 RedactionOverlay UI 细化。nextColor state + 3 颜色芯片（黑/白/灰，律师场景：黑色涂黑 / 白色擦除 / 灰色模糊），颜色仅作用于后续 commit 的 region（已 commit 不变）。新增撤销按钮 + 单 X 删除按钮（X 按钮 pointerEvents:auto 不冒泡触发 overlay 拖动）。**全量 1206/1207 通过**（+5 新测试）。复用 DEC-107 applyRedaction 算法 + DEC-132 redactPageMargins 算法，零算法层变更。
-- 2026-06-17：完成 ISS-071 阶段 3 error.ts → SecurityPanel AppError 端到端迁移（DEC-138）。Rust set/remove_pdfpassword 改返 `Result<_, AppError>` 替代 `Result<_, String>`，错误码映射：NotSupported / FileNotFound / InvalidInput / PdfParseError / DecryptionError / IoError，context 携带脱敏 path（DEC-102 P0-1）。调整 remove_pdfpassword 校验顺序：空密码 → 文件存在 → canonicalize → load（用户友好）。前端 SecurityPanel `friendlyMessageForCode(err: AppError)` helper，9 个 ErrCode 各有中文兜底文案（i18n 后续可按 code 切英文）。`normalizeError` 兼容旧 string 错误（code=Unknown, message=原串）。**全量 1206/1207 通过**（+4 新前端测试）。ISS-071 累计 75 测试 / 3 commit 全部 ship。
-- 2026-06-17：完成 ISS-064 阶段 2 真实 PDF 加密（DEC-139 + DEC-135 决策更新）。**DEC-135 决策纠偏**：原计划升级 lopdf 0.34 不可行（0.34 仍无 encrypt API + 0.34.0 pom_parser 自带编译 bug + 0.33 没 pdf_writer feature），实际升级到 lopdf 0.41（含完整 V4 128-bit AES 加密 API）。`set_pdfpassword` 真实实现：`EncryptionState::try_from(EncryptionVersion::V4 { ... })` + `Aes128CryptFilter` + `doc.encrypt(&state)`，输出 `<stem>-secured.pdf` 新副本；自动补缺失的 `/ID`（某些工具导出 PDF 缺 /ID，lopdf 加密算法强制要求）。权限组合：PRINTABLE | COPYABLE | ANNOTABLE | FILLABLE | ASSEMBLABLE。SecurityPanel set 模式激活（按钮 disabled={loading || !ownerPwd}），复用 DEC-138 normalizeError。**真实 AES 加密 round-trip 测试**：构造 PDF → set 密码 → decrypt 验证 user_password 正确。**cargo test 97/97**（+1 新测试；原 90 → 96 → 97 累加）+ **npm test 1208/1209**（+5 累计，pre-existing zoom 唯一失败 DEC-099 已知）。
-- 2026-06-17：完成 ISS-072 阶段 2 后续 阶段 3 前端 PropertiesDialog 集成 set_pdf_producer（DEC-137）。PropertiesDialog 只读 fieldset 内新增「用 FaroPDF 真覆盖 Producer (Rust 后端)」按钮 + 成功 / 错误反馈行；inputFilePath 缺失（浏览器拖拽场景）或未传 onProducerOverride 回调时按钮不渲染。AppShell.handleProducerOverride 接 document.path → invoke set_pdf_producer → 反馈回填到 dialog，错误用 alert role + 命令反馈双通道（与 SecurityPanel handleRemovePassword 同模式）。**全量 1198/1199 通过**（+6 UI 测试；唯一失败 useReaderController zoomIn/zoomOut 是 pre-existing，DEC-099 已知）。**ISS-072 累计 30 测试 / 4 commit** 全部 ship（DEC-109 10 + DEC-116 9 + DEC-136 5 + DEC-137 6）。设计决策：把 Rust 路径拆为独立按钮，不和 pdf-lib「保存元数据」confirm 联动，理由是输出位置不同（Rust 写源目录、pdf-lib 走浏览器下载）合成会让用户困惑。复用 DEC-136 Rust set_pdf_producer（lopdf InfoDict 真覆盖）+ DEC-102 P0-3 输出副本碰撞保护 + DEC-109 pdf-lib Producer 限制绕道。CHANGELOG / DECISIONS / TASKS 三处同步。
-- 2026-06-16：完成 ISS-070 阶段 2 + ISS-060 阶段 2 第二步签名持久化（DEC-113）。新增 `signatureStore.ts` localStorage 持久化（save/list/delete + 上限 4 + 损坏数据兜底 + 9 测试）+ `SignaturePanel.tsx`（缩略图列表 + 「+ 新画签名」按钮弹 SignaturePad + 删除 + 错误提示 + 9 测试）。`RightPanel` 扩 signatures panel 接入 SignaturePanel（annotate/forms 模式可用），同时 stamps panel 扩到 forms/export 模式让律师表单签字时也能盖业务章。AppShell 注入 `onSelectSignature` 回调：annotate 模式把 signature.image 当 custom stamp 落点；forms 模式反馈提示。**全量 1028 通过**（+20 新测试）+ typecheck/lint 全绿。阶段 3 FormsPanel 真集成 + commands.ts 入口 + 落入文档任意位置 UI 待启动。
-- 2026-06-16：完成 ISS-060 阶段 2 第一步 + ISS-062 阶段 3 集成（DEC-112）。RightPanel 从 skeleton placeholder → **真实渲染 CustomStampPanel**（annotate + stamps 模式）。AppShell 接 `onSelectCustomStamp` → `annotationArmed`：用户从右栏选自定义图章立即 set `activeToolType="stamp"` + `stampName="custom"` + `stampLabel` + `stampImage` → 画布可点按落点。`AnnotationToolState` 加 `stampImage?: string` 字段（base64 data URL）。RightPanel 测试 +2（annotate+stamps 真渲染 / 非 annotate 不渲染）。**全量 1008 通过**（+1 测试，CustomStampPanel 与 RightPanel 共用 test-id 测试稳定）。这是 PDF Expert 风格右栏的首次真实内容接入；后续 ISS-060 阶段 2 第二/三/四步接 SignaturePad（forms+signatures）/ 标准图章 grid 增强 / OCR 队列简版 / 导出预览简版。
-- 2026-06-16：完成 ISS-062 阶段 2 自定义图章上传 + 持久化（DEC-111）。**Wave A 5/5 完成**。`customStampStore` localStorage 持久化（saveCustomStamp / listCustomStamps / deleteCustomStamp / 上限 4 张 FIFO 强制 + 损坏数据兜底过滤 + 10 测试）+ `CustomStampPanel` React 组件（2×2 缩略图网格 + 上传 PNG/JPG ≤ 1MB + 删除按钮 + 错误提示 + 上限禁用 + 9 测试 含 FileReader prototype mock）。**全量 1007 通过**（+19）。**Wave A 累计**：5 个 ISS 阶段 1 全部 ship（067/070/072/066/062-stage2），988 → 1007 共 +29 测试，~2.5 小时纯 PM 单 session TDD。阶段 3 集成到 RightPanel + commands.ts 入口待启动。
-- 2026-06-16：完成 ISS-066 阶段 1 扫描拆双页 + 网格切 + 自定义断点切算法（DEC-110）。PM 单 session TDD 第 4 个 ISS（**Wave A 4/5 完成**）。`splitPagesByGrid(pdfBytes, { rows, cols, pageIndexes? })` 按 N×M 网格切每页 → 输出 N×M 倍页数；`splitPagesByBreakpoints(pdfBytes, { pageIndex, horizontalBreaks?, verticalBreaks? })` 按自定义断点切单页。**真切**（不是只改 cropbox）：用 pdf-lib `embedPage` + `drawPage` 平移 offset 让目标子矩形落入新 page (0,0)~(cellW,cellH) 区域。11 测试覆盖：1×2 拆双页 / 2×2 网格切 / 子页尺寸 / pageIndexes 限定（只切指定页其他保留）/ rows=0 / cols=0 / pageIndexes 越界 / 1 水平断点 / 1 横+1 纵 / 不切 / 断点越界。**全量 988 通过**（+11）。
-- 2026-06-16：完成 ISS-072 阶段 1 PDF 文档属性读写层（DEC-109）。PM 单 session TDD 第 3 个 ISS。`readPdfMetadata(pdfBytes)` + `writePdfMetadata(pdfBytes, updates)` + `PdfMetadata { title, author, subject, keywords[], producer, creator, creationDate, modDate, pageCount, isEncrypted }`。Title / Author / Subject / Keywords / Creator / Dates 字段正常通过 pdf-lib API 读写。**Producer 字段 pdf-lib v1.17.1 已知限制**（DEC-109 §决策）：`save()` force override + XMP metadata 双写让 SaveOptions + 字节流 patch 都无法稳定覆盖；本阶段把 "FaroPDF" 标识写入 **Creator** 字段，Producer 真覆盖留阶段 2 用 Rust lopdf 直接编辑 InfoDict。10 测试覆盖：empty/含字段读取 / 写 title / 写 author+keywords / 保留既有字段 / Creator 默认 FaroPDF / Creator 可覆盖 / ModDate 自动更新 / 空 updates / 输出合法 PDF。**全量 977 通过**（+10）。
-- 2026-06-16：完成 ISS-070 阶段 1 SignaturePad 手写签名板（DEC-108）。PM 单 session TDD 路径第 2 个 ISS。`SignaturePad` React 组件 + 纯 Canvas API（无外部库）：mousedown→mousemove→mouseup 画笔触 + 多笔画支持 + 清空/保存/取消 3 按钮 + 白底变透明（保存前 getImageData 把 R/G/B > 250 像素 alpha 置 0）+ onSave 回调 PNG data URL。8 测试覆盖：默认渲染 / width-height 可控 / 单笔画 strokeCount / 多笔画 / 清空 reset / 保存 toDataURL + onSave / 取消 onCancel / mouseleave 中止笔画。**全量 966 通过**（+8）。阶段 2 待启动：FormsPanel 集成 + signatureStore localStorage 持久化 + commands.ts forms-sign-handwrite + 落入文档任意位置 UI。
-- 2026-06-16：完成 ISS-067 阶段 1 矩形遮罩涂黑算法（DEC-107）。PM 单 session TDD 路径（DEC-106 multi-agent 退役后第一个 ISS）。`applyRedaction(pdfBytes, regions): Promise<Uint8Array>` + `RedactionRegion { pageIndex, x, y, width, height, color? }`，用 pdf-lib drawRectangle 在指定 pageIndex 区域绘制不透明矩形（默认黑色 rgb(0,0,0)）覆盖原内容。**真不可恢复**（不是 PDF annotation，是 content stream 直接绘制）。10 测试覆盖：单页单矩形、多页多矩形、跨页同 pageIndex、默认黑色、自定义 hex 颜色、空 regions、越界 pageIndex 抛错、负数 pageIndex、非法 color、负数 width/height。**全量 958 通过**（+10）+ typecheck/lint/cargo check 全绿。后续 ISS-067 阶段 2 接 AppShell + commands.ts + RedactionOverlay 拖矩形 UI + 去页眉页脚。
-- 2026-06-16：Wave A 5-worker multi-agent 实战**完全失败**（详见 DEC-106）。spawn 全 5 worker + paste-buffer 投递 prompt 成功，但 90 分钟内 0 commit / 0 文件 / 仅 2 worker 写出 STATUS bootstrap。System load 持续 14-17 严重过载（8 核机器跑 5 claude REPL + 既有 tmux session），permission prompt 重复弹出阻塞 worker，paste-buffer 时序坑（4 个 worker 首次 paste 在 REPL 没就绪时丢失，需要 PM 手动 second paste），ISS-072 触发 autocompact 37%。**决策**：multi-agent 在 FaroPDF 本机环境退役（双 Wave 8 worker 尝试全失败）；ISS-067/070/062-stage2/066/072 改 PM 单 session 顺序推进。5 worker prompt 保留在 `/tmp/iss-*-worker-prompt.md` 供下次 PM 直推参考。Skill 改进建议（paste-buffer 时序 / permission auto-accept / load-cap / worker envelope 文档）记入 skill follow-up。
-- 2026-06-15：登记 ISS-073 v0.2 阶段 2 "PDF Expert 页面布局"完整对齐路线图。整理 PDF Expert audit 揭露的剩余差距按 5 桶分类：桶 1（P0 页面布局：多 Tab + 右栏真实内容）；桶 2（P0 律师场景：遮罩 / 去水印 / OCR 出目录 / 真实加密）；桶 3（P1 表单+扫描+视觉）；桶 4（P1 ISS-071 阶段 2 迁移）；桶 5（P2 元数据）。推进策略 Wave A/B/C 按依赖 + 风险排序。Wave A 5 个 ISS 阶段 1（ISS-067/070/062/066/072）是窄 scope + 互不冲突 + 适合 multi-agent。
-- 2026-06-15：完成 ISS-071 阶段 1（4 个工程基础设施抽象，DEC-105）。**m1 pageRange DSL** `parsePageRange(input, totalPages) → number[]` 支持 all/even/odd/N/范围/反向/混合 + 12 测试；**m2 units** `convertLength(value, from, to)` pt/cm/mm/in 互转 TS + Rust 双侧 + 12 TS + 12 Rust 测试；**m3 naming** `suggestOutputName(name, suffix)` 18 个 OutputSuffix 枚举 TS + Rust 双侧 + 12 TS + 8 Rust 测试；**m4 error schema** `AppError { code, message, context }` + 9 个 ErrCode + serde::Serialize TS + Rust 双侧 + 8 TS + 8 Rust 测试。lib.rs 加 `mod util; mod error;`。AppShell.tsx 迁移示范：两个本地命名 helper 改用 `suggestOutputName`。全量 948 通过（+51 新测试）+ cargo 26 测试 + typecheck/lint 全绿。
-- 2026-06-15：Wave 1 multi-agent spawn ISS-071 worker 实战失败（详见 DEC-104）。3 个 bug 阻塞：①`.git/main` 孤儿文件导致 `main` ref ambiguous；②`spawn-worker.sh` `<` shell redirect 不被 tmux 展开（需 `bash -lc` 包）；③claude `-p` batch 模式 + 7KB prompt + FaroPDF 大上下文 → autocompact thrash 3 次自动终止。**决策**：取消 Wave 1，ISS-066~072 改 PM 单 session 顺序推进。未来 multi-agent 启用条件提高（小 prompt + 交互式 claude + 窄 scope）。
-- 2026-06-15：归档 PDF-Guru 参考项目调研（DEC-103）。新立 ISS-066~072 律师场景刚需 + 工程基础设施任务卡。**P0 候选**：ISS-067（证据遮蔽 + 去页眉页脚）、ISS-068（去水印）、ISS-069（OCR 自动出目录）。**P1**：ISS-066（扫描清洁校正）、ISS-070（签名手写板）、ISS-071（页码 DSL / 单元转换 / 文件命名 / 错误 schema 抽象）。明确不引入 PyMuPDF（AGPL-3.0 传染风险），所有实现 Rust / TypeScript 独立重写。
-- 2026-06-15：完成 code review cce1ce5..HEAD 4 个 commit（DEC-102）+ push origin/main。3 个 P0 安全 bug + 5 个 P1 hooks/UI + 1 个被错放 P2 的核心交互 bug（rightPanel useState→useMemo）+ 5 个 P2 polish 全部修复。新增 SecurityPanel.test.tsx 7 + RightPanel.test.tsx +2 测试覆盖。907 单测通过 + 1 pre-existing zoom 失败。
-- 2026-06-15：完成 ISS-060 / ISS-061 / ISS-064 阶段 1 集成（详见 DEC-101）。`RightPanel` 接入 AppShell 按 activeMode 推导内容；`TextSelectionToolbar` 接入 `usePdfTextSelection` hook 真选区，5 启用 + 2 disabled 占位；`SecurityPanel` 接入 utility panel slot，`export-set-password / export-remove-password` 命令进入导出模式打开面板，`remove_pdfpassword` Rust 命令注册到 `invoke_handler!` 并能用 lopdf 真实解密；新增 3 个测试（commands 1 + AppShell 2），typecheck / lint / 全量单测 897 通过 / cargo check 17 warnings（pre-existing）全部 0 回归。
-- 2026-06-15：完成 ISS-062 阶段 1（内置图章 5→9 + diagonal 对角斜条带形态）。`PdfStampName` 扩 4 个（forReview / notForDistribution / internalOnly / proprietary），`PdfStampShape` 加 `diagonal`，`PdfAnnotationStamp.image` 字段为阶段 2 自定义图章预留；stamps.test.ts 12/12 通过；阶段 2 自定义上传 tab + 缩略图渲染留下次推进。
-- 2026-06-15：登记 DEC-100 修正 DEC-099 与 Cargo 现实矛盾——HEAD 上 Cargo.toml = 0.1.2 但 lock = 0.1.1 本就不同步，working tree lock 升 0.1.2 是修复同步，应保留，DEC-099 "撤回 Cargo.lock" 条款作废。
-- 2026-06-15：登记 ISS-056 / 057 / 058 + 综合评估段。`computer-use` skill 调研结论：当前走 `osascript + System Events` 是"路径 B 最轻量"路线，能用但会动真实鼠标；Codex 那种"独立光标 + 不抢焦点"靠的是 AXPress 优先 + 自绘覆盖层 / MCP 代理。给出三条升级路径（A 自改 / B 装第三方 MCP / C 学官方 quickstart 架构）暂缓入队，综合评估不互斥、A 最轻先做、B/C 安全风险需评估。
-- 2026-06-09：完成 ISS-055。针对用户继续反馈的多层级菜单与整体简洁问题，收口顶栏任务模式入口：`OCR / 批注 / 填写和签名 / 导出` 统一进入 `工具` 工作流启动器，顶栏只保留阅读和全局入口；切入后继续显示对应上下文工具条或工作台。
-- 2026-06-09：完成 ISS-054。深色模式作为 `设置 > 常规` 的外观偏好接入，默认浅色、旧设置缺字段回退浅色；切换深色后根节点写入 `data-theme="dark"` 并套用深色 token，不新增顶栏、二级工具条或工具启动器入口，PDF 纸面内容保持不反相。
-- 2026-06-09：完成 ISS-053。页眉页脚继续保持工具启动器 / 原生菜单深层入口，不进入导出二级工具条；右侧交付设置面板新增页眉 / 页脚各自的左 / 中 / 右视觉位置选择器，导出时映射到上方 / 下方 watermark placement，并继续与奇偶页范围共存。
-- 2026-06-09：完成 ISS-052。左侧文档摘要缩略图的批注 / 搜索命中 / OCR 状态改为紧凑视觉标记，保留 `aria-label` 和 `title` 辅助说明；状态提示继续停留在左侧摘要，不进入顶栏、二级工具条或工具启动器。
-- 2026-06-09：完成 ISS-051。`页眉页脚` 继续保持工具启动器 / 原生菜单深层入口，不进入导出二级工具条；右侧交付设置面板新增 `全部页面 / 奇数页 / 偶数页` 应用范围，奇偶页通过 `PdfWatermarkOperation.pageIndexes` 传给导出引擎，无匹配页面时阻止导出并提示。
+- 2026-07-30：DEC-191 按最新 AGENTS / doc-curator 门禁瘦身 TASKS，并修复历史归档排序与 DEC 索引断档。
+- 2026-07-30：DEC-190 页面书签已达到 behavior-complete；添加、幂等、排序、跳页、删除、刷新恢复、文档隔离和隐私 sidecar 均经真实浏览器验证。
+- 2026-07-30：DEC-189 形状样式、画布 overlay 与 PDF writer 已统一状态和坐标，并通过导出重开验证。
+- 2026-07-30：DEC-188 AcroForm 以会话工作副本接通填写、签名、扁平化与 round-trip。
+- 2026-07-30：DEC-187 将 PDF Expert 从像素复刻改为功能框架参考；未实现入口统一 fail-closed。
 
-较早进度日志已迁移到 `docs/DECISIONS.md` 的 DEC-083。
+较早进度均已由 `docs/DECISIONS.md` 的对应 DEC 与工作日志承接，不再重复留在唯一任务源中。
 
 ### ISS-NEW-K `feature-extract-from-screenshots` skill 落地
 
@@ -1592,7 +1543,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 类型：UI 信息架构 / 上下文治理 / 视觉与行为验收
 - 来源：2026-07-23 用户反馈「多次要求完整复刻 PDF Expert，但截图研究没有转化为最终布局和功能」
 - 状态：**M0、M2.1、M2.2 已完成；2026-07-30 起不再以像素一致为交付目标。M3 核心行为已完成真实 PDF 往返；M4/M5 按功能真实性继续推进。M1/accepted-golden 降为可选视觉优化。**
-- 当前负责人：M2.2 由 Codex 于 2026-07-28 收口；未触碰 `src/modules/reader/readerReducer.test.ts`、`.zcode/**`、`src-tauri/**`。
+- 当前负责人：M4 页面书签已由 Codex 于 2026-07-30 单 owner 收口；当前无进行中代码领取，下一候选为 M5 密码 / 损坏 / 权限 / OCR 失败异常态。M2.2、M3 核心、M5 表单与 M4 shape-style 也已收口。继续禁止触碰 `src/modules/reader/readerReducer.test.ts`、`.zcode/**`、`src-tauri/**`。
 - 唯一证据入口：`docs/reference/pdf-expert/README.md`
 - 实现现状入口：`docs/reference/pdf-expert/implementation-map.md`
 - 验收入口：`docs/reference/pdf-expert/acceptance-contract.md`
@@ -1677,12 +1628,26 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 #### M4 — Shell / Sidebar / RightPanel 分域复刻
 
-- 本轮领取（2026-07-30，Codex，单 owner）：形状样式右栏纵向闭环。Allowed files：`src/modules/annotation/**`、`src/shared/pdf/annotation.ts`、批注相关 `AppShell` / `AnnotationOverlay` / `ShapeToolPanel` / 类型与测试、对应协作文档；Forbidden files：`src/modules/reader/readerReducer.test.ts`、`.zcode/**`、`src-tauri/**`、表单 / OCR / 页面管理链路。
+- 本轮完成（2026-07-30，Codex，单 owner）：页面书签纵向闭环。
+  - ISS-NEW-M 阶段：M4。
+  - 目标 surface：L5a `书签` tab、工具 / 原生命令 `添加书签` 与 Reader 当前页跳转；不把 PDF outline 冒充个人页面书签。
+  - capture / 证据等级：R04 仅为 `raw-B`，可证明 L5a tab 信息架构和大纲相邻位置，不能证明书签列表内容、精确间距或交互；书签目标状态仍为 `missing`。本轮按 2026-07-30 功能优先决策推进，最高交付 `behavior-complete`，不得声称 `visually-verified`。
+  - Allowed files：`src/modules/bookmarks/**`、`src/shared/pdf/bookmark.ts`、`src/components/layout/Sidebar.tsx`、`src/components/layout/Sidebar.test.tsx`、`src/components/layout/AppShell.tsx`、`src/components/layout/AppShell.test.tsx`、`src/components/layout/types.ts`、`src/shared/app/commands.ts` 与对应测试、`src/shared/index.ts`、`src/styles/app.css`（仅 bookmark / summary 局部 selector）、`src/App.tsx` 与 `scripts/verify-pdf-expert-{layout,visual}.mjs`（仅修复 planned T 编辑的 dev-only 验证触发）、对应协作文档。
+  - Forbidden files：`src/modules/reader/readerReducer.test.ts`、`.zcode/**`、`src-tauri/**`、批注 / 表单 / OCR / 页面管理 / PDF 写回链路和全局 shell 几何。
+  - 行为验证：真实五页 fixture 打开后添加当前页、添加第二页、重复添加幂等、列表排序、点击跳页、删除、刷新 / 重新打开恢复；不同文档 key 隔离；没有文档时 fail-closed。
+  - 视觉验证：只检查 L5a tab、空态 / 列表态、当前页状态和控件可达性；因 accepted-golden=0 且书签 surface=`missing`，本轮不做像素差异验收。
+- 上一轮完成（2026-07-30，Codex，单 owner）：形状样式右栏纵向闭环。Allowed files：`src/modules/annotation/**`、`src/shared/pdf/annotation.ts`、批注相关 `AppShell` / `AnnotationOverlay` / `ShapeToolPanel` / 类型与测试、对应协作文档；Forbidden files：`src/modules/reader/readerReducer.test.ts`、`.zcode/**`、`src-tauri/**`、表单 / OCR / 页面管理链路。
 - [x] 建立失败基线：右栏 shape / width / opacity / stroke / fill 只改变独立 UI state，未进入批注草稿、sidecar、overlay 或 PDF writer
 - [x] 矩形、椭圆、直线、箭头、双向箭头和铅笔共用真实 shape state；选择右栏形状会 arm 对应画布工具
 - [x] 线宽、不透明度、实线 / 虚线、边框色与填充色进入 sidecar，并在画布重开后回显
 - [x] PDF writer 支持全部六类形状，导出后重开确认无 skipped；修正扁平化元数据在 save 后设置导致未写入的问题
 - [x] Playwright 实际绘制、刷新恢复、导出下载与 PDF 重开验证通过
+- [x] 建立书签失败基线：命令仍为 planned、utilityPanel 是“开发中”占位、摘要栏书签加号无动作
+- [x] 页面书签使用按 document fingerprint / 安全摘要隔离的 sidecar；不写原 PDF，不把真实文件名写入 storage key
+- [x] 接通添加当前页、重复添加幂等、列表排序、当前页标记、点击跳页和删除
+- [x] 接通 `view-add-bookmark` 命令与 L5a 书签 tab；无文档时 fail-closed，不再用 recentFiles.lastPage 冒充书签
+- [x] 单元 / 组件测试和 Playwright 实机覆盖刷新恢复、文档隔离与控制台零错误
+- [x] 修复验证器与 planned 策略冲突：先断言 `T 编辑` disabled，再由带显式 query 的 dev-only 测试钩子触发潜在 edit surface；正式构建和普通开发页面均不解锁
 - [ ] 按 accepted-golden 依次验收 L2、L3、L5、状态栏，不并行争抢全局布局
 - [ ] 左栏分别完成 thumbnails、outline、annotations、bookmarks、search 的真实面板和状态
 - [ ] 右栏分别完成 signatures、stamps、shape-style、annotation-summary、forms、export、OCR
@@ -1925,3 +1890,18 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 任何面板修正子卡升级到 `visually-verified` 必须先有对应 accepted-golden（当前 6 张全是 raw-Aminus，不可）。
 - 重采速度过慢的根因（会话恢复抢占 fixture、辅助功能权限被拒）仍存在；补采子卡执行时仍需你授权辅助功能或协助用 cliclick 拖动窗口。
 - `src/modules/reader/readerReducer.test.ts` 有你的未提交修改；本卡任何子卡都不触碰。
+
+### ISS-NEW-O doc-curator 扫描范围与历史任务卡归档维护
+
+- 优先级：P1（文档治理维护，不阻塞 M4/M5 功能推进）
+- 类型：工具链 / 上下文健康
+- 来源：2026-07-30 按最新 AGENTS.md 执行 doc-curator 全量体检
+- 状态：**待领取**；本轮已先修复进度日志、ISS 归档排序和 DEC-074～096 索引断档
+- 现状：`tasks` / `decisions` / `context-sync` 的目标硬门禁已通过；全量 `markdown-link-broken` 仍扫描 `node_modules/`、ignored worktree 和历史 research，共报 261 条既有/误判结果。TASKS 仍有 46 张活跃卡、1907 行，DECISIONS 仍高于历史行数基线。
+- Allowed files：`.claude/skills/doc-curator/config/faropdf.yaml`、必要的 doc-curator 扫描脚本、`docs/TASKS.md`、`docs/DECISIONS.md` 与对应 skill 内部三件套；如项目 skill 为 symlink，按 skill-manager / git-workflow 另行确认真正归属仓库。
+- Forbidden files：`src/**`、`src-tauri/**`、PDF Expert 功能实现、用户已有 `src/modules/reader/readerReducer.test.ts` 与 `.zcode/**`。
+- 验收：
+  - [ ] 断链扫描显式排除依赖目录、ignored worktree、构建产物和被项目规则弃用的 `research/pdf-expert/`
+  - [ ] 为反引号示例、外部路径和真实仓内链接建立可区分的测试 fixture，避免“修文档迎合误报”
+  - [ ] 审计 46 张旧任务卡，将已完成项分批迁入 DECISIONS 归档；未完成项保留真实状态，不机械删除
+  - [ ] 维护后全量 scan 无 hard；adaptive 项有明确接受或后续记录

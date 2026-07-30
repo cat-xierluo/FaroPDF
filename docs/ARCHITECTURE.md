@@ -61,7 +61,7 @@ PDF.js page.render(canvas) + text layer + annotation overlay
   ↓
 搜索按需读取页文本并建立内存索引；批注/页面/导出/OCR 写入各自队列
   ↓
-search state / sidecar / page operation queue / export job queue / OCR job queue
+search state / annotation sidecar / bookmark sidecar / page operation queue / export job queue / OCR job queue
   ↓
 导出时由 pdfOperationEngine 读取 PDF bytes，用 pdf-lib 生成新 PDF bytes；路径型导出再写入新输出路径
 ```
@@ -223,6 +223,34 @@ export interface AnnotationSidecar {
     pageCount?: number;
   };
   annotations: PdfAnnotation[];
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### BookmarkSidecar
+
+个人页面书签与 PDF 自带 outline 分开建模。`src/modules/bookmarks/` 负责添加、幂等去重、排序、删除和持久化；L5a 摘要栏、独立书签面板与 `view-add-bookmark` 命令共用同一 controller。第一版只保存 sidecar，不改写原始 PDF：
+
+- 有 fingerprint 时按 fingerprint 派生文档身份，无 fingerprint 时用 path 兜底；localStorage key 始终只保留身份哈希。
+- sidecar value 只保存 fingerprint、页数、书签页索引 / 标签和时间戳，不保存 PDF 路径或文件名。
+- 同页重复添加返回既有书签，不产生重复记录；加载时剔除超出当前页数的旧记录。
+- localStorage 不可用时回退进程内存；写入失败在 UI 显示错误，不伪装成功。
+
+```ts
+export interface BookmarkSidecar {
+  schemaVersion: 1;
+  document: {
+    fingerprint?: string;
+    pageCount: number;
+  };
+  bookmarks: Array<{
+    id: string;
+    pageIndex: number;
+    label: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -619,6 +647,7 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 | `pdfRenderScheduler` | 页面虚拟化、渲染队列、取消不可见页渲染 |
 | `pdfTextService` | 文本层检测、按需全文索引、搜索命中 |
 | `annotationService` | sidecar 批注模型、编辑、导出摘要 |
+| `bookmarkService` | 按文档隔离的个人页面书签 sidecar、添加 / 删除 / 跳页与刷新恢复 |
 | `pdfExportService` | 路径型导出安全校验、仅新建写入、批注/页面操作计划和表单导出 |
 | `pdfOperationEngine` | 抽象 PDF 写入能力，第一版用 pdf-lib 起步复制 PDF、扁平化表单、写入水印/页码/Bates 并生成导出计划，预留更强引擎替换空间 |
 | `formService` | AcroForm 字段读取、填写、签名图片写入、表单扁平化和批量表单操作 |
@@ -645,6 +674,7 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 
 - 原始 PDF 默认不可变。
 - 批注默认保存到 sidecar，导出时再写入新 PDF。
+- 个人页面书签默认保存到独立 sidecar，不写入原 PDF，也不与 PDF outline 混用。
 - 页面整理、OCR、压缩、扁平化表单默认输出新 PDF。
 - 水印、Bates 编号、页码和批注扁平化默认输出新 PDF。
 - 覆盖原文件必须由用户显式选择并二次确认。
@@ -724,10 +754,10 @@ FaroPDF 可复用本机 `legal-skills` 中成熟 PDF 脚本的算法，但不直
 | --- | --- | --- |
 | Shell | L2/L3 各 40px 分行；L3 为 navigation/zoom/workflows/collaboration/search 五区；L5 DOM 固定左/中/右 | measured 几何/密度门禁通过，accepted-golden 视觉对齐仍缺 |
 | Read | read 不渲染 L4；PDF.js 阅读能力存在 | 双页和主题缺可靠 reference |
-| Sidebar | 左栏容器和多个 panel 已存在；大纲参考态的图标标签栏、标题与空态层级已接线 | thumbnails/outline/annotation/bookmark 仍需 accepted-golden 逐态视觉和行为复核 |
+| Sidebar | 左栏容器和多个 panel 已存在；大纲参考态已接线；个人页面书签已完成添加、幂等、排序、跳页、删除、刷新恢复与文档隔离 | thumbnails/outline/annotations 继续逐态行为复核；bookmarks 视觉证据仍 missing，不能声明 visually-verified |
 | Edit | `T 编辑` 进入独立 `edit` mode，保留 G05 measured 的 272px 大纲左栏、整窗居中的单页 ReaderCanvas 与编辑 L4 | 文本/图像/链接/隐藏写回引擎尚未接入，当前按钮显式禁用 |
 | Page management | 独立 `pages` mode；真实缩略图、选择/多选、拖拽、删除、旋转、撤销和 execute 导出已接入，产物已重开解析 | 页面剪贴板、真实尺寸标签和更多异常态 |
-| RightPanel | mode-driven 容器；文档摘要、OCR 状态/页码范围和 shape-style 已接真实数据/state/controller | bookmarks 等仍需接线 |
+| RightPanel | mode-driven 容器；文档摘要、OCR 状态/页码范围和 shape-style 已接真实数据/state/controller | 其余右栏 surface 与异常态仍需逐项验收；bookmarks 属于 L5a，不再误列到 RightPanel |
 | Search/Annotate | 搜索业务已接线；形状批注完成右栏、overlay、sidecar、PDF writer 和重开闭环 | 其余批注辅助命令、参考视觉和异常态仍不完整 |
 | Forms/Export/OCR | 有独立业务模块和部分真实输出 | 不能从“底座存在”推导完整工作流或视觉完成 |
 | Validation | typecheck/test/build + Playwright 真实交互 + PDF 产物重开解析 + OCR 真 pipeline；73 项 measured 门禁继续保留 | accepted-golden image diff 为可选视觉优化；仍缺部分 surface/异常态 |

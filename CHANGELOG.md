@@ -1,3 +1,17 @@
+## 未发版 · 任务源与决策索引治理（2026-07-30，DEC-191）
+
+- `docs/TASKS.md` 按最新 AGENTS / doc-curator 规则只保留最近 5 条进度摘要，当前唯一推进序列与下一候选异常态保持在顶部。
+- 修复 DECISIONS 的 ISS 归档排序，并从可追溯历史 commit 恢复 DEC-074～096 最小索引；不重写旧决策语义。
+- 文档硬门禁恢复通过；活跃卡数量和文件行数仍作为 adaptive maintenance 提示保留，后续单独审计归档。
+
+## 未发版 · 页面书签 sidecar 与刷新恢复闭环（2026-07-30，DEC-190）
+
+- **入口统一接线**：L5a 摘要栏“书签”tab、独立书签 utility panel 和原生 `view-add-bookmark` 命令共用同一领域状态；移除“开发中”占位和 recentFiles.lastPage 假书签。
+- **完整页面行为**：支持添加当前页、重复添加幂等、按页排序、当前页标记、点击跳页和删除；没有文档时按钮和命令 fail-closed，大纲写回未接入时加号保持 disabled。
+- **隐私与安全**：书签保存在按 fingerprint / path 安全摘要隔离的 localStorage sidecar；storage key 只包含哈希，sidecar 不保存原 PDF 路径或文件名，也不改写原始 PDF。
+- **真实交互证据**：Playwright 在五页 `reference.pdf` 上添加第 1/3 页、验证重复添加、跳页、刷新重开恢复、第二份 PDF 隔离和删除；console/page error 均为 0，截图位于 `/private/tmp/faropdf-bookmark-audit-20260730/bookmark-roundtrip.png`。
+- **验收边界**：R04 只粗证 L5a tab 信息架构，书签内容 surface 仍无 accepted-golden；本轮达到 `behavior-complete`，不声明 `visually-verified`。
+
 ## 未发版 · 形状批注样式与 PDF 往返闭环（2026-07-30，DEC-189）
 
 - **右栏真实接线**：形状、线型、线宽、不透明度、边框色和填充色进入统一 `AnnotationToolState`；选择形状会 arm 对应画布工具，不再维护与批注模块无关的本地 UI state。
@@ -23,7 +37,7 @@
 - **独立回验**：S4 首轮发现 G05 假绿，回验又发现原生 `pdf-edit-*` 会二次折叠左栏与 `canvas` bbox 语义重叠；整改后按 reference/协议/矩阵/量测/实现/report 三轮复核，最终严格 PASS。
 - **验证限制**：全仓 lint 唯一错误仍位于用户已有改动 `src/modules/reader/readerReducer.test.ts:244` 的 `prefer-const`；本轮未修改该文件。本轮相关 ESLint 与 AppShell edit/native 定向测试均通过；AppShell 全文件 Vitest 的既有 open-handle 仍未冒充 PASS。accepted-golden 仍为 0，因此最高等级为 `wired + geometry/density-verified`，不声明 `visually-verified`。
 
-## 未发版 · PDF Expert 状态机与验证器纠偏（2026-07-28，DEC-185）
+## 未发版 · PDF Expert 状态机与验证器纠偏（2026-07-28，DEC-185；几何基线已由 DEC-186 校准）
 
 > 历史初校记录：本节的 29/32/33pt、搜索 480px 和 24 项结果已被 DEC-186 的二次像素校准与 73 项门禁取代；状态机拆分等其余决定继续有效。
 

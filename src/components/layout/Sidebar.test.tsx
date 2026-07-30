@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { PdfAnnotation } from "../../shared/pdf/annotation";
+import type { PdfPageBookmark } from "../../shared/pdf/bookmark";
 import { DocumentSummaryPanel, type RenderThumbnailFn } from "./Sidebar";
 
 /** 创建测试用批注 */
@@ -144,6 +145,79 @@ describe("DocumentSummaryPanel 批注列表", () => {
     // 没有内容摘要的 span
     const button = screen.getByRole("button", { name: /矩形 - 第 1 页$/ });
     expect(button).toBeInTheDocument();
+  });
+});
+
+describe("DocumentSummaryPanel 页面书签", () => {
+  const bookmarks: PdfPageBookmark[] = [
+    {
+      id: "page-2",
+      pageIndex: 1,
+      label: "第 2 页",
+      createdAt: "2026-07-30T00:00:00.000Z",
+      updatedAt: "2026-07-30T00:00:00.000Z",
+    },
+    {
+      id: "page-4",
+      pageIndex: 3,
+      label: "第 4 页",
+      createdAt: "2026-07-30T00:01:00.000Z",
+      updatedAt: "2026-07-30T00:01:00.000Z",
+    },
+  ];
+
+  test("空态加号添加当前页；大纲未接线加号保持 disabled", async () => {
+    const user = userEvent.setup();
+    const onAddBookmark = vi.fn();
+    render(
+      <DocumentSummaryPanel
+        currentPage={2}
+        hasDocument
+        onAddBookmark={onAddBookmark}
+      />,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "书签" }));
+    await user.click(screen.getByRole("button", { name: "添加当前页书签" }));
+    expect(onAddBookmark).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("tab", { name: "大纲" }));
+    expect(screen.getByRole("button", { name: "添加大纲项目（尚未接入）" })).toBeDisabled();
+  });
+
+  test("列表显示当前页，跳转使用 1-based 页码并可删除", async () => {
+    const user = userEvent.setup();
+    const onSelectBookmarkPage = vi.fn();
+    const onRemoveBookmark = vi.fn();
+    render(
+      <DocumentSummaryPanel
+        bookmarks={bookmarks}
+        currentPage={4}
+        hasDocument
+        onRemoveBookmark={onRemoveBookmark}
+        onSelectBookmarkPage={onSelectBookmarkPage}
+      />,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "书签" }));
+    expect(screen.getByTestId("bookmark-list")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "跳转到第 4 页" })).toHaveAttribute("aria-current", "page");
+
+    await user.click(screen.getByRole("button", { name: "跳转到第 2 页" }));
+    expect(onSelectBookmarkPage).toHaveBeenCalledWith(2);
+
+    await user.click(screen.getByRole("button", { name: "删除第 4 页书签" }));
+    expect(onRemoveBookmark).toHaveBeenCalledWith("page-4");
+  });
+
+  test("没有文档时添加按钮 fail closed", async () => {
+    const user = userEvent.setup();
+    render(<DocumentSummaryPanel hasDocument={false} preferredTab="书签" />);
+
+    const addButton = screen.getByRole("button", { name: "添加当前页书签" });
+    expect(addButton).toBeDisabled();
+    expect(screen.getByText("打开 PDF 后可以添加页面书签。")).toBeInTheDocument();
+    await user.click(addButton);
   });
 });
 

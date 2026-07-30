@@ -704,12 +704,16 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 
 `docs/TASKS.md` 收敛为活跃/暂缓任务入口；已完成 ISS 的详细任务卡迁移到本节，保留为单行摘要。后续如需恢复为正式 ISS，先在本节追加"恢复"标注，再回到 `docs/TASKS.md` 新增。
 
+
 - **ISS-001 初始化 Tauri 应用脚手架**（P0，工程基础，已完成）— `feat/foundation-scaffold`：建立 Tauri v2 + React + TS + Vite 应用，补齐 `typecheck`/测试/构建脚本。
 - **ISS-002 PDF.js 快速阅读底座**（P0，阅读核心，已完成底座+canvas 渲染+缩略图+滚动同步）— `feat/reader-core` → `feat/reader-canvas-render-clean` → `feat/reader-thumbnails`：PDF.js 加载、worker chunk、虚拟化、真实 canvas、PDF.js 缩略图懒加载、阅读区滚动同步当前页。连续滚动/键盘翻页/缩放预设/页码恢复待后续。
 - **ISS-003 文本层检测与全文搜索**（P0，检索，已完成第一版）— `feat/text-search`：内存搜索会话、按批次页文本索引、命中列表、上下一个命中、当前页轻量高亮、文字层缺失/质量差 OCR 提示。真实几何高亮留阅读渲染深化。
 - **ISS-004 批注 sidecar 模型**（P0，批注，已完成 sidecar+侧边栏列表 UI+点击跳转）— `feat/annotations-sidecar`：`PdfAnnotation` 模型、sidecar 持久化（默认 `.faropdf/annotations/*.annotations.json`）、批注列表 UI 和跳转。
 - **ISS-005 PDF 导出与批注扁平化**（P0，导出，部分完成）— `feat/pdf-export-engine`：`pdfOperationEngine` 抽象、pdf-lib 复制/扁平化表单、批注与页面操作 plan-only 计划、绝对新 PDF 路径。批注几何绘制和 UI 接入待后续。
 - **ISS-006 页面整理工作台**（P0，页面管理，进行中）— `feat/page-organizer`：`PdfPageOrganizerState` 状态机、旋转/删除/重排/恢复/撤销、plan-only 导出请求。完整 UI、插入/合并/裁剪、A4 标准化、页级 manifest、Bates 编号待后续。
+- **ISS-007 OCR bridge（含端到端联调 worker）**（P0，OCR/质量，已完成 v0.1 收口）— `feat/ocr-bridge` → `feat/iss-007-keychain` → PR #18 / #29 / #33 / #47：bridge 真实接入（`start_ocr_job` 按 provider 分发到 `ocrmypdf` / PaddleOCR / MinerU）+ UI 接线（OCR 模式工具条 + OcrJobList + OcrQualityReportView）+ 端到端 fixture 验证（`tests/e2e/ocr-e2e.test.ts` 4 case + Rust `ocr_e2e_tests`）+ keychain apiKeyRef + OS Keychain 集成（DEC-030 / DEC-042 / DEC-050 / DEC-061）。下一波 OCR 后处理（原 Agent 集成卡 025）暂缓到 v0.3。
+- **ISS-008 表单填写与签署**（P1，表单/签署，已完成 v0.1 收口）— `feat/forms-signing` → `feat/iss-008-forms-utility-panel`：AcroForm 字段识别、批量填写/flatten、签名图片限定 PNG/JPG、FormsPanel 浮层 + 窄屏底部 sheet 自适应（`FORMS_PANEL_NARROW_BREAKPOINT=480`）+ AppShell 左侧 utility panel 收口（DEC-035 / DEC-055 / DEC-064）。批量填写规则引擎 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件留后续 worker。
+- **ISS-009 设计系统落地**（P0，UI/信息架构，已完成 v0.1 收口）— `feat/pdf-expert-shell-ia` → PR #32：PDF Expert 风格主工具栏/左侧按需工具区/上下文工具条/独立页面管理工作台/状态栏/设置入口；M1 阅读态视觉 polish + M2 搜索结果层 + M3 页面管理多选撤销 + M4 OCR 任务参数区 4 个 milestone 全部完成（DEC-049）。浏览器截图视觉验收由 PM 推进。
 - **ISS-010 法律材料隐私与联网 OCR 提示**（P0，安全，已完成第一版）— `feat/privacy-safety`：notice/consent 模型、`ocrPrivacyConsentGuard` 绑定指纹+nonce+有效期、API key 引用脱敏、bridge audit 衔接。真实 PaddleOCR/MinerU 调用和完整 UI 弹窗待后续。
 - **ISS-011 共享契约与模块边界**（P0，工程基础，已完成）— `feat/shared-contracts`：`PdfDocumentState`/`PdfPageViewport`/`PdfAnnotation`/`PdfPageOperation`/`PdfExportJob`/`OcrProviderConfig`/`OcrJob`/`AppSettings` 共享契约与 `FAROPDF_MODULES` 模块边界。
 - **ISS-012 基础应用 Shell 与验证夹具**（P0，UI/工程基础，已完成）— `feat/app-shell-foundation`：PDF Expert 风格主工具栏/按需左侧工具区/上下文工具条/页面管理工作台/状态栏/设置入口、测试 fixture 规则。
@@ -720,15 +724,11 @@ FaroPDF 的项目级文档（`docs/TASKS.md` / `docs/DECISIONS.md` / `docs/ROADM
 - **ISS-018 证据图片 A4 编排**（P1，页面管理/证据材料，已完成第一版 plan-only 编排计划器）— `feat/evidence-image-pack`：`imagePackPlanner` 纯函数规划器（auto 3/auto 1/平手回落/显式 2/4/逐项方向/固定方向/单元格纵横比/页边距/输出路径安全/空 items/越界/负 margin/零或 NaN 尺寸/`sort=name`/混合 image+pdf-page）。真实目录拾取、像素渲染、image/PDF I/O 待后续。
 - **ISS-019 文书整理 manifest 与规范命名**（P1，法律材料整理，已完成第一版 manifest 服务）— `feat/document-organizer-manifest`：页级检查索引、文书边界建议、拆分/合并 manifest、规范命名建议。真实 PDF 解析和 UI 接入待后续。
 - **ISS-020 临时应用图标**（P1，品牌/UI，已完成）— 暂用最初生成的灯塔图标，覆盖 `src-tauri/icons/` 和 `public/favicon.png`；后续正式品牌图标再继续简化。
-- **ISS-007 OCR bridge（含 ISS-007 端到端联调 worker）**（P0，OCR/质量，已完成 v0.1 收口）— `feat/ocr-bridge` → `feat/iss-007-keychain` → PR #18 / #29 / #33 / #47：bridge 真实接入（`start_ocr_job` 按 provider 分发到 `ocrmypdf` / PaddleOCR / MinerU）+ UI 接线（OCR 模式工具条 + OcrJobList + OcrQualityReportView）+ 端到端 fixture 验证（`tests/e2e/ocr-e2e.test.ts` 4 case + Rust `ocr_e2e_tests`）+ keychain apiKeyRef + OS Keychain 集成（DEC-030 / DEC-042 / DEC-050 / DEC-061）。下一波 OCR 后处理（ISS-025 Agent 集成）暂缓到 v0.3。
-- **ISS-008 表单填写与签署**（P1，表单/签署，已完成 v0.1 收口）— `feat/forms-signing` → `feat/iss-008-forms-utility-panel`：AcroForm 字段识别、批量填写/flatten、签名图片限定 PNG/JPG、FormsPanel 浮层 + 窄屏底部 sheet 自适应（`FORMS_PANEL_NARROW_BREAKPOINT=480`）+ AppShell 左侧 utility panel 收口（DEC-035 / DEC-055 / DEC-064）。批量填写规则引擎 / 手写签名 / 日期 / 勾号 / 叉号 / 图章等高级控件留后续 worker。
-- **ISS-009 设计系统落地**（P0，UI/信息架构，已完成 v0.1 收口）— `feat/pdf-expert-shell-ia` → PR #32：PDF Expert 风格主工具栏/左侧按需工具区/上下文工具条/独立页面管理工作台/状态栏/设置入口；M1 阅读态视觉 polish + M2 搜索结果层 + M3 页面管理多选撤销 + M4 OCR 任务参数区 4 个 milestone 全部完成（DEC-049）。浏览器截图视觉验收由 PM 推进。
 - **ISS-021 全平台打包与自动更新（含 v0.1.0 / v0.1.1 发布）**（P1，发布/工程，已完成 v0.1 收口）— `feat/app-distribution` → PR #31 / #41 / #55 / #56 / #60：tauri-plugin-updater 接入、9 态 updater 状态机、autoUpdateCheck 设置项、真实 keypair 替换（DEC-065）、release.yml 跨平台矩阵 + tauri-action 切换 + Gitee 同步（DEC-070 / DEC-071）。v0.1.0 + v0.1.1 成功发布；增量更新失败回退（DEC-066）/ 移动端 / CODE_SIGNING 留 v0.3 follow-up。
-- **ISS-023 关于页面与作者页**（P1，UI/品牌，已完成 v0.1 收口）— `feat/iss-023-author-update`：AuthorCard 独立组件 + 关于 section 替换占位 div + 1×1 灰阶 PNG 占位二维码 + `QRCODE_LICENSE.md` 替换说明（DEC-038 / DEC-051）。真实公众号二维码按 `QRCODE_LICENSE.md` 流程后续替换（ISS-029 联动）。
+- **ISS-023 关于页面与作者页**（P1，UI/品牌，已完成 v0.1 收口）— `feat/iss-023-author-update`：AuthorCard 独立组件 + 关于 section 替换占位 div + 1×1 灰阶 PNG 占位二维码 + `QRCODE_LICENSE.md` 替换说明（DEC-038 / DEC-051）。真实公众号二维码按 `QRCODE_LICENSE.md` 流程后续替换（原联动卡 029）。
 - **ISS-024 文档瘦身 subagent（doc-curator）**（P1，工程协作/工具链，已完成首版部署）— PR #17 + DEC-043：项目级 doc-curator skill 落地、本机基线建立、AGENTS.md Skill 强制调用表加 doc-curator 行。后续 v0.1 PR 创建/合并后自动跑体检 + 必要时提 maintenance PR。
 - **ISS-026 批注深化（高亮/手写/图章/搜索）**（P0，批注/检索，已完成 v0.1 + v0.2 收口）— PR #19 / #24 / #28 / #30 / #43：4 阶段批注 sidecar（颜色/作者/时间/页码/几何）+ active 联动（Overlay↔Sidebar）+ v0.2 摘要分组面板（DEC-068）。9 类型批注 + 6 色色板 + 5 图章模板 + 4 维度分组 + 真实 PDF 绘制 flatten 全部完成。
 - **ISS-027 根目录配置收束**（P2，工程基础，已完成）— PR #36 / DEC-053：`docs/` 架构收口 + 文档体系统一。Folia 对齐度（删 `package.json` 冗余 Tauri 配置 / 切换 pnpm / Gitee 同步等）按需另起 worker。
-
 ## 工作日志
 
 - 2026-06-02：初始化项目上下文，固定名称、独立项目形态、首版范围、技术选型和安全边界。
@@ -3646,6 +3646,100 @@ v0.1.1 流程：
 2. 设置页 focus-visible 统一使用 accent + accent-soft 体系，删除 app.css 中与 SettingsPanel.css 冲突的遗留规则。
 3. macOS 菜单使用 Tauri v2 Rust Menu API 而非 tauri.conf.json 配置，获得更好的类型安全和运行时灵活性。
 4. DESIGN.md 从 8 节扁平文档重构为 21 节成熟结构，新增组件样式、信息密度、交互规则、深度层级、响应式、空态规范、工具栏克制原则、设置页规范、菜单栏规范、禁止事项、设计评审等章节。
+
+> 2026-07-30 文档治理修复：DEC-074～DEC-095 的完整历史曾写入 commit `41519cab92bda504748dc46900c1d01d2d5d636a`，DEC-096 曾写入 commit `b8c6a081f83319c525116f22b27041a5058ed72d`，但分支收口时未进入当前主线文档，后续编号却从 DEC-097 继续。以下恢复最小索引以保持编号连续和历史可追溯；完整原始记录仍以对应 commit 为准，不在本轮重写其历史结论。
+
+## DEC-074 ISS-039 PDF 工具启动器与导出编号面板收口（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-075 ISS-032 原生菜单事件桥接与文件打开补齐（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-076 ISS-039 全量验证收口（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-077 ISS-040 文字 / 图片水印交付面板接入（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-078 ISS-041 压缩交付面板接入（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-079 ISS-042 页眉页脚交付面板接入（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-080 ISS-043 表单扁平化入口与填写签名工具条收口（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-081 ISS-044 页面管理工作台真实状态与另存导出接入（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-082 ISS-045 批注扁平化入口与批注侧栏导出接入（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-083 doc-curator 硬门禁收口：进度日志瘦身与 ISS 归档排序（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-084 ISS-046 页面管理重排 UI 与真实另存接入（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-085 ISS-047 ReaderCanvas PDF.js 并发渲染取消缺陷（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-086 ISS-048 工具启动器去假入口与批注摘要重路由（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-087 ISS-049 阅读模式工具注册幂等修复（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-088 ISS-050 原生菜单系统动作去提示型假入口（2026-06-08）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-089 ISS-051 页眉页脚奇偶页范围接入（2026-06-09）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-090 ISS-052 缩略图状态标记克制化（2026-06-09）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-091 ISS-053 页眉页脚视觉位置选择器（2026-06-09）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-092 ISS-054 深色模式最小接入（2026-06-09）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-093 ISS-055 顶栏任务模式入口收口（2026-06-09）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-094 3 阶段排查与 ISS-FIX-1 Toolbar 左区 aria-label（2026-06-14）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-095 ISS-FIX-7 OCR 真实接入文档修订（2026-06-14）
+
+- 状态：历史索引恢复；完整记录见 `41519cab92bda504748dc46900c1d01d2d5d636a`。
+
+## DEC-096 ISS-NEW-E ROADMAP 状态对齐（2026-06-14）
+
+- 状态：历史索引恢复；完整记录见 `b8c6a081f83319c525116f22b27041a5058ed72d`。
 
 ## DEC-097 ISS-NEW-A 阶段 1 PDF 插入 / 合并 / 提取能力（2026-06-14）
 
@@ -7465,3 +7559,42 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 验证：失败基线为 toolbar state 缺少 shapeStyle、writer 12 类输入只绘制 9 类。修复后 annotation 模块、overlay、ShapeToolPanel 和 RightPanel 共 173 项测试通过，AppShell 定向 4 项通过，typecheck、相关 ESLint 和 production build 通过。Playwright 在 1280×832 对 `reference.pdf` 实际绘制红色 6pt 虚线、50% 透明、蓝色填充椭圆及双向箭头；刷新重开后样式与位置保持，初次和重开时 overlay/canvas bbox 分别完全一致，console/page error 为 0。下载副本经 `pdfinfo` 和渲染重开确认 5 页、2/2 批注已绘制，keywords 含 `faropdf:annotation-count:2` / `faropdf:annotation-drawn:2`，画布与 PDF 产物位置一致。
 
 边界：本决策关闭 shape-style 的功能闭环，不声明 accepted-golden 或像素级视觉一致；旋转页、极端小尺寸、跨页连续模式和其余批注辅助命令的异常态仍需后续逐项验收。
+
+## DEC-190 页面书签使用独立隐私 sidecar，并统一 L5a 与命令入口（2026-07-30）
+
+- 日期：2026-07-30
+- 状态：已采纳
+- 关联：ISS-NEW-M M4、DEC-187、R04（raw-B）
+
+问题：页面书签在代码中有三套不一致表象：`view-add-bookmark` 被 command catalog 标记为 planned；即使越过门禁，旧处理也只是把当前页写入 `recentFiles.lastPage`；独立 bookmark utility panel 显示“开发中”，摘要栏书签 tab 的加号则没有 handler。用户看到书签 UI，却无法确认它是否真正持久化、跳页或与其他文档隔离。R04 只证明书签 tab 与大纲相邻的信息架构，不能证明列表内容或视觉细节。
+
+决策：
+
+1. 新建 `BookmarkSidecar` 与 bookmarks module。个人页面书签独立于 PDF outline，记录 pageIndex / label / 时间戳；不改写原 PDF。
+2. 文档身份优先使用 PDF fingerprint，无 fingerprint 时以 path 兜底；localStorage key 只保存身份哈希，sidecar value 不保存路径或文件名。加载时校验 schema / fingerprint / 页数，损坏数据 fail-closed 为空集合。
+3. L5a 摘要栏“书签”tab、独立 bookmark utility panel 和 `view-add-bookmark` 原生命令共用同一 React controller。添加当前页、重复添加幂等、按页排序、当前页标记、点击跳页和删除全部进入真实状态。
+4. 原生命令从 planned 升级为 ready；没有文档仍由 `requiresDocument` 拦截。旧 `recentFiles.lastPage` 写入分支删除，阅读位置与个人书签继续保持两个不同概念。
+5. 大纲写回仍未接入，因此大纲加号显式 disabled；不再保留相邻 surface 的 noop。书签局部颜色只使用现有设计 token，不修改全局 shell 几何。
+6. command signal 以 `id + nonce` 去重，避免书签状态更新导致 effect 重放同一原生命令。
+7. 必跑布局门禁发现验证器仍普通点击 planned `T 编辑`，与 DEC-187 的 disabled 策略冲突。两套验证器现先断言入口保持 disabled，再通过仅限 Vite DEV 且要求 `?verification=pdf-expert` 的事件钩子触发潜在 edit surface；正式构建、普通开发页面和 command availability 均不解锁。
+
+验证：bookmark store、Sidebar 与 command catalog 共 47 项测试通过；AppShell 页面书签 3 项与原生命令 1 项定向测试通过；typecheck、相关文件 ESLint 和 production build 通过；修复 stale 触发后 `verify:ui-layout` 两视口与 `verify:pdf-expert-visual` 73 项恢复 exit 0。Playwright 在 1280×832 打开五页 `reference.pdf`，添加第 1/3 页、验证同页重复添加只有一条、点击跳回第 1 页、刷新后恢复两条书签、打开第二份 PDF 时列表为空、重新打开首份文档后删除第 1 页并保留第 3 页；storage key 为安全哈希，value 无 path / filename，console/page error 均为 0。验收截图位于 `/private/tmp/faropdf-bookmark-audit-20260730/bookmark-roundtrip.png`。
+
+边界：本轮达到 `behavior-complete`，不声明 `visually-verified`。R04 不能证明书签内容布局，accepted-golden 仍为 0；PDF outline 写回、书签命名编辑、跨设备同步和导出 / 导入不在本子任务范围。全量 `npm run lint` 仍被用户已有 `src/modules/reader/readerReducer.test.ts:244 prefer-const` 阻断，本轮不修改该文件；AppShell 全文件 Vitest 的既有 open-handle 运行人工中止，不计入 PASS。
+
+## DEC-191 TASKS 按最新 AGENTS 协议恢复为精简唯一任务源（2026-07-30）
+
+- 日期：2026-07-30
+- 状态：已采纳
+- 关联：AGENTS.md v3.8、doc-curator v0.5.1、ISS-NEW-M
+
+问题：本轮完成页面书签上下文同步后，doc-curator 的 working-tree 检查确认 CHANGELOG 与新 DEC 已覆盖，但全量体检发现 `docs/TASKS.md` 仍留有 42 条历史进度日志，超过 AGENTS / doc-curator 规定的 5 条硬上限；`docs/DECISIONS.md` 的 ISS 归档行因交叉引用编号干扰排序，并且 DEC-074～096 曾只存在于未收口的历史 commit，当前主线文档从 DEC-073 直接跳到 DEC-097。这些问题会让 TASKS 的“唯一任务源”定位继续被历史记录稀释。
+
+决策：
+
+1. TASKS 的进度日志只保留最近 5 条决策摘要，历史动作统一由 DECISIONS 承接；任务领取继续只看顶部 M0～M5 和 ISS-NEW-M 当前 envelope。
+2. ISS 归档按主编号升序排列；归档摘要里的跨卡引用改为不参与编号扫描的“原卡 025/029”措辞，不改变历史任务含义。
+3. 从历史 commit `41519cab92bda504748dc46900c1d01d2d5d636a` 与 `b8c6a081f83319c525116f22b27041a5058ed72d` 恢复 DEC-074～096 的最小可追溯索引，不伪造或重写当时的详细判断。
+4. TASKS 当前仍有 46 张卡、1907 行，DECISIONS 仍超过历史基线；这两项属于 adaptive 维护提醒，不把它们伪装成已清零。后续应以独立 maintenance 轮次审计已完成卡并迁入归档，不能在功能提交中机械删除仍可能领取的内容。
+
+验证：`doc-curator --only context-sync --working-tree` 确认本轮 CHANGELOG / DECISIONS 同步；`--only tasks` 的进度日志与归档指针硬门禁通过；`--only decisions` 的 ISS 排序与 DEC 连续性硬门禁通过。上述目标检查剩余为行数、活跃卡数量和 README 当前状态等 adaptive / soft 提示。全量断链检查另有 261 条既有结果，主要来自 `node_modules/`、ignored worktree、历史 research 和把示例反引号误判为路径；扫描范围缺陷已登记 ISS-NEW-O，不纳入本次功能与 TASKS 硬门禁的完成声明。

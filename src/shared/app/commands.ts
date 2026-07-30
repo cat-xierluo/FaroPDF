@@ -287,13 +287,11 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "view-add-bookmark",
     label: "添加书签",
-    description: "v0.2 占位：在当前页添加书签。",
+    description: "为当前页添加个人页面书签，并保存到按文档隔离的 sidecar。",
     layer: "tertiary",
     group: "view",
     entryPoints: ["native-menu"],
     requiresDocument: true,
-    feedback: "视图功能开发中，等待后续 worker 接入。",
-    availability: "planned",
   },
   // ISS-NEW-D 阶段 1（2026-06-22）：批注菜单 8 工具 + 形状 submenu 6 形状。
   // 全部 tertiary / native-menu / annotation group，与 macOS 批注 SubmenuBuilder 一一对应。

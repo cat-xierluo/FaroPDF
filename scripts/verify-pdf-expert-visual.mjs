@@ -99,7 +99,7 @@ function findSurface(measurements, captureId) {
 }
 
 async function openFixture(page) {
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}?verification=pdf-expert`, { waitUntil: "networkidle" });
   await page.locator('input[type="file"][aria-label="选择本地 PDF 文件"]').setInputFiles(fixturePath);
   await page.locator('.pdf-page[data-page-number="1"]').waitFor();
   await page.evaluate(() => {
@@ -119,6 +119,16 @@ async function openFixture(page) {
   await page.locator(".reader").evaluate((element) => element.scrollTo({ top: 0, behavior: "instant" }));
   await page.locator('.pdf-page[data-page-number="1"] canvas').waitFor();
   await page.waitForTimeout(250);
+}
+
+async function activatePlannedEditSurface(page) {
+  const editButton = page.getByRole("button", { name: "T 编辑", exact: true });
+  if (!(await editButton.isDisabled())) {
+    throw new Error("planned T 编辑入口必须保持 disabled");
+  }
+  await page.evaluate(() => {
+    window.dispatchEvent(new window.CustomEvent("faropdf:verification:set-mode", { detail: "edit" }));
+  });
 }
 
 async function bbox(page, selector, label) {
@@ -232,7 +242,7 @@ async function verifyAnnotate(page, measurements) {
 async function verifyEditCanvas(page, measurements) {
   const surface = findSurface(measurements, "N-EDIT-CANVAS");
   await openFixture(page);
-  await page.getByRole("button", { name: "T 编辑", exact: true }).click();
+  await activatePlannedEditSurface(page);
   await page.locator(".app-shell[data-active-mode='edit']").waitFor();
   await page.locator(".workspace[data-layout='left-main']").waitFor();
   const checks = await sharedLayerChecks(page, surface, "edit_toolbar");

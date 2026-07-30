@@ -1076,6 +1076,124 @@ select.zoom-control {
   line-height: 20px;
 }
 
+.bookmark-panel:not(.summary-outline) {
+  padding: 10px 8px;
+}
+
+.bookmark-panel:not(.summary-outline) .bookmark-panel__header {
+  margin: -4px -8px 0;
+}
+
+.bookmark-panel .bookmark-panel__header {
+  border-color: var(--border);
+}
+
+.bookmark-panel .bookmark-panel__header h2 {
+  color: var(--fg);
+}
+
+.bookmark-panel .bookmark-panel__header button {
+  background: var(--surface-strong);
+  color: var(--fg);
+}
+
+.bookmark-panel__header button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.bookmark-panel__empty.summary-empty {
+  padding: 18px 12px;
+}
+
+.bookmark-panel__error {
+  margin: 10px 4px 0;
+  padding: 8px;
+  border: 1px solid var(--warning-border);
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.bookmark-list {
+  display: grid;
+  gap: 4px;
+  padding: 8px 4px 0;
+  margin: 0;
+  list-style: none;
+}
+
+.bookmark-list__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  border-radius: 6px;
+}
+
+.bookmark-list__item--current {
+  background: var(--accent-soft);
+}
+
+.bookmark-list__jump,
+.bookmark-list__delete {
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+}
+
+.bookmark-list__jump {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  text-align: left;
+}
+
+.bookmark-list__jump span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmark-list__jump small {
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.bookmark-list__delete {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--muted);
+}
+
+.bookmark-list__delete:hover {
+  background: var(--surface-strong);
+  color: var(--danger);
+}
+
+.bookmark-list__jump:disabled,
+.bookmark-list__delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.bookmark-list__jump:focus-visible,
+.bookmark-list__delete:focus-visible,
+.bookmark-panel__header button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .thumbnail-list {
   display: grid;
   gap: 10px;

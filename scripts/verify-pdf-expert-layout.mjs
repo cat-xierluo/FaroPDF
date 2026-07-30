@@ -72,6 +72,14 @@ async function captureState(page, viewportLabel, state) {
   });
 }
 
+async function activatePlannedEditSurface(page, viewportLabel) {
+  const editButton = page.getByRole("button", { name: "T 编辑", exact: true });
+  assert(await editButton.isDisabled(), `${viewportLabel} planned T 编辑入口必须保持 disabled`);
+  await page.evaluate(() => {
+    window.dispatchEvent(new window.CustomEvent("faropdf:verification:set-mode", { detail: "edit" }));
+  });
+}
+
 async function prepareFixture() {
   const pdf = await PDFDocument.create();
   for (let pageNumber = 1; pageNumber <= 5; pageNumber += 1) {
@@ -86,7 +94,7 @@ async function verifyViewport(browser, viewport) {
   const page = await context.newPage();
   const viewportLabel = `${viewport.width}x${viewport.height}`;
 
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}?verification=pdf-expert`, { waitUntil: "networkidle" });
   await page.locator('input[type="file"][aria-label="选择本地 PDF 文件"]').setInputFiles(fixturePath);
   await page.locator('.pdf-page[data-page-number="1"]').waitFor();
   await page.getByRole("button", { name: "视图设置", exact: true }).click();
@@ -147,7 +155,8 @@ async function verifyViewport(browser, viewport) {
   );
   await captureState(page, viewportLabel, "left-panel-annotate");
 
-  await page.getByRole("button", { name: "T 编辑", exact: true }).click();
+  await activatePlannedEditSurface(page, viewportLabel);
+  await page.locator(".app-shell[data-active-mode='edit']").waitFor();
   await page.locator(".workspace[data-layout='left-main']").waitFor();
   await page.locator('[role="tab"][aria-label="大纲"][aria-selected="true"]').waitFor();
   assert(

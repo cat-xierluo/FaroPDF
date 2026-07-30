@@ -29,7 +29,7 @@ export type UtilityPanelId =
   | "forms"
   /** ISS-064：文档安全面板（设置 / 移除密码），从导出工具启动器入口进入 */
   | "security"
-  /** ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏书签面板（占位 — 真实书签列表 + 添加 / 跳转 留后续）。 */
+  /** L5a 页面书签面板：添加 / 删除 / 跳转与按文档 sidecar 持久化。 */
   | "bookmark"
   | "none";
 

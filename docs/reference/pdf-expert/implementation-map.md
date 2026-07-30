@@ -10,7 +10,8 @@
 | L3 toolbar | `Toolbar.tsx`、`Toolbar.css` | `wired` + `geometry/density-verified` | 五段结构已验证；协作区只提供真实“摘要/导出与交付”；未实现 T 编辑显式禁用 | 继续逐控件行为复核；视觉 diff 为可选优化 |
 | L4 read | `AppShell.tsx` | `wired` + `geometry-verified` | read 不渲染 L4 | 补可靠 read golden；视图菜单真实动作单独验收 |
 | L5 column order | `workspaceLayout.ts`、`AppShell.tsx`、`app.css` | `wired` + `geometry-verified` | DOM 顺序和中央弹性列已验证；搜索态 273/767/240 双栏 measured | 其他双栏组合、精确宽度和动画仍 missing |
-| L5a sidebar | `Sidebar.tsx`、`AnnotationSidebar.tsx` | `wired`，部分行为已有 | reader thumbnail API 可用；大纲 measured 态的图标标签栏、标题、空态与 272px 宽度已接线 | 左栏 thumbnails/annotations/bookmarks 的完整状态与 accepted-golden 视觉 diff |
+| L5a sidebar | `Sidebar.tsx`、`AnnotationSidebar.tsx`、bookmarks module | `wired`，页面书签 `behavior-complete` | reader thumbnail API 可用；大纲 measured 态已接线；页面书签支持添加、幂等、排序、当前页、跳转、删除、刷新恢复和文档隔离 | 左栏 thumbnails/outline/annotations 继续逐态行为复核；accepted-golden 视觉 diff 为可选优化 |
+| Page bookmarks | `src/modules/bookmarks/`、`Sidebar.tsx`、`AppShell.tsx` | `behavior-complete` | `view-add-bookmark` 与两处 L5a 入口共用 sidecar；storage key 只含安全哈希，value 不含路径 / 文件名；五页 fixture 刷新恢复、第二文档隔离和删除实测通过 | PDF outline 写回不属于个人页面书签；视觉参考仍 missing，不声明 `visually-verified` |
 | Read canvas | reader module / canvas components | `behavior-complete` 的部分能力 + `geometry/density-verified` | PDF.js 阅读、页码、缩放已存在；single 只渲染当前页，50% 运行态页面 bbox 对齐 48% reference | 两页态可靠参考；accepted-golden 页面内容与主题 diff |
 | Search | search module、`SearchResultsPanel.tsx` | `wired` + `geometry/density-verified`，部分行为已有 | L3 查询打开 240px L5b 结果栏；273/767/240 三列与按页分组结果已接线 | accepted-golden 字体/命中高亮；零结果/关闭/状态保持逐态复核 |
 | Annotate | annotation module、`AnnotationToolbar.tsx`、`AnnotationOverlay.tsx` | `behavior-complete`（形状纵向闭环）+ geometry-coarse-verified | 12 类批注；shape state/样式、当前页 bbox、PDF 坐标、sidecar 重开和扁平副本已实测；G03 大纲/L4/单页 measured 几何与 active 蓝反馈已接线 | 其余辅助命令、异常态与 accepted-golden 视觉优化 |
@@ -33,7 +34,7 @@
 以下内容在清理当日仍能从代码直接检出，任何相关任务不得标记完成：
 
 - `EditModeGridView.tsx`：已卸载的历史 skeleton，仍含空白缩略图、硬编码 A4、placeholder 回调说明。
-- `AppShell.tsx` / command catalog：内容编辑、部分批注辅助命令、独立缩放工具、重新载入、书签和 OCR 批量增强标记 `availability=planned`，执行层 fail-closed。
+- `AppShell.tsx` / command catalog：内容编辑、部分批注辅助命令、独立缩放工具、重新载入和 OCR 批量增强仍标记 `availability=planned`，执行层 fail-closed；页面书签已从 planned 升级为 ready。
 - `PageOrganizerWorkspace.tsx`：复制/粘贴在页面剪贴板实现前 disabled；不再增加假计数。
 - `TextSelectionToolbar.tsx`：翻译 disabled，不再把原文包装成“翻译结果”写入剪贴板。
 - Welcome 图片/Word 转换入口 disabled，不再触发 toast-only feedback。

@@ -262,6 +262,28 @@ function App() {
   }
 
   useEffect(() => {
+    const verificationEnabled =
+      import.meta.env.DEV && new URLSearchParams(window.location.search).get("verification") === "pdf-expert";
+    if (!verificationEnabled) {
+      return;
+    }
+
+    function handleVerificationMode(event: Event) {
+      const requestedMode = (event as CustomEvent<unknown>).detail;
+      if (requestedMode !== "edit") {
+        return;
+      }
+      setActiveMode("edit");
+      setUtilityPanel("summary");
+    }
+
+    window.addEventListener("faropdf:verification:set-mode", handleVerificationMode);
+    return () => {
+      window.removeEventListener("faropdf:verification:set-mode", handleVerificationMode);
+    };
+  }, []);
+
+  useEffect(() => {
     readerRef.current = reader;
   }, [reader]);
 

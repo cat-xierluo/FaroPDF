@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import { PDFDocument } from "pdf-lib";
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { PdfAnnotation } from "../../shared/pdf/annotation";
 import type { AppSettings } from "../../shared/settings/types";
 import { createDefaultAppSettings } from "../../shared/settings/defaults";
@@ -15,6 +15,10 @@ import { TabProvider, useTabStore } from "../../state/tabStore";
 import type { AnnotationArmedStateBundle, AppModeId, UtilityPanelId } from "./types";
 import type { OcrWorkspaceController } from "../../modules/ocr";
 import type { AppCommandSignal } from "../../shared/app/commands";
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 function makeAnnotation(overrides: Partial<PdfAnnotation> & { id: string; pageIndex: number }): PdfAnnotation {
   return {
@@ -1396,8 +1400,9 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
     expect(await screen.findByText(/浏览历史只有 2 项/)).toBeInTheDocument();
   });
 
-  test("ISS-NEW-H 第 3 阶段：view-add-bookmark 不再伪装成 lastPage 更新", async () => {
+  test("M4：view-add-bookmark 写入真实 sidecar，不再伪装成 lastPage 更新", async () => {
     const onSettingsChange = vi.fn();
+    const onUtilityPanelChange = vi.fn();
     const reader = makeReadyReader();
     const recentFile = {
       path: "test.pdf",
@@ -1409,11 +1414,13 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
       activeMode: "read",
       commandSignal: { id: "view-add-bookmark", nonce: 1 },
       onSettingsChange,
+      onUtilityPanelChange,
       reader,
       settings: baseSettings,
       utilityPanel: "none",
     });
-    expect(await screen.findByText(/「添加书签」尚未接入真实功能/)).toBeInTheDocument();
+    expect(await screen.findByText("已添加第 1 页书签。")).toBeInTheDocument();
+    expect(onUtilityPanelChange).toHaveBeenCalledWith("bookmark");
     expect(onSettingsChange).not.toHaveBeenCalled();
   });
 
@@ -1632,26 +1639,56 @@ describe("AppShell ISS-NEW-M：read 模式不渲染 L4", () => {
   });
 });
 
-describe("AppShell ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏 4 toggle", () => {
-  test("Toolbar 书签按钮点击 → utilityPanel=bookmark", () => {
+describe("AppShell M4：页面书签闭环", () => {
+  test("Toolbar 摘要入口打开 summary，再由 L5a tab 进入书签", async () => {
+    const user = userEvent.setup();
     const onUtilityPanelChange = vi.fn();
     renderAppShell({
       activeMode: "read",
       reader: makeReadyReader(),
       onUtilityPanelChange,
-      utilityPanel: "none",
+      utilityPanel: "summary",
     });
-    fireEvent.click(screen.getByTestId("toolbar-sidebar-bookmark"));
-    expect(onUtilityPanelChange).toHaveBeenCalledWith("bookmark");
+    await user.click(screen.getByRole("tab", { name: "书签" }));
+    expect(screen.getByRole("tabpanel", { name: "书签面板" })).toBeInTheDocument();
   });
 
-  test("utilityPanel=bookmark 时 AppShell 渲染 BookmarkPanelPlaceholder", () => {
+  test("utilityPanel=bookmark 时可添加、跳转和删除页面书签", async () => {
+    const user = userEvent.setup();
+    const reader = makeReadyReader();
+    renderAppShell({
+      activeMode: "read",
+      reader,
+      utilityPanel: "bookmark",
+    });
+    expect(screen.getByTestId("bookmark-panel")).toBeInTheDocument();
+    expect(screen.getByText("点击上方加号，为当前页面添加书签。")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "添加当前页书签" }));
+    expect(await screen.findByRole("button", { name: "跳转到第 1 页" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "跳转到第 1 页" }));
+    expect(reader.setCurrentPage).toHaveBeenCalledWith(1);
+
+    await user.click(screen.getByRole("button", { name: "删除第 1 页书签" }));
+    expect(screen.queryByTestId("bookmark-list")).not.toBeInTheDocument();
+  });
+
+  test("M4：书签在卸载并重新打开同一 PDF 后恢复", async () => {
+    const user = userEvent.setup();
+    const first = renderAppShell({
+      activeMode: "read",
+      reader: makeReadyReader(),
+      utilityPanel: "bookmark",
+    });
+    await user.click(screen.getByRole("button", { name: "添加当前页书签" }));
+    expect(await screen.findByRole("button", { name: "跳转到第 1 页" })).toBeInTheDocument();
+    first.unmount();
+
     renderAppShell({
       activeMode: "read",
       reader: makeReadyReader(),
       utilityPanel: "bookmark",
     });
-    expect(screen.getByTestId("bookmark-panel")).toBeInTheDocument();
-    expect(screen.getByText(/书签功能开发中/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "跳转到第 1 页" })).toBeInTheDocument();
   });
 });
