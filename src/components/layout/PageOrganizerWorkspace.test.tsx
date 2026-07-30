@@ -78,11 +78,13 @@ describe("PageOrganizerWorkspace 多选 / 撤销 / 风险", () => {
     expect(screen.getByText("打开 PDF 后管理页面")).toBeInTheDocument();
   });
 
-  test("默认选中当前页，真实页面动作可用，未接入的复制/粘贴明确禁用", () => {
+  test("默认选中当前页，真实页面动作可用，复制启用（需选中），粘贴禁用（剪贴板空）", () => {
     render(<PageOrganizerWorkspace reader={makeReader(makeState())} />);
     expect(screen.getByRole("button", { name: "删除" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "旋转" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "复制" })).toBeDisabled();
+    // 复制：有选中页 → 启用（ISS-NEW-M M3 已接入页面剪贴板）
+    expect(screen.getByRole("button", { name: "复制" })).toBeEnabled();
+    // 粘贴：剪贴板为空 → 禁用
     expect(screen.getByRole("button", { name: "粘贴" })).toBeDisabled();
     expect(screen.getByTestId("page-organizer-save-as")).toBeInTheDocument();
   });
@@ -384,5 +386,40 @@ describe("PageOrganizerWorkspace ISS-NEW-A 阶段 2：插入 / 合并 / 提取 U
     const calls = (saveUpdatedBytes as unknown as { mock: { calls: Array<[Uint8Array, string]> } }).mock.calls;
     const [, nameArg] = calls[0]!;
     expect(nameArg).toBe("y-merged.pdf");
+  });
+});
+
+describe("PageOrganizerWorkspace 页面剪贴板（ISS-NEW-M M3）", () => {
+  test("点击复制后粘贴按钮启用", async () => {
+    const user = userEvent.setup();
+    render(<PageOrganizerWorkspace reader={makeReader(makeState())} />);
+    // 初始：有选中页，复制启用，粘贴禁用
+    expect(screen.getByRole("button", { name: "复制" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "粘贴" })).toBeDisabled();
+    // 点击复制 → 剪贴板写入 → 粘贴启用
+    await user.click(screen.getByRole("button", { name: "复制" }));
+    expect(screen.getByRole("button", { name: "粘贴" })).toBeEnabled();
+  });
+
+  test("点击粘贴后页数 +1（页面卡片增加）", async () => {
+    const user = userEvent.setup();
+    render(<PageOrganizerWorkspace reader={makeReader(makeState())} />);
+    // 默认 5 页
+    expect(screen.getAllByRole("button", { name: /第 \d+ 页/ })).toHaveLength(5);
+    // 复制当前页 → 粘贴
+    await user.click(screen.getByRole("button", { name: "复制" }));
+    await user.click(screen.getByRole("button", { name: "粘贴" }));
+    // 页数 +1 = 6
+    expect(screen.getAllByRole("button", { name: /第 \d+ 页/ })).toHaveLength(6);
+  });
+
+  test("粘贴后撤销可恢复原页数", async () => {
+    const user = userEvent.setup();
+    render(<PageOrganizerWorkspace reader={makeReader(makeState())} />);
+    await user.click(screen.getByRole("button", { name: "复制" }));
+    await user.click(screen.getByRole("button", { name: "粘贴" }));
+    expect(screen.getAllByRole("button", { name: /第 \d+ 页/ })).toHaveLength(6);
+    await user.click(screen.getByRole("menuitem", { name: /撤销/ }));
+    expect(screen.getAllByRole("button", { name: /第 \d+ 页/ })).toHaveLength(5);
   });
 });
