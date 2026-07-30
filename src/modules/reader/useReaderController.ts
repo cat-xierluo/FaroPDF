@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { AppSettings } from "../../shared/settings/types";
+import type { OutlineNode } from "../../shared/pdf/reader";
 import type { PdfPageText } from "../../shared/pdf/text";
 import type { PageRotation, PdfViewMode, ReaderSession, ZoomPresetId } from "../../shared/pdf/types";
 import { loadPdfFromBytes, loadPdfFromFile, type LoadedPdfDocument } from "./pdfReaderService";
@@ -56,6 +57,8 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     [settings.defaultViewMode, settings.defaultZoom],
   );
   const [state, dispatch] = useReducer(readerReducer, initialState);
+  // ISS-NEW-M M4：PDF outline（书签 destination）随文档加载异步读取并暂存。
+  const [outline, setOutline] = useState<OutlineNode[]>([]);
 
   const openFile = useCallback(async (file: File) => {
     const loadRequestId = loadRequestIdRef.current + 1;
@@ -222,6 +225,28 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     }
     sessionRestoredRef.current = document.fingerprint;
   }, [state.document?.fingerprint, state.document?.documentId]);
+
+  // ISS-NEW-M M4：文档加载成功后异步读取 PDF outline（书签 destination），失败时静默置空。
+  useEffect(() => {
+    const document = state.document;
+    if (!document) {
+      setOutline([]);
+      return;
+    }
+    let cancelled = false;
+    loadedDocumentRef.current?.getOutline().then((nodes) => {
+      if (!cancelled) {
+        setOutline(nodes);
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setOutline([]);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [state.document?.documentId]);
 
   // 阅读状态变化后持久化（currentPage/zoom/viewMode/rotation 任意变化触发）
   useEffect(() => {
@@ -435,6 +460,7 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
 
   return {
     state,
+    outline,
     openFile,
     openNativeFile,
     submitPassword,

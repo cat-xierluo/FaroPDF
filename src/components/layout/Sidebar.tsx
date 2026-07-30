@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { Bookmark, Files, ListTree, MessageSquareText, Plus, Trash2 } from "lucide-react";
 import type { PdfAnnotation, PdfAnnotationType } from "../../shared/pdf/annotation";
 import type { PdfPageBookmark } from "../../shared/pdf/bookmark";
+import type { OutlineNode } from "../../shared/pdf/reader";
 import type { PdfViewMode, ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
 
@@ -97,6 +98,52 @@ interface DocumentSummaryPanelProps {
   onSelectBookmarkPage?: (pageNumber: number) => void;
   /** sidecar 读写失败时在面板内显示，不伪装成功。 */
   bookmarkError?: string | null;
+  /** ISS-NEW-M M4：PDF outline（书签 destination）树；空数组或未提供时展示空态。 */
+  outline?: OutlineNode[];
+  /** 点击 outline 节点时跳转到目标页（1-based）；pageNumber 为 undefined 的节点禁用。 */
+  onSelectOutlinePage?: (pageNumber: number) => void;
+}
+
+/**
+ * ISS-NEW-M M4：递归渲染 PDF outline 树。每个节点按 depth 缩进，可点击节点跳页；
+ * pageNumber 为 undefined（destination 损坏）的节点渲染为禁用纯文本。
+ */
+function renderOutlineNodes(
+  nodes: OutlineNode[],
+  onSelectPage?: (pageNumber: number) => void,
+): ReactElement[] {
+  return nodes.map((node, index) => {
+    const hasPage = typeof node.pageNumber === "number";
+    const key = `${node.depth}-${index}-${node.title}`;
+    return (
+      <li className="summary-outline__item" key={key}>
+        {hasPage && onSelectPage ? (
+          <button
+            className="summary-outline__entry"
+            data-testid={`outline-entry-${node.pageNumber}`}
+            onClick={() => onSelectPage(node.pageNumber!)}
+            style={{ paddingLeft: 12 + node.depth * 16 }}
+            type="button"
+          >
+            <span className="summary-outline__title">{node.title}</span>
+            <span className="summary-outline__page">第 {node.pageNumber} 页</span>
+          </button>
+        ) : (
+          <span
+            className="summary-outline__entry summary-outline__entry--disabled"
+            style={{ paddingLeft: 12 + node.depth * 16 }}
+          >
+            <span className="summary-outline__title">{node.title}</span>
+          </span>
+        )}
+        {node.children.length > 0 && (
+          <ul className="summary-outline__list summary-outline__list--nested">
+            {renderOutlineNodes(node.children, onSelectPage)}
+          </ul>
+        )}
+      </li>
+    );
+  });
 }
 
 export function DocumentSummaryPanel({
@@ -114,6 +161,8 @@ export function DocumentSummaryPanel({
   onRemoveBookmark,
   onSelectBookmarkPage,
   bookmarkError,
+  outline,
+  onSelectOutlinePage,
 }: DocumentSummaryPanelProps) {
   const [activeTab, setActiveTab] = useState<SummaryTab>(preferredTab ?? "缩略图");
 
@@ -176,31 +225,16 @@ export function DocumentSummaryPanel({
         <div className="summary-outline" role="tabpanel" aria-label={activeTab}>
           <header className="summary-outline__header">
             <h2>{activeTab}</h2>
-            <button
-              aria-label="添加大纲项目（尚未接入）"
-              disabled
-              title="大纲写回尚未接入"
-              type="button"
-            >
-              <Plus aria-hidden="true" size={16} />
-            </button>
           </header>
-          <div className="summary-outline__empty">
-            <div className="summary-outline__illustration" aria-hidden="true">
-              <span className="summary-outline__sheet summary-outline__sheet--back" />
-              <span className="summary-outline__sheet summary-outline__sheet--front">
-                <i />
-                <i />
-                <i />
-                <i />
-              </span>
+          {outline && outline.length > 0 ? (
+            <ul className="summary-outline__list" data-testid="outline-list">
+              {renderOutlineNodes(outline, onSelectOutlinePage)}
+            </ul>
+          ) : (
+            <div className="summary-outline__empty" role="status">
+              <p>此 PDF 没有内置大纲（书签）。可用「工具 &gt; 自动生成目录」从文字层识别章节。</p>
             </div>
-            <p>
-              {activeTab === "大纲"
-                ? "右击文本并从菜单选择 添加大纲项目。"
-                : "点击上方加号，为当前页面添加书签。"}
-            </p>
-          </div>
+          )}
         </div>
       ) : (
         <div className="summary-empty" role="tabpanel">

@@ -21,6 +21,9 @@ vi.mock("./pdfReaderService", () => ({
     },
     getPageViewport: vi.fn(),
     renderPageToCanvas: vi.fn(async () => undefined),
+    renderThumbnail: vi.fn(async () => undefined),
+    getRawTextContent: vi.fn(async () => null),
+    getOutline: vi.fn(async () => []),
     destroy: vi.fn(async () => undefined),
   })),
 }));
