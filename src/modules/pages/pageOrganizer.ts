@@ -31,6 +31,15 @@ export interface ReorderOrganizerPagesInput extends PageOrganizerSelectionInput 
   toIndex: number;
 }
 
+/**
+ * ISS-NEW-M M3：粘贴页面输入。`afterPageId` 指定粘贴插入位置（在该页之后）；
+ * 未提供时粘贴到末尾。粘贴源来自 state.clipboard。
+ */
+export interface PasteOrganizerPagesInput {
+  afterPageId?: string;
+  createdAt?: string;
+}
+
 export interface PageOrganizerExportRequestInput {
   id?: string;
   inputPath?: string;
@@ -186,6 +195,89 @@ export function reorderOrganizerPages(
   const action = createAction(state, "reorder", selectedPages, input.createdAt, {
     toIndex: input.toIndex,
     orderedPageIndexes: nextPages.map((page) => page.originalPageIndex),
+  });
+
+  return commitStateChange(state, nextPages, action, input.createdAt);
+}
+
+/**
+ * ISS-NEW-M M3：复制选中页到剪贴板。不改 pages，只写 state.clipboard
+ * （源页 originalPageIndex + rotation 引用，不缓存字节）。剪贴板操作不入 undoStack。
+ */
+export function copyOrganizerPages(
+  state: PdfPageOrganizerState,
+  input: PageOrganizerSelectionInput,
+): PdfPageOrganizerState {
+  const selectedPages = resolveSelectedPages(state, input.pageIds, { allowDeleted: false });
+  const copiedAt = input.createdAt ?? new Date().toISOString();
+
+  return {
+    ...state,
+    clipboard: {
+      sourcePageIndexes: selectedPages.map((page) => page.originalPageIndex),
+      rotations: selectedPages.map((page) => page.rotation),
+      copiedAt,
+    },
+    updatedAt: copiedAt,
+  };
+}
+
+/**
+ * ISS-NEW-M M3：把剪贴板里的页克隆并插入到 afterPageId 之后（或末尾）。
+ * 新页 originalPageIndex 与源页相同（导出时 copyPages 支持重复索引），id 生成新副本标识。
+ * 走 commitStateChange，可 undo。
+ */
+export function pasteOrganizerPages(
+  state: PdfPageOrganizerState,
+  input: PasteOrganizerPagesInput,
+): PdfPageOrganizerState {
+  const clipboard = state.clipboard;
+  if (!clipboard || clipboard.sourcePageIndexes.length === 0) {
+    throw new Error("剪贴板为空，请先复制页面。");
+  }
+
+  // 确定插入位置：找到 afterPageId 在 active 页中的 orderIndex，副本插在其后；未指定则末尾。
+  const activePages = state.pages.filter((page) => !page.deleted);
+  let insertAfterOrder = activePages.length; // 默认末尾
+  if (input.afterPageId) {
+    const afterPage = state.pages.find((page) => page.id === input.afterPageId && !page.deleted);
+    if (!afterPage) {
+      throw new Error("粘贴位置页面不存在或已删除。");
+    }
+    insertAfterOrder = afterPage.orderIndex + 1;
+  }
+
+  // 校验剪贴板索引仍合法（源 PDF 页数未变）
+  const invalidIndex = clipboard.sourcePageIndexes.find(
+    (pageIndex) => !isPageIndexInRange(pageIndex, state.document.pageCount),
+  );
+  if (invalidIndex !== undefined) {
+    throw new Error("剪贴板页面索引超出源 PDF 范围。");
+  }
+
+  // 构造副本页：originalPageIndex 与源相同，id 加副本后缀，rotation 取剪贴板记录
+  const pastedPages: PdfPageOrganizerPage[] = clipboard.sourcePageIndexes.map((pageIndex, copyIndex) => ({
+    id: `page-${pageIndex + 1}-copy-${clipboard.copiedAt}-${copyIndex}`,
+    originalPageIndex: pageIndex,
+    originalPageNumber: pageIndex + 1,
+    orderIndex: -1, // normalizePageOrder 会重排
+    rotation: clipboard.rotations[copyIndex] ?? 0,
+    deleted: false,
+  }));
+
+  // 把副本插入 active 页序列的 insertAfterOrder 位置；deleted 页保持在尾部
+  const reorderedActive = [
+    ...activePages.slice(0, insertAfterOrder),
+    ...pastedPages,
+    ...activePages.slice(insertAfterOrder),
+  ];
+  const deletedPages = state.pages.filter((page) => page.deleted);
+  const nextPages = normalizePageOrder(mergeActiveAndDeletedPages(reorderedActive, deletedPages));
+
+  const action = createAction(state, "paste", pastedPages, input.createdAt, {
+    sourcePageIndexes: clipboard.sourcePageIndexes,
+    insertAfterOrder,
+    pastedCount: pastedPages.length,
   });
 
   return commitStateChange(state, nextPages, action, input.createdAt);
@@ -432,15 +524,16 @@ function validatePageOrganizerState(state: PdfPageOrganizerState): void {
   if (!Number.isInteger(state.document.pageCount) || state.document.pageCount <= 0) {
     throw new Error("页面整理状态页数必须是正整数。");
   }
-  if (state.pages.length !== state.document.pageCount) {
-    throw new Error("页面整理状态页码必须唯一且覆盖源 PDF。");
-  }
-
+  // ISS-NEW-M M3：粘贴副本后 pages.length 可能 > pageCount（同一源索引出现多次）。
+  // 校验改为：每个 originalPageIndex 都在源 PDF 范围内，且源 PDF 的每个索引至少出现一次。
   const indexes = state.pages.map((page) => page.originalPageIndex);
+  const allInRange = indexes.every((pageIndex) => isPageIndexInRange(pageIndex, state.document.pageCount));
+  if (!allInRange) {
+    throw new Error("页面整理状态页码必须在源 PDF 范围内。");
+  }
   const uniqueIndexes = new Set(indexes);
-  const coversSourcePdf = indexes.every((pageIndex) => isPageIndexInRange(pageIndex, state.document.pageCount));
-  if (uniqueIndexes.size !== state.document.pageCount || !coversSourcePdf) {
-    throw new Error("页面整理状态页码必须唯一且覆盖源 PDF。");
+  if (uniqueIndexes.size !== state.document.pageCount) {
+    throw new Error("页面整理状态页码必须覆盖源 PDF 的每一页。");
   }
 }
 

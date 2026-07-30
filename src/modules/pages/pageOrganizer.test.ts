@@ -339,7 +339,7 @@ describe("page organizer", () => {
         id: "export-pages-duplicate",
         requestedAt: FIXED_TIME,
       }),
-    ).toThrow("页面整理状态页码必须唯一且覆盖源 PDF。");
+    ).toThrow("页面整理状态页码必须覆盖源 PDF 的每一页。");
 
     const outOfRangePageState = createPageOrganizerState({
       pageCount: 2,
@@ -356,6 +356,6 @@ describe("page organizer", () => {
         id: "export-pages-out-of-range",
         requestedAt: FIXED_TIME,
       }),
-    ).toThrow("页面整理状态页码必须唯一且覆盖源 PDF。");
+    ).toThrow("页面整理状态页码必须在源 PDF 范围内。");
   });
 });
