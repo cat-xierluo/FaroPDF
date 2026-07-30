@@ -91,7 +91,7 @@ open /Applications/FaroPDF.app
 ### 导出
 
 - 导出引擎（pdf-lib）：复制、删除、重排、旋转真实改写
-- 表单扁平化：`form.flatten()`，单次 `PDFDocument.load` 后批量执行 fill / sign / flatten
+- 表单填写与扁平化：同一内存工作副本累计 fill / sign / flatten，每一步只下载新 PDF；真实 AcroForm fixture 已完成 UI 导出和重开验证
 - 批注扁平化：plan-only 与 draw 双策略，draw 走 `writeAnnotationPdf`
 - 文字 / 图片水印、页眉页脚（全部页面 / 奇数页 / 偶数页，页眉 / 页脚位置）、Bates 编号、普通页码写入 PDF
 - 证据图片 A4 编排：JPEG / PNG 真实拾取、PDF 页面真实嵌入、按 A4 1 / 2 / 3 / 4 张每页自动编排
@@ -101,9 +101,9 @@ open /Applications/FaroPDF.app
 ### 表单签署
 
 - 读取 AcroForm 字段（text / dropdown / checkbox / radio）
-- FormsPanel 浮层：按字段类型分组渲染 + 填值编辑器
-- 签名图片（PNG / JPG）+ 签名位置调整
-- 表单扁平化导出（单条失败封装为 `status: "failed"`，不中断后续操作）
+- FormsPanel 左侧工具面板：按字段类型分组渲染 + 填值编辑器
+- 签名图片（PNG / JPG）嵌入已有字段位置；自由拖放签名位置仍未实现
+- 同一会话连续填写、勾选、签名和表单扁平化不会回退到原始 bytes；单条失败封装为 `status: "failed"`
 - reader 暴露 `getFileBytes` / `saveUpdatedBytes`，导出走浏览器原生 `<a download>`
 
 ### 设置

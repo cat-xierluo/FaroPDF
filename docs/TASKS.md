@@ -1688,7 +1688,11 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 #### M5 — 功能闭环与错误状态
 
-- [ ] 表单填写、签名、导出、重新打开闭环
+- 本轮完成（2026-07-30，Codex，单 owner）：AcroForm 表单纵向闭环。Allowed files：`src/modules/forms/**`、表单相关 `AppShell` 接线、`tests/fixtures/forms/**`、对应测试与协作文档；未触碰 `src/modules/reader/readerReducer.test.ts`、`.zcode/**`、OCR / 页面管理写回链路。
+- [x] 用可提交的无敏感信息 AcroForm fixture 复现“连续填写仍从原始 bytes 开始”的失败基线
+- [x] 同一表单会话累计填写、勾选、签名和扁平化到工作副本；任何一步都不覆盖原文件
+- [x] 从 UI 导出填写副本 / 扁平副本，并重开确认字段值、字段数量和页面结果
+- [x] 表单填写、签名、导出、重新打开闭环（已有字段落点；自由拖放签名位置不在本子任务范围）
 - [x] OCR controller、页码范围、任务队列、取消/质量报告链路有单元覆盖；本机真实 `ocrmypdf 17.4.0 + pdftotext 26.02.0` E2E pipeline 通过
 - [x] 默认中文文字水印实际导出 5 页 PDF；字体 URL/fontkit interop 修复，浏览器下载产物可重开
 - [ ] 密码 PDF、文件损坏、权限不足、OCR 失败等错误态可复现并验收

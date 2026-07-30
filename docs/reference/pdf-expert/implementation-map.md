@@ -25,7 +25,7 @@
 | Signature panel | `SignaturePanel.tsx`（forms/ui）、`signatureStore.ts` | `wired` + geometry-coarse-verified（ISS-NEW-N-P01） | 列表/存储/落点链路存在；点击后选中蓝描边（--selection） | 参考状态精确宽度、落点动画、保存重开和视觉验证 |
 | Stamp panel | `StampPanel.tsx`（stamp/ui）、`CustomStampPanel.tsx`、`stamps.ts` | `wired` + geometry-coarse-verified（ISS-NEW-N-P04） | 统一面板：标准/自定义 tab + 响应式网格（9 模板）+ 选中蓝 | stamp 落点几何、精确 2×2 断点、custom 上传完整闭环和视觉验证 |
 | Welcome | `WelcomeScreen.tsx`、`AppShell.tsx` | `wired` + planned 子项 | 打开/拖放 PDF 真实；图片/Word 转换引擎未接入，卡片明确 disabled | 接转换引擎后再启用 |
-| Forms | forms module / `FormsPanel`、`AppShell.tsx` | `wired`，部分 behavior-complete | 字段读取/填写/扁平化底座存在；无证据的 forms→shape 默认 fallback 已移除 | 补 forms 可靠参考图、状态矩阵和 round-trip |
+| Forms | forms module / `FormsPanel`、`AppShell.tsx` | `behavior-complete`（AcroForm 字段工作流） | 真实 fixture 已从 UI 累计填写、勾选、签名和扁平化下载；重开确认字段值累积、签名 XObject 存在、最终 1 页/0 字段；不覆盖原 PDF | 自由拖放签名位置和异常表单扩展；视觉参考为可选优化 |
 | Export | export module / `ExportDeliveryPanel` | `wired/behavior-complete` 的部分能力 | 多项导出能力存在；默认中文文字水印实际输出 5 页有效 PDF | 继续逐工具 round-trip 与错误态 |
 
 ## 明确的 planned / 未完成项

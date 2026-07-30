@@ -31,6 +31,7 @@ import type { PdfAnnotationType } from "../../shared/pdf/annotation";
 import { useFormController } from "../../modules/forms/useFormController";
 import { setActiveFormController } from "../../modules/forms/activeFormController";
 import { FormsPanel } from "../../modules/forms/ui/FormsPanel";
+import { decodeSignatureDataUrl } from "../../modules/forms/signatureImage";
 import { createPdfOperationEngine } from "../../modules/export";
 import { ExportDeliveryPanel, type ExportDeliveryTool } from "../../modules/export/ui/ExportDeliveryPanel";
 import { ReaderCanvas } from "./ReaderCanvas";
@@ -1268,7 +1269,7 @@ export function AppShell({
           onSelectSignature={(signature) => {
             // DEC-113 ISS-060 阶段 2 + ISS-070 阶段 2：用户从右栏选签名 →
             // 当 annotate 模式：把 signature.image 当 stamp 落点（与 customStamp 同套路）
-            // 当 forms 模式：暂只反馈，后续接入 formController.applySignature
+            // 当 forms 模式：把签名库 data URL 解码给同一 formController 工作副本。
             if (activeMode === "annotate") {
               if (!annotationArmed) {
                 setCommandFeedback("请先打开 PDF 文档并进入批注模式。");
@@ -1283,7 +1284,16 @@ export function AppShell({
               });
               setCommandFeedback(`已选中签名「${signature.name}」，请在画布点按落点。`);
             } else if (activeMode === "forms") {
-              setCommandFeedback(`已选中签名「${signature.name}」，下次接入填写签名字段后可直接落入。`);
+              try {
+                const decoded = decodeSignatureDataUrl(signature.image);
+                formController.setSignatureImage(decoded.bytes, decoded.type);
+                formController.openPanel("sign");
+                onUtilityPanelChange("forms");
+                setCommandFeedback(`已载入签名「${signature.name}」，请选择字段并确认嵌入。`);
+              } catch (error) {
+                formController.setErrorMessage(error instanceof Error ? error.message : "签名数据损坏。");
+                onUtilityPanelChange("forms");
+              }
             } else {
               setCommandFeedback(`已选中签名「${signature.name}」。`);
             }

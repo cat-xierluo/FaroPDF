@@ -365,6 +365,7 @@ export interface PdfExportResult {
 
 - `pdfOperationEngine` 不写文件，只返回新 PDF bytes；`pdfExportService` 在路径型导出时拒绝 `outputPath === inputPath`。
 - `flatten-form` 使用 pdf-lib `form.flatten()`，可生成不可编辑表单提交版 bytes；UI 入口归属填写和签名面板，不进入导出二级工具条。
+- Forms controller 首次从 `reader.getFileBytes()` 建立内存工作副本；字段填写、勾选、签名和扁平化依次消费上一操作的 bytes。每一步可下载新副本，但不会把下载动作误当成 reader 原始 bytes 已更新，也不会覆盖源 PDF。
 - `flatten-annotations` 支持 `plan-only` 摘要模式和 `draw` 真实绘制模式；批注侧栏的 `扁平化导出` 走 `draw`，默认保存 `*-annotations-flattened.pdf` 新副本，不覆盖原始 PDF。
 - `page-operations` 支持 `execute` 真实改写页面顺序、旋转和删除；裁剪、插入和合并仍待后续导出深化接入。
 - `watermark`、`page-number`、`bates-number` 使用 pdf-lib 写入新 PDF bytes；CJK 文本通过 Source Han Sans 字体路径嵌入。页眉页脚复用两个 text watermark operation，页眉映射到 `top-left` / `top-center` / `top-right`，页脚映射到 `bottom-left` / `bottom-center` / `bottom-right`，应用范围通过 `PdfWatermarkOperation.pageIndexes` 支持全部页面 / 奇数页 / 偶数页。

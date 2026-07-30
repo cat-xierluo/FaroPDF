@@ -24,7 +24,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 3. M2：建立会以非零退出码失败的 measured 几何/语义验证器；M2.2 已覆盖 L3 横向层级、页面 bbox/单页计数和真实页卡 canvas，accepted-golden 图像 diff 待 M1。
 4. M3：页面管理真实缩略图、选择/多选、拖拽重排、旋转、删除、撤销、导出和重开解析已闭环；页面剪贴板和真实尺寸标签继续补齐。
 5. M4：按 surface 逐项接真实 state/controller；未实现入口必须显式禁用。
-6. M5：完成 forms、export、OCR 和错误状态的行为/产物闭环；视觉不再是功能完成门禁。
+6. M5：AcroForm 填写、签名、扁平化已完成真实 fixture 的 UI 下载与重开闭环；继续补 export 逐工具和错误状态，视觉不再是功能完成门禁。
 
 并发旁支（ISS-NEW-N，2026-07-23 启动）：历史批次曾按 6 张 raw-Aminus 安排 SignaturePanel / SetPasswordDialog / OcrPanelView / StampPanel / AnnotationToolbar 与旧 `EditModeGridView` 修正，并安排窗口 crop / 缩略图 / selection 浮条 / shape 6 段合同补采；旧状态机决策已撤销 `EditModeGridView` 路线，现行 DEC-186 又取代旧几何基线，页面管理实现统一使用 `PageOrganizerWorkspace`。当前可领取状态与文件边界只以 `docs/TASKS.md` 为准；未有 accepted-golden 的 surface 禁止宣称 `visually-verified`。
 
@@ -108,7 +108,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 - [x] 读取 AcroForm 字段并高亮可填写区域（`FormService.readFormFields`）。
 - [x] 支持文本框、复选框、单选框和下拉字段填写（`FormService.fillFormField` + `applyFormOperations` 批量）。
-- [ ] 支持签名图片、手写签名和签名位置调整（**部分**：签名图片限定 PNG/JPG 已落，ISS-008 / DEC-055，CHANGELOG 0.1.0-alpha.5；手写签名 / 签名位置调整待后续 worker）。
+- [ ] 支持签名图片、手写签名和签名位置调整（**部分**：PNG/JPG 可从文件或签名库嵌入已有字段并参与累计工作副本、扁平化和重开；自由拖放位置仍待实现）。
 - [x] 支持表单扁平化导出（`FormService.flattenForm`，pdf-lib `form.flatten()`；ISS-043：三级 `表单扁平化` 入口进入填写和签名面板确认导出）。
 
 ### 8. 设置与安全

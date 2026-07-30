@@ -1,3 +1,10 @@
+## 未发版 · AcroForm 表单工作副本闭环（2026-07-30，DEC-188）
+
+- **连续操作不丢失**：Forms controller 首次读取原始 PDF 后建立内存工作副本；后续填写、勾选、签名和扁平化均消费上一操作的 bytes，不再每次回退到原始文件。
+- **签名入口真实接线**：签名库 data URL 统一校验并解码为 PNG/JPG bytes；forms 模式选择签名后进入真实字段嵌入流程，不再只显示“后续接入”的反馈。
+- **真实往返证据**：新增无敏感信息的 4 字段 AcroForm fixture。Playwright 从 FaroPDF UI 连续下载填写、勾选、签名和扁平副本；重开确认姓名值保留、复选框为 true、签名 XObject 存在，最终 PDF 为 1 页且 0 个可编辑字段，console/page error 均为 0。
+- **安全边界**：所有步骤只下载新 PDF，不修改或覆盖 reader 持有的原始 bytes；自由拖放签名位置仍未实现，文档不再把它误报为已完成。
+
 ## 未发版 · Shell 层级、密度与画布几何纠偏（2026-07-28，DEC-186）
 
 - **量测纠错**：逐行像素取色推翻先前 29/32/33pt 基线，canonical 改为 L2=40pt、L3=40pt、annotate/edit L4=43pt、页面管理 L4=44pt；页面 bbox 与页卡 canvas 通过白色连通域复核。

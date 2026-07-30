@@ -7425,3 +7425,22 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 验证：`npm run typecheck`、相关聚焦测试和生产 build 通过；本机 `ocrmypdf 17.4.0 + pdftotext 26.02.0` 的真实 OCR E2E 通过；`cargo check` 通过（仅既有 warning）；Playwright 完成搜索 8 命中、矩形批注、摘要、页面管理、表单无字段态、中文/英文水印下载和 OCR 工作区巡检，console/page error 均为 0。全仓 lint 唯一错误仍是用户已有 `readerReducer.test.ts:244 prefer-const`，本次不修改该文件。
 
 边界：T 编辑、页面剪贴板、图片/Word 转换、翻译、bookmarks/部分批注辅助命令和若干错误态仍未实现，但都必须保持 planned/disabled，不得计为完成。表单仍需用真实 AcroForm fixture 做 UI round-trip；浏览器 Vite 无 Tauri `invoke`，OCR 原生路径由真实 E2E 与 Rust 编译验证覆盖。
+
+## DEC-188 AcroForm 以会话工作副本形成填写、签名与扁平化闭环（2026-07-30）
+
+- 日期：2026-07-30
+- 状态：已采纳
+- 关联：ISS-NEW-M M5、DEC-187、`tests/fixtures/forms/reference-form.pdf`
+
+问题：FormsPanel 的字段读取、填写、签名和扁平化入口都已存在，但 controller 每次操作都重新调用 `reader.getFileBytes()`。由于 `saveUpdatedBytes()` 只下载副本、不替换 reader 源 bytes，第二次填写和最终扁平化会从原始 PDF 重新开始；UI 却用上一操作的结果刷新字段列表，形成“画面已更新、后续产物丢操作”的假闭环。右栏在 forms 模式选择签名时也只给出“后续接入”反馈。
+
+决策：
+
+1. `useFormController` 为当前 `documentId` 维护内存工作副本。首次访问从 reader 读取原始 bytes，后续 fill / sign / batch / flatten 只消费上一操作的输出；切换文档时清空工作副本。
+2. 每一步仍通过 `saveUpdatedBytes()` 下载新 PDF，不把下载动作解释为源文件已替换，也不覆盖原始 PDF。字段切换同步载入该字段当前值，避免复选框、下拉框和已有文本沿用上一字段草稿。
+3. 签名库 data URL 统一走 `decodeSignatureDataUrl` 校验和解码；forms 模式选择签名后把真实 PNG/JPG bytes 交给 controller 并打开签名字段面板，不再出现 toast-only 分支。
+4. 新增无敏感信息的 4 字段 AcroForm fixture 和 1×1 测试签名。功能完成以 UI 下载产物的字段值、PDF 资源和重开结果为证据，不依赖 forms 参考截图。
+
+验证：失败基线先证明第二次填写实际收到原始 `[1,2,3]`，修复后 controller 定向测试通过。forms service/controller/panel/签名解码及真实 fixture 共 115 项测试通过。Playwright 在 1280×832 Vite 实机完成 `client_name=UI Roundtrip`、`accepted=true`、签名嵌入和扁平化四次下载，console/page error 均为 0；pdf-lib 重开确认第二份填写副本保留姓名和勾选，签名副本含 Image XObject，最终副本 1 页、0 个 AcroForm 字段且保留签名/扁平 widget XObject。
+
+边界：当前签名落点使用已有字段矩形；自由拖放签名位置、非标准/损坏表单兼容性和密码/权限异常态仍是后续任务，不能因本闭环完成而宣称全部表单场景已覆盖。
