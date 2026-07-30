@@ -25,6 +25,10 @@ export type RenderPageToCanvasFn = (
 
 interface ReaderCanvasProps {
   onOpenFile?: (file: File) => void | Promise<void>;
+  /** ISS-NEW-M M5：加密 PDF 用户提交密码（接 reader.submitPassword）。 */
+  onSubmitPassword?: (password: string) => void | Promise<void>;
+  /** ISS-NEW-M M5：用户取消密码输入（接 reader.cancelPassword）。 */
+  onCancelPassword?: () => void;
   readerState: ReaderState;
   searchState?: TextSearchState;
   /** 由 reader controller 提供的 canvas 渲染方法 */
@@ -65,6 +69,8 @@ interface ReaderCanvasProps {
 
 export function ReaderCanvas({
   onOpenFile,
+  onSubmitPassword,
+  onCancelPassword,
   onPageNavigate,
   onPageVisible,
   onRequestOcr,
@@ -86,6 +92,19 @@ export function ReaderCanvas({
     pageCount: document?.pageCount ?? 0,
     viewMode: document?.viewMode ?? "continuous",
   });
+
+  if (readerState.passwordChallenge) {
+    // ISS-NEW-M M5：加密 PDF 打开进入「等待密码」中间态，优先于错误 / 空态判断。
+    // reason=1（需要密码）/ reason=2（密码错误）由 ReaderErrorScreen 据此切换提示文案。
+    return (
+      <ReaderErrorScreen
+        errorMessage=""
+        onCancelPassword={onCancelPassword}
+        onSubmitPassword={onSubmitPassword}
+        passwordChallenge={readerState.passwordChallenge}
+      />
+    );
+  }
 
   if (readerState.status === "error") {
     // ISS-NEW-M M5：PDF 加载失败（损坏 / 加密等）状态。

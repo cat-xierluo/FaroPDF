@@ -1270,6 +1270,8 @@ export function AppShell({
               recentFiles={settings.recentFiles}
               renderPageToCanvas={reader.renderPageToCanvas}
               searchState={search.state}
+              onSubmitPassword={reader.submitPassword}
+              onCancelPassword={reader.cancelPassword}
             />
           )}
           {activeMode === "export" ? (

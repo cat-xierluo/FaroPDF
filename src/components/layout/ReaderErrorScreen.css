@@ -62,3 +62,55 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* 密码提示态（加密 PDF） */
+.reader-error__password-form {
+  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.reader-error__password-input {
+  background: var(--surface-strong);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  color: var(--fg);
+  font-size: 14px;
+  padding: 10px 12px;
+}
+
+.reader-error__password-input:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 0;
+}
+
+.reader-error__password-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.reader-error__cancel {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 20px;
+  transition: background-color 120ms ease;
+}
+
+.reader-error__cancel:hover {
+  background: var(--surface-soft);
+}
+
+.reader-error__retry:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

@@ -5,6 +5,19 @@ import type { PageRotation, PdfViewMode, ReaderSession, ZoomPresetId } from "../
 import { loadPdfFromBytes, loadPdfFromFile, type LoadedPdfDocument } from "./pdfReaderService";
 import { normalizeError } from "../../shared/error";
 import { friendlyMessageForCode } from "../../shared/errorMessages";
+
+/**
+ * ISS-NEW-M M5：识别 PDF.js 密码异常。
+ * PDF.js PasswordException 带 name="PasswordException" + code（1=NEED, 2=INCORRECT）。
+ * 命中返回 reason，否则 null（交由通用错误归一化处理，如损坏 PDF）。
+ */
+function readPasswordReason(error: unknown): number | null {
+  if (error instanceof Error && error.name === "PasswordException") {
+    const code = (error as Error & { code?: number }).code;
+    return typeof code === "number" ? code : 1;
+  }
+  return null;
+}
 import {
   createDefaultReaderSessionStorage,
   type ReaderSessionStorage,
@@ -72,11 +85,16 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
         return;
       }
 
+      // ISS-NEW-M M5：加密 PDF 进入密码提示态（保留 cachedFileRef 供重试），其余失败归一化为中文错误。
+      const passwordReason = readPasswordReason(error);
+      if (passwordReason !== null) {
+        dispatch({ type: "reader/passwordPrompt", payload: { reason: passwordReason } });
+        return;
+      }
+
       cachedFileRef.current = null;
       dispatch({
         type: "reader/loadFailed",
-        // ISS-NEW-M M5：归一化成 AppError 后走中文友好文案分支，
-        // 损坏 PDF（InvalidPDFException）落到 PdfParseError，不再透传 PDF.js 英文原文。
         payload: { errorMessage: friendlyMessageForCode(normalizeError(error)) },
       });
     }
@@ -114,14 +132,72 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
         return;
       }
 
+      // ISS-NEW-M M5：加密 PDF 进入密码提示态（保留 cachedFileRef 供重试），其余失败归一化为中文错误。
+      const passwordReason = readPasswordReason(error);
+      if (passwordReason !== null) {
+        dispatch({ type: "reader/passwordPrompt", payload: { reason: passwordReason } });
+        return;
+      }
+
       cachedFileRef.current = null;
       dispatch({
         type: "reader/loadFailed",
-        // ISS-NEW-M M5：归一化成 AppError 后走中文友好文案分支，
-        // 损坏 PDF（InvalidPDFException）落到 PdfParseError，不再透传 PDF.js 英文原文。
         payload: { errorMessage: friendlyMessageForCode(normalizeError(error)) },
       });
     }
+  }, []);
+
+  // ISS-NEW-M M5：用户提交密码后，复用 cachedFileRef 缓存的源 bytes 带密码重试加载。
+  // 成功 → loadSucceeded；密码错（code=2）→ 再次 passwordPrompt（循环重试）；
+  // 其他失败 → loadFailed。未处于 passwordChallenge 态或无缓存时 no-op。
+  const submitPassword = useCallback(async (password: string) => {
+    const cached = cachedFileRef.current;
+    if (!cached) {
+      return;
+    }
+    const loadRequestId = loadRequestIdRef.current + 1;
+    loadRequestIdRef.current = loadRequestId;
+    dispatch({ type: "reader/loadStarted", payload: { fileName: cached.name } });
+
+    try {
+      await loadedDocumentRef.current?.destroy();
+      const bytes = await cached.bytesPromise;
+      const loadedDocument = await loadPdfFromBytes(
+        { data: new Uint8Array(bytes), fileName: cached.name },
+        undefined,
+        { password },
+      );
+      if (loadRequestIdRef.current !== loadRequestId) {
+        await loadedDocument.destroy();
+        return;
+      }
+
+      loadedDocumentRef.current = loadedDocument;
+      dispatch({
+        type: "reader/loadSucceeded",
+        payload: { documentId: `document-${loadRequestId}`, metadata: loadedDocument.metadata },
+      });
+    } catch (error) {
+      if (loadRequestIdRef.current !== loadRequestId) {
+        return;
+      }
+      const passwordReason = readPasswordReason(error);
+      if (passwordReason !== null) {
+        // 密码错误：再次提示，保留 cachedFileRef 继续重试。
+        dispatch({ type: "reader/passwordPrompt", payload: { reason: passwordReason } });
+        return;
+      }
+      cachedFileRef.current = null;
+      dispatch({
+        type: "reader/loadFailed",
+        payload: { errorMessage: friendlyMessageForCode(normalizeError(error)) },
+      });
+    }
+  }, []);
+
+  const cancelPassword = useCallback(() => {
+    cachedFileRef.current = null;
+    dispatch({ type: "reader/passwordCancel" });
   }, []);
 
   // 文档加载成功后恢复上次的阅读会话
@@ -354,6 +430,8 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     state,
     openFile,
     openNativeFile,
+    submitPassword,
+    cancelPassword,
     setCurrentPage,
     goBack,
     goToHistory,
