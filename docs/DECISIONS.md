@@ -7636,3 +7636,39 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 - `npm run lint` 唯一错误在 `src/modules/reader/readerReducer.test.ts:244`（用户未提交修改，`prefer-const`），TASKS 待补齐清单 D 已记录「留用户处理」。
 
 后续 M5 剩余项：密码 PDF（需 onPassword 回调 + 密码输入 modal + 加密 fixture）、权限不足（需 Rust `read_pdf_file_from_path` 迁移 AppError 区分 NotFound/Permission）、OCR 失败（Rust `OcrDispatchError` 失败路径单测，受 `src-tauri/**` 禁令约束需单独评估）。
+
+## DEC-193 加密 PDF 密码输入闭环：提示 / 重试 / 取消 + 中英 i18n（2026-07-30）
+
+- 日期：2026-07-30
+- 状态：已采纳
+- 关联：ISS-NEW-M M5、DEC-192（损坏 PDF 闭环，共用 normalizeError / friendlyMessageForCode / ReaderErrorScreen）、DEC-187
+
+问题：ISS-NEW-M M5 剩余项之一是「密码 PDF」。侦察确认打开加密 PDF 时，PDF.js `getDocument` 无密码会 reject `PasswordException`（name + code：1=NEED_PASSWORD，2=INCORRECT_PASSWORD）。DEC-192 已把 PasswordException 在 normalizeError 识别为 EncryptionError，但只是错误归类——没有密码输入 UI，加密 PDF 仍落到错误卡片（虽非 silent failure，但无法打开）。本卡补齐「密码输入 + 重试 + 取消」完整闭环。
+
+决策（不触碰 src-tauri/**）：
+
+1. `pdfReaderService.loadPdfFromBytes` 加 `options?: { password?: string }`，透传给 PDF.js `getDocument`（PDF.js 原生支持 password 参数，无需 onPassword 回调）。
+2. `readerState` 加 `passwordChallenge?: { reason: number }` 字段 + `reader/passwordPrompt` / `reader/passwordCancel` 两个 action；passwordPrompt 保留 `status=loading`（文档仍在尝试打开），loadStarted/succeeded/failed 清除 passwordChallenge。
+3. `useReaderController` 新增 `readPasswordReason`（按 error.name===PasswordException + code 识别）；openFile/openNativeFile catch 命中密码异常时 dispatch passwordPrompt（保留 cachedFileRef 供重试），其余失败走 DEC-192 归一化；新增 `submitPassword(pwd)` 复用 cachedFileRef 缓存的源 bytes 带密码重试（成功 loadSucceeded / 错密码再 prompt 循环 / 其他失败 loadFailed）+ `cancelPassword`（回 error）。
+4. `ReaderErrorScreen` 扩展密码提示态：`passwordChallenge` 存在时渲染密码输入框（type=password + autoComplete + data-1p-ignore 防密码管理器干扰）+ 提交/取消，reason=1/2 切换「需要密码 / 密码错误」文案；错误态保持不变（向后兼容）。
+5. i18n：`readerError` 段补 6 个密码 key（zh-CN + en）。
+6. `ReaderCanvas` 加 passwordChallenge 分支（优先于 error/空态）；`AppShell` 透传 submitPassword/cancelPassword（reader 相关接线，非全局布局改动）。
+7. fixture：`tests/fixtures/reader/generate-encrypted.mjs`（pdf-lib 明文 + 系统 qpdf 256-bit 加密，密码 test123）+ encrypted.pdf 入仓。无密码 code=1、错密码 code=2、对密码加载成功均实机验证。
+
+边界与不做：
+
+- 不触碰 `src-tauri/**`（与损坏 PDF 同边界）；密码重试纯前端，cachedFileRef 缓存的 bytes 足够。
+- 不触碰 `src/modules/reader/readerReducer.test.ts`（用户未提交修改）；密码 reducer 行为由 useReaderController.test.tsx 间接覆盖。
+- 不做密码记忆 / 持久化（每次重开加密 PDF 都要重输，符合 FaroPDF「默认安全、不存储敏感信息」原则）。
+- accepted-golden=0，最高交付 behavior-complete，不声明 visually-verified。
+
+验证：
+
+- `npm run typecheck` 通过（仅 pre-existing readerReducer.test.ts 的 state.history possibly undefined，与本次无关）。
+- 聚焦测试 71 passed（controller 6 用例 + UI 6 用例 + i18n + errorMessages + ReaderCanvas），除 1 个 pre-existing zoomIn。
+- fixture 实机：无密码 PasswordException code=1、错密码 code=2、对密码加载成功（numPages=1）。
+- **Playwright 实机往返**：加载 encrypted.pdf → 进入密码态（标题「此 PDF 已加密」+「请输入密码」）→ 输错密码 → 切「密码错误，请重新输入」可继续重试 → 输对密码 test123 → 密码框消失、阅读区显示、控制台零错误。
+- 纯 `vite build` 成功（3.84s）；`npm run build` 因 pre-existing tsc 错误中断于 readerReducer.test.ts，非本次回归。
+- lint 我的文件干净（唯一 lint 错误在 readerReducer.test.ts:244，pre-existing）。
+
+后续 M5 剩余项：权限不足（需 Rust `read_pdf_file_from_path` 迁移 AppError 区分 NotFound/Permission，受 src-tauri 约束）、OCR 失败（Rust OcrDispatchError 失败路径单测，同样受约束）。这两项需解除 src-tauri 禁令或改为纯前端 mock 路径才能推进。

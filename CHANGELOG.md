@@ -1,3 +1,11 @@
+## 未发版 · 加密 PDF 密码输入闭环（2026-07-30，DEC-193）
+
+- **加密 PDF 可打开**：打开加密 PDF 不再落到错误卡片，进入「等待密码」中间态，渲染密码输入框（🔒 图标 + 标题 + 提交/取消），支持拖拽与中英 i18n。
+- **密码重试循环**：输错密码（PDF.js code=2）切到「密码错误，请重新输入」可继续重试，输对密码即打开；用户可取消回到错误态。
+- **底层接线**：`pdfReaderService.loadPdfFromBytes` 支持 password 参数；reader state 新增 passwordChallenge 中间态 + submitPassword/cancelPassword；复用 DEC-192 的 normalizeError 错误归一化与 ReaderErrorScreen。
+- **fixture**：新增 `tests/fixtures/reader/encrypted.pdf`（qpdf 256-bit 加密，密码 test123）+ 生成脚本，无密码/错密码/对密码行为均经实机验证。
+- **验收边界**：本轮达到 M5「密码 PDF」behavior-complete；不存储密码（每次重开需重输，符合默认安全）；accepted-golden=0，不声明 visually-verified。权限不足 / OCR 失败仍为 M5 后续项。
+
 ## 未发版 · 应用图标圆角 + RGBA 透明四角收口（2026-07-30）
 
 - **macOS 系统圆角遮罩落地**：对齐 Folia 的「圆角矩形 + RGBA 透明四角」做法。`src-tauri/icons/icon-source.png` 由 1254×1254 RGB 无 alpha 升级为 1454×1454 RGBA（α=0 四角 + 18% 圆角 + 8% 透明外扩安全边），主体（灯塔+纸叠+暖光）保留原始位不动。
