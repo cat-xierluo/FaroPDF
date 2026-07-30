@@ -2,12 +2,15 @@ import { PDFDocument } from "pdf-lib";
 import { describe, expect, test } from "vitest";
 import { createMemoryPdfExportStorage, createPdfExportService } from "../export";
 import {
+  copyOrganizerPages,
   createPageOrganizerExportRequest,
   createPageOrganizerState,
   deleteOrganizerPages,
+  pasteOrganizerPages,
   reorderOrganizerPages,
   rotateOrganizerPages,
   suggestPageOrganizerOutputPath,
+  undoPageOrganizer,
 } from "./pageOrganizer";
 
 const FIXED_TIME = "2026-06-03T00:00:00.000Z";
@@ -176,5 +179,66 @@ describe("pageOrganizer export - execute mode 真实改写 PDF", () => {
     };
 
     await expect(service.exportToPath(corruptRequest)).rejects.toThrow(/页面操作页码超出源 PDF 页数/);
+  });
+});
+
+describe("pageOrganizer export - 页面剪贴板复制/粘贴（ISS-NEW-M M3）", () => {
+  test("复制第 2 页后粘贴 → 导出页数 +1，副本页内容（宽度）与源页一致", async () => {
+    const inputBytes = await createLabeledPdf(3); // 页宽 200/210/220
+    const storage = createMemoryPdfExportStorage({ [SOURCE_PATH]: inputBytes });
+    const service = createPdfExportService({ storage });
+
+    const initial = createPageOrganizerState({
+      pageCount: 3,
+      sourcePath: SOURCE_PATH,
+      fingerprint: "fixture",
+      createdAt: FIXED_TIME,
+    });
+    const copied = copyOrganizerPages(initial, {
+      pageIds: ["page-2"],
+      createdAt: FIXED_TIME,
+    });
+    const pasted = pasteOrganizerPages(copied, {
+      afterPageId: "page-2",
+      createdAt: FIXED_TIME,
+    });
+
+    expect(pasted.pages.filter((p) => !p.deleted)).toHaveLength(4);
+
+    const request = createPageOrganizerExportRequest(pasted, {
+      id: "export-paste",
+      requestedAt: FIXED_TIME,
+    });
+    await service.exportToPath(request);
+
+    const outputPdf = await loadOutputPdf(storage);
+    expect(outputPdf.getPageCount()).toBe(4);
+    // 第 1、2 页（0-based）都应是源第 2 页的副本（宽度 210）；pdf-lib getPage 0-based 同步返回
+    const widths = Array.from({ length: 4 }, (_, i) => outputPdf.getPage(i).getWidth());
+    expect(widths).toEqual([200, 210, 210, 220]);
+  });
+
+  test("空剪贴板粘贴 → 抛错", () => {
+    const initial = createPageOrganizerState({
+      pageCount: 2,
+      sourcePath: SOURCE_PATH,
+      fingerprint: "fixture",
+      createdAt: FIXED_TIME,
+    });
+    expect(() => pasteOrganizerPages(initial, { createdAt: FIXED_TIME })).toThrow("剪贴板为空");
+  });
+
+  test("粘贴可 undo 恢复原页数", () => {
+    const initial = createPageOrganizerState({
+      pageCount: 2,
+      sourcePath: SOURCE_PATH,
+      fingerprint: "fixture",
+      createdAt: FIXED_TIME,
+    });
+    const copied = copyOrganizerPages(initial, { pageIds: ["page-1"], createdAt: FIXED_TIME });
+    const pasted = pasteOrganizerPages(copied, { createdAt: FIXED_TIME });
+    expect(pasted.pages.filter((p) => !p.deleted)).toHaveLength(3);
+    const undone = undoPageOrganizer(pasted);
+    expect(undone.pages.filter((p) => !p.deleted)).toHaveLength(2);
   });
 });
