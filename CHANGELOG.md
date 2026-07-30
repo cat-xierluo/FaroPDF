@@ -1,3 +1,14 @@
+## 未发版 · 应用图标圆角 + RGBA 透明四角收口（2026-07-30）
+
+- **macOS 系统圆角遮罩落地**：对齐 Folia 的「圆角矩形 + RGBA 透明四角」做法。`src-tauri/icons/icon-source.png` 由 1254×1254 RGB 无 alpha 升级为 1454×1454 RGBA（α=0 四角 + 18% 圆角 + 8% 透明外扩安全边），主体（灯塔+纸叠+暖光）保留原始位不动。
+- **全套应用图标同步重生成**：`src-tauri/icons/` 下 `icon.png / 32x32 / 128x128 / 128x128@2x / icon.icns (8 档) / icon.ico (6 档) / Square30/44/71/89/107/142/150/284/310×Logo / StoreLogo` 共 17 个文件 + `public/favicon.png`（64×64 → 32×32 RGBA 圆角）+ `docs/icon-design-v1.png`（设计稿，含半径标注与棋盘格。
+- **新增 `scripts/build-icons.mjs`**：~280 行 Node 脚本，依赖 macOS 自带 `sips / magick / iconutil / file`，**不引入新 npm 依赖**；可通过 `node scripts/build-icons.mjs <src.png> <outDir> [docDir]` 一次性重出全套平台图标。
+- **参考依据**：`docs/DESIGN.md §16 应用图标`明文要求"macOS 图标加 RGBA 透明四角实现系统圆角遮罩"；本轮就为实现 §16。Folia 对标：圆角半径 18% + 10% 透明安全边（`folia/CHANGELOG.md` v0.6.1 / `docs/DECISIONS.md` DEC-125）。
+- **不变**：主体（灯塔 + 纸叠 + 暖光、暖白纸页、深墨蓝绿、琥珀灯光）、`tauri.conf.json` bundle.icon 引用列表、`index.html`、任何应用代码与 Cargo / Tauri 配置、`docs/icon-128.png` 与 `docs/icon.png`（README 引用，属于 brand ISS 边界）。
+- **验证**：`sips -g pixelWidth -g pixelHeight -g hasAlpha` × 19 个文件通过；`magick identify` 显示 RGBA α 4 角=0、中心=255；`file icon.icns` 显示 "Mac OS X icon, 1183826 bytes, ic07"；`file icon.ico` 显示 "MS Windows icon resource - 6 icons (16/24/32/48/64/128)"；肉眼 + 棋盘格背景下 32×32 / 512×512 圆角 + 透明四角显见。
+- **验收边界**：本轮达到 icon-shell `behavior-complete`。DESIGN §16 主色收敛愿景（2–3 主色 + 32px 轮廓清楚）留待后续 brand ISS；M2 视觉验证器不适用本轮。**未声明 `visually-verified`**。
+- **回退**：原 16 个图标 + favicon.png 全部备份到 `/tmp/faropdf-icon-backup-2026-07-30/`；`git revert` 后再 `cp -R /tmp/faropdf-icon-backup-2026-07-30/icons src-tauri/` 即可全量还原。
+
 ## 未发版 · 损坏 PDF 错误卡片与归一化错误码闭环（2026-07-30，DEC-192）
 
 - **修复 silent failure**：打开损坏或无效 PDF 时不再回到空 Welcome 屏，改为展示 `role="alert"` 的中文错误卡片（标题「无法打开此 PDF」+ 归一化错误文案 + 「重新选择文件」入口），支持拖拽放入新文件。

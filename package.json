@@ -27,7 +27,8 @@
     "lint": "eslint . --config config/eslint.config.js",
     "preview": "vite preview --config config/vite.config.ts",
     "tauri": "tauri",
-    "updater:manifest": "node scripts/create-updater-manifest.mjs"
+    "updater:manifest": "node scripts/create-updater-manifest.mjs",
+    "icons:build": "node scripts/build-icons.mjs src-tauri/icons/icon-source.png src-tauri/icons docs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
