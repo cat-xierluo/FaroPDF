@@ -1,4 +1,5 @@
 import { useRef, type ChangeEvent, type CSSProperties, type DragEvent } from "react";
+import { useI18n } from "../../shared/i18n/useI18n";
 import "./ReaderErrorScreen.css";
 
 /**
@@ -28,6 +29,7 @@ const fileInputStyle: CSSProperties = {
 };
 
 export function ReaderErrorScreen({ errorMessage, onOpenFile }: ReaderErrorScreenProps) {
+  const dict = useI18n();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -62,14 +64,14 @@ export function ReaderErrorScreen({ errorMessage, onOpenFile }: ReaderErrorScree
         <span className="reader-error__icon" aria-hidden="true">
           ⚠️
         </span>
-        <h2 className="reader-error__title">无法打开此 PDF</h2>
+        <h2 className="reader-error__title">{dict.readerError.title}</h2>
         <p className="reader-error__message" data-testid="reader-error-message">
           {errorMessage}
         </p>
         <input
           ref={fileInputRef}
           accept="application/pdf,.pdf"
-          aria-label="重新选择 PDF 文件"
+          aria-label={dict.readerError.fileInputAria}
           className="reader-error__file-input"
           data-testid="reader-error-file-input"
           onChange={handleFileChange}
@@ -82,7 +84,7 @@ export function ReaderErrorScreen({ errorMessage, onOpenFile }: ReaderErrorScree
           onClick={() => fileInputRef.current?.click()}
           type="button"
         >
-          重新选择文件
+          {dict.readerError.retryButton}
         </button>
       </section>
     </main>

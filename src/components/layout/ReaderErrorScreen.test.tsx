@@ -1,8 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import { setCurrentLanguage } from "../../shared/i18n/useI18n";
 import { ReaderErrorScreen } from "./ReaderErrorScreen";
 
 describe("ReaderErrorScreen", () => {
+  afterEach(() => {
+    setCurrentLanguage("zh-CN");
+  });
+
   test("渲染错误标题与 errorMessage，错误区 role=alert 可达性", () => {
     render(<ReaderErrorScreen errorMessage="PDF 解析失败，文件可能已损坏或不是有效 PDF。" />);
     const region = screen.getByTestId("reader-error-screen");
@@ -47,5 +52,35 @@ describe("ReaderErrorScreen", () => {
     const input = screen.getByTestId("reader-error-file-input") as HTMLInputElement;
     const file = new File(["%PDF-1.4"], "bad.pdf", { type: "application/pdf" });
     expect(() => fireEvent.change(input, { target: { files: [file] } })).not.toThrow();
+  });
+});
+
+describe("ReaderErrorScreen i18n（与 WelcomeScreen 对齐）", () => {
+  afterEach(() => {
+    setCurrentLanguage("zh-CN");
+  });
+
+  test("zh-CN 下显示中文标题与按钮（默认）", () => {
+    setCurrentLanguage("zh-CN");
+    render(<ReaderErrorScreen errorMessage="损坏" />);
+    expect(screen.getByText("无法打开此 PDF")).toBeInTheDocument();
+    expect(screen.getByTestId("reader-error-retry")).toHaveTextContent("重新选择文件");
+    expect(screen.getByTestId("reader-error-file-input")).toHaveAttribute(
+      "aria-label",
+      "重新选择 PDF 文件",
+    );
+  });
+
+  test("en 下切换为英文标题与按钮", () => {
+    setCurrentLanguage("en");
+    render(<ReaderErrorScreen errorMessage="corrupted" />);
+    expect(screen.getByText("Unable to open this PDF")).toBeInTheDocument();
+    expect(screen.getByTestId("reader-error-retry")).toHaveTextContent("Choose another file");
+    expect(screen.getByTestId("reader-error-file-input")).toHaveAttribute(
+      "aria-label",
+      "Select another PDF file",
+    );
+    // errorMessage 来自 friendlyMessageForCode（错误码→中文，暂不随语言切换，与 SecurityPanel 同模式）
+    expect(screen.getByTestId("reader-error-message")).toHaveTextContent("corrupted");
   });
 });
