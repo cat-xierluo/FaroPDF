@@ -14,9 +14,11 @@ import {
 import type { ReaderController } from "../../modules/reader";
 import { createPdfOperationEngine } from "../../modules/export";
 import {
+  copyOrganizerPages,
   createPageOrganizerExportOperation,
   createPageOrganizerState,
   deleteOrganizerPages,
+  pasteOrganizerPages,
   reorderOrganizerPages,
   rotateOrganizerPages,
   undoPageOrganizer,
@@ -143,6 +145,28 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
       }
       if (RISKY_ACTIONS.has(action)) {
         setPendingRiskAction(action);
+        return;
+      }
+      // ISS-NEW-M M3：页面剪贴板复制（写剪贴板，需选中页）。
+      if (action === "复制" && organizerState && selectedPageNumbers.size > 0) {
+        setOrganizerState(
+          copyOrganizerPages(organizerState, {
+            pageIds: Array.from(selectedPageNumbers, (pageNumber) => `page-${pageNumber}`),
+          }),
+        );
+        return;
+      }
+      // ISS-NEW-M M3：页面剪贴板粘贴（读剪贴板，插在选中页之后；无选中则末尾）。
+      if (action === "粘贴" && organizerState && organizerState.clipboard) {
+        const selectedArray = Array.from(selectedPageNumbers);
+        // 粘贴位置：取选中页中 orderIndex 最大的那页 id；无选中则 undefined（末尾）。
+        const afterPageId =
+          selectedArray.length > 0
+            ? organizerState.pages
+                .filter((page) => selectedArray.includes(page.originalPageNumber) && !page.deleted)
+                .sort((a, b) => b.orderIndex - a.orderIndex)[0]?.id
+            : undefined;
+        setOrganizerState(pasteOrganizerPages(organizerState, { afterPageId }));
         return;
       }
       if (action === "旋转" && organizerState && selectedPageNumbers.size > 0) {
@@ -359,9 +383,15 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
       <div className="page-organizer__toolbar" role="toolbar" aria-label="页面管理工具条">
         <div className="page-organizer__actions" role="group" aria-label="页面操作">
           {ACTION_LABELS.map((action) => {
-            const needsSelection = action === "旋转" || action === "摘录" || action === "删除";
-            const unsupported = action === "复制" || action === "粘贴";
-            const isDisabled = unsupported || (needsSelection && !hasSelection) || rewriteBusy;
+            // ISS-NEW-M M3：复制需要选中页；粘贴需要剪贴板非空；其余按 needsSelection。
+            const needsSelection =
+              action === "旋转" || action === "摘录" || action === "删除" || action === "复制";
+            const needsClipboard = action === "粘贴";
+            const hasClipboard = !!organizerState?.clipboard;
+            const isDisabled =
+              rewriteBusy ||
+              (needsSelection && !hasSelection) ||
+              (needsClipboard && !hasClipboard);
             const Icon = ACTION_ICONS[action];
             return (
               <button
@@ -369,12 +399,14 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
                 className={
                   "context-tool" +
                   (action === "删除" ? " context-tool--danger" : "") +
-                  (unsupported ? " context-tool--disabled" : "")
+                  (needsClipboard && !hasClipboard ? " context-tool--disabled" : "")
                 }
                 disabled={isDisabled}
                 key={action}
                 onClick={() => handleAction(action)}
-                title={unsupported ? `${action}尚未接入页面剪贴板` : undefined}
+                title={
+                  needsClipboard && !hasClipboard ? "剪贴板为空，请先复制页面" : undefined
+                }
                 type="button"
               >
                 <Icon size={19} />

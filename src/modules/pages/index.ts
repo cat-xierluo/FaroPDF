@@ -1,8 +1,10 @@
 export {
+  copyOrganizerPages,
   createPageOrganizerExportRequest,
   createPageOrganizerExportOperation,
   createPageOrganizerState,
   deleteOrganizerPages,
+  pasteOrganizerPages,
   reorderOrganizerPages,
   restoreOrganizerPages,
   rotateOrganizerPages,
@@ -13,6 +15,7 @@ export type {
   CreatePageOrganizerStateInput,
   PageOrganizerExportRequestInput,
   PageOrganizerSelectionInput,
+  PasteOrganizerPagesInput,
   ReorderOrganizerPagesInput,
   RotateOrganizerPagesInput,
 } from "./pageOrganizer";
