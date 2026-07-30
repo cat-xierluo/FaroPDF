@@ -32,8 +32,11 @@ export interface PdfAnnotationAuthor {
   displayName?: string;
 }
 
+export type PdfAnnotationStrokeStyle = "solid" | "dashed";
+
 export interface PdfAnnotationStyle {
   strokeWidth?: number;
+  strokeStyle?: PdfAnnotationStrokeStyle;
   fontSize?: number;
   fontFamily?: string;
   fillColor?: string;

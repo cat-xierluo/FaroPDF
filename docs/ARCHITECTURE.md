@@ -211,6 +211,8 @@ export interface PdfAnnotation {
 - 有 PDF fingerprint 时使用 fingerprint 派生安全文件名。
 - 无 fingerprint 时使用源路径哈希兜底，不把真实文件名写进 sidecar 文件名。
 - sidecar 内容只保存 `fingerprint`、`pageCount`、schema version、时间戳和批注数组，不保存源 PDF 文件名。
+- 形状样式使用 `PdfAnnotationStyle.strokeWidth / strokeStyle / fillColor` 与 annotation `opacity`；`AnnotationToolState.shapeStyle` 是右栏和 overlay 的单一真相源，sidecar 重开后可直接回显。
+- AnnotationOverlay 以当前页 `.page-container` 相对 workspace 的真实 bbox 定位；事件坐标从 DOM 左上原点翻转为 PDF 左下用户空间，因此 overlay 与 pdf-lib writer 共用同一套几何值。
 - Markdown / HTML 批注摘要使用 `PDF <fingerprint>` 或通用标签，不包含真实用户文件名。
 
 ```ts
@@ -367,6 +369,7 @@ export interface PdfExportResult {
 - `flatten-form` 使用 pdf-lib `form.flatten()`，可生成不可编辑表单提交版 bytes；UI 入口归属填写和签名面板，不进入导出二级工具条。
 - Forms controller 首次从 `reader.getFileBytes()` 建立内存工作副本；字段填写、勾选、签名和扁平化依次消费上一操作的 bytes。每一步可下载新副本，但不会把下载动作误当成 reader 原始 bytes 已更新，也不会覆盖源 PDF。
 - `flatten-annotations` 支持 `plan-only` 摘要模式和 `draw` 真实绘制模式；批注侧栏的 `扁平化导出` 走 `draw`，默认保存 `*-annotations-flattened.pdf` 新副本，不覆盖原始 PDF。
+- 批注 draw writer 覆盖 12 类批注；矩形/椭圆支持填充和虚线，直线/单向箭头/双向箭头共享线型和线宽，铅笔复用同一 stroke style。creator/producer/annotation-count 元数据必须在 `save()` 前写入。
 - `page-operations` 支持 `execute` 真实改写页面顺序、旋转和删除；裁剪、插入和合并仍待后续导出深化接入。
 - `watermark`、`page-number`、`bates-number` 使用 pdf-lib 写入新 PDF bytes；CJK 文本通过 Source Han Sans 字体路径嵌入。页眉页脚复用两个 text watermark operation，页眉映射到 `top-left` / `top-center` / `top-right`，页脚映射到 `bottom-left` / `bottom-center` / `bottom-right`，应用范围通过 `PdfWatermarkOperation.pageIndexes` 支持全部页面 / 奇数页 / 偶数页。
 - 导出模式 UI 通过 `ExportDeliveryPanel` 复用 `reader.getFileBytes()` 和 `reader.saveUpdatedBytes()` 调用 `watermark` / `page-number` / `bates-number` / `compress` operation，默认下载 `*-text-watermarked.pdf` / `*-image-watermarked.pdf` / `*-header-footer.pdf` / `*-page-numbered.pdf` / `*-bates.pdf` / `*-compressed.pdf`，不覆盖原始 PDF。
@@ -724,8 +727,8 @@ FaroPDF 可复用本机 `legal-skills` 中成熟 PDF 脚本的算法，但不直
 | Sidebar | 左栏容器和多个 panel 已存在；大纲参考态的图标标签栏、标题与空态层级已接线 | thumbnails/outline/annotation/bookmark 仍需 accepted-golden 逐态视觉和行为复核 |
 | Edit | `T 编辑` 进入独立 `edit` mode，保留 G05 measured 的 272px 大纲左栏、整窗居中的单页 ReaderCanvas 与编辑 L4 | 文本/图像/链接/隐藏写回引擎尚未接入，当前按钮显式禁用 |
 | Page management | 独立 `pages` mode；真实缩略图、选择/多选、拖拽、删除、旋转、撤销和 execute 导出已接入，产物已重开解析 | 页面剪贴板、真实尺寸标签和更多异常态 |
-| RightPanel | mode-driven 容器；文档摘要与 OCR 状态/页码范围已接真实数据和 controller | shape-style、bookmarks 等仍需接线 |
-| Search/Annotate | 业务模块和部分 UI 已接线 | 参考状态、转换、保存重开和视觉验收不完整 |
+| RightPanel | mode-driven 容器；文档摘要、OCR 状态/页码范围和 shape-style 已接真实数据/state/controller | bookmarks 等仍需接线 |
+| Search/Annotate | 搜索业务已接线；形状批注完成右栏、overlay、sidecar、PDF writer 和重开闭环 | 其余批注辅助命令、参考视觉和异常态仍不完整 |
 | Forms/Export/OCR | 有独立业务模块和部分真实输出 | 不能从“底座存在”推导完整工作流或视觉完成 |
 | Validation | typecheck/test/build + Playwright 真实交互 + PDF 产物重开解析 + OCR 真 pipeline；73 项 measured 门禁继续保留 | accepted-golden image diff 为可选视觉优化；仍缺部分 surface/异常态 |
 

@@ -24,9 +24,11 @@ import {
   armAnnotationTool,
   createInitialAnnotationToolState,
   disarmAnnotationTool,
+  isAnnotationShapeTool,
+  setAnnotationShapeStyle,
   STAMP_TEMPLATES,
 } from "../../modules/annotation";
-import type { AnnotationToolState } from "../../modules/annotation";
+import type { AnnotationShapeToolType, AnnotationToolState } from "../../modules/annotation";
 import type { PdfAnnotationType } from "../../shared/pdf/annotation";
 import { useFormController } from "../../modules/forms/useFormController";
 import { setActiveFormController } from "../../modules/forms/activeFormController";
@@ -57,7 +59,7 @@ import { TitlebarTabs } from "./TitlebarTabs";
 import { useTabStore } from "../../state/tabStore";
 import { SettingsPanel } from "../../modules/settings/SettingsPanel";
 import type { SectionId } from "../../modules/settings/sections";
-import { AnnotationOverlay, type AnnotationDraftInput, type AnnotationOverlayViewport } from "./AnnotationOverlay";
+import { AnnotationOverlay, type AnnotationDraftInput, type AnnotationOverlayPlacement, type AnnotationOverlayViewport } from "./AnnotationOverlay";
 import { RedactionOverlay, type RedactionRegionDraft } from "../../modules/redaction/ui/RedactionOverlay";
 import { applyRedaction } from "../../modules/redaction/redactionEngine";
 import { regionsScreenToPdf, selectPageCanvas } from "../../modules/redaction/redactionCoords";
@@ -132,6 +134,14 @@ const contextualToolbarLabels: Record<Exclude<AppModeId, "read" | "pages">, stri
   ocr: "OCR 工具条",
 };
 
+function shapeKindToAnnotationType(shape: ShapeToolValue["shape"]): AnnotationShapeToolType {
+  return shape === "pencil" ? "ink" : shape;
+}
+
+function annotationTypeToShapeKind(type: AnnotationShapeToolType): ShapeToolValue["shape"] {
+  return type === "ink" ? "pencil" : type;
+}
+
 export function AppShell({
   activeMode,
   annotations,
@@ -193,22 +203,44 @@ export function AppShell({
     nonce: 0,
   });
   const [settingsInitialSection, setSettingsInitialSection] = useState<SectionId>("general");
-  // ISS-NEW-I（W2 worker）：形状工具受控 state — 真实绘制引擎由后续 worker 接入；
-  // 当前 stage 仅 UI 状态持久化 + 右栏渲染 shape panel。
-  const [shapeToolValue, setShapeToolValue] = useState<ShapeToolValue>({
-    shape: "rectangle",
-    strokeStyle: "solid",
-    strokeWidth: 2,
-    opacity: 100,
-    strokeColor: "#000000",
-    fillColor: "transparent",
-  });
+  // 形状面板与 annotationArmed 共用单一真相源；右栏值会进入草稿、sidecar、overlay 和 PDF writer。
+  const shapeToolValue = useMemo<ShapeToolValue>(() => ({
+    shape: annotationTypeToShapeKind(annotationState.shapeStyle.toolType),
+    strokeStyle: annotationState.shapeStyle.strokeStyle,
+    strokeWidth: annotationState.shapeStyle.strokeWidth,
+    opacity: Math.round(annotationState.shapeStyle.opacity * 100),
+    strokeColor: annotationState.shapeStyle.strokeColor,
+    fillColor: annotationState.shapeStyle.fillColor,
+  }), [annotationState.shapeStyle]);
+  const handleShapeToolChange = useCallback((next: ShapeToolValue) => {
+    if (!annotationArmed) {
+      return;
+    }
+    annotationArmed.onStateChange(setAnnotationShapeStyle(annotationArmed.state, {
+      toolType: shapeKindToAnnotationType(next.shape),
+      strokeStyle: next.strokeStyle,
+      strokeWidth: next.strokeWidth,
+      opacity: next.opacity / 100,
+      strokeColor: next.strokeColor,
+      fillColor: next.fillColor,
+    }));
+  }, [annotationArmed]);
   // ISS-060 阶段 2 后续：用户显式 tab 切换的 override。annotate/forms 模式下用户可
   // 在 [图章][签名] 间切换；切 mode 时 reset override 回 null（让默认派生接管）。
   const [rightPanelOverride, setRightPanelOverride] = useState<RightPanelId | null>(null);
   useEffect(() => {
     setRightPanelOverride(null);
   }, [activeMode]);
+  useEffect(() => {
+    if (activeMode !== "annotate") {
+      return;
+    }
+    if (isAnnotationShapeTool(annotationState.activeToolType)) {
+      setRightPanelOverride("shape");
+      return;
+    }
+    setRightPanelOverride((current) => current === "shape" ? null : current);
+  }, [activeMode, annotationState.activeToolType]);
 
   // ISS-060 阶段 2 后续：左右栏宽度持久化（panelWidthStore 提供 localStorage 读写）。
   // 当前 ship：mount 时读 localStorage 注入 inline style；用户拖拽 divider 留后续 session。
@@ -414,6 +446,60 @@ export function AppShell({
         rotation: currentPageViewport.rotation,
       }
     : null;
+  const [annotationOverlayPlacement, setAnnotationOverlayPlacement] = useState<AnnotationOverlayPlacement | null>(null);
+  useEffect(() => {
+    const workspace = workspaceMainRef.current;
+    if (!isAnnotateMode || !workspace || !overlayViewport) {
+      setAnnotationOverlayPlacement(null);
+      return;
+    }
+
+    const pageContainer = workspace.querySelector<HTMLElement>(
+      `.pdf-page[data-page-number="${currentPageNumber}"] .page-container`,
+    );
+    if (!pageContainer) {
+      setAnnotationOverlayPlacement(null);
+      return;
+    }
+
+    const updatePlacement = () => {
+      const workspaceRect = workspace.getBoundingClientRect();
+      const pageRect = pageContainer.getBoundingClientRect();
+      if (pageRect.width <= 0 || pageRect.height <= 0) {
+        return;
+      }
+      const next = {
+        left: pageRect.left - workspaceRect.left,
+        top: pageRect.top - workspaceRect.top,
+        width: pageRect.width,
+        height: pageRect.height,
+      };
+      setAnnotationOverlayPlacement((current) =>
+        current &&
+        Math.abs(current.left - next.left) < 0.5 &&
+        Math.abs(current.top - next.top) < 0.5 &&
+        Math.abs(current.width - next.width) < 0.5 &&
+        Math.abs(current.height - next.height) < 0.5
+          ? current
+          : next,
+      );
+    };
+
+    const scrollContainer = workspace.querySelector<HTMLElement>(".reader__viewport");
+    const animationFrame = window.requestAnimationFrame(updatePlacement);
+    scrollContainer?.addEventListener("scroll", updatePlacement, { passive: true });
+    window.addEventListener("resize", updatePlacement);
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updatePlacement);
+    resizeObserver?.observe(workspace);
+    resizeObserver?.observe(pageContainer);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      scrollContainer?.removeEventListener("scroll", updatePlacement);
+      window.removeEventListener("resize", updatePlacement);
+      resizeObserver?.disconnect();
+    };
+  }, [currentPageNumber, isAnnotateMode, overlayViewport?.height, overlayViewport?.width, reader.state.document?.rotation, reader.state.document?.zoom, showRightPanel, showUtilityPanel]);
   // 当前页的批注子集
   const currentPageAnnotations = (annotations ?? []).filter((annotation) => annotation.pageIndex === currentPageNumber - 1);
 
@@ -1167,7 +1253,13 @@ export function AppShell({
           {isAnnotateMode && hasDocument && overlayViewport ? (
             <AnnotationOverlay
               activeAnnotationId={activeAnnotationId}
-              activeColor={annotationState.color}
+              activeColor={isAnnotationShapeTool(annotationState.activeToolType) ? annotationState.shapeStyle.strokeColor : annotationState.color}
+              activeOpacity={isAnnotationShapeTool(annotationState.activeToolType) ? annotationState.shapeStyle.opacity : undefined}
+              activeStyle={isAnnotationShapeTool(annotationState.activeToolType) ? {
+                strokeWidth: annotationState.shapeStyle.strokeWidth,
+                strokeStyle: annotationState.shapeStyle.strokeStyle,
+                fillColor: annotationState.shapeStyle.fillColor,
+              } : undefined}
               activeStampLabel={annotationState.stampLabel}
               activeStampName={annotationState.stampName}
               activeStampImage={annotationState.stampImage}
@@ -1184,6 +1276,7 @@ export function AppShell({
                   : undefined
               }
               pageIndex={currentPageNumber - 1}
+              placement={annotationOverlayPlacement ?? undefined}
               viewport={overlayViewport}
             />
           ) : null}
@@ -1221,7 +1314,7 @@ export function AppShell({
           }}
           onPanelChange={setRightPanelOverride}
           shapeToolValue={shapeToolValue}
-          onShapeToolChange={setShapeToolValue}
+          onShapeToolChange={handleShapeToolChange}
           searchQuery={search.state.query}
           searchHits={searchHits}
           searchActiveHitId={search.state.activeHitId ?? null}

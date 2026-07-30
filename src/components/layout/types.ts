@@ -74,6 +74,8 @@ export interface AnnotationDraftSubmission {
   pageIndex: number;
   rects: import("../../shared/pdf/annotation").PdfRect[];
   color: string;
+  opacity?: number;
+  style?: import("../../shared/pdf/annotation").PdfAnnotationStyle;
   content?: string;
   quote?: string;
   line?: import("../../shared/pdf/annotation").PdfAnnotationLine;

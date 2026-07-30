@@ -1223,7 +1223,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   | 触发 | 目标内容 | 当前等级 / 阻塞 |
   | --- | --- | --- |
   | 阅读默认 | 折叠 | `wired + geometry-verified`；视觉待 read golden |
-  | 批注 / 形状 | 形状/样式设置 | `skeleton/wired`；R12 语义不确定，controlled placeholder 仍在 |
+  | 批注 / 形状 | 形状/样式设置 | `behavior-complete`（DEC-189）；统一 state、sidecar、overlay 与 12 类 PDF writer，视觉 accepted-golden 为可选优化 |
   | 签名 | 手写签名缩略图列表 | `wired`，部分真实行为；选择→落点→保存重开未统一验收 |
   | 图章 | 标准 + 自定义 tab | `wired`，部分真实行为；参考结构和落点链路未视觉验收 |
   | OCR status | 状态、范围、开始 | `skeleton`；AppShell 仍传 noop |
@@ -1677,6 +1677,12 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 #### M4 — Shell / Sidebar / RightPanel 分域复刻
 
+- 本轮领取（2026-07-30，Codex，单 owner）：形状样式右栏纵向闭环。Allowed files：`src/modules/annotation/**`、`src/shared/pdf/annotation.ts`、批注相关 `AppShell` / `AnnotationOverlay` / `ShapeToolPanel` / 类型与测试、对应协作文档；Forbidden files：`src/modules/reader/readerReducer.test.ts`、`.zcode/**`、`src-tauri/**`、表单 / OCR / 页面管理链路。
+- [x] 建立失败基线：右栏 shape / width / opacity / stroke / fill 只改变独立 UI state，未进入批注草稿、sidecar、overlay 或 PDF writer
+- [x] 矩形、椭圆、直线、箭头、双向箭头和铅笔共用真实 shape state；选择右栏形状会 arm 对应画布工具
+- [x] 线宽、不透明度、实线 / 虚线、边框色与填充色进入 sidecar，并在画布重开后回显
+- [x] PDF writer 支持全部六类形状，导出后重开确认无 skipped；修正扁平化元数据在 save 后设置导致未写入的问题
+- [x] Playwright 实际绘制、刷新恢复、导出下载与 PDF 重开验证通过
 - [ ] 按 accepted-golden 依次验收 L2、L3、L5、状态栏，不并行争抢全局布局
 - [ ] 左栏分别完成 thumbnails、outline、annotations、bookmarks、search 的真实面板和状态
 - [ ] 右栏分别完成 signatures、stamps、shape-style、annotation-summary、forms、export、OCR

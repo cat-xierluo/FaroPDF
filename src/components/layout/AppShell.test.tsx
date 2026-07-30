@@ -132,6 +132,7 @@ interface RenderArgs {
   annotationArmed?: AnnotationArmedStateBundle;
   commandSignal?: AppCommandSignal | null;
   onModeChange?: (mode: AppModeId) => void;
+  onAnnotationDraft?: (input: import("./types").AnnotationDraftSubmission) => void;
   onSettingsChange?: (settings: AppSettings) => void;
   onUtilityPanelChange?: (panel: UtilityPanelId) => void;
   reader?: ReaderController;
@@ -151,6 +152,7 @@ function renderAppShell(args: RenderArgs = {}) {
         annotationArmed={args.annotationArmed}
         annotations={args.annotations}
         commandSignal={args.commandSignal}
+        onAnnotationDraft={args.onAnnotationDraft}
         onModeChange={onModeChange}
         onSettingsChange={onSettingsChange}
         onUtilityPanelChange={onUtilityPanelChange}
@@ -940,6 +942,40 @@ describe("AppShell annotate toolbar integration (ISS-026 stage 4 milestone 2)", 
     expect(onStateChange).toHaveBeenCalledTimes(1);
     const next = (onStateChange.mock.calls.at(-1) as [{ activeToolType: string }])[0];
     expect(next.activeToolType).toBe("highlight");
+  });
+
+  test("armed 形状自动打开右栏，右栏选择会更新同一个 annotation state", async () => {
+    const onStateChange = vi.fn();
+    const state = {
+      ...createInitialAnnotationToolState(),
+      activeToolType: "rectangle" as const,
+      shapeStyle: {
+        toolType: "rectangle" as const,
+        strokeStyle: "dashed" as const,
+        strokeWidth: 6,
+        opacity: 0.5,
+        strokeColor: "#d04444",
+        fillColor: "#2a8df0",
+      },
+    };
+    renderAppShell({
+      activeMode: "annotate",
+      annotationArmed: { state, onStateChange },
+      reader: makeReadyReader(1),
+      utilityPanel: "annotation",
+    });
+
+    await waitFor(() => expect(screen.getByTestId("shape-tool-panel")).toBeInTheDocument());
+    expect(screen.getByTestId("shape-stroke-width-value")).toHaveTextContent("6 px");
+    expect(screen.getByTestId("shape-opacity-value")).toHaveTextContent("50 %");
+    fireEvent.click(screen.getByTestId("shape-option-ellipse"));
+
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+    expect(onStateChange.mock.calls[0][0]).toMatchObject({
+      activeToolType: "ellipse",
+      color: "#d04444",
+      shapeStyle: { toolType: "ellipse", strokeStyle: "dashed", strokeWidth: 6, opacity: 0.5 },
+    });
   });
 
   test("hasDocument=false 时 AnnotationToolbar 全部按钮 disabled", () => {

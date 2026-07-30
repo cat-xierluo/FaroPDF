@@ -7444,3 +7444,24 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 验证：失败基线先证明第二次填写实际收到原始 `[1,2,3]`，修复后 controller 定向测试通过。forms service/controller/panel/签名解码及真实 fixture 共 115 项测试通过。Playwright 在 1280×832 Vite 实机完成 `client_name=UI Roundtrip`、`accepted=true`、签名嵌入和扁平化四次下载，console/page error 均为 0；pdf-lib 重开确认第二份填写副本保留姓名和勾选，签名副本含 Image XObject，最终副本 1 页、0 个 AcroForm 字段且保留签名/扁平 widget XObject。
 
 边界：当前签名落点使用已有字段矩形；自由拖放签名位置、非标准/损坏表单兼容性和密码/权限异常态仍是后续任务，不能因本闭环完成而宣称全部表单场景已覆盖。
+
+## DEC-189 形状右栏、页面 overlay 与 PDF writer 使用统一批注状态和坐标（2026-07-30）
+
+- 日期：2026-07-30
+- 状态：已采纳
+- 关联：ISS-NEW-M M4/M5、DEC-187、`G04-shape-rectangle-a`
+
+问题：形状右栏已经有 shape / stroke / width / opacity / color / fill 控件，但由 `AppShell` 内部独立 `shapeToolValue` 持有，`onShapeToolChange` 只更新控件。`AnnotationToolState`、草稿、sidecar 和 writer 均收不到这些参数；ellipse / line / double-arrow 会被 writer 作为不支持类型跳过。进一步实机检查发现，AnnotationOverlay 绝对定位到整个 workspace，而非当前 PDF 页；DOM 左上坐标也被直接当作 PDF 左下坐标，画布回显与扁平产物可能位置不一致。
+
+决策：
+
+1. `AnnotationToolState.shapeStyle` 作为 shape 右栏与画布的单一真相源，保存 toolType、strokeStyle、strokeWidth、opacity、strokeColor、fillColor。选择右栏形状直接 arm 对应工具；选择非形状工具时只关闭 shape 右栏，不丢失样式偏好。
+2. `AnnotationDraftInput`、AppShell submission 和 `PdfAnnotationStyle` 透传 opacity / strokeWidth / strokeStyle / fillColor。sidecar schema version 保持 1，新增字段为可选，旧 sidecar 继续可读；非法 strokeStyle fail-closed。
+3. Overlay 使用当前页 `.page-container` 相对 workspace 的真实 bbox，并通过 scroll / resize / ResizeObserver 更新。批注模型统一使用 PDF 用户空间：pointer Y 从 DOM 左上翻转到 PDF 左下；矩形、椭圆、线条、箭头、墨迹和图章回显时再转换到 SVG/CSS 顶部坐标。
+4. pdf-lib writer 补齐 rectangle / ellipse / line / arrow / double-arrow / ink 的线宽、虚线、填充和透明度；双向箭头两端绘制显式箭头折线。所有 12 类 `PdfAnnotationType` 均可写入 PDF。
+5. creator / producer / keywords 在 `workingPdf.save()` 前设置，避免 summary 报告已绘制但产物缺少 annotation-count / drawn 元数据。
+6. 保持原始 PDF 不可变；shape sidecar 可编辑，扁平化继续只下载 `*-annotations-flattened.pdf` 新副本。
+
+验证：失败基线为 toolbar state 缺少 shapeStyle、writer 12 类输入只绘制 9 类。修复后 annotation 模块、overlay、ShapeToolPanel 和 RightPanel 共 173 项测试通过，AppShell 定向 4 项通过，typecheck、相关 ESLint 和 production build 通过。Playwright 在 1280×832 对 `reference.pdf` 实际绘制红色 6pt 虚线、50% 透明、蓝色填充椭圆及双向箭头；刷新重开后样式与位置保持，初次和重开时 overlay/canvas bbox 分别完全一致，console/page error 为 0。下载副本经 `pdfinfo` 和渲染重开确认 5 页、2/2 批注已绘制，keywords 含 `faropdf:annotation-count:2` / `faropdf:annotation-drawn:2`，画布与 PDF 产物位置一致。
+
+边界：本决策关闭 shape-style 的功能闭环，不声明 accepted-golden 或像素级视觉一致；旋转页、极端小尺寸、跨页连续模式和其余批注辅助命令的异常态仍需后续逐项验收。

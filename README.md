@@ -58,10 +58,11 @@ open /Applications/FaroPDF.app
 
 ### 批注
 
-- 9 种批注类型：高亮 / 下划线 / 删除线 / 备注 / 文本框 / 矩形 / 箭头 / 手写 / 图章
+- 12 种批注类型：高亮 / 下划线 / 删除线 / 备注 / 文本框 / 矩形 / 椭圆 / 直线 / 单向箭头 / 双向箭头 / 手写 / 图章
+- 形状右栏真实控制线型、线宽、不透明度、边框色和填充色；刷新从 sidecar 恢复，扁平化后写入新 PDF
 - 6 色色板 + 5 套图章模板（矩形 / 圆角 / 椭圆 / 横幅 4 种 shape）
 - 批注侧边栏：批注列表 + 当前页 / 总页数 + 选中跳页
-- AnnotationOverlay 挂到阅读区（点击 / 拖拽 / 手写 3 种交互模式）
+- AnnotationOverlay 对齐当前页真实 canvas bbox（点击 / 拖拽 / 手写 3 种交互模式），DOM 坐标会转换到 PDF 用户空间
 - AnnotationToolbar 挂到上下文工具条
 - 中文图章真实绘制（思源黑体 SC + pdf-lib fontkit 嵌入）
 - 默认保存为可编辑 sidecar（当前使用 localStorage adapter，schema version 1，存储不可用时回退内存）；导出时可扁平化到 PDF

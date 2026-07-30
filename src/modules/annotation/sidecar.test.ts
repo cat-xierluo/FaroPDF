@@ -85,7 +85,7 @@ describe("annotation sidecar", () => {
           pageIndex: 5,
           rects: [{ x: 60, y: 80, width: 200, height: 90 }],
           color: "#6c5ce7",
-          style: { strokeWidth: 2 },
+          style: { strokeWidth: 2, strokeStyle: "dashed", fillColor: "#2a8df0" },
           createdAt: "2026-06-02T10:05:00.000Z",
           updatedAt: "2026-06-02T10:05:00.000Z",
         },
@@ -137,6 +137,11 @@ describe("annotation sidecar", () => {
       "ink",
       "stamp",
     ]);
+    expect(parsed.annotations.find((annotation) => annotation.id === "ann-rectangle")?.style).toEqual({
+      strokeWidth: 2,
+      strokeStyle: "dashed",
+      fillColor: "#2a8df0",
+    });
   });
 
   test("rejects unsupported sidecar schema versions", () => {
@@ -171,5 +176,26 @@ describe("annotation sidecar", () => {
 
     expect(() => validateAnnotationSidecar(invalidSidecar)).toThrow("unsupported stamp name");
     expect(() => serializeAnnotationSidecar(invalidSidecar)).toThrow("unsupported stamp name");
+  });
+
+  test("rejects unknown shape stroke styles", () => {
+    const invalidJson = JSON.stringify({
+      schemaVersion: ANNOTATION_SIDECAR_SCHEMA_VERSION,
+      document: { fingerprint: "PDF:fixture/2026", pageCount: 1 },
+      annotations: [{
+        id: "ann-shape",
+        type: "rectangle",
+        pageIndex: 0,
+        rects: [{ x: 1, y: 2, width: 30, height: 40 }],
+        color: "#000000",
+        style: { strokeStyle: "dotted" },
+        createdAt: "2026-07-30T00:00:00.000Z",
+        updatedAt: "2026-07-30T00:00:00.000Z",
+      }],
+      createdAt: "2026-07-30T00:00:00.000Z",
+      updatedAt: "2026-07-30T00:00:00.000Z",
+    });
+
+    expect(() => parseAnnotationSidecar(invalidJson)).toThrow(/strokeStyle.*solid or dashed/);
   });
 });

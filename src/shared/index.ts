@@ -113,6 +113,7 @@ export type {
   PdfAnnotationPatch,
   PdfAnnotationStamp,
   PdfAnnotationStyle,
+  PdfAnnotationStrokeStyle,
   PdfAnnotationType,
   PdfPoint,
   PdfRect,

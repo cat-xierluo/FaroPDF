@@ -7,6 +7,7 @@ import {
   createInitialAnnotationToolState,
   disarmAnnotationTool,
   setAnnotationColor,
+  setAnnotationShapeStyle,
   setAnnotationStampLabel,
   setAnnotationStampName,
 } from "./toolbarModel";
@@ -41,6 +42,36 @@ describe("annotation toolbar model", () => {
     expect(initial.color).toBe(DEFAULT_ANNOTATION_COLOR);
     expect(initial.stampName).toBe("reviewed");
     expect(initial.stampLabel.length).toBeGreaterThan(0);
+    expect(initial.shapeStyle).toEqual({
+      toolType: "rectangle",
+      strokeStyle: "solid",
+      strokeWidth: 2,
+      opacity: 1,
+      strokeColor: "#000000",
+      fillColor: "transparent",
+    });
+  });
+
+  test("形状样式与 armed 工具共用同一状态，不再停留在右栏本地 state", () => {
+    const initial = createInitialAnnotationToolState();
+    const next = setAnnotationShapeStyle(initial, {
+      toolType: "ellipse",
+      strokeStyle: "dashed",
+      strokeWidth: 6,
+      opacity: 0.5,
+      strokeColor: "#d04444",
+      fillColor: "#2a8df0",
+    });
+
+    expect(next.activeToolType).toBe("ellipse");
+    expect(next.shapeStyle).toMatchObject({
+      toolType: "ellipse",
+      strokeStyle: "dashed",
+      strokeWidth: 6,
+      opacity: 0.5,
+      strokeColor: "#d04444",
+      fillColor: "#2a8df0",
+    });
   });
 
   test("armAnnotationTool 切换 armed 状态，再点同工具就 disarm", () => {

@@ -58,7 +58,7 @@ describe("writeAnnotationPdf", () => {
     expect(result.summary.outputPageCount).toBe(3);
   });
 
-  test("9 种批注全部成功绘制", async () => {
+  test("12 种批注全部成功绘制，形状样式进入 PDF", async () => {
     const source = await makeBlankPdfBytes(3);
     const annotations: PdfAnnotation[] = [
       makeAnnotation({ id: "hl", pageIndex: 0, type: "highlight", color: "#f6d66f" }),
@@ -66,13 +66,34 @@ describe("writeAnnotationPdf", () => {
       makeAnnotation({ id: "so", pageIndex: 0, type: "strikeout", color: "#d14d4d" }),
       makeAnnotation({ id: "nt", pageIndex: 0, type: "note", color: "#2c8a4a", rects: [{ x: 20, y: 20, width: 28, height: 28 }] }),
       makeAnnotation({ id: "tb", pageIndex: 1, type: "textbox", content: "review me" }),
-      makeAnnotation({ id: "rc", pageIndex: 1, type: "rectangle", color: "#6c5ce7" }),
+      makeAnnotation({
+        id: "rc",
+        pageIndex: 1,
+        type: "rectangle",
+        color: "#6c5ce7",
+        opacity: 0.6,
+        style: { strokeWidth: 4, strokeStyle: "dashed", fillColor: "#f0c33c" },
+      }),
+      makeAnnotation({ id: "el", pageIndex: 1, type: "ellipse", color: "#2a8df0", style: { fillColor: "#e89234" } }),
       makeAnnotation({
         id: "ar",
         pageIndex: 1,
         type: "arrow",
         color: "#1f2937",
         line: { start: { x: 100, y: 100 }, end: { x: 200, y: 200 } },
+      }),
+      makeAnnotation({
+        id: "da",
+        pageIndex: 1,
+        type: "double-arrow",
+        line: { start: { x: 120, y: 120 }, end: { x: 240, y: 180 } },
+      }),
+      makeAnnotation({
+        id: "ln",
+        pageIndex: 1,
+        type: "line",
+        line: { start: { x: 80, y: 200 }, end: { x: 260, y: 220 } },
+        style: { strokeWidth: 3, strokeStyle: "dashed" },
       }),
       makeAnnotation({
         id: "ik",
@@ -94,14 +115,15 @@ describe("writeAnnotationPdf", () => {
       sidecar: makeSidecar(annotations),
     });
 
-    expect(result.summary.drawnCount).toBe(9);
+    expect(result.summary.drawnCount).toBe(12);
     expect(result.summary.skippedCount).toBe(0);
     expect(result.summary.skipped).toEqual([]);
-    expect(result.summary.annotationCount).toBe(9);
-    expect(result.summary.pageDrawCounts).toEqual({ 0: 4, 1: 3, 2: 2 });
+    expect(result.summary.annotationCount).toBe(12);
+    expect(result.summary.pageDrawCounts).toEqual({ 0: 4, 1: 6, 2: 2 });
 
     const loaded = await PDFDocument.load(result.bytes);
     expect(loaded.getPageCount()).toBe(3);
+    expect(loaded.getKeywords()).toContain("faropdf:annotation-drawn:12");
     expect(result.bytes.length).toBeGreaterThan(0);
   });
 

@@ -326,6 +326,8 @@ function App() {
             pageIndex: input.pageIndex,
             rects: input.rects,
             color: input.color,
+            ...(input.opacity !== undefined ? { opacity: input.opacity } : {}),
+            ...(input.style ? { style: input.style } : {}),
             ...(input.content ? { content: input.content } : {}),
             ...(input.quote ? { quote: input.quote } : {}),
             ...(input.line ? { line: input.line } : {}),

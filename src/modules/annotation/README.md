@@ -13,6 +13,7 @@
 - `geometry.ts`：矩形/线段/墨迹的规整、外接盒、视口裁剪等纯函数工具。
 - `search.ts`：按 query / types / pageNumbers / color 过滤批注的纯函数工具。
 - `stamps.ts`：已阅、重点、待核、证据、自定义 5 套 SVG 图章模板和 XML 转义。
-- `toolbarModel.ts`：9 种批注工具的元信息、默认色板和工具状态原子操作（arm / disarm / 颜色 / 图章）。
+- `toolbarModel.ts`：12 种批注工具的元信息、默认色板、shape style 与工具状态原子操作（arm / disarm / 颜色 / 图章 / 形状样式）。
+- `annotationPdfWriter.ts`：把全部 12 类批注按 PDF 用户空间绘制到新 PDF；形状支持线宽、实线/虚线、透明度和填充色。
 
-UI 批注工具条、批注 overlay 渲染、列表搜索、批注 overlay 拖拽绘制和点击跳转由 layout 组件在 `src/components/layout/` 中接入，调用 `AnnotationService`。
+UI 批注工具条、形状右栏、列表搜索和批注 overlay 由 layout 组件接入。Overlay 对齐当前页真实 bbox，并把 DOM 左上坐标转换为 PDF 左下用户空间；草稿通过 `AnnotationService` 持久化到 sidecar。

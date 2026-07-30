@@ -1,3 +1,11 @@
+## 未发版 · 形状批注样式与 PDF 往返闭环（2026-07-30，DEC-189）
+
+- **右栏真实接线**：形状、线型、线宽、不透明度、边框色和填充色进入统一 `AnnotationToolState`；选择形状会 arm 对应画布工具，不再维护与批注模块无关的本地 UI state。
+- **六类形状完整覆盖**：矩形、椭圆、直线、单向箭头、双向箭头和铅笔均能在 overlay 预览、sidecar 恢复，并由 pdf-lib 写入新 PDF；虚线、线宽、颜色、填充和透明度保持一致。
+- **坐标与页框修正**：overlay 按当前页 `.page-container` 的真实 bbox 定位，并把 DOM 左上坐标转换为 PDF 左下用户空间；修复过去覆盖整个 workspace、落点和导出位置可能偏移的问题。
+- **真实往返证据**：Playwright 绘制蓝底红色虚线椭圆与双向箭头，刷新重开后样式和位置保持；overlay/canvas bbox 完全一致。扁平副本重开为 5 页，元数据确认绘制 2/2，console/page error 均为 0。
+- **导出元数据修复**：批注 writer 在 `save()` 前写入 creator/producer/keywords，`faropdf:annotation-count` 和 `faropdf:annotation-drawn` 现在真实存在于产物中。
+
 ## 未发版 · AcroForm 表单工作副本闭环（2026-07-30，DEC-188）
 
 - **连续操作不丢失**：Forms controller 首次读取原始 PDF 后建立内存工作副本；后续填写、勾选、签名和扁平化均消费上一操作的 bytes，不再每次回退到原始文件。

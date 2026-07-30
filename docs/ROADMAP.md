@@ -23,7 +23,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 2. M1：按固定 fixture、主题和窗口重采、裁剪并量测参考状态；2026-07-30 起为可选视觉优化，不阻塞功能。
 3. M2：建立会以非零退出码失败的 measured 几何/语义验证器；M2.2 已覆盖 L3 横向层级、页面 bbox/单页计数和真实页卡 canvas，accepted-golden 图像 diff 待 M1。
 4. M3：页面管理真实缩略图、选择/多选、拖拽重排、旋转、删除、撤销、导出和重开解析已闭环；页面剪贴板和真实尺寸标签继续补齐。
-5. M4：按 surface 逐项接真实 state/controller；未实现入口必须显式禁用。
+5. M4：按 surface 逐项接真实 state/controller；shape-style 已完成 UI→sidecar→overlay→PDF 往返，继续补 bookmarks 等 surface；未实现入口必须显式禁用。
 6. M5：AcroForm 填写、签名、扁平化已完成真实 fixture 的 UI 下载与重开闭环；继续补 export 逐工具和错误状态，视觉不再是功能完成门禁。
 
 并发旁支（ISS-NEW-N，2026-07-23 启动）：历史批次曾按 6 张 raw-Aminus 安排 SignaturePanel / SetPasswordDialog / OcrPanelView / StampPanel / AnnotationToolbar 与旧 `EditModeGridView` 修正，并安排窗口 crop / 缩略图 / selection 浮条 / shape 6 段合同补采；旧状态机决策已撤销 `EditModeGridView` 路线，现行 DEC-186 又取代旧几何基线，页面管理实现统一使用 `PageOrganizerWorkspace`。当前可领取状态与文件边界只以 `docs/TASKS.md` 为准；未有 accepted-golden 的 surface 禁止宣称 `visually-verified`。

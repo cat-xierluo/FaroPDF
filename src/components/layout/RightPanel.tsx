@@ -63,7 +63,7 @@ export interface RightPanelProps {
    */
   ocrQueueJobs?: ReadonlyArray<OcrCommandJob>;
   onCancelOcrJob?: (jobId: string) => void;
-  /** ISS-NEW-I（W2 worker）：形状工具右栏当前值 + onChange（受控 placeholder） */
+  /** 形状工具右栏当前值 + onChange；由 AnnotationToolState 统一持有。 */
   shapeToolValue?: ShapeToolValue;
   onShapeToolChange?: (next: ShapeToolValue) => void;
   /** ISS-NEW-I（W2 worker）：搜索右栏 query/hits + 回调 */
