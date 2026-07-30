@@ -51,7 +51,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | M2 | 视觉验证器 | **73 项 measured 几何/密度/语义门禁已完成（2026-07-28）**；accepted-golden 图像回归待 M1 | measured reference 可用 | 分层/横向/页面/G05 编辑大纲与中央画布/页卡/搜索双栏几何 JSON + surface 语义断言 + 非零失败码 |
 | M2.1 | 状态机与验证器纠偏 | **已完成（2026-07-28，Codex；独立 S4 PASS）** | G01–G05 measured 证据和失败基线可用 | `T 编辑`/页面管理已拆分；批注默认 panel、L2/L3/L4 与 surface 语义已校准 |
 | M2.2 | Shell 层级、密度与画布几何纠偏 | **已完成（2026-07-28，Codex；独立 S4 PASS）** | G01/G02/G03/G05 measured + 当前 actual 肉眼复核 | 重建 L3 分组；校准中性深色壳层、按钮间距、单页与编辑大纲几何；页面管理接真实缩略图；验证器新增横向/页面/页卡/搜索门禁 |
-| M3 | 页面管理纵向闭环 | **核心行为已闭环；剩余能力显式禁用** | 功能契约和真实 PDF fixture | 真实缩略图、选择/多选、拖拽、删除、旋转、撤销、导出与重开解析已通过；页面剪贴板待实现 |
+| M3 | 页面管理纵向闭环 | **核心行为 + 页面剪贴板已闭环；剩余为视觉优化** | 功能契约和真实 PDF fixture | 真实缩略图、选择/多选、拖拽、删除、旋转、撤销、导出与重开、**复制/粘贴（DEC-195）** 已通过；剩余为真实页面尺寸标签、响应式断点和 EditModeGridView 历史清理 |
 | M4 | Shell / Sidebar / RightPanel 分域接线 | **shape-style、页面书签已 behavior-complete；其余 surface 继续推进** | 不依赖 accepted-golden | 每个可见入口接真实 state/controller；planned 入口显式禁用 |
 | M5 | forms/export/OCR/异常态补齐 | 进行中 | 不依赖 capture | forms/export/OCR 逐项以真实产物、round-trip 和错误态验收 |
 
@@ -1478,11 +1478,11 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 > 依照 AGENTS.md 与 doc-curator 门禁，本节只保留最近 5 条摘要；它不是任务入口。领取任务只看本文件顶部的 M0～M5 与 ISS-NEW-M，完整历史见 `docs/DECISIONS.md`。
 
+- 2026-07-30：DEC-195 M3 页面剪贴板——同文档复制/粘贴闭环（写剪贴板 + 克隆副本插入 + 撤销 + 导出重开页数正确），M3 纵向闭环核心行为全部完成。
 - 2026-07-30：DEC-194 M5 异常态收尾——权限不足（read_pdf_file_from_path 迁移 AppError + 前端归一化）与 OCR 失败（OcrDispatchError 7 变体单测）合并，M5 四项异常态全部 behavior-complete。
 - 2026-07-30：DEC-193 加密 PDF 密码输入闭环；密码中间态 + 提交/重试/取消 + qpdf 加密 fixture，Playwright 实机往返通过。
 - 2026-07-30：DEC-192 损坏 PDF 不再 silent failure；归一化错误码后中文错误卡片与「重新选择文件」入口闭环，新增 corrupt fixture。
 - 2026-07-30：DEC-191 按最新 AGENTS / doc-curator 门禁瘦身 TASKS，并修复历史归档排序与 DEC 索引断档。
-- 2026-07-30：DEC-190 页面书签已达到 behavior-complete；添加、幂等、排序、跳页、删除、刷新恢复、文档隔离和隐私 sidecar 均经真实浏览器验证。
 
 较早进度均已由 `docs/DECISIONS.md` 的对应 DEC 与工作日志承接，不再重复留在唯一任务源中。
 
@@ -1623,7 +1623,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - [ ] 用真实页面尺寸替换元数据占位，并按 M1 断点证据完成响应式卡片网格
 - [x] 实现选择、多选、拖拽排序、插入、删除、旋转和撤销的真实状态
 - [x] 重排/旋转/删除结果写入 `*-organized.pdf`；Playwright 下载后用 `pdfinfo` 重开解析，确认 5 页且第一页旋转 90°
-- [x] 页面复制/粘贴在剪贴板实现前显式 disabled，不再用视觉计数冒充成功
+- [x] 页面复制/粘贴已接通同文档剪贴板（DEC-195）：复制写剪贴板、粘贴克隆副本插入选中页后（页数+1）、可撤销、导出重开页数正确；不再 disabled
 - [x] 覆盖选择、拖拽、删除、旋转、撤销和导出行为测试；像素视觉 diff 不再是功能完成前置
 
 #### M4 — Shell / Sidebar / RightPanel 分域复刻

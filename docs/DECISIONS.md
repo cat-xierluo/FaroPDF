@@ -7690,3 +7690,23 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 验证：cargo test read_pdf_file_command_tests 4 passed + ocr_dispatch::tests 11 passed；typecheck 通过（除 pre-existing readerReducer.test.ts）；前端 errorMessages 11 passed；vite build 成功。
 
 M5 异常态最终状态：文件损坏 ✅、密码 PDF ✅、权限不足 ✅、OCR 失败 ✅，四项全部 behavior-complete 并合并。PermissionDenied 的纯文件系统端到端（chmod 000）未做自动化（跨平台 flaky），靠 Rust 单测 + 归一化集成测试 + error.rs From<io::Error> 映射测试三层保证。安全边界全程遵守：corrupt/encrypted fixture 入仓、密码不存储、路径脱敏、权限错误不泄露完整路径。
+
+## DEC-195 M3 页面剪贴板：同文档复制/粘贴闭环（2026-07-30）
+
+- 日期：2026-07-30
+- 状态：已采纳
+- 关联：ISS-NEW-M M3、PR #76
+
+问题：M3 页面管理纵向闭环唯一剩余项是「页面剪贴板」——复制/粘贴按钮此前显式 disabled（L1626）。核心障碍是 pageOrganizer state 的不变式（`pages.length === pageCount` 且索引唯一覆盖），复制粘贴要让页数 +1 必须突破它。
+
+决策（同文档复制+粘贴 MVP，独立 worktree 实现，3 commit）：
+
+1. `shared/pdf/pageOrganizer.ts`：`ActionType` 加 `paste`；`State` 加 `clipboard?` 字段（sourcePageIndexes + rotations 引用，**不缓存字节**——现有 page 模型本就是索引引用，同文档粘贴时源 PDF 导出时仍可读）。
+2. `modules/pages/pageOrganizer.ts`：`copyOrganizerPages`（写剪贴板，不入 undoStack）+ `pasteOrganizerPages`（克隆副本插入选中页后，新 id `page-N-copy-{ts}-{i}`，originalPageIndex 复用源页，走 commitStateChange 可 undo）；**放宽 validatePageOrganizerState** 从「页数=源页数且索引唯一」改为「覆盖源 PDF 全部页（unique size === pageCount）+ 每个索引在范围内」，允许重复 originalPageIndex。
+3. `PageOrganizerWorkspace.tsx`：handleAction 加复制/粘贴分支；disabled 逻辑改为「复制需选中页、粘贴需剪贴板非空」。
+
+导出引擎**零改动**：paste 后 `orderedPageIndexes` 含重复源索引，`buildPageOperations` 现有 reorder op 直接传重复索引给 pdf-lib `copyPages`（已验证 pdf-lib 1.17.1 `copyPages` 支持重复索引，无 same-document 守卫）。
+
+验证：Playwright 实机往返（5 页→复制→粘贴→页卡 5→6，零 console error）；导出集成测试（getPageCount +1 + widths 证明副本页内容正确）；pageOrganizer 全模块 132 测试 passed；typecheck 通过；lint 干净；vite build 成功。
+
+设计边界：跨文档粘贴留后续（涉及文件拾取 + 字节缓存生命周期，且现有「插入 PDF」对话框已覆盖跨文档需求）。validate 放宽是核心风险点，已用 132 测试 + 导出往返 + 实机三层兜底，确认未破坏 rotate/delete/reorder 既有语义。M3 纵向闭环核心行为至此全部完成。
