@@ -1,3 +1,11 @@
+## 未发版 · 损坏 PDF 错误卡片与归一化错误码闭环（2026-07-30，DEC-192）
+
+- **修复 silent failure**：打开损坏或无效 PDF 时不再回到空 Welcome 屏，改为展示 `role="alert"` 的中文错误卡片（标题「无法打开此 PDF」+ 归一化错误文案 + 「重新选择文件」入口），支持拖拽放入新文件。
+- **错误码归一化**：`shared/error.ts` 的 `normalizeError` 现在按 `error.name` 识别 PDF.js 异常——`InvalidPDFException` → `PdfParseError`、`PasswordException` → `EncryptionError`；损坏 PDF 的 PDF.js 英文原文不再透传给用户。
+- **共享错误文案**：把 `SecurityPanel` 私有的 `friendlyMessageForCode` 提取到 `shared/errorMessages.ts`，reader 加载失败与加解密面板共用同一套 9 类中文友好文案，消除分叉。
+- **可复现 fixture**：新增 `tests/fixtures/reader/generate-corrupt.mjs`，生成截断 PDF 稳定触发 PDF.js `InvalidPDFException`，供实机与 CI 验证。
+- **验收边界**：本轮达到 M5「文件损坏」`behavior-complete`；accepted-golden=0，不声明 `visually-verified`。密码 PDF / 权限不足 / OCR 失败仍为 M5 后续项。
+
 ## 未发版 · 任务源与决策索引治理（2026-07-30，DEC-191）
 
 - `docs/TASKS.md` 按最新 AGENTS / doc-curator 规则只保留最近 5 条进度摘要，当前唯一推进序列与下一候选异常态保持在顶部。

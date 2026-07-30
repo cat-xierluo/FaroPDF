@@ -7,6 +7,7 @@ import { resolveEffectiveZoom } from "../../modules/reader/viewMode";
 import type { TextLayerStatus } from "../../shared/pdf/types";
 import type { RecentPdfFile } from "../../shared/settings/types";
 import { WelcomeScreen } from "./WelcomeScreen";
+import { ReaderErrorScreen } from "./ReaderErrorScreen";
 
 /** PDF Expert 的 UI 百分比不是 PDF.js 的 1 CSS px = 1 PDF pt。
  * measured fixture 在 48% 时白页宽约 514px；FaroPDF 固定 50% 以此显示密度校准。
@@ -85,6 +86,18 @@ export function ReaderCanvas({
     pageCount: document?.pageCount ?? 0,
     viewMode: document?.viewMode ?? "continuous",
   });
+
+  if (readerState.status === "error") {
+    // ISS-NEW-M M5：PDF 加载失败（损坏 / 加密等）状态。
+    // 在此之前 errorMessage 无任何 UI 消费方，损坏 PDF 落到 silent failure（只渲染 WelcomeScreen）。
+    // 现在展示归一化后的中文错误卡片与「重新选择文件」入口，错误态优先于 idle 空态判断。
+    return (
+      <ReaderErrorScreen
+        errorMessage={readerState.errorMessage ?? "无法打开此 PDF。"}
+        onOpenFile={onOpenFile}
+      />
+    );
+  }
 
   if (!document) {
     // ISS-NEW-G（Wave 3 W1）：空态用 WelcomeScreen 替换旧 open-dropzone。

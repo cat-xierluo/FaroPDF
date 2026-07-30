@@ -445,3 +445,56 @@ describe("useReaderController 浏览历史栈", () => {
     expect(ref.current?.state.history).toEqual([]);
   });
 });
+
+// ISS-NEW-M M5：加载失败归一化闭环。
+// 损坏 / 加密 PDF 在 mock 层抛 PDF.js 异常（按 error.name），验证 dispatch loadFailed 后
+// errorMessage 走中文友好文案而非 PDF.js 英文原文。
+describe("useReaderController 加载失败归一化（ISS-NEW-M M5）", () => {
+  beforeEach(() => {
+    vi.mocked(loadPdfFromBytes).mockReset();
+    vi.mocked(loadPdfFromFile).mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("openNativeFile 喂入损坏 PDF（InvalidPDFException）→ status error + 中文损坏文案", async () => {
+    const invalidPdf = new Error("Invalid PDF structure.");
+    invalidPdf.name = "InvalidPDFException";
+    vi.mocked(loadPdfFromBytes).mockRejectedValue(invalidPdf);
+
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} />);
+
+    await act(async () => {
+      await ref.current?.openNativeFile({
+        bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+        name: "corrupt.pdf",
+        path: "/case/corrupt.pdf",
+      });
+    });
+
+    expect(ref.current?.state.status).toBe("error");
+    expect(ref.current?.state.document).toBeNull();
+    expect(ref.current?.state.errorMessage).toBe(
+      "PDF 解析失败，文件可能已损坏或不是有效 PDF。",
+    );
+  });
+
+  test("openFile 抛普通 Error（非 PDF.js 异常）→ status error + 原始 message 兜底", async () => {
+    vi.mocked(loadPdfFromFile).mockRejectedValue(new Error("network timeout"));
+
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} />);
+
+    const file = new File([new Uint8Array([1])], "doc.pdf", { type: "application/pdf" });
+    await act(async () => {
+      await ref.current?.openFile(file);
+    });
+
+    expect(ref.current?.state.status).toBe("error");
+    // 非 PDF.js 异常落 Unknown，friendlyMessageForCode 回退到原 message
+    expect(ref.current?.state.errorMessage).toBe("network timeout");
+  });
+});

@@ -7598,3 +7598,41 @@ v0.2 PDF Expert 视觉对齐路线图（ISS-073 桶 1）要求 Toolbar 严格 5 
 4. TASKS 当前仍有 46 张卡、1907 行，DECISIONS 仍超过历史基线；这两项属于 adaptive 维护提醒，不把它们伪装成已清零。后续应以独立 maintenance 轮次审计已完成卡并迁入归档，不能在功能提交中机械删除仍可能领取的内容。
 
 验证：`doc-curator --only context-sync --working-tree` 确认本轮 CHANGELOG / DECISIONS 同步；`--only tasks` 的进度日志与归档指针硬门禁通过；`--only decisions` 的 ISS 排序与 DEC 连续性硬门禁通过。上述目标检查剩余为行数、活跃卡数量和 README 当前状态等 adaptive / soft 提示。全量断链检查另有 261 条既有结果，主要来自 `node_modules/`、ignored worktree、历史 research 和把示例反引号误判为路径；扫描范围缺陷已登记 ISS-NEW-O，不纳入本次功能与 TASKS 硬门禁的完成声明。
+
+## DEC-192 损坏 PDF 不再 silent failure：归一化错误码与中文错误卡片闭环（2026-07-30）
+
+- 日期：2026-07-30
+- 状态：已采纳
+- 关联：ISS-NEW-M M5、DEC-187（功能优先）、AGENTS.md「多 Agent 并行与 PR 收口纪律」
+
+问题：ISS-NEW-M M5 的未勾选验收项之一是「密码 PDF、文件损坏、权限不足、OCR 失败等错误态可复现并验收」。侦察确认打开损坏 PDF 时，PDF.js 抛 `InvalidPDFException` → `useReaderController` catch → dispatch `reader/loadFailed` → state `status:'error'` + `errorMessage` 有值，但 `reader.state.errorMessage` 在整个 `src/**` 无任何 UI 消费方，`ReaderCanvas` 只判断 `if (!document)` 渲染 WelcomeScreen，用户看到空态且无任何错误提示 = silent failure。同时 `useReaderController` 的 catch 透传 PDF.js 英文原文（`error.message`），无错误码归一化。
+
+决策（领取「文件损坏」作为 M5 单一最小可复现闭环）：
+
+1. `src/shared/error.ts` 的 `normalizeError` 增加 PDF.js 异常识别：按 `error.name` 把 `InvalidPDFException` 映射到 `PdfParseError`、`PasswordException` 映射到 `EncryptionError`（为后续 M5 密码项铺路，本卡不做密码输入 modal）、`UnknownErrorException` 映射到 `Unknown`；新增导出 `classifyPdfjsException`。
+2. 新建 `src/shared/errorMessages.ts` 提取 `friendlyMessageForCode`（原 `SecurityPanel` 私有函数原样提取），`SecurityPanel` 改 import 共享版，消除 reader 与 SecurityPanel 错误文案分叉。
+3. `useReaderController` 两处 catch（`openFile` / `openNativeFile`）的 payload 改用 `friendlyMessageForCode(normalizeError(error))`，损坏 PDF 现在得到中文「PDF 解析失败，文件可能已损坏或不是有效 PDF。」。
+4. 新建 `src/components/layout/ReaderErrorScreen.tsx` + `.css`：`role="alert"` 错误卡片（图标 + 中文标题 + errorMessage + 「重新选择文件」隐藏 file input 入口 + 拖拽 drop），复用 WelcomeScreen 的 file input 模式与全局 CSS token（自动跟随深色模式）。
+5. `ReaderCanvas` 在 `if (!document)` 之前插入 `if (readerState.status === "error")` 分支渲染 `ReaderErrorScreen`，无需改 props 签名。
+6. 新建 `tests/fixtures/reader/generate-corrupt.mjs`：pdf-lib 生成合法 PDF 后截断尾部（丢弃 xref/trailer），实机验证稳定触发 `InvalidPDFException - Invalid PDF structure.`；产物入仓供 CI / 实机验证。
+
+边界与不做：
+
+- 本卡不触碰 `src-tauri/**`（Rust `read_pdf_file_from_path` 的 NotFound/Permission 混淆留给 M5「权限不足」后续项）、`src/App.tsx`、`AppShell.tsx`、全局布局、PDF 写回/导出引擎。
+- 不触碰 `src/modules/reader/readerReducer.test.ts`（用户有未提交修改）与 `.zcode/**`。
+- 不做密码输入 modal；PasswordException 仅识别 code，密码 PDF 是后续独立 M5 项。
+- accepted-golden=0，最高交付等级 `behavior-complete`，不声明 `visually-verified`。
+
+验证：
+
+- `npm run typecheck` 通过。
+- 聚焦测试：`errorMessages.test.ts`（9 个 ErrCode + PDF.js 异常归一化链路）、`ReaderErrorScreen.test.tsx`（错误卡片渲染 / role=alert / 重新选择文件 / 拖拽 / 未传回调不崩溃）、`ReaderCanvas.test.tsx`（新增 error 分支 3 用例）、`useReaderController.test.tsx`（新增"加载失败归一化"块：InvalidPDFException → 中文文案 + 普通 Error → 原始 message 兜底）、`SecurityPanel.test.tsx`（15/15，确认提取共享文案后行为不变）—— 共 53 passed。
+- fixture 实机验证：`node tests/fixtures/reader/generate-corrupt.mjs` 生成 875 字节截断 PDF，`pdfjs-dist` 加载稳定抛 `InvalidPDFException`。
+- `npm run build` 成功（3.46s）。
+
+已知 pre-existing（与本次改动无关，已用 `git stash` 纯净 main 版本验证）：
+
+- `useReaderController.test.tsx > zoomIn/zoomOut 按 0.1 步进并夹紧` 在不含本次改动的状态下同样失败（跨测试状态污染，expected 0.5 to be 1）。
+- `npm run lint` 唯一错误在 `src/modules/reader/readerReducer.test.ts:244`（用户未提交修改，`prefer-const`），TASKS 待补齐清单 D 已记录「留用户处理」。
+
+后续 M5 剩余项：密码 PDF（需 onPassword 回调 + 密码输入 modal + 加密 fixture）、权限不足（需 Rust `read_pdf_file_from_path` 迁移 AppError 区分 NotFound/Permission）、OCR 失败（Rust `OcrDispatchError` 失败路径单测，受 `src-tauri/**` 禁令约束需单独评估）。

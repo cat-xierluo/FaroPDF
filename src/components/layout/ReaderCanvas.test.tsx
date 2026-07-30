@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ReaderState } from "../../modules/reader/readerState";
@@ -295,5 +295,41 @@ describe("ReaderCanvas Welcome 屏转换卡接线（ISS-NEW-G 2026-06-22 收口�
     render(<ReaderCanvas readerState={makeState()} />);
     expect(screen.queryByTestId("welcome-convert-images")).not.toBeInTheDocument();
     expect(screen.queryByTestId("welcome-convert-word")).not.toBeInTheDocument();
+  });
+});
+
+describe("ReaderCanvas 加载失败错误态（ISS-NEW-M M5）", () => {
+  test("status==='error' 渲染 ReaderErrorScreen 而非 WelcomeScreen dropzone", () => {
+    const state = makeState({
+      document: null,
+      status: "error",
+      errorMessage: "PDF 解析失败，文件可能已损坏或不是有效 PDF。",
+    });
+    render(<ReaderCanvas readerState={state} />);
+
+    expect(screen.getByTestId("reader-error-screen")).toBeInTheDocument();
+    expect(screen.getByText("无法打开此 PDF")).toBeInTheDocument();
+    // 不渲染空态 WelcomeScreen 的 dropzone
+    expect(screen.queryByTestId("welcome-dropzone")).not.toBeInTheDocument();
+  });
+
+  test("status==='error' 时 errorMessage 回退到兜底文案", () => {
+    const state = makeState({ document: null, status: "error", errorMessage: undefined });
+    render(<ReaderCanvas readerState={state} />);
+    expect(screen.getByTestId("reader-error-message")).toHaveTextContent("无法打开此 PDF。");
+  });
+
+  test("status==='error' 时「重新选择文件」按钮点击触发 file input", () => {
+    const onOpenFile = vi.fn();
+    const state = makeState({
+      document: null,
+      status: "error",
+      errorMessage: "损坏",
+    });
+    render(<ReaderCanvas onOpenFile={onOpenFile} readerState={state} />);
+    const input = screen.getByTestId("reader-error-file-input") as HTMLInputElement;
+    const clickSpy = vi.spyOn(input, "click");
+    fireEvent.click(screen.getByTestId("reader-error-retry"));
+    expect(clickSpy).toHaveBeenCalledOnce();
   });
 });
