@@ -3,6 +3,7 @@ import type {
   PdfAnnotation,
   PdfAnnotationInk,
   PdfAnnotationLine,
+  PdfAnnotationStyle,
   PdfAnnotationType,
   PdfPoint,
   PdfRect,
@@ -18,9 +19,18 @@ export interface AnnotationOverlayViewport {
   rotation?: 0 | 90 | 180 | 270;
 }
 
+export interface AnnotationOverlayPlacement {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 export interface AnnotationOverlayProps {
   pageIndex: number;
   viewport: AnnotationOverlayViewport;
+  /** 当前 PDF 页容器相对 workspace 的实际像素位置。 */
+  placement?: AnnotationOverlayPlacement;
   /** 当前页上的批注（pageIndex 已匹配） */
   annotations: ReadonlyArray<PdfAnnotation>;
   /** 当前选中的批注 id（高亮） */
@@ -29,6 +39,10 @@ export interface AnnotationOverlayProps {
   activeToolType?: PdfAnnotationType | null;
   /** 当前 armed 工具的颜色 */
   activeColor?: string;
+  /** 当前 armed 形状的不透明度（0..1）。 */
+  activeOpacity?: number;
+  /** 当前 armed 形状的线宽、线型和填充。 */
+  activeStyle?: PdfAnnotationStyle;
   /** 当前 armed stamp 工具的图章 */
   activeStampName?: PdfStampName;
   /** 当前 armed stamp 工具的图章文字 */
@@ -45,6 +59,8 @@ export interface AnnotationDraftInput {
   type: PdfAnnotationType;
   rects: PdfRect[];
   color: string;
+  opacity?: number;
+  style?: PdfAnnotationStyle;
   content?: string;
   quote?: string;
   line?: PdfAnnotationLine;
@@ -60,6 +76,8 @@ export interface AnnotationDraftInput {
 export function AnnotationOverlay({
   activeAnnotationId,
   activeColor,
+  activeOpacity,
+  activeStyle,
   activeStampImage,
   activeStampLabel,
   activeStampName,
@@ -68,6 +86,7 @@ export function AnnotationOverlay({
   onAnnotationClick,
   onAnnotationDraft,
   pageIndex,
+  placement,
   viewport,
 }: AnnotationOverlayProps) {
   const draftRef = useRef<DraftState | null>(null);
@@ -79,11 +98,12 @@ export function AnnotationOverlay({
     : null;
 
   const overlayStyle: CSSProperties = {
-    inset: 0,
+    ...(placement
+      ? { left: placement.left, top: placement.top, width: placement.width, height: placement.height }
+      : { inset: 0, width: "100%", height: "100%" }),
     position: "absolute",
-    width: "100%",
-    height: "100%",
     pointerEvents: "auto",
+    zIndex: 4,
   };
 
   const interactive = interaction !== null && onAnnotationDraft !== undefined;
@@ -94,7 +114,8 @@ export function AnnotationOverlay({
     const scaleY = viewport.height / Math.max(1, rect.height);
     return {
       x: (event.clientX - rect.left) * scaleX,
-      y: (event.clientY - rect.top) * scaleY,
+      // 批注模型使用 PDF 用户空间（原点左下）；DOM 事件使用左上原点。
+      y: viewport.height - (event.clientY - rect.top) * scaleY,
     };
   }
 
@@ -151,7 +172,7 @@ export function AnnotationOverlay({
     if (interaction === "drag" && draftRef.current?.kind === "drag") {
       const { start } = draftRef.current;
       draftRef.current = null;
-      onAnnotationDraft(buildDragDraft(activeToolType, start, point, viewport, activeColor));
+      onAnnotationDraft(buildDragDraft(activeToolType, start, point, viewport, activeColor, activeOpacity, activeStyle));
       return;
     }
 
@@ -160,7 +181,7 @@ export function AnnotationOverlay({
       const strokes = inkStrokesRef.current;
       inkStrokesRef.current = [];
       if (strokes.some((stroke) => stroke.length > 0)) {
-        onAnnotationDraft(buildInkDraft(strokes, viewport, activeColor));
+        onAnnotationDraft(buildInkDraft(strokes, viewport, activeColor, activeOpacity, activeStyle));
       }
     }
   }
@@ -177,7 +198,7 @@ export function AnnotationOverlay({
     onAnnotationClick?.(annotationId);
   }
 
-  const previewDraft = computePreview(draftRef.current, inkStrokesRef.current, interaction, activeToolType, viewport, activeColor, activeStampName, activeStampLabel);
+  const previewDraft = computePreview(draftRef.current, inkStrokesRef.current, interaction, activeToolType, viewport, activeColor, activeOpacity, activeStyle, activeStampName, activeStampLabel);
 
   return (
     <div
@@ -274,31 +295,43 @@ function buildDragDraft(
   end: PdfPoint,
   viewport: AnnotationOverlayViewport,
   color: string | undefined,
+  opacity?: number,
+  style?: PdfAnnotationStyle,
 ): AnnotationDraftInput {
   const resolvedColor = color ?? "#f6d66f";
   const rect = clampRect(pointsToRect(start, end), viewport);
 
-  if (rect.width < 1 || rect.height < 1) {
-    return { type: "highlight", rects: [rect], color: resolvedColor };
-  }
-
-  if (type === "arrow") {
+  if (type === "arrow" || type === "double-arrow" || type === "line") {
     return {
-      type: "arrow",
+      type,
       rects: [rect],
       color: resolvedColor,
+      ...(opacity !== undefined ? { opacity } : {}),
+      ...(style ? { style } : {}),
       line: { start, end },
     };
+  }
+
+  if (rect.width < 1 || rect.height < 1) {
+    return { type: type ?? "highlight", rects: [rect], color: resolvedColor };
   }
 
   return {
     type: type ?? "highlight",
     rects: [rect],
     color: resolvedColor,
+    ...(opacity !== undefined ? { opacity } : {}),
+    ...(style ? { style } : {}),
   };
 }
 
-function buildInkDraft(strokes: PdfPoint[][], viewport: AnnotationOverlayViewport, color: string | undefined): AnnotationDraftInput {
+function buildInkDraft(
+  strokes: PdfPoint[][],
+  viewport: AnnotationOverlayViewport,
+  color: string | undefined,
+  opacity?: number,
+  style?: PdfAnnotationStyle,
+): AnnotationDraftInput {
   const filtered = strokes.filter((stroke) => stroke.length > 0);
   const bounds = inkStrokesToRect(filtered);
   const rects = bounds ? [clampRect(bounds, viewport)] : [];
@@ -307,6 +340,8 @@ function buildInkDraft(strokes: PdfPoint[][], viewport: AnnotationOverlayViewpor
     type: "ink",
     rects,
     color: color ?? "#1f2937",
+    ...(opacity !== undefined ? { opacity } : {}),
+    ...(style ? { style } : {}),
     ink: { strokes: filtered },
   };
 }
@@ -318,6 +353,8 @@ function computePreview(
   activeToolType: PdfAnnotationType | null | undefined,
   viewport: AnnotationOverlayViewport,
   color: string | undefined,
+  opacity: number | undefined,
+  style: PdfAnnotationStyle | undefined,
   _stampName: PdfStampName | undefined,
   _stampLabel: string | undefined,
 ): PdfAnnotation | null {
@@ -328,7 +365,7 @@ function computePreview(
   const baseColor = color ?? "#f6d66f";
 
   if (interaction === "drag" && dragDraft) {
-    const draft = buildDragDraft(activeToolType, dragDraft.start, dragDraft.current, viewport, baseColor);
+    const draft = buildDragDraft(activeToolType, dragDraft.start, dragDraft.current, viewport, baseColor, opacity, style);
     return previewFromDraft(draft, viewport);
   }
 
@@ -337,7 +374,7 @@ function computePreview(
     if (filtered.length === 0) {
       return null;
     }
-    const draft = buildInkDraft(filtered, viewport, baseColor);
+    const draft = buildInkDraft(filtered, viewport, baseColor, opacity, style);
     return previewFromDraft(draft, viewport);
   }
 
@@ -352,6 +389,8 @@ function previewFromDraft(draft: AnnotationDraftInput, _viewport: AnnotationOver
     pageIndex: 0,
     rects: draft.rects,
     color: draft.color,
+    ...(draft.opacity !== undefined ? { opacity: draft.opacity } : {}),
+    ...(draft.style ? { style: draft.style } : {}),
     ...(draft.line ? { line: draft.line } : {}),
     ...(draft.ink ? { ink: draft.ink } : {}),
     ...(draft.stamp ? { stamp: draft.stamp } : {}),
@@ -359,8 +398,6 @@ function previewFromDraft(draft: AnnotationDraftInput, _viewport: AnnotationOver
     ...(draft.quote ? { quote: draft.quote } : {}),
     createdAt: now,
     updatedAt: now,
-    // 仅用于渲染时的标记位
-    opacity: 0.6,
   } as PdfAnnotation & { opacity?: number; viewport: AnnotationOverlayViewport; isPreview?: boolean };
 }
 
@@ -394,8 +431,8 @@ function AnnotationGlyph({ annotation, isActive, onSelect, viewport }: Annotatio
     return <InkGlyph annotation={annotation} isActive={isActive} onSelect={onSelect} viewport={viewport} />;
   }
 
-  if (annotation.type === "arrow" && annotation.line) {
-    return <ArrowGlyph annotation={annotation} isActive={isActive} onSelect={onSelect} viewport={viewport} />;
+  if ((annotation.type === "arrow" || annotation.type === "double-arrow" || annotation.type === "line") && annotation.line) {
+    return <LineGlyph annotation={annotation} isActive={isActive} onSelect={onSelect} viewport={viewport} />;
   }
 
   return <RectGlyph annotation={annotation} isActive={isActive} onSelect={onSelect} viewport={viewport} {...common} />;
@@ -418,20 +455,21 @@ function RectGlyph({ annotation, color, isActive, isPreview, onSelect, opacity, 
   }
 
   const base = {
-    backgroundColor: typeBackground(annotation.type, color, opacity),
-    border: typeBorder(annotation.type, color, isActive),
+    backgroundColor: typeBackground(annotation, color, opacity),
+    border: typeBorder(annotation, color, isActive),
+    borderRadius: annotation.type === "ellipse" ? "50%" : undefined,
     boxShadow: isActive ? "0 0 0 2px var(--accent)" : undefined,
     cursor: onSelect ? "pointer" : "default",
     left: `${(bounds.x / viewport.width) * 100}%`,
     pointerEvents: isPreview ? ("none" as const) : ("auto" as const),
     position: "absolute" as const,
-    top: `${(bounds.y / viewport.height) * 100}%`,
+    top: `${((viewport.height - bounds.y - bounds.height) / viewport.height) * 100}%`,
     width: `${(bounds.width / viewport.width) * 100}%`,
     height: `${(bounds.height / viewport.height) * 100}%`,
   };
 
   if (annotation.type === "underline" || annotation.type === "strikeout") {
-    const lineY = annotation.type === "underline" ? bounds.y + bounds.height - 1 : bounds.y + bounds.height / 2;
+    const lineY = annotation.type === "underline" ? bounds.y + 1 : bounds.y + bounds.height / 2;
     return (
       <div
         aria-label={describeAnnotation(annotation)}
@@ -441,10 +479,10 @@ function RectGlyph({ annotation, color, isActive, isPreview, onSelect, opacity, 
         style={{
           ...base,
           background: "transparent",
-          borderTop: `2px ${annotation.type === "underline" ? "underline" : "line-through"} ${color}`,
+          borderTop: `2px solid ${color}`,
           height: "0",
           left: `${(bounds.x / viewport.width) * 100}%`,
-          top: `${(lineY / viewport.height) * 100}%`,
+          top: `${((viewport.height - lineY) / viewport.height) * 100}%`,
           width: `${(bounds.width / viewport.width) * 100}%`,
         }}
         tabIndex={onSelect ? 0 : -1}
@@ -480,7 +518,7 @@ function InkGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyphP
 
   const path = annotation.ink.strokes
     .filter((stroke) => stroke.length > 0)
-    .map((stroke) => stroke.map((point, index) => `${index === 0 ? "M" : "L"}${point.x} ${point.y}`).join(" "))
+    .map((stroke) => stroke.map((point, index) => `${index === 0 ? "M" : "L"}${point.x} ${viewport.height - point.y}`).join(" "))
     .join(" ");
 
   return (
@@ -496,26 +534,28 @@ function InkGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyphP
         overflow: "visible",
         pointerEvents: onSelect ? "auto" : "none",
         position: "absolute",
-        top: `${((bounds.y - 1) / viewport.height) * 100}%`,
+        top: `${((viewport.height - bounds.y - bounds.height - 1) / viewport.height) * 100}%`,
         width: `${(bounds.width / viewport.width) * 100 + 2}%`,
         filter: isActive ? "drop-shadow(0 0 0 var(--accent))" : undefined,
       }}
       tabIndex={onSelect ? 0 : -1}
-      viewBox={`${bounds.x - 1} ${bounds.y - 1} ${bounds.width + 2} ${bounds.height + 2}`}
+      viewBox={`${bounds.x - 1} ${viewport.height - bounds.y - bounds.height - 1} ${bounds.width + 2} ${bounds.height + 2}`}
     >
       <path
         d={path}
         fill="none"
         stroke={annotation.color}
+        opacity={annotation.opacity ?? 1}
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeWidth="2"
+        strokeDasharray={annotation.style?.strokeStyle === "dashed" ? `${(annotation.style.strokeWidth ?? 2) * 3} ${(annotation.style.strokeWidth ?? 2) * 2}` : undefined}
+        strokeWidth={annotation.style?.strokeWidth ?? 2}
       />
     </svg>
   );
 }
 
-function ArrowGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyphProps) {
+function LineGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyphProps) {
   if (!annotation.line) {
     return null;
   }
@@ -524,11 +564,21 @@ function ArrowGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyp
   if (!bounds) {
     return null;
   }
+  const strokeWidth = annotation.style?.strokeWidth ?? 2;
+  const arrowHeadSize = Math.max(8, strokeWidth * 4);
+  const arrowHeads = annotation.type === "line"
+    ? []
+    : annotation.type === "double-arrow"
+      ? [
+          computeLineArrowHead(annotation.line.start, annotation.line.end, arrowHeadSize),
+          computeLineArrowHead(annotation.line.end, annotation.line.start, arrowHeadSize),
+        ]
+      : [computeLineArrowHead(annotation.line.start, annotation.line.end, arrowHeadSize)];
 
   return (
     <svg
       aria-label={describeAnnotation(annotation)}
-      className={"annotation-glyph annotation-glyph--arrow" + (isActive ? " is-active" : "")}
+      className={"annotation-glyph annotation-glyph--line-shape" + (isActive ? " is-active" : "")}
       onClick={onSelect}
       role="button"
       style={{
@@ -538,29 +588,55 @@ function ArrowGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyp
         overflow: "visible",
         pointerEvents: onSelect ? "auto" : "none",
         position: "absolute",
-        top: `${((bounds.y - 1) / viewport.height) * 100}%`,
+        top: `${((viewport.height - bounds.y - bounds.height - 1) / viewport.height) * 100}%`,
         width: `${(bounds.width / viewport.width) * 100 + 2}%`,
       }}
       tabIndex={onSelect ? 0 : -1}
-      viewBox={`${bounds.x - 1} ${bounds.y - 1} ${bounds.width + 2} ${bounds.height + 2}`}
+      viewBox={`${bounds.x - 1} ${viewport.height - bounds.y - bounds.height - 1} ${bounds.width + 2} ${bounds.height + 2}`}
     >
-      <defs>
-        <marker id="annotation-arrow-head" markerHeight="8" markerUnits="userSpaceOnUse" markerWidth="8" orient="auto-start-reverse" refX="8" refY="4">
-          <path d="M0 0 L8 4 L0 8 z" fill={annotation.color} />
-        </marker>
-      </defs>
       <line
-        markerEnd="url(#annotation-arrow-head)"
+        opacity={annotation.opacity ?? 1}
         stroke={annotation.color}
         strokeLinecap="round"
-        strokeWidth="2"
+        strokeDasharray={annotation.style?.strokeStyle === "dashed" ? `${strokeWidth * 3} ${strokeWidth * 2}` : undefined}
+        strokeWidth={strokeWidth}
         x1={annotation.line.start.x}
         x2={annotation.line.end.x}
-        y1={annotation.line.start.y}
-        y2={annotation.line.end.y}
+        y1={viewport.height - annotation.line.start.y}
+        y2={viewport.height - annotation.line.end.y}
       />
+      {arrowHeads.map((head, index) => (
+        <polyline
+          fill="none"
+          key={index}
+          opacity={annotation.opacity ?? 1}
+          points={`${head.left.x},${viewport.height - head.left.y} ${head.tip.x},${viewport.height - head.tip.y} ${head.right.x},${viewport.height - head.right.y}`}
+          stroke={annotation.color}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={strokeWidth}
+        />
+      ))}
     </svg>
   );
+}
+
+function computeLineArrowHead(start: PdfPoint, end: PdfPoint, size: number) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const ux = dx / length;
+  const uy = dy / length;
+  const baseX = end.x - ux * size;
+  const baseY = end.y - uy * size;
+  const perpX = -uy;
+  const perpY = ux;
+  const half = size * 0.5;
+  return {
+    tip: end,
+    left: { x: baseX + perpX * half, y: baseY + perpY * half },
+    right: { x: baseX - perpX * half, y: baseY - perpY * half },
+  };
 }
 
 function StampGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyphProps) {
@@ -594,7 +670,7 @@ function StampGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyp
         left: `${(bounds.x / viewport.width) * 100}%`,
         pointerEvents: onSelect ? "auto" : "none",
         position: "absolute",
-        top: `${(bounds.y / viewport.height) * 100}%`,
+        top: `${((viewport.height - bounds.y - bounds.height) / viewport.height) * 100}%`,
         width: `${(bounds.width / viewport.width) * 100}%`,
         height: `${(bounds.height / viewport.height) * 100}%`,
         transform: "rotate(-6deg)",
@@ -614,18 +690,27 @@ function StampGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyp
   );
 }
 
-function typeBackground(type: PdfAnnotationType, color: string, opacity?: number): string {
-  if (type === "highlight" || type === "note" || type === "textbox") {
+function typeBackground(annotation: PdfAnnotation, color: string, opacity?: number): string {
+  if (annotation.type === "highlight" || annotation.type === "note" || annotation.type === "textbox") {
     const alpha = opacity ?? 0.35;
     return hexWithAlpha(color, alpha);
+  }
+
+  if (annotation.type === "rectangle" || annotation.type === "ellipse") {
+    const fillColor = annotation.style?.fillColor;
+    if (fillColor && fillColor !== "transparent") {
+      return hexWithAlpha(fillColor, opacity ?? 1);
+    }
   }
 
   return "transparent";
 }
 
-function typeBorder(type: PdfAnnotationType, color: string, isActive: boolean): string {
-  if (type === "rectangle" || type === "textbox" || type === "note") {
-    return `${isActive ? 3 : 2}px ${color}`;
+function typeBorder(annotation: PdfAnnotation, color: string, isActive: boolean): string {
+  if (annotation.type === "rectangle" || annotation.type === "ellipse" || annotation.type === "textbox" || annotation.type === "note") {
+    const width = isActive ? Math.max(3, annotation.style?.strokeWidth ?? 2) : annotation.style?.strokeWidth ?? 2;
+    const strokeStyle = annotation.style?.strokeStyle ?? "solid";
+    return `${width}px ${strokeStyle} ${hexWithAlpha(color, annotation.opacity ?? 1)}`;
   }
 
   return "none";

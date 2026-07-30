@@ -50,7 +50,7 @@ export interface RightPanelProps {
   docSummary?: DocSummary | null;
   /** ISS-NEW-C：OCR 状态面板输入。仅当 rightPanel="ocr-status" 生效。 */
   ocrStatus?: OcrJobStatus;
-  /** ISS-NEW-C：用户点击 OCR 状态面板「开始」按钮（placeholder，真实 OCR 调用不在本任务）。 */
+  /** 用户点击 OCR 状态面板「开始」按钮；由 AppShell 接到真实 OCR controller。 */
   onStartOcr?: (options: OcrStartOptions) => void;
   /**
    * ISS-NEW-C 阶段 2 后续（2026-06-22 收口）：右栏「导出预览」面板输入。
@@ -63,7 +63,7 @@ export interface RightPanelProps {
    */
   ocrQueueJobs?: ReadonlyArray<OcrCommandJob>;
   onCancelOcrJob?: (jobId: string) => void;
-  /** ISS-NEW-I（W2 worker）：形状工具右栏当前值 + onChange（受控 placeholder） */
+  /** 形状工具右栏当前值 + onChange；由 AnnotationToolState 统一持有。 */
   shapeToolValue?: ShapeToolValue;
   onShapeToolChange?: (next: ShapeToolValue) => void;
   /** ISS-NEW-I（W2 worker）：搜索右栏 query/hits + 回调 */
@@ -74,6 +74,8 @@ export interface RightPanelProps {
   onSearchSelectHit?: (hitId: string) => void;
   onSearchJumpPrevious?: () => void;
   onSearchJumpNext?: () => void;
+  searchOcrHint?: { visible: boolean; message: string; actionLabel: string };
+  onSearchRequestOcr?: () => void;
   onSearchClose?: () => void;
 }
 
@@ -90,9 +92,19 @@ const PANELS_BY_MODE: Record<AppModeId, Record<Exclude<RightPanelId, "none">, Pa
     "ocr-queue": { title: "OCR 队列", hint: "OCR 模式不进入批注流程" },
     // 历史 skeleton：具体字段、顺序和密度等待 M1 参考证据。
     summary: { title: "文档摘要", hint: "文件名 / 页数 / 大小 / 元数据；目标层级待 M1 验证" },
-    "ocr-status": { title: "OCR 状态", hint: "当前 OCR 任务状态 + 页码范围 + 开始按钮（placeholder）" },
+    "ocr-status": { title: "OCR 状态", hint: "当前 OCR 任务状态、页码范围和真实任务启动入口" },
     shape: { title: "形状", hint: "批注时插入矩形/椭圆/箭头/直线/铅笔，含线宽/不透明度/边框/填充色。" },
     search: { title: "搜索", hint: "批注文档的全文搜索命中导航与高亮。" },
+  },
+  edit: {
+    stamps: { title: "图章", hint: "内容编辑默认态不显示右栏" },
+    signatures: { title: "签名", hint: "内容编辑默认态不显示右栏" },
+    "export-preview": { title: "导出预览", hint: "内容编辑默认态不显示右栏" },
+    "ocr-queue": { title: "OCR 队列", hint: "内容编辑默认态不显示右栏" },
+    summary: { title: "文档摘要", hint: "内容编辑默认态不显示右栏" },
+    "ocr-status": { title: "OCR 状态", hint: "内容编辑默认态不显示右栏" },
+    shape: { title: "形状", hint: "内容编辑默认态不显示右栏" },
+    search: { title: "搜索", hint: "内容编辑默认态不显示右栏" },
   },
   export: {
     stamps: { title: "图章", hint: "在导出过程中复用已保存的图章模板" },
@@ -154,7 +166,6 @@ const READ_INACTIVE_IDS: ReadonlyArray<RightPanelId> = [
   "summary",
   "ocr-status",
   "shape",
-  "search",
 ];
 
 export function RightPanel({
@@ -180,12 +191,18 @@ export function RightPanel({
   onSearchSelectHit,
   onSearchJumpPrevious,
   onSearchJumpNext,
+  searchOcrHint,
+  onSearchRequestOcr,
   onSearchClose,
 }: RightPanelProps) {
   const headingId = useId();
 
-  if (activeMode === "read" || activeMode === "pages") {
-    if (rightPanel === "none" || READ_INACTIVE_IDS.includes(rightPanel)) {
+  if (rightPanel === "none") {
+    return null;
+  }
+
+  if (activeMode === "read" || activeMode === "edit" || activeMode === "pages") {
+    if (READ_INACTIVE_IDS.includes(rightPanel)) {
       return null;
     }
   }
@@ -214,7 +231,7 @@ export function RightPanel({
 
   return (
     <aside aria-labelledby={headingId} className="right-pane" data-active-mode={activeMode} data-panel={rightPanel}>
-      <header className="right-pane__header">
+      <header className={"right-pane__header" + (showSearchPanel ? " right-pane__header--search" : "")}>
         <h2 id={headingId} className="right-pane__title">{title}</h2>
         <span aria-hidden="true" className="right-pane__mode-pill">{activeMode}</span>
       </header>
@@ -252,6 +269,8 @@ export function RightPanel({
             onSelectHit={onSearchSelectHit}
             onJumpPrevious={onSearchJumpPrevious}
             onJumpNext={onSearchJumpNext}
+            ocrHint={searchOcrHint}
+            onRequestOcr={onSearchRequestOcr}
             onClose={onSearchClose}
           />
         ) : rightPanel === "summary" ? (

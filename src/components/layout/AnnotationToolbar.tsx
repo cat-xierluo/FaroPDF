@@ -1,5 +1,20 @@
 import { useId } from "react";
 import {
+  ArrowLeftRight,
+  ArrowRight,
+  Circle,
+  Highlighter,
+  MessageSquare,
+  Minus,
+  PenTool,
+  Square,
+  Stamp,
+  Strikethrough,
+  Type,
+  Underline,
+  X,
+} from "lucide-react";
+import {
   ANNOTATION_COLOR_SWATCHES,
   ANNOTATION_TOOL_LIST,
   STAMP_TEMPLATES,
@@ -20,6 +35,21 @@ interface AnnotationToolbarProps {
   onStateChange: (nextState: AnnotationToolState) => void;
   disabled?: boolean;
 }
+
+const TOOL_ICONS: Record<PdfAnnotationType, typeof Highlighter> = {
+  highlight: Highlighter,
+  underline: Underline,
+  strikeout: Strikethrough,
+  note: MessageSquare,
+  textbox: Type,
+  rectangle: Square,
+  ellipse: Circle,
+  arrow: ArrowRight,
+  "double-arrow": ArrowLeftRight,
+  line: Minus,
+  ink: PenTool,
+  stamp: Stamp,
+};
 
 /** 批注模式上下文工具条：选择 9 种工具 + 6 色色板 + 图章细分 */
 export function AnnotationToolbar({ state, onStateChange, disabled }: AnnotationToolbarProps) {
@@ -59,6 +89,7 @@ export function AnnotationToolbar({ state, onStateChange, disabled }: Annotation
       <div aria-label="批注工具" className="annotation-toolbar-tools" role="toolbar">
         {ANNOTATION_TOOL_LIST.map((tool) => {
           const isActive = activeType === tool.type;
+          const Icon = TOOL_ICONS[tool.type];
           return (
             <button
               aria-pressed={isActive}
@@ -71,18 +102,20 @@ export function AnnotationToolbar({ state, onStateChange, disabled }: Annotation
               title={tool.hint}
               type="button"
             >
-              {tool.label}
+              <Icon size={20} />
+              <span className="annotation-tool-button__label">{tool.label}</span>
             </button>
           );
         })}
         {activeType !== null ? (
           <button
+            aria-label="取消当前批注工具"
             className="annotation-tool-button annotation-tool-button--disarm"
             disabled={disabled}
             onClick={handleDisarm}
             type="button"
           >
-            取消
+            <X size={18} />
           </button>
         ) : null}
       </div>

@@ -11,7 +11,7 @@
 | 应用 | PDF Expert 3.9.2（`/Applications/PDF Expert.app`） | 实机版本，manifest `observed_version` 已更正；不得用历史误标的 25.2.1 |
 | Fixture | `tests/fixtures/expert/reference.pdf`（5 页 A4 文字层） | 受控、入仓、确定性生成；详见 `tests/fixtures/expert/README.md` |
 | 主题 | macOS 深色（Dark；2026-07-24 补采实测） | 本批次以实机当前外观为准；若未来切换浅色，必须另建 capture batch，不得与本批次混用 |
-| 缩放 | 100%（Fit/Actual Size） | 打开 fixture 后按 Cmd+1 / 视图菜单归一 |
+| 缩放 | 48%（当前 1280×832 批次的 observed 显示值） | 在缩放控件设置 48%，或使用该窗口下显示为 48% 的 Fit Page；不得把现有 48% capture 误记为 100% |
 | 显示器 | 主屏（3024×1964 Retina，本机） | 单主屏采集；副屏不参与 |
 | 窗口位置 | `{x: 200, y: 120}` | 留出顶部菜单栏（y≥0）与左侧 |
 | 窗口尺寸 | `{w: 1280, h: 832}` | 固定逻辑尺寸，crop 以此为基准 |
@@ -23,7 +23,7 @@
 1. 关闭并重开 PDF Expert（保证无残留状态）
 2. open -a "PDF Expert" tests/fixtures/expert/reference.pdf
 3. osascript 把 window 1 固定到 {200,120} + {1280,832}，delay 1.5
-4. 归一状态：Cmd+1（100%）+ 视图重置
+4. 归一状态：缩放控件确认 48%（或 Fit Page 后显示 48%）+ 视图重置
 5. 触发目标状态（见下表）
 6. screencapture -x -m 捕获 Retina 全屏（或使用 `screencapture -l` 捕获窗口）
 7. 若使用全屏，按窗口物理偏移 `{400,240}` 和尺寸 `{2560,1664}` 用 ImageMagick `-crop 2560x1664+400+240 +repage` 生成 window-only crop；不要用无 offset 的 `sips -c` 冒充窗口 crop
@@ -39,13 +39,14 @@
 | capture id | 状态 | 触发步骤 |
 | --- | --- | --- |
 | G01 | read default | 打开 fixture，默认阅读态，左栏折叠，不进入批注/编辑 |
-| G02 | thumbnails | read 态下点左栏缩略图按钮（或 视图→缩略图），展开左栏缩略图列表 |
-| G03 | annotate | read 态下点工具栏 `A 批注`，进入批注态（二级批注工具条出现） |
-| G04 | edit grid | read 态下点工具栏 `T 编辑`，进入页面网格编辑态 |
+| G02 | page management | read 态下点独立“页面管理”入口，进入全宽页面卡片网格 |
+| G03 | annotate + outline | read 态先展开大纲，再点工具栏 `A 批注`，进入批注态（二级批注工具条出现、右栏折叠） |
+| G04 | shape rectangle | annotate 态选择矩形工具，右侧出现 shape panel |
+| G05 | edit canvas | read 态先打开文档摘要并选择“大纲”，再点工具栏 `T 编辑`；进入保留 272pt 大纲左栏的单页内容编辑画布，L4 为文本/图像/链接/隐藏 |
 
 若某状态在 3.9.2 实机上入口与上述不符，停止并在 manifest/coverage-gap 登记，不强行凑状态。
 
-2026-07-24 补采校准：`G02` 入口实际得到的是“页面管理”全宽卡片网格（5 页同排），不是左栏缩略图列表；`G05` 记录了 `T 编辑` 的文本/图像/链接/隐藏编辑画布。左栏缩略图与文本选区浮条仍标记 missing。
+2026-07-28 二次像素校准：现有 G01–G05 画面显示缩放值为 48%，此前协议写成 100% 属记录错误；逐行取色确认 L2/L3 均为 40pt，annotate/edit L4 约 43pt、页面管理 L4 约 44pt。`G02` 是“页面管理”全宽卡片网格，不是左栏缩略图；`G05` 是保留大纲左栏的 `T 编辑` 单页内容编辑画布。左栏缩略图与文本选区浮条仍标记 missing。
 
 ## 命名规范
 

@@ -26,6 +26,8 @@ export interface SearchResultsPanelProps {
   onSelectHit?: (hitId: string) => void;
   onJumpPrevious?: () => void;
   onJumpNext?: () => void;
+  ocrHint?: { visible: boolean; message: string; actionLabel: string };
+  onRequestOcr?: () => void;
   /** 点击「回到第 1 项」或关闭按钮 → onClose（v0.2：折叠右栏回到默认派生） */
   onClose?: () => void;
 }
@@ -75,6 +77,8 @@ export function SearchResultsPanel({
   onSelectHit,
   onJumpPrevious,
   onJumpNext,
+  ocrHint,
+  onRequestOcr,
   onClose,
 }: SearchResultsPanelProps): ReactElement {
   const hitCount = results.length;
@@ -82,6 +86,15 @@ export function SearchResultsPanel({
     () => (activeHitId ? results.findIndex((hit) => hit.id === activeHitId) : -1),
     [activeHitId, results],
   );
+  const groupedResults = useMemo(() => {
+    const groups = new Map<number, SearchHitItem[]>();
+    for (const hit of results) {
+      const pageHits = groups.get(hit.pageNumber) ?? [];
+      pageHits.push(hit);
+      groups.set(hit.pageNumber, pageHits);
+    }
+    return Array.from(groups.entries());
+  }, [results]);
 
   const handleClose = useCallback(() => {
     onClose?.();
@@ -91,6 +104,14 @@ export function SearchResultsPanel({
     <section className="search-panel" data-testid="search-results-panel" aria-label="搜索结果">
       {/* 段 1：header */}
       <header className="search-panel__header">
+        <div className="search-panel__header-nav" aria-label="搜索命中导航" role="toolbar">
+          <button aria-label="上一个命中" disabled={hitCount === 0} onClick={() => onJumpPrevious?.()} type="button">
+            <ChevronLeft aria-hidden="true" size={14} />
+          </button>
+          <button aria-label="下一个命中" disabled={hitCount === 0} onClick={() => onJumpNext?.()} type="button">
+            <ChevronRight aria-hidden="true" size={14} />
+          </button>
+        </div>
         <span>
           已找到 <span className="search-panel__count" data-testid="search-results-count">{hitCount}</span> 项
         </span>
@@ -119,39 +140,51 @@ export function SearchResultsPanel({
       </div>
 
       {/* 段 3：命中列表 */}
-      {hitCount === 0 ? (
+      {ocrHint?.visible ? (
+        <div className="search-panel__ocr-hint">
+          <p>{ocrHint.message}</p>
+          <button type="button" onClick={() => onRequestOcr?.()}>{ocrHint.actionLabel}</button>
+        </div>
+      ) : hitCount === 0 ? (
         <p className="search-panel__empty" data-testid="search-results-empty">
           {query.trim().length === 0 ? "输入关键词开始搜索" : "暂无命中"}
         </p>
       ) : (
         <ol className="search-panel__hits" aria-label="搜索命中列表">
-          {results.map((hit) => {
-            const active = hit.id === activeHitId;
-            return (
-              <li key={hit.id}>
-                <button
-                  aria-pressed={active}
-                  className={
-                    "search-panel__hit" +
-                    (active ? " search-panel__hit--active" : "")
-                  }
-                  data-hit-id={hit.id}
-                  data-testid="search-results-item"
-                  onClick={() => onSelectHit?.(hit.id)}
-                  type="button"
-                >
-                  <span className="search-panel__hit-line">Line {hit.lineNumber}</span>
-                  <span className="search-panel__hit-snippet">{highlightSnippet(hit.snippet, query)}</span>
-                </button>
-              </li>
-            );
-          })}
+          {groupedResults.map(([pageNumber, pageHits]) => (
+            <li className="search-panel__page-group" key={pageNumber}>
+              <header className="search-panel__page-header">
+                <span>页面 {pageNumber}</span>
+                <span>{pageHits.length} 个项目</span>
+              </header>
+              <ol>
+                {pageHits.map((hit) => {
+                  const active = hit.id === activeHitId;
+                  return (
+                    <li key={hit.id}>
+                      <button
+                        aria-pressed={active}
+                        className={"search-panel__hit" + (active ? " search-panel__hit--active" : "")}
+                        data-hit-id={hit.id}
+                        data-testid="search-results-item"
+                        onClick={() => onSelectHit?.(hit.id)}
+                        type="button"
+                      >
+                        <span className="search-panel__hit-line">Line {hit.lineNumber}</span>
+                        <span className="search-panel__hit-snippet">{highlightSnippet(hit.snippet, query)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </li>
+          ))}
         </ol>
       )}
 
       {/* 段 4：footer — 回到第 1 项 + 页码导航 */}
       {hitCount > 0 ? (
-        <footer className="search-panel__footer">
+        <footer aria-hidden="true" className="search-panel__footer">
           <button
             className="search-panel__footer-button search-panel__footer-button--primary"
             data-testid="search-results-jump-first"

@@ -172,12 +172,13 @@ describe("useOcrWorkspaceController", () => {
       />,
     );
     await act(async () => {
-      await ref.current!.startOcr();
+      await ref.current!.startOcr({ pageRange: "2-4" });
     });
     expect(startOcr).toHaveBeenCalledWith(
       expect.objectContaining({
         inputPath: "/Users/alice/cases/case.pdf",
         outputPath: "/Users/alice/cases/case-ocr.pdf",
+        pageRange: "2-4",
         providerId: "local-ocrmypdf",
         outputStrategy: "new-layered-pdf",
       }),

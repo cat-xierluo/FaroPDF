@@ -1,5 +1,6 @@
 export {
   createPageOrganizerExportRequest,
+  createPageOrganizerExportOperation,
   createPageOrganizerState,
   deleteOrganizerPages,
   reorderOrganizerPages,

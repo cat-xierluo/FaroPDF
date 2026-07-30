@@ -5,6 +5,7 @@ export type { FormController, FormPanelMode } from "./useFormController";
 export { FormProvider } from "./FormProvider";
 export { registerFormsToolbarTools } from "./registerFormsToolbarTools";
 export { setActiveFormController, getActiveFormController } from "./activeFormController";
+export { decodeSignatureDataUrl } from "./signatureImage";
 export { FormsPanel } from "./ui/FormsPanel";
 export {
   FORMS_PANEL_NARROW_BREAKPOINT,

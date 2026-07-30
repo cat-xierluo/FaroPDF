@@ -2,12 +2,14 @@
 
 ## 完成状态
 
-| 状态 | 定义 | 能否关闭 UI 复刻任务 |
+| 状态 | 定义 | 能否关闭任务 |
 | --- | --- | --- |
 | `skeleton` | 组件、入口、静态面板或演示数据存在 | 否 |
 | `wired` | 入口与真实 state/controller 连接；无 noop、toast-only 或不可达分支 | 否 |
-| `behavior-complete` | 主流程可操作，保存/导出后能验证真实结果 | 否 |
-| `visually-verified` | behavior-complete，并通过 accepted-golden 的几何、视觉 diff 和交互验收 | 是 |
+| `behavior-complete` | 主流程可操作，保存/导出后能验证真实结果 | 可以关闭功能任务 |
+| `visually-verified` | behavior-complete，并通过 accepted-golden 的几何、视觉 diff 和交互验收 | 可以关闭明确要求视觉一致的任务 |
+
+2026-07-30 用户明确不要求像素级一比一复刻，因此本项目默认以 `behavior-complete` 作为产品功能完成线；`visually-verified` 是可选精修等级。截图缺失不得再阻塞独立的功能接线和 PDF round-trip。
 
 `geometry-verified` 是验证标签，不是第五种完成状态。它只说明某些 DOM 顺序和宽度断言通过，不能把 `wired` 自动升级为 `visually-verified`。
 
@@ -57,13 +59,12 @@
 
 ## PR / 交付门禁
 
-任何涉及 AppShell、Toolbar、TitlebarTabs、Sidebar、RightPanel、EditModeGridView 或全局布局 CSS 的交付必须附：
+任何涉及 AppShell、Toolbar、TitlebarTabs、Sidebar、RightPanel 或全局布局 CSS 的交付必须附：
 
-1. 使用的 capture id、证据等级和明确未推断事项。
-2. 两种以上 viewport 的几何 JSON；涉及响应式网格时还要覆盖断点两侧。
-3. 目标状态的应用截图；存在 accepted-golden 后必须附视觉 diff。
-4. typecheck、聚焦测试、build 和实际启动结果。
-5. placeholder/noop/toast-only 列表及其 TASKS 状态。
-6. 交付等级及升级理由。
+1. typecheck、聚焦测试、build 和实际启动结果。
+2. 写入型功能的真实产物与重开/解析结果。
+3. `planned / placeholder / noop / toast-only` 列表及其 TASKS 状态。
+4. 交付等级及升级理由。
+5. 只有任务明确要求视觉精修时，才必须附 capture id、两视口几何、截图和视觉 diff。
 
 不满足时保持任务未完成，不能用“后续优化”关闭验收项。

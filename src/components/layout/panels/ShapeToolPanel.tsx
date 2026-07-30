@@ -9,11 +9,7 @@ import {
 } from "lucide-react";
 import "./ShapeToolPanel.css";
 
-/** 形状工具右栏的历史 skeleton。
- *
- * 当前控件分组来自已降级的旧 catalog，DEC-173 不再承认“固定 6 段”是 PDF Expert
- * 规格。组件只有受控 UI；真实绘制和目标层级分别等待 M3/M4 与 M1 证据。
- */
+/** 形状工具右栏。控件分组来自 measured 参考，值由 AnnotationToolState 受控并进入真实绘制链。 */
 
 export type ShapeKind = "rectangle" | "ellipse" | "arrow" | "double-arrow" | "line" | "pencil";
 export type StrokeStyle = "solid" | "dashed";
@@ -82,7 +78,7 @@ export function ShapeToolPanel({ value, onChange }: ShapeToolPanelProps = {}): R
 
   return (
     <section className="shape-panel" data-testid="shape-tool-panel" aria-label="形状工具">
-      {/* 当前 skeleton 的形状选择网格；未通过 accepted-golden。 */}
+      {/* measured 形状选择网格；像素级 accepted-golden 仍是可选视觉优化。 */}
       <div className="shape-panel__section">
         <span className="shape-panel__heading">形状</span>
         <div className="shape-panel__grid" role="radiogroup" aria-label="形状选择">

@@ -1,9 +1,9 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ReaderState } from "../../modules/reader/readerState";
 import type { PdfDocumentState } from "../../shared/pdf/types";
-import { ReaderCanvas, type RenderPageToCanvasFn } from "./ReaderCanvas";
+import { PDF_EXPERT_FIXED_ZOOM_SCALE, ReaderCanvas, type RenderPageToCanvasFn } from "./ReaderCanvas";
 
 const baseDocument: PdfDocumentState = {
   documentId: "doc-1",
@@ -79,7 +79,7 @@ describe("ReaderCanvas 阅读深化", () => {
   test("single 模式只渲染当前页", () => {
     const state = makeState({
       document: { ...baseDocument, viewMode: "single", currentPage: 2 },
-      renderRange: { endPage: 2, pageNumbers: [2], startPage: 2 },
+      renderRange: { endPage: 5, pageNumbers: [1, 2, 3, 4, 5], startPage: 1 },
     });
     render(<ReaderCanvas readerState={state} />);
 
@@ -134,7 +134,7 @@ describe("ReaderCanvas 阅读深化", () => {
     return new Promise<void>((resolve) => {
       setTimeout(() => {
         expect(renderPageToCanvas).toHaveBeenCalled();
-        expect(renderPageToCanvas.mock.calls[0]?.[2]).toBeCloseTo(1.5);
+        expect(renderPageToCanvas.mock.calls[0]?.[2]).toBeCloseTo(1.5 * PDF_EXPERT_FIXED_ZOOM_SCALE);
         resolve();
       }, 0);
     });
@@ -169,6 +169,12 @@ describe("ReaderCanvas 阅读深化", () => {
     render(<ReaderCanvas readerState={state} />);
     const footer = screen.getByTestId("reader-status-footer");
     expect(within(footer).getByText("x.pdf")).toBeInTheDocument();
+  });
+
+  test("single 模式不渲染连续阅读状态页", () => {
+    const state = makeState({ document: { ...baseDocument, viewMode: "single" } });
+    render(<ReaderCanvas readerState={state} />);
+    expect(screen.queryByTestId("reader-status-footer")).not.toBeInTheDocument();
   });
 
   test("ocrStatus=needed 时显示 OCR-needed 提示条，onRequestOcr 回调被调用", async () => {
@@ -210,7 +216,7 @@ describe("ReaderCanvas 阅读深化", () => {
   });
 
   test("active hit 对应页加 data-active-hit=true，其他页不加", () => {
-    const state = makeState({ document: { ...baseDocument, viewMode: "single", currentPage: 2 } });
+    const state = makeState({ document: { ...baseDocument, viewMode: "continuous", currentPage: 2 } });
     const searchState = {
       query: "foo",
       normalizedQuery: "foo",
@@ -237,7 +243,7 @@ describe("ReaderCanvas 阅读深化", () => {
 });
 
 describe("ReaderCanvas Welcome 屏转换卡接线（ISS-NEW-G 2026-06-22 收口）", () => {
-  test("空态下「图片转 PDF」卡点击触发 onConvertFromImages", async () => {
+  test("空态下「图片转 PDF」未接入时禁用", async () => {
     const user = userEvent.setup();
     const onConvertFromImages = vi.fn();
     render(
@@ -251,10 +257,11 @@ describe("ReaderCanvas Welcome 屏转换卡接线（ISS-NEW-G 2026-06-22 收口�
     expect(card).toBeInTheDocument();
     await user.click(card);
 
-    expect(onConvertFromImages).toHaveBeenCalledTimes(1);
+    expect(card).toBeDisabled();
+    expect(onConvertFromImages).not.toHaveBeenCalled();
   });
 
-  test("空态下「Word 转 PDF」卡点击触发 onConvertFromWord", async () => {
+  test("空态下「Word 转 PDF」未接入时禁用", async () => {
     const user = userEvent.setup();
     const onConvertFromWord = vi.fn();
     render(
@@ -268,7 +275,8 @@ describe("ReaderCanvas Welcome 屏转换卡接线（ISS-NEW-G 2026-06-22 收口�
     expect(card).toBeInTheDocument();
     await user.click(card);
 
-    expect(onConvertFromWord).toHaveBeenCalledTimes(1);
+    expect(card).toBeDisabled();
+    expect(onConvertFromWord).not.toHaveBeenCalled();
   });
 
   test("空态不传 onConvert 回调时，转换卡仍渲染但点击不崩溃", async () => {
@@ -287,5 +295,41 @@ describe("ReaderCanvas Welcome 屏转换卡接线（ISS-NEW-G 2026-06-22 收口�
     render(<ReaderCanvas readerState={makeState()} />);
     expect(screen.queryByTestId("welcome-convert-images")).not.toBeInTheDocument();
     expect(screen.queryByTestId("welcome-convert-word")).not.toBeInTheDocument();
+  });
+});
+
+describe("ReaderCanvas 加载失败错误态（ISS-NEW-M M5）", () => {
+  test("status==='error' 渲染 ReaderErrorScreen 而非 WelcomeScreen dropzone", () => {
+    const state = makeState({
+      document: null,
+      status: "error",
+      errorMessage: "PDF 解析失败，文件可能已损坏或不是有效 PDF。",
+    });
+    render(<ReaderCanvas readerState={state} />);
+
+    expect(screen.getByTestId("reader-error-screen")).toBeInTheDocument();
+    expect(screen.getByText("无法打开此 PDF")).toBeInTheDocument();
+    // 不渲染空态 WelcomeScreen 的 dropzone
+    expect(screen.queryByTestId("welcome-dropzone")).not.toBeInTheDocument();
+  });
+
+  test("status==='error' 时 errorMessage 回退到兜底文案", () => {
+    const state = makeState({ document: null, status: "error", errorMessage: undefined });
+    render(<ReaderCanvas readerState={state} />);
+    expect(screen.getByTestId("reader-error-message")).toHaveTextContent("无法打开此 PDF。");
+  });
+
+  test("status==='error' 时「重新选择文件」按钮点击触发 file input", () => {
+    const onOpenFile = vi.fn();
+    const state = makeState({
+      document: null,
+      status: "error",
+      errorMessage: "损坏",
+    });
+    render(<ReaderCanvas onOpenFile={onOpenFile} readerState={state} />);
+    const input = screen.getByTestId("reader-error-file-input") as HTMLInputElement;
+    const clickSpy = vi.spyOn(input, "click");
+    fireEvent.click(screen.getByTestId("reader-error-retry"));
+    expect(clickSpy).toHaveBeenCalledOnce();
   });
 });

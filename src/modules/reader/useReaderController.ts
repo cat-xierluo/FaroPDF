@@ -3,6 +3,8 @@ import type { AppSettings } from "../../shared/settings/types";
 import type { PdfPageText } from "../../shared/pdf/text";
 import type { PageRotation, PdfViewMode, ReaderSession, ZoomPresetId } from "../../shared/pdf/types";
 import { loadPdfFromBytes, loadPdfFromFile, type LoadedPdfDocument } from "./pdfReaderService";
+import { normalizeError } from "../../shared/error";
+import { friendlyMessageForCode } from "../../shared/errorMessages";
 import {
   createDefaultReaderSessionStorage,
   type ReaderSessionStorage,
@@ -73,7 +75,9 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
       cachedFileRef.current = null;
       dispatch({
         type: "reader/loadFailed",
-        payload: { errorMessage: error instanceof Error ? error.message : "无法打开 PDF" },
+        // ISS-NEW-M M5：归一化成 AppError 后走中文友好文案分支，
+        // 损坏 PDF（InvalidPDFException）落到 PdfParseError，不再透传 PDF.js 英文原文。
+        payload: { errorMessage: friendlyMessageForCode(normalizeError(error)) },
       });
     }
   }, []);
@@ -113,7 +117,9 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
       cachedFileRef.current = null;
       dispatch({
         type: "reader/loadFailed",
-        payload: { errorMessage: error instanceof Error ? error.message : "无法打开 PDF" },
+        // ISS-NEW-M M5：归一化成 AppError 后走中文友好文案分支，
+        // 损坏 PDF（InvalidPDFException）落到 PdfParseError，不再透传 PDF.js 英文原文。
+        payload: { errorMessage: friendlyMessageForCode(normalizeError(error)) },
       });
     }
   }, []);

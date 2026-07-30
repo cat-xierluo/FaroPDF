@@ -269,6 +269,101 @@ describe("useFormController", () => {
     expect(result.current.successMessage).toMatch(/name_field/);
   });
 
+  test("连续填写和扁平化始终消费上一操作的工作副本", async () => {
+    const sourceBytes = new Uint8Array([1, 2, 3]);
+    const firstFilledBytes = new Uint8Array([9, 1]);
+    const secondFilledBytes = new Uint8Array([9, 2]);
+    const flattenedBytes = new Uint8Array([9, 3]);
+    const reader = makeFakeReader({ fileBytes: sourceBytes });
+    const service = makeFakeService({
+      readFormFields: vi.fn(async () => SAMPLE_FORM_STATE),
+      fillFormField: vi
+        .fn()
+        .mockResolvedValueOnce(firstFilledBytes)
+        .mockResolvedValueOnce(secondFilledBytes),
+      flattenForm: vi.fn(async () => ({
+        bytes: flattenedBytes,
+        summary: { fieldCountBeforeFlatten: 2, fieldCountAfterFlatten: 0, flattened: true },
+      })),
+    });
+
+    const { result } = renderHook(() => useFormController(reader as ReaderController, { service }));
+
+    await act(async () => {
+      await result.current.refreshFormState();
+    });
+    act(() => {
+      result.current.openPanel("fill");
+      result.current.setDraftValue("Alice");
+    });
+    await act(async () => {
+      await result.current.applyFieldEdit();
+    });
+
+    act(() => {
+      result.current.selectField("agree");
+      result.current.setDraftValue("true");
+    });
+    await act(async () => {
+      await result.current.applyFieldEdit();
+    });
+    await act(async () => {
+      await result.current.flattenAndSave();
+    });
+
+    expect(service.fillFormField).toHaveBeenNthCalledWith(1, sourceBytes, {
+      fieldId: "name_field",
+      value: "Alice",
+    });
+    expect(service.fillFormField).toHaveBeenNthCalledWith(2, firstFilledBytes, {
+      fieldId: "agree",
+      value: "true",
+    });
+    expect(service.flattenForm).toHaveBeenCalledWith(secondFilledBytes);
+    expect(reader.getFileBytes).toHaveBeenCalledTimes(1);
+    expect(reader.saveUpdatedBytes).toHaveBeenNthCalledWith(3, flattenedBytes, "test-flattened.pdf");
+  });
+
+  test("下载失败时不把未交付 bytes 提交为下一步工作副本", async () => {
+    const sourceBytes = new Uint8Array([1, 2, 3]);
+    const reader = makeFakeReader({ fileBytes: sourceBytes });
+    reader.saveUpdatedBytes
+      .mockRejectedValueOnce(new Error("download failed"))
+      .mockResolvedValueOnce(undefined);
+    const service = makeFakeService({
+      readFormFields: vi.fn(async () => SAMPLE_FORM_STATE),
+      fillFormField: vi
+        .fn()
+        .mockResolvedValueOnce(new Uint8Array([8, 1]))
+        .mockResolvedValueOnce(new Uint8Array([8, 2])),
+    });
+
+    const { result } = renderHook(() => useFormController(reader as ReaderController, { service }));
+    await act(async () => {
+      await result.current.refreshFormState();
+    });
+    act(() => {
+      result.current.openPanel("fill");
+      result.current.setDraftValue("first");
+    });
+    await act(async () => {
+      await result.current.applyFieldEdit();
+    });
+    expect(result.current.errorMessage).toBe("download failed");
+
+    act(() => {
+      result.current.setDraftValue("retry");
+    });
+    await act(async () => {
+      await result.current.applyFieldEdit();
+    });
+
+    expect(service.fillFormField).toHaveBeenNthCalledWith(2, sourceBytes, {
+      fieldId: "name_field",
+      value: "retry",
+    });
+  });
+
   test("applySignature 调 signField + saveUpdatedBytes", async () => {
     const reader = makeFakeReader();
     const service = makeFakeService({

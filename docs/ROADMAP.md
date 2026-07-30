@@ -1,6 +1,6 @@
 # FaroPDF 路线图
 
-> Last updated: 2026-07-23（PDF Expert 高保真复刻上下文纠偏 DEC-173 + 证据治理与补采归档 DEC-175~178 + ISS-NEW-N 启动）
+> Last updated: 2026-07-30（功能框架优先，像素视觉降为可选 DEC-187）
 
 ## 项目愿景
 
@@ -12,21 +12,21 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 | --- | --- | --- |
 | v0.0 上下文初始化 | 固定项目名、定位、技术选型、文档体系 | 已完成 |
 | v0.1 完整基础版 | 快读、检索、批注、OCR/扫描、页面整理、常用导出、表单签署、设置 | 进行中（alpha.0 ~ 0.1.0-alpha.18 已封箱；详细子项审计留 follow-up，下一版起逐节刷新） |
-| v0.2 法律增强与界面恢复 | PDF Expert 高保真界面恢复、批注摘要、证据目录、材料拆合并、Bates 编号深化 | 进行中：M0 已完成；M1（规范化重采集）仍按 ISS-NEW-M 推进；ISS-NEW-N 启动基于 raw 的有限面板修正批次（6 个 P0x 子卡）+ 4 个补采子卡（CROP/THUMB/SEL/SHAPE），均与 M1 并行；法律能力逐项以 TASKS 为准 |
+| v0.2 法律增强与界面恢复 | PDF Expert 功能框架对应、批注摘要、证据目录、材料拆合并、Bates 编号深化 | 进行中：入口/模块/产物真实性为 P0；页面管理、shape-style、页面书签、AcroForm、中文水印和本地 OCR pipeline 已验证；像素视觉与 accepted-golden 为可选优化 |
 | v0.3 性能与发布 | 大卷宗性能、自动更新、跨平台打包、官网与文档站（迁出 personal-site） | 待开始 |
 
-## 当前 P0：PDF Expert 高保真界面恢复
+## 当前 P0：PDF Expert 功能框架与真实模块对应
 
 路线图只保留里程碑；可领取任务、状态和 allowed files 以 `docs/TASKS.md` 的“当前唯一推进序列”、ISS-NEW-M 与 ISS-NEW-N 为准。
 
 1. M0：纠正截图分类、冲突文档和完成状态。
-2. M1：按固定 fixture、主题和窗口重采、裁剪并量测参考状态（仍按 ISS-NEW-M 推进；不阻塞 ISS-NEW-N）。
-3. M2：建立会以非零退出码失败的几何 + 感知 diff 验证器。
-4. M3：先闭环 `T 编辑` 的真实缩略图、响应式网格、重排、导出和重开。
-5. M4：按 surface 分别恢复 Shell、左栏和右栏。
-6. M5：完成 forms、export、OCR 和错误状态的行为/视觉闭环。
+2. M1：按固定 fixture、主题和窗口重采、裁剪并量测参考状态；2026-07-30 起为可选视觉优化，不阻塞功能。
+3. M2：建立会以非零退出码失败的 measured 几何/语义验证器；M2.2 已覆盖 L3 横向层级、页面 bbox/单页计数和真实页卡 canvas，accepted-golden 图像 diff 待 M1。
+4. M3：页面管理真实缩略图、选择/多选、拖拽重排、旋转、删除、撤销、导出和重开解析已闭环；页面剪贴板和真实尺寸标签继续补齐。
+5. M4：按 surface 逐项接真实 state/controller；shape-style 已完成 UI→sidecar→overlay→PDF 往返，页面书签已完成添加 / 删除 / 跳页 / 刷新恢复 / 文档隔离；继续补其余左栏和右栏 surface，未实现入口必须显式禁用。
+6. M5：AcroForm 填写、签名、扁平化已完成真实 fixture 的 UI 下载与重开闭环；继续补 export 逐工具和错误状态，视觉不再是功能完成门禁。
 
-并发旁支（ISS-NEW-N，2026-07-23 启动）：基于 6 张 raw-Aminus 的面板修正批次（SignaturePanel / SetPasswordDialog / OcrPanelView / StampPanel / EditModeGridView / AnnotationToolbar）+ 4 张补采子卡（窗口 crop / 缩略图 / selection 浮条 / shape 6 段合同）。允许面板修正子卡在 M1 全量重采未完成时推进，但禁止宣称 `visually-verified`，最高交付等级为 `wired` + `geometry-coarse-verified`（基于 raw 粗估，未 crop、未稳定性 diff）；详见 DEC-177。
+并发旁支（ISS-NEW-N，2026-07-23 启动）：历史批次曾按 6 张 raw-Aminus 安排 SignaturePanel / SetPasswordDialog / OcrPanelView / StampPanel / AnnotationToolbar 与旧 `EditModeGridView` 修正，并安排窗口 crop / 缩略图 / selection 浮条 / shape 6 段合同补采；旧状态机决策已撤销 `EditModeGridView` 路线，现行 DEC-186 又取代旧几何基线，页面管理实现统一使用 `PageOrganizerWorkspace`。当前可领取状态与文件边界只以 `docs/TASKS.md` 为准；未有 accepted-golden 的 surface 禁止宣称 `visually-verified`。
 
 当前 accepted-golden 为 0；既有 `verify:ui-layout` 只证明结构与几何，不表示视觉完成。历史进度日志保留为事实记录，但不覆盖 DEC-173 / DEC-177 / ISS-NEW-M / ISS-NEW-N。
 
@@ -108,7 +108,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 - [x] 读取 AcroForm 字段并高亮可填写区域（`FormService.readFormFields`）。
 - [x] 支持文本框、复选框、单选框和下拉字段填写（`FormService.fillFormField` + `applyFormOperations` 批量）。
-- [ ] 支持签名图片、手写签名和签名位置调整（**部分**：签名图片限定 PNG/JPG 已落，ISS-008 / DEC-055，CHANGELOG 0.1.0-alpha.5；手写签名 / 签名位置调整待后续 worker）。
+- [ ] 支持签名图片、手写签名和签名位置调整（**部分**：PNG/JPG 可从文件或签名库嵌入已有字段并参与累计工作副本、扁平化和重开；自由拖放位置仍待实现）。
 - [x] 支持表单扁平化导出（`FormService.flattenForm`，pdf-lib `form.flatten()`；ISS-043：三级 `表单扁平化` 入口进入填写和签名面板确认导出）。
 
 ### 8. 设置与安全

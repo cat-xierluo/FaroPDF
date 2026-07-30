@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import { PDFDocument } from "pdf-lib";
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { PdfAnnotation } from "../../shared/pdf/annotation";
 import type { AppSettings } from "../../shared/settings/types";
 import { createDefaultAppSettings } from "../../shared/settings/defaults";
@@ -15,6 +15,10 @@ import { TabProvider, useTabStore } from "../../state/tabStore";
 import type { AnnotationArmedStateBundle, AppModeId, UtilityPanelId } from "./types";
 import type { OcrWorkspaceController } from "../../modules/ocr";
 import type { AppCommandSignal } from "../../shared/app/commands";
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 function makeAnnotation(overrides: Partial<PdfAnnotation> & { id: string; pageIndex: number }): PdfAnnotation {
   return {
@@ -132,6 +136,7 @@ interface RenderArgs {
   annotationArmed?: AnnotationArmedStateBundle;
   commandSignal?: AppCommandSignal | null;
   onModeChange?: (mode: AppModeId) => void;
+  onAnnotationDraft?: (input: import("./types").AnnotationDraftSubmission) => void;
   onSettingsChange?: (settings: AppSettings) => void;
   onUtilityPanelChange?: (panel: UtilityPanelId) => void;
   reader?: ReaderController;
@@ -151,6 +156,7 @@ function renderAppShell(args: RenderArgs = {}) {
         annotationArmed={args.annotationArmed}
         annotations={args.annotations}
         commandSignal={args.commandSignal}
+        onAnnotationDraft={args.onAnnotationDraft}
         onModeChange={onModeChange}
         onSettingsChange={onSettingsChange}
         onUtilityPanelChange={onUtilityPanelChange}
@@ -165,7 +171,7 @@ function renderAppShell(args: RenderArgs = {}) {
 }
 
 function renderShell(
-  activeMode: "read" | "annotate" | "export" | "forms" | "ocr" | "pages",
+  activeMode: "read" | "annotate" | "edit" | "export" | "forms" | "ocr" | "pages",
   options: {
     ocr?: OcrWorkspaceController;
     settings?: AppSettings;
@@ -318,22 +324,27 @@ describe("AppShell modes 上下文工具条", () => {
   test("empty read toolbar hides document-only helpers", () => {
     renderAppShell({ utilityPanel: "none" });
 
-    expect(screen.getByText("- / -")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "A 批注" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "导出" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "逆时针" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "顺时针" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "适合页面" })).not.toBeInTheDocument();
   });
 
-  test("workflow mode switches live in the tool launcher instead of the top toolbar", async () => {
+  test("核心工作流在 L3 直接可达，完整命令仍由工具菜单承载", async () => {
     const user = userEvent.setup();
     const onModeChange = vi.fn();
-    renderAppShell({ onModeChange, utilityPanel: "none" });
+    renderAppShell({ onModeChange, reader: makeReadyReader(), utilityPanel: "none" });
 
     const toolbar = screen.getByRole("banner");
-    expect(within(toolbar).queryByRole("button", { name: "OCR" })).not.toBeInTheDocument();
-    expect(within(toolbar).queryByRole("button", { name: "批注" })).not.toBeInTheDocument();
-    expect(within(toolbar).queryByRole("button", { name: "填写和签名" })).not.toBeInTheDocument();
-    expect(within(toolbar).queryByRole("button", { name: "导出" })).not.toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: "扫描和文本识别" })).toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: "A 批注" })).toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: "填写和签名" })).toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: "导出" })).toBeInTheDocument();
+
+    await user.click(within(toolbar).getByRole("button", { name: "导出" }));
+    expect(onModeChange).toHaveBeenCalledWith("export");
 
     await user.click(within(toolbar).getByRole("button", { name: "工具" }));
     const menu = screen.getByRole("menu", { name: "PDF 工具菜单" });
@@ -342,8 +353,7 @@ describe("AppShell modes 上下文工具条", () => {
     expect(within(menu).getByRole("menuitem", { name: "填写和签名" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "OCR" })).toBeInTheDocument();
 
-    await user.click(within(menu).getByRole("menuitem", { name: "导出" }));
-    expect(onModeChange).toHaveBeenCalledWith("export");
+    expect(within(menu).getByRole("menuitem", { name: "设置" })).toBeInTheDocument();
   });
 
   test("read toolbar keeps document tools inside a grouped tool launcher", async () => {
@@ -437,6 +447,23 @@ describe("AppShell modes 上下文工具条", () => {
     });
     expect(onModeChange).toHaveBeenCalledWith("forms");
     expect(screen.getByText("已进入填写和签名面板，请在面板内读取字段并确认扁平化导出。")).toBeInTheDocument();
+  });
+
+  test("native PDF 内容编辑命令在引擎未接入时 fail-closed", async () => {
+    const onModeChange = vi.fn();
+    const onUtilityPanelChange = vi.fn();
+    renderAppShell({
+      activeMode: "read",
+      commandSignal: { id: "pdf-edit-content", nonce: 1 },
+      onModeChange,
+      onUtilityPanelChange,
+      reader: makeReadyReader(),
+      utilityPanel: "none",
+    });
+
+    await waitFor(() => expect(screen.getByText(/「编辑」尚未接入真实功能/)).toBeInTheDocument());
+    expect(onModeChange).not.toHaveBeenCalled();
+    expect(onUtilityPanelChange).not.toHaveBeenCalled();
   });
 
   test("native annotation flatten command enters annotate mode and requests annotation panel", async () => {
@@ -637,6 +664,31 @@ describe("AppShell modes 上下文工具条", () => {
     expect(screen.getByRole("toolbar", { name: "批注工具条" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "高亮" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "图章" })).toBeInTheDocument();
+  });
+
+  test("annotate 默认态不凭空打开右栏", () => {
+    const { container } = renderAppShell({ activeMode: "annotate", utilityPanel: "none" });
+    expect(container.querySelector(".workspace")).toHaveAttribute("data-layout", "main-only");
+    expect(container.querySelector(".right-pane")).toBeNull();
+  });
+
+  test("edit 使用左侧大纲、单页阅读画布和独立编辑 L4，不再渲染页面网格", () => {
+    const { container } = renderAppShell({ activeMode: "edit", reader: makeReadyReader(), utilityPanel: "summary" });
+    const toolbar = screen.getByRole("toolbar", { name: "编辑工具条" });
+    for (const label of ["文本", "图像", "链接", "隐藏"]) {
+      expect(within(toolbar).getByRole("button", { name: label })).toBeDisabled();
+    }
+    expect(screen.getByRole("main", { name: "PDF 阅读区" })).toBeInTheDocument();
+    expect(container.querySelector(".workspace")).toHaveAttribute("data-layout", "left-main");
+    expect(screen.getByRole("tab", { name: "大纲" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: "大纲" })).toBeInTheDocument();
+    expect(screen.queryByRole("main", { name: "页面管理工作台" })).not.toBeInTheDocument();
+  });
+
+  test("pages 使用独立页面管理工作台，不渲染编辑 L4", () => {
+    renderAppShell({ activeMode: "pages", reader: makeReadyReader(), utilityPanel: "none" });
+    expect(screen.getByRole("main", { name: "页面管理工作台" })).toBeInTheDocument();
+    expect(screen.queryByRole("toolbar", { name: "编辑工具条" })).not.toBeInTheDocument();
   });
 
   test("read mode 不渲染批注工具条", () => {
@@ -896,6 +948,40 @@ describe("AppShell annotate toolbar integration (ISS-026 stage 4 milestone 2)", 
     expect(next.activeToolType).toBe("highlight");
   });
 
+  test("armed 形状自动打开右栏，右栏选择会更新同一个 annotation state", async () => {
+    const onStateChange = vi.fn();
+    const state = {
+      ...createInitialAnnotationToolState(),
+      activeToolType: "rectangle" as const,
+      shapeStyle: {
+        toolType: "rectangle" as const,
+        strokeStyle: "dashed" as const,
+        strokeWidth: 6,
+        opacity: 0.5,
+        strokeColor: "#d04444",
+        fillColor: "#2a8df0",
+      },
+    };
+    renderAppShell({
+      activeMode: "annotate",
+      annotationArmed: { state, onStateChange },
+      reader: makeReadyReader(1),
+      utilityPanel: "annotation",
+    });
+
+    await waitFor(() => expect(screen.getByTestId("shape-tool-panel")).toBeInTheDocument());
+    expect(screen.getByTestId("shape-stroke-width-value")).toHaveTextContent("6 px");
+    expect(screen.getByTestId("shape-opacity-value")).toHaveTextContent("50 %");
+    fireEvent.click(screen.getByTestId("shape-option-ellipse"));
+
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+    expect(onStateChange.mock.calls[0][0]).toMatchObject({
+      activeToolType: "ellipse",
+      color: "#d04444",
+      shapeStyle: { toolType: "ellipse", strokeStyle: "dashed", strokeWidth: 6, opacity: 0.5 },
+    });
+  });
+
   test("hasDocument=false 时 AnnotationToolbar 全部按钮 disabled", () => {
     // makeReader 默认 document=null → hasDocument=false
     renderAppShell({ activeMode: "annotate", utilityPanel: "annotation" });
@@ -1151,14 +1237,12 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
     });
   });
 
-  test("ISS-NEW-H: native view-zoom-tool 命令复用 setZoomPreset('1') + 给出占位 feedback", async () => {
+  test("ISS-NEW-H: native view-zoom-tool 未接入时 fail-closed", async () => {
     const reader = makeReadyReader();
     renderAppShell({ activeMode: "read", commandSignal: { id: "view-zoom-tool", nonce: 1 }, reader, utilityPanel: "none" });
 
-    await waitFor(() => {
-      expect(reader.setZoomPreset).toHaveBeenCalledWith("1");
-    });
-    expect(await screen.findByText("缩放工具待后续 worker 接入；当前已切到实际大小。")).toBeInTheDocument();
+    expect(await screen.findByText(/「缩放工具」尚未接入真实功能/)).toBeInTheDocument();
+    expect(reader.setZoomPreset).not.toHaveBeenCalled();
   });
 
   // 缩略图 2 个命令直接调 reader.setViewMode。
@@ -1205,7 +1289,7 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
     expect(await screen.findByText(/当前已在第/)).toBeInTheDocument();
   });
 
-  test("ISS-NEW-H 第 3 阶段：view-reload 实质接通（window.location.reload 触发）", async () => {
+  test("ISS-NEW-H 第 3 阶段：view-reload 未实现磁盘重读时 fail-closed", async () => {
     const reloadSpy = vi.fn();
     const originalLocation = window.location;
     Object.defineProperty(window, "location", {
@@ -1218,8 +1302,8 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
       reader: makeReadyReader(),
       utilityPanel: "none",
     });
-    expect(await screen.findByText(/重新载入整个 webview/)).toBeInTheDocument();
-    expect(reloadSpy).toHaveBeenCalled();
+    expect(await screen.findByText(/「重新载入」尚未接入真实功能/)).toBeInTheDocument();
+    expect(reloadSpy).not.toHaveBeenCalled();
     Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
   });
 
@@ -1316,8 +1400,9 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
     expect(await screen.findByText(/浏览历史只有 2 项/)).toBeInTheDocument();
   });
 
-  test("ISS-NEW-H 第 3 阶段：view-add-bookmark 实质接通 → onSettingsChange 更新 recentFiles[].lastPage", async () => {
+  test("M4：view-add-bookmark 写入真实 sidecar，不再伪装成 lastPage 更新", async () => {
     const onSettingsChange = vi.fn();
+    const onUtilityPanelChange = vi.fn();
     const reader = makeReadyReader();
     const recentFile = {
       path: "test.pdf",
@@ -1329,14 +1414,14 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
       activeMode: "read",
       commandSignal: { id: "view-add-bookmark", nonce: 1 },
       onSettingsChange,
+      onUtilityPanelChange,
       reader,
       settings: baseSettings,
       utilityPanel: "none",
     });
-    expect(await screen.findByText(/已在第 1 页添加书签/)).toBeInTheDocument();
-    expect(onSettingsChange).toHaveBeenCalled();
-    const updated = onSettingsChange.mock.calls.at(-1)?.[0] as AppSettings | undefined;
-    expect(updated?.recentFiles[0]?.lastPage).toBe(1);
+    expect(await screen.findByText("已添加第 1 页书签。")).toBeInTheDocument();
+    expect(onUtilityPanelChange).toHaveBeenCalledWith("bookmark");
+    expect(onSettingsChange).not.toHaveBeenCalled();
   });
 
   // view-zoom-tool / view-thumbnails-* / view-zoom-in / view-zoom-out 在无文档时被挡掉。
@@ -1374,8 +1459,8 @@ describe("AppShell ISS-NEW-H：视图菜单 submenu 命令路由", () => {
   });
 });
 
-describe("AppShell ISS-NEW-A 阶段 1：Toolbar 5 段骨架 + L2 tab 上移", () => {
-  test("Toolbar 包含 5 段（data-section=sidebar-toggles|file|reading|mode|right）且 DOM 严格 5 段", () => {
+describe("AppShell M2.2：Toolbar 5 段层级 + L2 tab", () => {
+  test("Toolbar 包含 navigation|zoom|workflows|collaboration|search 且 DOM 严格 5 段", () => {
     const { container } = renderAppShell({ utilityPanel: "none" });
 
     const toolbar = container.querySelector('[data-testid="app-toolbar"]');
@@ -1386,19 +1471,19 @@ describe("AppShell ISS-NEW-A 阶段 1：Toolbar 5 段骨架 + L2 tab 上移", ()
 
     const sectionIds = sections.map((el) => el.dataset.section);
     expect(sectionIds).toEqual([
-      "sidebar-toggles",
-      "file",
-      "reading",
-      "mode",
-      "right",
+      "navigation",
+      "zoom",
+      "workflows",
+      "collaboration",
+      "search",
     ]);
 
     // DOM 顺序与 contract 一致；任何插入 / 调换 / 缺段会让测试红。
-    expect(sections[0]).toHaveAttribute("aria-label", "侧栏切换");
-    expect(sections[1]).toHaveAttribute("aria-label", "文件操作");
-    expect(sections[2]).toHaveAttribute("aria-label", "阅读控制");
-    expect(sections[3]).toHaveAttribute("aria-label", "模式切换");
-    expect(sections[4]).toHaveAttribute("aria-label", "搜索和设置");
+    expect(sections[0]).toHaveAttribute("aria-label", "导航与视图");
+    expect(sections[1]).toHaveAttribute("aria-label", "缩放");
+    expect(sections[2]).toHaveAttribute("aria-label", "核心工作流");
+    expect(sections[3]).toHaveAttribute("aria-label", "协作与交付");
+    expect(sections[4]).toHaveAttribute("aria-label", "全文搜索");
   });
 
   test("TitlebarTabs 渲染在 Toolbar 上方（独立行，不嵌在 Toolbar 内）", () => {
@@ -1464,20 +1549,20 @@ describe("AppShell ISS-NEW-A 阶段 1：Toolbar 5 段骨架 + L2 tab 上移", ()
     expect(relation & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  test("5 段中每个段至少含一个可访问按钮（contract sanity）", () => {
+  test("5 段中每个段至少含一个可访问控件（contract sanity）", () => {
     const { container } = renderAppShell({ utilityPanel: "none" });
     const toolbar = container.querySelector('[data-testid="app-toolbar"]');
     const sections = Array.from(toolbar?.querySelectorAll<HTMLElement>("[data-section]") ?? []);
 
     for (const section of sections) {
-      const buttons = section.querySelectorAll("button");
-      expect(buttons.length).toBeGreaterThan(0);
+      const controls = section.querySelectorAll("button, input, select");
+      expect(controls.length).toBeGreaterThan(0);
     }
   });
 });
 
-describe("AppShell ISS-NEW-G 2026-06-22 收口：Welcome 屏转换卡接线", () => {
-  test("空态下「图片转 PDF」卡点击触发占位 command feedback", async () => {
+describe("AppShell ISS-NEW-G 2026-06-22 收口：Welcome 屏转换入口真实性", () => {
+  test("空态下「图片转 PDF」卡在引擎接入前禁用", async () => {
     const user = userEvent.setup();
     // reader 状态: document=null → 进入空态 → 渲染 WelcomeScreen
     renderAppShell({
@@ -1491,11 +1576,11 @@ describe("AppShell ISS-NEW-G 2026-06-22 收口：Welcome 屏转换卡接线", ()
 
     await user.click(card);
 
-    const feedback = await screen.findByTestId("command-feedback");
-    expect(feedback).toHaveTextContent(/图片转 PDF.*功能开发中/);
+    expect(card).toBeDisabled();
+    expect(screen.queryByTestId("command-feedback")).not.toBeInTheDocument();
   });
 
-  test("空态下「Word 转 PDF」卡点击触发占位 command feedback", async () => {
+  test("空态下「Word 转 PDF」卡在引擎接入前禁用", async () => {
     const user = userEvent.setup();
     renderAppShell({
       activeMode: "read",
@@ -1508,8 +1593,8 @@ describe("AppShell ISS-NEW-G 2026-06-22 收口：Welcome 屏转换卡接线", ()
 
     await user.click(card);
 
-    const feedback = await screen.findByTestId("command-feedback");
-    expect(feedback).toHaveTextContent(/Word 转 PDF.*功能开发中/);
+    expect(card).toBeDisabled();
+    expect(screen.queryByTestId("command-feedback")).not.toBeInTheDocument();
   });
 
   test("非空态（有 document）不渲染 Welcome 屏转换卡", () => {
@@ -1554,26 +1639,56 @@ describe("AppShell ISS-NEW-M：read 模式不渲染 L4", () => {
   });
 });
 
-describe("AppShell ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏 4 toggle", () => {
-  test("Toolbar 书签按钮点击 → utilityPanel=bookmark", () => {
+describe("AppShell M4：页面书签闭环", () => {
+  test("Toolbar 摘要入口打开 summary，再由 L5a tab 进入书签", async () => {
+    const user = userEvent.setup();
     const onUtilityPanelChange = vi.fn();
     renderAppShell({
       activeMode: "read",
       reader: makeReadyReader(),
       onUtilityPanelChange,
-      utilityPanel: "none",
+      utilityPanel: "summary",
     });
-    fireEvent.click(screen.getByTestId("toolbar-sidebar-bookmark"));
-    expect(onUtilityPanelChange).toHaveBeenCalledWith("bookmark");
+    await user.click(screen.getByRole("tab", { name: "书签" }));
+    expect(screen.getByRole("tabpanel", { name: "书签面板" })).toBeInTheDocument();
   });
 
-  test("utilityPanel=bookmark 时 AppShell 渲染 BookmarkPanelPlaceholder", () => {
+  test("utilityPanel=bookmark 时可添加、跳转和删除页面书签", async () => {
+    const user = userEvent.setup();
+    const reader = makeReadyReader();
+    renderAppShell({
+      activeMode: "read",
+      reader,
+      utilityPanel: "bookmark",
+    });
+    expect(screen.getByTestId("bookmark-panel")).toBeInTheDocument();
+    expect(screen.getByText("点击上方加号，为当前页面添加书签。")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "添加当前页书签" }));
+    expect(await screen.findByRole("button", { name: "跳转到第 1 页" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "跳转到第 1 页" }));
+    expect(reader.setCurrentPage).toHaveBeenCalledWith(1);
+
+    await user.click(screen.getByRole("button", { name: "删除第 1 页书签" }));
+    expect(screen.queryByTestId("bookmark-list")).not.toBeInTheDocument();
+  });
+
+  test("M4：书签在卸载并重新打开同一 PDF 后恢复", async () => {
+    const user = userEvent.setup();
+    const first = renderAppShell({
+      activeMode: "read",
+      reader: makeReadyReader(),
+      utilityPanel: "bookmark",
+    });
+    await user.click(screen.getByRole("button", { name: "添加当前页书签" }));
+    expect(await screen.findByRole("button", { name: "跳转到第 1 页" })).toBeInTheDocument();
+    first.unmount();
+
     renderAppShell({
       activeMode: "read",
       reader: makeReadyReader(),
       utilityPanel: "bookmark",
     });
-    expect(screen.getByTestId("bookmark-panel")).toBeInTheDocument();
-    expect(screen.getByText(/书签功能开发中/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "跳转到第 1 页" })).toBeInTheDocument();
   });
 });

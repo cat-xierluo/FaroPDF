@@ -7,6 +7,13 @@ import { resolveEffectiveZoom } from "../../modules/reader/viewMode";
 import type { TextLayerStatus } from "../../shared/pdf/types";
 import type { RecentPdfFile } from "../../shared/settings/types";
 import { WelcomeScreen } from "./WelcomeScreen";
+import { ReaderErrorScreen } from "./ReaderErrorScreen";
+
+/** PDF Expert 的 UI 百分比不是 PDF.js 的 1 CSS px = 1 PDF pt。
+ * measured fixture 在 48% 时白页宽约 514px；FaroPDF 固定 50% 以此显示密度校准。
+ * fit-width 已由容器宽度决定，不应用此固定倍率。
+ */
+export const PDF_EXPERT_FIXED_ZOOM_SCALE = 1.728;
 
 /** 将 PDF 页面渲染到 canvas 的函数签名 */
 export type RenderPageToCanvasFn = (
@@ -79,6 +86,18 @@ export function ReaderCanvas({
     pageCount: document?.pageCount ?? 0,
     viewMode: document?.viewMode ?? "continuous",
   });
+
+  if (readerState.status === "error") {
+    // ISS-NEW-M M5：PDF 加载失败（损坏 / 加密等）状态。
+    // 在此之前 errorMessage 无任何 UI 消费方，损坏 PDF 落到 silent failure（只渲染 WelcomeScreen）。
+    // 现在展示归一化后的中文错误卡片与「重新选择文件」入口，错误态优先于 idle 空态判断。
+    return (
+      <ReaderErrorScreen
+        errorMessage={readerState.errorMessage ?? "无法打开此 PDF。"}
+        onOpenFile={onOpenFile}
+      />
+    );
+  }
 
   if (!document) {
     // ISS-NEW-G（Wave 3 W1）：空态用 WelcomeScreen 替换旧 open-dropzone。
@@ -184,8 +203,22 @@ function DocumentReader({ document, pageViewports, renderRange, searchState, ren
     [containerWidth, document.zoom, document.viewMode, effectivePageWidth],
   );
 
-  const pageWidth = Math.round(effectivePageWidth * effectiveZoom);
-  const pageHeight = Math.round(effectivePageHeight * effectiveZoom);
+  const renderZoom = document.viewMode === "fit-width"
+    ? effectiveZoom
+    : effectiveZoom * PDF_EXPERT_FIXED_ZOOM_SCALE;
+  const pageWidth = Math.round(effectivePageWidth * renderZoom);
+  const pageHeight = Math.round(effectivePageHeight * renderZoom);
+
+  const visiblePageNumbers = useMemo(() => {
+    if (document.viewMode === "single") {
+      return [document.currentPage];
+    }
+    if (document.viewMode === "double") {
+      return [document.currentPage, document.currentPage + 1]
+        .filter((pageNumber) => pageNumber <= document.pageCount);
+    }
+    return renderRange.pageNumbers;
+  }, [document.currentPage, document.pageCount, document.viewMode, renderRange.pageNumbers]);
 
   const viewportStyle: CSSProperties = {
     alignItems: "center",
@@ -241,7 +274,7 @@ function DocumentReader({ document, pageViewports, renderRange, searchState, ren
         ref={containerRef}
         style={viewportStyle}
       >
-        {renderRange.pageNumbers.map((pageNumber) => (
+        {visiblePageNumbers.map((pageNumber) => (
           <PdfPage
             activeHit={activeHitPageNumber === pageNumber}
             key={pageNumber}
@@ -256,22 +289,24 @@ function DocumentReader({ document, pageViewports, renderRange, searchState, ren
             rotation={document.rotation}
             textLayerStatus={document.textLayerStatus}
             viewMode={document.viewMode}
-            zoom={effectiveZoom}
+            zoom={renderZoom}
           />
         ))}
-        <section
-          aria-label="阅读状态"
-          className="pdf-page pdf-page--empty"
-          data-testid="reader-status-footer"
-          style={{ ...pageStyle, minHeight: 120 }}
-        >
-          <div className="empty-state">
-            <p className="empty-state__title">{document.name}</p>
-            <p className="empty-state__body">
-              当前渲染 {renderRange.startPage}-{renderRange.endPage} / {document.pageCount}
-            </p>
-          </div>
-        </section>
+        {document.viewMode === "continuous" ? (
+          <section
+            aria-label="阅读状态"
+            className="pdf-page pdf-page--empty"
+            data-testid="reader-status-footer"
+            style={{ ...pageStyle, minHeight: 120 }}
+          >
+            <div className="empty-state">
+              <p className="empty-state__title">{document.name}</p>
+              <p className="empty-state__body">
+                当前渲染 {renderRange.startPage}-{renderRange.endPage} / {document.pageCount}
+              </p>
+            </div>
+          </section>
+        ) : null}
       </div>
     </main>
   );

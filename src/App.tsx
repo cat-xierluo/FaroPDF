@@ -3,11 +3,13 @@ import { AppShell } from "./components/layout/AppShell";
 import type { AnnotationDraftSubmission, AppModeId, UtilityPanelId } from "./components/layout/types";
 import {
   AnnotationService,
+  createLocalStorageAnnotationStorage,
   createInitialAnnotationToolState,
   type AnnotationToolState,
 } from "./modules/annotation";
 import { createMemoryAnnotationStorage } from "./modules/annotation";
 import { AnnotationRepository } from "./modules/annotation";
+import type { AnnotationStorage } from "./modules/annotation/repository";
 import { useReaderController, type ReaderController } from "./modules/reader";
 import { registerReadModeTools } from "./modules/reader/readerModeTools";
 import { openNativePdfFileDialog, readPdfFileFromPath } from "./modules/reader/tauriPdfFileService";
@@ -197,12 +199,20 @@ function App() {
     };
   }, [settings.themePreference]);
 
-  // 批注服务实例：使用内存存储，后续可替换为文件存储
+  // 批注服务实例：Tauri webview 的 localStorage 持久化 sidecar，键使用路径哈希，
+  // 不覆盖原 PDF；localStorage 不可用时才回退到当前会话内存。
   const annotationServiceRef = useRef<AnnotationService | null>(null);
 
   function getAnnotationService(): AnnotationService {
     if (!annotationServiceRef.current) {
-      const storage = createMemoryAnnotationStorage();
+      let storage: AnnotationStorage = createMemoryAnnotationStorage();
+      try {
+        if (typeof window !== "undefined" && window.localStorage) {
+          storage = createLocalStorageAnnotationStorage(window.localStorage);
+        }
+      } catch {
+        // 隐私模式或禁用 DOM storage 时保留可用的内存 sidecar。
+      }
       const repository = new AnnotationRepository({ storage });
       annotationServiceRef.current = new AnnotationService({ repository });
     }
@@ -234,7 +244,12 @@ function App() {
 
   function handleModeChange(nextMode: AppModeId) {
     setActiveMode(nextMode);
-    if (nextMode === "pages") {
+    if (nextMode === "edit") {
+      // G05 measured reference shows the outline sidebar alongside the edit canvas.
+      // Keep that state explicit instead of inheriting whichever utility panel happened
+      // to be open in read/annotate mode.
+      setUtilityPanel("summary");
+    } else if (nextMode === "pages") {
       setUtilityPanel("none");
     }
   }
@@ -245,6 +260,28 @@ function App() {
       setActiveMode("read");
     }
   }
+
+  useEffect(() => {
+    const verificationEnabled =
+      import.meta.env.DEV && new URLSearchParams(window.location.search).get("verification") === "pdf-expert";
+    if (!verificationEnabled) {
+      return;
+    }
+
+    function handleVerificationMode(event: Event) {
+      const requestedMode = (event as CustomEvent<unknown>).detail;
+      if (requestedMode !== "edit") {
+        return;
+      }
+      setActiveMode("edit");
+      setUtilityPanel("summary");
+    }
+
+    window.addEventListener("faropdf:verification:set-mode", handleVerificationMode);
+    return () => {
+      window.removeEventListener("faropdf:verification:set-mode", handleVerificationMode);
+    };
+  }, []);
 
   useEffect(() => {
     readerRef.current = reader;
@@ -311,6 +348,8 @@ function App() {
             pageIndex: input.pageIndex,
             rects: input.rects,
             color: input.color,
+            ...(input.opacity !== undefined ? { opacity: input.opacity } : {}),
+            ...(input.style ? { style: input.style } : {}),
             ...(input.content ? { content: input.content } : {}),
             ...(input.quote ? { quote: input.quote } : {}),
             ...(input.line ? { line: input.line } : {}),

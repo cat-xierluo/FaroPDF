@@ -84,7 +84,7 @@ export interface OcrWorkspaceController {
   errorMessage: string | null;
   /** 当前任务参数区展示用的只读摘要（ISS-009 收口用） */
   parameters: OcrWorkspaceParameters;
-  startOcr: () => Promise<void>;
+  startOcr: (options?: { pageRange?: string }) => Promise<void>;
   outputLayeredPdf: () => Promise<void>;
   cancelJob: (job: OcrCommandJob) => Promise<void>;
   selectJob: (job: OcrCommandJob) => void;
@@ -234,7 +234,7 @@ export function useOcrWorkspaceController(
     return undefined;
   }, [jobs, selectedJobId]);
 
-  const startOcr = useCallback(async () => {
+  const startOcr = useCallback(async (options?: { pageRange?: string }) => {
     if (!hasDocument) {
       setErrorMessage("请先打开一个带路径的 PDF 文档再启动 OCR。");
       return;
@@ -253,6 +253,7 @@ export function useOcrWorkspaceController(
       const request: OcrRequest = {
         inputPath: documentPath!,
         outputPath: deriveLayeredOutputPath(documentPath!),
+        ...(options?.pageRange ? { pageRange: options.pageRange } : {}),
         providerId: provider.id,
         outputStrategy,
         ...(qualityCheck ? { qualityCheck } : {}),

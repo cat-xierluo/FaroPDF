@@ -13,7 +13,7 @@ export type AppCommandGroup =
   | "settings"
   | "help";
 
-export type AppCommandTargetMode = "read" | "annotate" | "export" | "forms" | "ocr" | "pages";
+export type AppCommandTargetMode = "read" | "annotate" | "edit" | "export" | "forms" | "ocr" | "pages";
 
 export type AppCommandTargetUtilityPanel =
   | "summary"
@@ -125,6 +125,8 @@ export interface AppCommandDefinition {
   targetMode?: AppCommandTargetMode;
   targetUtilityPanel?: AppCommandTargetUtilityPanel;
   feedback?: string;
+  /** `planned` 表示命令只保留在功能地图中，执行层必须 fail-closed，不能伪装成已接线。 */
+  availability?: "ready" | "planned";
 }
 
 export type AppToolLauncherSectionId = "organize" | "deliver" | "markup" | "scan";
@@ -242,6 +244,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "view",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    availability: "planned",
   },
   {
     id: "view-thumbnails-single",
@@ -264,12 +267,11 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
   {
     id: "view-go-current-page",
     label: "跳到当前页",
-    description: "v0.2 占位：把阅读焦点定位到当前激活页。",
+    description: "把阅读焦点定位到当前激活页。",
     layer: "tertiary",
     group: "view",
     entryPoints: ["native-menu"],
     requiresDocument: true,
-    feedback: "视图功能开发中，等待后续 worker 接入。",
   },
   {
     id: "view-reload",
@@ -280,16 +282,16 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     entryPoints: ["native-menu"],
     requiresDocument: true,
     feedback: "视图功能开发中，等待后续 worker 接入。",
+    availability: "planned",
   },
   {
     id: "view-add-bookmark",
     label: "添加书签",
-    description: "v0.2 占位：在当前页添加书签。",
+    description: "为当前页添加个人页面书签，并保存到按文档隔离的 sidecar。",
     layer: "tertiary",
     group: "view",
     entryPoints: ["native-menu"],
     requiresDocument: true,
-    feedback: "视图功能开发中，等待后续 worker 接入。",
   },
   // ISS-NEW-D 阶段 1（2026-06-22）：批注菜单 8 工具 + 形状 submenu 6 形状。
   // 全部 tertiary / native-menu / annotation group，与 macOS 批注 SubmenuBuilder 一一对应。
@@ -421,6 +423,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "annotation",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    availability: "planned",
   },
   {
     id: "annotation-outline",
@@ -430,6 +433,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "annotation",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    availability: "planned",
   },
   {
     id: "annotation-delete",
@@ -439,6 +443,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "annotation",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    availability: "planned",
   },
   {
     id: "annotation-delete-all",
@@ -448,6 +453,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "annotation",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    availability: "planned",
   },
   {
     id: "annotation-jump-to",
@@ -457,6 +463,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "annotation",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    availability: "planned",
   },
   {
     id: "annotation-previous",
@@ -466,6 +473,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "annotation",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    availability: "planned",
   },
   {
     id: "annotation-next",
@@ -475,6 +483,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "annotation",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    availability: "planned",
   },
   {
     id: "annotation-collapse-all",
@@ -484,6 +493,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "annotation",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    availability: "planned",
   },
   {
     id: "annotation-expand-all",
@@ -493,6 +503,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "annotation",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    availability: "planned",
   },
   // ISS-NEW-D 阶段 1（2026-06-22）：扫描菜单 4 档质量 submenu + 4 顶层动作。
   // 全部 tertiary / native-menu / ocr group，menu event handler 走 ocr 模式 entry point。
@@ -567,53 +578,64 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "ocr",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    availability: "planned",
   },
   // ISS-NEW-D 阶段 1（2026-06-22）：编辑 PDF 菜单 5 动作。
-  // 全部 tertiary / native-menu / export group，v0.2 占位（真实 PDF 内容编辑由后续 worker 接入）。
+  // 全部 tertiary / native-menu / edit mode，真实 PDF 内容编辑由后续阶段接入。
   {
     id: "pdf-edit-content",
     label: "编辑",
     description: "v0.2 占位：直接编辑 PDF 文字 / 图像内容。",
     layer: "tertiary",
-    group: "export",
+    group: "mode",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    targetMode: "edit",
+    availability: "planned",
   },
   {
     id: "pdf-add-image",
     label: "添加图像",
     description: "v0.2 占位：在 PDF 当前页插入外部图像。",
     layer: "tertiary",
-    group: "export",
+    group: "mode",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    targetMode: "edit",
+    availability: "planned",
   },
   {
     id: "pdf-add-link",
     label: "添加链接",
     description: "v0.2 占位：在 PDF 选中区域添加超链接。",
     layer: "tertiary",
-    group: "export",
+    group: "mode",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    targetMode: "edit",
+    availability: "planned",
   },
   {
     id: "pdf-add-text",
     label: "添加文字",
     description: "v0.2 占位：在 PDF 当前页插入文本框。",
     layer: "tertiary",
-    group: "export",
+    group: "mode",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    targetMode: "edit",
+    availability: "planned",
   },
   {
     id: "pdf-redact",
     label: "隐藏",
     description: "v0.2 占位：选中区域涂抹遮蔽（ISS-067 已有遮蔽 UI）。",
     layer: "tertiary",
-    group: "export",
+    group: "mode",
     entryPoints: ["native-menu"],
     requiresDocument: true,
+    targetMode: "edit",
+    availability: "planned",
   },
   // ISS-NEW-D 阶段 1（2026-06-22）：前往菜单 5 顶层 + 5 历史 submenu 项。
   // 全部 tertiary / native-menu / view group（导航类）。
@@ -734,6 +756,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "view",
     entryPoints: ["native-menu"],
     requiresDocument: false,
+    availability: "planned",
   },
   {
     id: "view-sidebar-toggle",
@@ -743,6 +766,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     group: "view",
     entryPoints: ["native-menu"],
     requiresDocument: false,
+    availability: "planned",
   },
   {
     id: "view-fit-screen",
@@ -961,6 +985,7 @@ export const APP_COMMANDS: AppCommandDefinition[] = [
     targetMode: "annotate",
     targetUtilityPanel: "annotation",
     feedback: "已进入批注模式，选中文本后点击浮动工具条的「翻译」。",
+    availability: "planned",
   },
   {
     id: "annotation-tts",

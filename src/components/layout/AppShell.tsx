@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { getPanelWidth } from "../../shared/panelWidthStore";
+import { EyeOff, Image as ImageIcon, Link2, Type } from "lucide-react";
+import {
+  getPanelWidth,
+  SEARCH_RIGHT_PANEL_WIDTH,
+  SHAPE_RIGHT_PANEL_WIDTH,
+} from "../../shared/panelWidthStore";
 import type { AnnotationSidecar, PdfAnnotation } from "../../shared";
 import type { ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
@@ -19,24 +24,30 @@ import {
   armAnnotationTool,
   createInitialAnnotationToolState,
   disarmAnnotationTool,
+  isAnnotationShapeTool,
+  setAnnotationShapeStyle,
   STAMP_TEMPLATES,
 } from "../../modules/annotation";
-import type { AnnotationToolState } from "../../modules/annotation";
+import type { AnnotationShapeToolType, AnnotationToolState } from "../../modules/annotation";
 import type { PdfAnnotationType } from "../../shared/pdf/annotation";
 import { useFormController } from "../../modules/forms/useFormController";
+import { useBookmarkController } from "../../modules/bookmarks";
 import { setActiveFormController } from "../../modules/forms/activeFormController";
 import { FormsPanel } from "../../modules/forms/ui/FormsPanel";
+import { decodeSignatureDataUrl } from "../../modules/forms/signatureImage";
 import { createPdfOperationEngine } from "../../modules/export";
 import { ExportDeliveryPanel, type ExportDeliveryTool } from "../../modules/export/ui/ExportDeliveryPanel";
 import { ReaderCanvas } from "./ReaderCanvas";
-import { DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
+import { BookmarkPanel, DocumentSummaryPanel, ViewSettingsPanel } from "./Sidebar";
 import { AnnotationSidebar, type AnnotationFlattenResult } from "./AnnotationSidebar";
 import { AnnotationToolbar } from "./AnnotationToolbar";
-import { EditModeGridView } from "./EditModeGridView";
+import { PageOrganizerWorkspace } from "./PageOrganizerWorkspace";
 import { RightPanel } from "./RightPanel";
 import { SecurityPanel } from "./SecurityPanel";
 import type { ShapeToolValue } from "./panels/ShapeToolPanel";
 import type { SearchHitItem } from "./panels/SearchResultsPanel";
+import type { DocSummary } from "./panels/DocSummaryPanelView";
+import type { OcrJobStatus } from "./panels/OcrStatusPanelView";
 import {
   TextSelectionToolbar,
   usePdfTextSelection,
@@ -49,7 +60,7 @@ import { TitlebarTabs } from "./TitlebarTabs";
 import { useTabStore } from "../../state/tabStore";
 import { SettingsPanel } from "../../modules/settings/SettingsPanel";
 import type { SectionId } from "../../modules/settings/sections";
-import { AnnotationOverlay, type AnnotationDraftInput, type AnnotationOverlayViewport } from "./AnnotationOverlay";
+import { AnnotationOverlay, type AnnotationDraftInput, type AnnotationOverlayPlacement, type AnnotationOverlayViewport } from "./AnnotationOverlay";
 import { RedactionOverlay, type RedactionRegionDraft } from "../../modules/redaction/ui/RedactionOverlay";
 import { applyRedaction } from "../../modules/redaction/redactionEngine";
 import { regionsScreenToPdf, selectPageCanvas } from "../../modules/redaction/redactionCoords";
@@ -118,10 +129,19 @@ const exportToolGroups = [
 
 const contextualToolbarLabels: Record<Exclude<AppModeId, "read" | "pages">, string> = {
   annotate: "批注工具条",
+  edit: "编辑工具条",
   export: "导出工具条",
   forms: "填写和签名工具条",
   ocr: "OCR 工具条",
 };
+
+function shapeKindToAnnotationType(shape: ShapeToolValue["shape"]): AnnotationShapeToolType {
+  return shape === "pencil" ? "ink" : shape;
+}
+
+function annotationTypeToShapeKind(type: AnnotationShapeToolType): ShapeToolValue["shape"] {
+  return type === "ink" ? "pencil" : type;
+}
 
 export function AppShell({
   activeMode,
@@ -166,7 +186,10 @@ export function AppShell({
     }
   }, [activeMode, redactActive]);
   // ocr 模式独占主区域（OcrWorkspace 包含任务列表 + 质量报告），隐藏 utility panel
-  const showUtilityPanel = utilityPanel !== "none" && activeMode !== "pages" && activeMode !== "ocr";
+  const showUtilityPanel =
+    utilityPanel !== "none" &&
+    activeMode !== "pages" &&
+    activeMode !== "ocr";
   const isOcrMode = activeMode === "ocr";
   const isAnnotateMode = activeMode === "annotate";
   // stage 4 批注 armed 状态：App.tsx 持有单一真相源；未传时回退到初始 state，保证既有测试不破
@@ -181,47 +204,72 @@ export function AppShell({
     nonce: 0,
   });
   const [settingsInitialSection, setSettingsInitialSection] = useState<SectionId>("general");
-  // ISS-NEW-I（W2 worker）：形状工具受控 state — 真实绘制引擎由后续 worker 接入；
-  // 当前 stage 仅 UI 状态持久化 + 右栏渲染 shape panel。
-  const [shapeToolValue, setShapeToolValue] = useState<ShapeToolValue>({
-    shape: "rectangle",
-    strokeStyle: "solid",
-    strokeWidth: 2,
-    opacity: 100,
-    strokeColor: "#000000",
-    fillColor: "transparent",
-  });
+  // 形状面板与 annotationArmed 共用单一真相源；右栏值会进入草稿、sidecar、overlay 和 PDF writer。
+  const shapeToolValue = useMemo<ShapeToolValue>(() => ({
+    shape: annotationTypeToShapeKind(annotationState.shapeStyle.toolType),
+    strokeStyle: annotationState.shapeStyle.strokeStyle,
+    strokeWidth: annotationState.shapeStyle.strokeWidth,
+    opacity: Math.round(annotationState.shapeStyle.opacity * 100),
+    strokeColor: annotationState.shapeStyle.strokeColor,
+    fillColor: annotationState.shapeStyle.fillColor,
+  }), [annotationState.shapeStyle]);
+  const handleShapeToolChange = useCallback((next: ShapeToolValue) => {
+    if (!annotationArmed) {
+      return;
+    }
+    annotationArmed.onStateChange(setAnnotationShapeStyle(annotationArmed.state, {
+      toolType: shapeKindToAnnotationType(next.shape),
+      strokeStyle: next.strokeStyle,
+      strokeWidth: next.strokeWidth,
+      opacity: next.opacity / 100,
+      strokeColor: next.strokeColor,
+      fillColor: next.fillColor,
+    }));
+  }, [annotationArmed]);
   // ISS-060 阶段 2 后续：用户显式 tab 切换的 override。annotate/forms 模式下用户可
   // 在 [图章][签名] 间切换；切 mode 时 reset override 回 null（让默认派生接管）。
   const [rightPanelOverride, setRightPanelOverride] = useState<RightPanelId | null>(null);
   useEffect(() => {
     setRightPanelOverride(null);
   }, [activeMode]);
+  useEffect(() => {
+    if (activeMode !== "annotate") {
+      return;
+    }
+    if (isAnnotationShapeTool(annotationState.activeToolType)) {
+      setRightPanelOverride("shape");
+      return;
+    }
+    setRightPanelOverride((current) => current === "shape" ? null : current);
+  }, [activeMode, annotationState.activeToolType]);
 
   // ISS-060 阶段 2 后续：左右栏宽度持久化（panelWidthStore 提供 localStorage 读写）。
   // 当前 ship：mount 时读 localStorage 注入 inline style；用户拖拽 divider 留后续 session。
   const [leftWidth] = useState<number>(() => getPanelWidth("left"));
-  const [rightWidth] = useState<number>(() => getPanelWidth("right"));
+  const [storedRightWidth] = useState<number>(() => getPanelWidth("right"));
   // ISS-060：右栏驱动 — 默认按 mode 派生；用户 tab override 优先。
   // P2-6 修复：之前用 useState(() => initial) 只在 mount 时算一次，read→annotate
   // 切换后 rightPanel 永远 stuck 在 mount 时的 "none"，导致右栏永不显示。
   const defaultRightPanel = useMemo<RightPanelId>(() => {
-    if (activeMode === "annotate") return "stamps";
     if (activeMode === "ocr") return "ocr-queue";
     if (activeMode === "export") return "export-preview";
     return "none";
   }, [activeMode]);
   // override 优先（用户 tab 显式切换），否则用 mode 默认派生
   const rightPanel: RightPanelId = rightPanelOverride ?? defaultRightPanel;
-  // 历史 ISS-NEW-I fallback：forms 在无右栏时会派生 shape。
-  // 这不是现行“T 编辑”合同（T 编辑实际是 pages），也未经过可靠证据验收；
-  // 保留为 implementation-map 中的待修行为，M1 前不在上下文里合理化它。
-  const rightPanelWithEditFallback: RightPanelId =
-    rightPanel === "none" && activeMode === "forms" ? "shape" : rightPanel;
+  // 搜索与形状是两个已量测且宽度不同的 surface；不能再把搜索的 240pt
+  // 当成所有右栏的全局默认值。其余未量测 panel 保留用户/基础默认宽度。
+  const rightWidth =
+    rightPanel === "search"
+      ? SEARCH_RIGHT_PANEL_WIDTH
+      : rightPanel === "shape"
+        ? SHAPE_RIGHT_PANEL_WIDTH
+        : storedRightWidth;
   const showRightPanel =
-    activeMode !== "read" &&
+    rightPanel !== "none" &&
+    activeMode !== "edit" &&
     activeMode !== "pages" &&
-    rightPanelWithEditFallback !== "none";
+    (activeMode !== "read" || rightPanel === "search");
   const workspaceLayout = resolveWorkspaceLayout({
     leftWidth,
     rightWidth,
@@ -316,6 +364,100 @@ export function AppShell({
   );
   const document = reader.state.document;
   const hasDocument = document !== null;
+  const bookmarkDocument = useMemo(() => document ? {
+    path: document.path,
+    ...(document.fingerprint ? { fingerprint: document.fingerprint } : {}),
+    pageCount: document.pageCount,
+    currentPage: document.currentPage,
+  } : null, [document?.currentPage, document?.fingerprint, document?.pageCount, document?.path]);
+  const bookmarkController = useBookmarkController(bookmarkDocument);
+  const handleAddCurrentPageBookmark = useCallback(() => {
+    const result = bookmarkController.addCurrentPage();
+    if (result.status === "added") {
+      setCommandFeedback(`已添加${result.bookmark.label}书签。`);
+    } else if (result.status === "exists") {
+      setCommandFeedback(`${result.bookmark.label}已有书签。`);
+    } else if (result.status === "no-document") {
+      setCommandFeedback("请先打开 PDF 文档。");
+    } else {
+      setCommandFeedback(result.message);
+    }
+  }, [bookmarkController.addCurrentPage]);
+  const handleRemoveBookmark = useCallback((bookmarkId: string) => {
+    if (bookmarkController.removeBookmark(bookmarkId)) {
+      setCommandFeedback("已删除页面书签。");
+    } else if (bookmarkController.errorMessage) {
+      setCommandFeedback(bookmarkController.errorMessage);
+    }
+  }, [bookmarkController.errorMessage, bookmarkController.removeBookmark]);
+  const [rightPanelDocSummary, setRightPanelDocSummary] = useState<DocSummary | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!document) {
+      setRightPanelDocSummary(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (typeof reader.getFileBytes !== "function") {
+      setRightPanelDocSummary(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void reader.getFileBytes().then(async (bytes) => {
+      if (!bytes) {
+        if (!cancelled) setRightPanelDocSummary(null);
+        return;
+      }
+      const metadata = await readPdfMetadata(new Uint8Array(bytes));
+      if (cancelled) return;
+      setRightPanelDocSummary({
+        fileName: typeof reader.getCurrentFileName === "function"
+          ? reader.getCurrentFileName() ?? document.name
+          : document.name,
+        pageCount: document.pageCount,
+        fileSizeBytes: bytes.byteLength,
+        metadata: {
+          ...(metadata.title ? { title: metadata.title } : {}),
+          ...(metadata.author ? { author: metadata.author } : {}),
+          ...(metadata.producer ? { producer: metadata.producer } : {}),
+          ...(metadata.creator ? { creator: metadata.creator } : {}),
+          ...(metadata.creationDate ? { createdAt: metadata.creationDate } : {}),
+        },
+      });
+    }).catch(() => {
+      if (!cancelled) setRightPanelDocSummary(null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [document?.documentId, document?.name, document?.pageCount, reader.getCurrentFileName, reader.getFileBytes]);
+  const rightPanelOcrStatus = useMemo<OcrJobStatus>(() => {
+    if (ocr?.errorMessage) {
+      return { state: "failed", message: "OCR 任务失败", progress: 0, error: ocr.errorMessage };
+    }
+    const job = ocr?.currentJob;
+    if (!job) {
+      return { state: "idle", message: "尚未开始 OCR", progress: 0 };
+    }
+    const totalPages = job.progress.totalPages;
+    const progress = totalPages > 0 ? job.progress.completedPages / totalPages : 0;
+    if (job.status === "completed") {
+      return { state: "completed", message: job.progress.message ?? "OCR 已完成", progress: 1 };
+    }
+    if (job.status === "failed" || job.status === "cancelled") {
+      return {
+        state: "failed",
+        message: job.status === "cancelled" ? "OCR 已取消" : "OCR 任务失败",
+        progress,
+        ...(job.errorMessage ? { error: job.errorMessage } : {}),
+      };
+    }
+    return { state: "running", message: job.progress.message ?? "OCR 正在处理", progress };
+  }, [ocr?.currentJob, ocr?.errorMessage]);
   useEffect(() => {
     if (hasDocument && commandFeedback === "请先打开 PDF 文档。") {
       setCommandFeedback(null);
@@ -331,6 +473,60 @@ export function AppShell({
         rotation: currentPageViewport.rotation,
       }
     : null;
+  const [annotationOverlayPlacement, setAnnotationOverlayPlacement] = useState<AnnotationOverlayPlacement | null>(null);
+  useEffect(() => {
+    const workspace = workspaceMainRef.current;
+    if (!isAnnotateMode || !workspace || !overlayViewport) {
+      setAnnotationOverlayPlacement(null);
+      return;
+    }
+
+    const pageContainer = workspace.querySelector<HTMLElement>(
+      `.pdf-page[data-page-number="${currentPageNumber}"] .page-container`,
+    );
+    if (!pageContainer) {
+      setAnnotationOverlayPlacement(null);
+      return;
+    }
+
+    const updatePlacement = () => {
+      const workspaceRect = workspace.getBoundingClientRect();
+      const pageRect = pageContainer.getBoundingClientRect();
+      if (pageRect.width <= 0 || pageRect.height <= 0) {
+        return;
+      }
+      const next = {
+        left: pageRect.left - workspaceRect.left,
+        top: pageRect.top - workspaceRect.top,
+        width: pageRect.width,
+        height: pageRect.height,
+      };
+      setAnnotationOverlayPlacement((current) =>
+        current &&
+        Math.abs(current.left - next.left) < 0.5 &&
+        Math.abs(current.top - next.top) < 0.5 &&
+        Math.abs(current.width - next.width) < 0.5 &&
+        Math.abs(current.height - next.height) < 0.5
+          ? current
+          : next,
+      );
+    };
+
+    const scrollContainer = workspace.querySelector<HTMLElement>(".reader__viewport");
+    const animationFrame = window.requestAnimationFrame(updatePlacement);
+    scrollContainer?.addEventListener("scroll", updatePlacement, { passive: true });
+    window.addEventListener("resize", updatePlacement);
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updatePlacement);
+    resizeObserver?.observe(workspace);
+    resizeObserver?.observe(pageContainer);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      scrollContainer?.removeEventListener("scroll", updatePlacement);
+      window.removeEventListener("resize", updatePlacement);
+      resizeObserver?.disconnect();
+    };
+  }, [currentPageNumber, isAnnotateMode, overlayViewport?.height, overlayViewport?.width, reader.state.document?.rotation, reader.state.document?.zoom, showRightPanel, showUtilityPanel]);
   // 当前页的批注子集
   const currentPageAnnotations = (annotations ?? []).filter((annotation) => annotation.pageIndex === currentPageNumber - 1);
 
@@ -610,6 +806,11 @@ export function AppShell({
       return;
     }
 
+    if (command.availability === "planned") {
+      setCommandFeedback(`「${command.label}」尚未接入真实功能，当前不可用。`);
+      return;
+    }
+
     if (command.id === "file-save-as") {
       try {
         setCommandFeedback("正在另存副本...");
@@ -776,7 +977,11 @@ export function AppShell({
       command.id === "pdf-add-text" ||
       command.id === "pdf-redact"
     ) {
-      setCommandFeedback(`${command.label}功能待后续 worker 接入 PDF 直接编辑链路；当前可用 L4 批注 / 导出工具条。`);
+      onModeChange("edit");
+      // 原生菜单与 L3 的 T 编辑入口必须落到同一 G05 结果态：
+      // 272px 大纲左栏 + 单页内容编辑画布，不能在 mode 切换后再次折叠左栏。
+      onUtilityPanelChange("summary");
+      setCommandFeedback(`${command.label}工具已定位到内容编辑模式；直接写回引擎尚未接入，因此工具保持禁用。`);
       return;
     }
 
@@ -855,18 +1060,10 @@ export function AppShell({
       }
       return;
     }
-    // view-add-bookmark 实质接通（v0.2 简化为把 currentPage 写回 recentFiles[].lastPage，
-    // 真实 outline 持久化留 v0.2 polish）。
+    // 页面书签写入独立 sidecar，不改原始 PDF，也不再借 recentFiles.lastPage 冒充。
     if (command.id === "view-add-bookmark" && reader.state.document) {
-      onSettingsChange?.({
-        ...settings,
-        recentFiles: settings.recentFiles.map((file) =>
-          file.path === reader.state.document?.path
-            ? { ...file, lastPage: reader.state.document.currentPage }
-            : file,
-        ),
-      });
-      setCommandFeedback(`已在第 ${reader.state.document.currentPage} 页添加书签（lastPage 已更新）。`);
+      handleAddCurrentPageBookmark();
+      onUtilityPanelChange("bookmark");
       return;
     }
     // ISS-NEW-H 第 3 阶段：滚动 / 翻页 / 适合屏幕。
@@ -943,19 +1140,25 @@ export function AppShell({
     if (command.feedback) {
       setCommandFeedback(command.feedback);
     }
-  }, [activeMode, document?.name, hasDocument, onModeChange, onUtilityPanelChange, reader]);
+  }, [activeMode, document?.name, handleAddCurrentPageBookmark, hasDocument, onModeChange, onUtilityPanelChange, reader]);
 
+  const processedCommandSignalRef = useRef<string | null>(null);
   useEffect(() => {
     if (!commandSignal || commandSignal.id === "file-open") {
       return;
     }
+    const signalKey = `${commandSignal.id}:${commandSignal.nonce}`;
+    if (processedCommandSignalRef.current === signalKey) {
+      return;
+    }
+    processedCommandSignalRef.current = signalKey;
     void executeCommand(commandSignal.id);
     // P1-2：依赖加 commandSignal?.id 以支持同 nonce 不同 id 的边界（理论上 App 层
     // 通过 nonce 递增控制重发，但 effect 列出全部源以满足 react-hooks/exhaustive-deps）。
   }, [commandSignal?.id, commandSignal?.nonce, executeCommand]);
 
   return (
-    <div className="app-shell" role="application" aria-label="FaroPDF PDF 工作台">
+    <div className="app-shell" data-active-mode={activeMode} role="application" aria-label="FaroPDF PDF 工作台">
       <TitlebarTabs
         onRequestNewTab={() => {
           // + 号：触发 Toolbar 的隐藏 file input，复用"打开"按钮
@@ -971,6 +1174,7 @@ export function AppShell({
         activeMode={activeMode}
         onCommand={executeCommand}
         onModeChange={onModeChange}
+        onRightPanelChange={setRightPanelOverride}
         onUtilityPanelChange={onUtilityPanelChange}
         reader={reader}
         search={search}
@@ -993,35 +1197,37 @@ export function AppShell({
       <div
         className="workspace"
         data-layout={workspaceLayout.id}
-        style={{ gridTemplateColumns: workspaceLayout.gridTemplateColumns }}
+        style={{
+          gridTemplateColumns: workspaceLayout.gridTemplateColumns,
+          "--left-pane-width": `${showUtilityPanel ? leftWidth : 0}px`,
+          "--right-pane-width": `${showRightPanel ? rightWidth : 0}px`,
+        } as CSSProperties}
       >
         {showUtilityPanel ? (
           <UtilityPanel
             activeAnnotationId={activeAnnotationId}
             annotations={annotations}
+            bookmarkError={bookmarkController.errorMessage}
+            bookmarks={bookmarkController.bookmarks}
             currentPdfPath={document?.path ?? null}
             formController={formController}
+            key={activeMode === "edit" ? "edit-outline" : "utility-panel"}
             onAnnotationClick={setActiveAnnotationId}
+            onAddBookmark={handleAddCurrentPageBookmark}
             annotationViewSignal={annotationViewSignal}
             onFlattenAnnotations={handleFlattenAnnotations}
+            onRemoveBookmark={handleRemoveBookmark}
             onSecurityClose={() => onUtilityPanelChange("none")}
             onSecurityFeedback={(message) => setCommandFeedback(message)}
             panel={utilityPanel}
+            preferredSummaryTab={activeMode === "edit" ? "大纲" : undefined}
             reader={reader}
             search={search}
           />
         ) : null}
         <div ref={workspaceMainRef} className="workspace__main" style={{ display: "flex", flexDirection: "column", minHeight: 0, minWidth: 0, position: "relative" }}>
           {activeMode === "pages" ? (
-            <EditModeGridView
-              reader={reader}
-              onSelectPage={(pageNumber) => reader.setCurrentPage(pageNumber)}
-              onReorder={() => {
-                // TODO：真实重排（reader.reorderPages）由后续 worker 接入；
-                // 当前 stage 只占位反馈，避免静默吞掉用户操作意图。
-                setCommandFeedback("编辑模式重排已触发，等待后续 worker 接入真实重排。");
-              }}
-            />
+            <PageOrganizerWorkspace reader={reader} />
           ) : isOcrMode ? (
             ocr ? (
               <OcrWorkspace
@@ -1076,7 +1282,13 @@ export function AppShell({
           {isAnnotateMode && hasDocument && overlayViewport ? (
             <AnnotationOverlay
               activeAnnotationId={activeAnnotationId}
-              activeColor={annotationState.color}
+              activeColor={isAnnotationShapeTool(annotationState.activeToolType) ? annotationState.shapeStyle.strokeColor : annotationState.color}
+              activeOpacity={isAnnotationShapeTool(annotationState.activeToolType) ? annotationState.shapeStyle.opacity : undefined}
+              activeStyle={isAnnotationShapeTool(annotationState.activeToolType) ? {
+                strokeWidth: annotationState.shapeStyle.strokeWidth,
+                strokeStyle: annotationState.shapeStyle.strokeStyle,
+                fillColor: annotationState.shapeStyle.fillColor,
+              } : undefined}
               activeStampLabel={annotationState.stampLabel}
               activeStampName={annotationState.stampName}
               activeStampImage={annotationState.stampImage}
@@ -1093,6 +1305,7 @@ export function AppShell({
                   : undefined
               }
               pageIndex={currentPageNumber - 1}
+              placement={annotationOverlayPlacement ?? undefined}
               viewport={overlayViewport}
             />
           ) : null}
@@ -1108,12 +1321,13 @@ export function AppShell({
         </div>
         <RightPanel
           activeMode={activeMode}
-          rightPanel={rightPanelWithEditFallback}
-          // ISS-NEW-C：文档摘要 + OCR 状态面板输入。来源在 Reader 派生，
-          // 当前实现给空（null / idle）。W2 / 后续 PM 收口时把 App.tsx 真值接进来。
-          docSummary={null}
-          ocrStatus={{ state: "idle", message: "尚未开始 OCR", progress: 0 }}
-          onStartOcr={() => undefined}
+          rightPanel={rightPanel}
+          // 文档摘要由当前 PDF bytes/metadata 派生；OCR 状态与启动动作复用同一 controller。
+          docSummary={rightPanelDocSummary}
+          ocrStatus={rightPanelOcrStatus}
+          onStartOcr={(options) => {
+            void ocr?.startOcr(options);
+          }}
           // ISS-NEW-C 阶段 2 后续（2026-06-22 收口）：导出预览 + OCR 队列。
           exportPreview={{
             activeTool: activeExportTool,
@@ -1129,7 +1343,7 @@ export function AppShell({
           }}
           onPanelChange={setRightPanelOverride}
           shapeToolValue={shapeToolValue}
-          onShapeToolChange={setShapeToolValue}
+          onShapeToolChange={handleShapeToolChange}
           searchQuery={search.state.query}
           searchHits={searchHits}
           searchActiveHitId={search.state.activeHitId ?? null}
@@ -1137,7 +1351,9 @@ export function AppShell({
           onSearchSelectHit={search.selectHit}
           onSearchJumpPrevious={search.selectPreviousHit}
           onSearchJumpNext={search.selectNextHit}
-          onSearchClose={() => onUtilityPanelChange("none")}
+          searchOcrHint={search.state.ocrHint ?? undefined}
+          onSearchRequestOcr={search.requestOcr}
+          onSearchClose={() => setRightPanelOverride("none")}
           onSelectCustomStamp={(stamp) => {
             // DEC-112 ISS-060 阶段 2 + ISS-062 阶段 3：用户从右栏选自定义图章 →
             // 把 stamp.image (base64) 写到 annotationArmed 让画布 stamp 工具立刻可用。
@@ -1175,7 +1391,7 @@ export function AppShell({
           onSelectSignature={(signature) => {
             // DEC-113 ISS-060 阶段 2 + ISS-070 阶段 2：用户从右栏选签名 →
             // 当 annotate 模式：把 signature.image 当 stamp 落点（与 customStamp 同套路）
-            // 当 forms 模式：暂只反馈，后续接入 formController.applySignature
+            // 当 forms 模式：把签名库 data URL 解码给同一 formController 工作副本。
             if (activeMode === "annotate") {
               if (!annotationArmed) {
                 setCommandFeedback("请先打开 PDF 文档并进入批注模式。");
@@ -1190,7 +1406,16 @@ export function AppShell({
               });
               setCommandFeedback(`已选中签名「${signature.name}」，请在画布点按落点。`);
             } else if (activeMode === "forms") {
-              setCommandFeedback(`已选中签名「${signature.name}」，下次接入填写签名字段后可直接落入。`);
+              try {
+                const decoded = decodeSignatureDataUrl(signature.image);
+                formController.setSignatureImage(decoded.bytes, decoded.type);
+                formController.openPanel("sign");
+                onUtilityPanelChange("forms");
+                setCommandFeedback(`已载入签名「${signature.name}」，请选择字段并确认嵌入。`);
+              } catch (error) {
+                formController.setErrorMessage(error instanceof Error ? error.message : "签名数据损坏。");
+                onUtilityPanelChange("forms");
+              }
             } else {
               setCommandFeedback(`已选中签名「${signature.name}」。`);
             }
@@ -1295,25 +1520,35 @@ function OcrWorkspaceUnavailable() {
 function UtilityPanel({
   activeAnnotationId,
   annotations,
+  bookmarkError,
+  bookmarks,
   currentPdfPath,
   formController,
   annotationViewSignal,
   onAnnotationClick,
+  onAddBookmark,
   onFlattenAnnotations,
+  onRemoveBookmark,
   onSecurityClose,
   onSecurityFeedback,
   panel,
+  preferredSummaryTab,
   reader,
   search,
 }: {
   activeAnnotationId: string | null;
+  bookmarkError: string | null;
+  bookmarks: import("../../shared/pdf/bookmark").PdfPageBookmark[];
   annotationViewSignal: { view: "list" | "summary"; nonce: number };
   currentPdfPath: string | null;
   onAnnotationClick: (annotationId: string) => void;
+  onAddBookmark: () => void;
   onFlattenAnnotations: () => Promise<AnnotationFlattenResult>;
+  onRemoveBookmark: (bookmarkId: string) => void;
   onSecurityClose: () => void;
   onSecurityFeedback: (message: string | null) => void;
   panel: Exclude<UtilityPanelId, "none">;
+  preferredSummaryTab?: "书签" | "大纲" | "批注列表" | "缩略图";
   reader: ReaderController;
   search: TextSearchController;
   annotations?: PdfAnnotation[];
@@ -1379,34 +1614,37 @@ function UtilityPanel({
     );
   }
 
-  // ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏「书签」面板占位。
-  // 当前 stage 不接 PDF outline 解析 / 持久化 / 跳转，由后续 worker 接入。
   if (panel === "bookmark") {
-    return <BookmarkPanelPlaceholder />;
+    return (
+      <BookmarkPanel
+        bookmarks={bookmarks}
+        currentPage={reader.state.document?.currentPage}
+        errorMessage={bookmarkError}
+        hasDocument={reader.state.document !== null}
+        onAddBookmark={onAddBookmark}
+        onRemoveBookmark={onRemoveBookmark}
+        onSelectPage={reader.setCurrentPage}
+      />
+    );
   }
 
   return (
     <DocumentSummaryPanel
       annotations={annotations}
+      bookmarkError={bookmarkError}
+      bookmarks={bookmarks}
       currentPage={reader.state.document?.currentPage}
       hasDocument={reader.state.document !== null}
       ocrNeeded={reader.state.document?.ocrStatus === "needed"}
+      onAddBookmark={onAddBookmark}
+      onRemoveBookmark={onRemoveBookmark}
+      onSelectBookmarkPage={reader.setCurrentPage}
       onSelectPage={reader.setCurrentPage}
       pageCount={reader.state.document?.pageCount}
       pagesWithHits={collectPagesWithSearchHits(search.state.hits)}
+      preferredTab={preferredSummaryTab}
       renderThumbnail={reader.renderThumbnail}
     />
-  );
-}
-
-/** ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏书签面板占位。
- *  真实能力（outline 解析 / 添加 / 跳转 / 持久化）留后续 worker。 */
-function BookmarkPanelPlaceholder() {
-  return (
-    <aside className="bookmark-panel" aria-label="书签面板" data-testid="bookmark-panel">
-      <h2 className="bookmark-panel__title">书签</h2>
-      <p className="bookmark-panel__empty">书签功能开发中，等待后续 worker 接入 PDF outline 解析与持久化。</p>
-    </aside>
   );
 }
 
@@ -1458,6 +1696,33 @@ function ContextToolbar({
     return (
       <div className="context-toolbar context-toolbar--annotation" role="toolbar" aria-label={contextualToolbarLabels[mode]}>
         <AnnotationToolbar disabled={annotationDisabled} state={annotationState} onStateChange={onAnnotationStateChange} />
+      </div>
+    );
+  }
+
+  if (mode === "edit") {
+    const editTools = [
+      { label: "文本", icon: Type },
+      { label: "图像", icon: ImageIcon },
+      { label: "链接", icon: Link2 },
+      { label: "隐藏", icon: EyeOff },
+    ] as const;
+    return (
+      <div
+        className="context-toolbar context-toolbar--edit"
+        data-testid="edit-context-toolbar"
+        role="toolbar"
+        aria-label={contextualToolbarLabels[mode]}
+      >
+        {editTools.map(({ label, icon: Icon }) => (
+          <button aria-label={label} className="context-tool" disabled key={label} title={`${label}编辑引擎尚未接入`} type="button">
+            <Icon size={19} />
+            <span>{label}</span>
+          </button>
+        ))}
+        <span className="context-toolbar__status" role="status">
+          内容编辑引擎待接入
+        </span>
       </div>
     );
   }

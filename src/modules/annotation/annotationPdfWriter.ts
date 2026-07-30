@@ -16,7 +16,7 @@ import { sortAnnotations } from "./sidecar";
  *
  * 设计目标：
  * - 不修改源 PDF bytes；输出是 in-memory 复制。
- * - 用 pdf-lib 提供的 drawRectangle / drawLine / drawText / drawSvgPath 绘制 9 种批注。
+ * - 用 pdf-lib 提供的 drawRectangle / drawEllipse / drawLine / drawText / drawSvgPath 绘制 12 种批注。
  * - 颜色接受 3/6 位 hex；非法颜色抛错并被记录为 skipped 警告，不影响其他批注。
  * - 越界 rect 自动 clamp 到页面 bounds（不抛错，遵守 DEC-031 几何裁剪语义）。
  * - 中文 / 非 Latin-1 文本按 WinAnsi 限制跳过该 textbox 批注，记录原因。
@@ -119,7 +119,6 @@ export async function writeAnnotationPdf(input: WriteAnnotationPdfInput): Promis
   }
 
   const drawnCount = sortedAnnotations.length - skipped.length;
-  const outputPdfBytes = await workingPdf.save({ useObjectStreams: false });
   workingPdf.setCreator("FaroPDF annotation writer");
   workingPdf.setProducer("FaroPDF pdf-lib annotation writer");
   workingPdf.setKeywords([
@@ -127,6 +126,7 @@ export async function writeAnnotationPdf(input: WriteAnnotationPdfInput): Promis
     `faropdf:annotation-count:${sortedAnnotations.length}`,
     `faropdf:annotation-drawn:${drawnCount}`,
   ]);
+  const outputPdfBytes = await workingPdf.save({ useObjectStreams: false });
 
   const summary: AnnotationPdfWriteSummary = {
     inputPageCount,
@@ -171,9 +171,13 @@ async function drawAnnotation(
     case "textbox":
       return drawTextbox(page, annotation.rects, bounds, annotation.content, color, opacity, font);
     case "rectangle":
-      return drawBorderRect(page, annotation.rects, bounds, color, opacity);
+      return drawShapeRect(page, annotation, bounds, color, opacity, "rectangle");
+    case "ellipse":
+      return drawShapeRect(page, annotation, bounds, color, opacity, "ellipse");
     case "arrow":
-      return drawArrow(page, annotation, bounds, color, opacity);
+    case "double-arrow":
+    case "line":
+      return drawLineShape(page, annotation, bounds, color, opacity);
     case "ink":
       return drawInk(page, annotation, bounds, color, opacity);
     case "stamp":
@@ -271,30 +275,52 @@ function drawNoteRect(
   return { drawn: true };
 }
 
-/** 矩形（无填充、纯边框） */
-function drawBorderRect(
+/** 矩形 / 椭圆：样式来自 sidecar，可选填充、虚线和线宽。 */
+function drawShapeRect(
   page: PDFPage,
-  rects: ReadonlyArray<PdfRect>,
+  annotation: PdfAnnotation,
   bounds: PdfRect,
   color: ReturnType<typeof rgb>,
   opacity: number,
+  kind: "rectangle" | "ellipse",
 ): { drawn: true } | { drawn: false; reason: string } {
-  const clamped = clampRects(rects, bounds);
+  const clamped = clampRects(annotation.rects, bounds);
   if (clamped.length === 0) {
     return { drawn: false, reason: "rect 全部越界或为空" };
   }
+  const fillValue = annotation.style?.fillColor?.trim();
+  const fillColor = fillValue && fillValue !== "transparent" ? parseColorOrWarn(fillValue) : null;
+  if (fillValue && fillValue !== "transparent" && !fillColor) {
+    return { drawn: false, reason: `填充颜色无法解析：${fillValue}` };
+  }
+  const strokeWidth = resolveStrokeWidth(annotation);
+  const borderDashArray = resolveDashArray(annotation, strokeWidth);
   for (const rect of clamped) {
-    page.drawRectangle({
-      x: rect.x,
-      y: rect.y,
-      width: rect.width,
-      height: rect.height,
-      borderColor: color,
-      borderOpacity: opacity,
-      borderWidth: STROKE_THICKNESS,
-      color: rgb(1, 1, 1),
-      opacity: 0,
-    });
+    if (kind === "rectangle") {
+      page.drawRectangle({
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        borderColor: color,
+        borderOpacity: opacity,
+        borderWidth: strokeWidth,
+        ...(borderDashArray ? { borderDashArray } : {}),
+        ...(fillColor ? { color: fillColor, opacity } : {}),
+      });
+    } else {
+      page.drawEllipse({
+        x: rect.x + rect.width / 2,
+        y: rect.y + rect.height / 2,
+        xScale: rect.width / 2,
+        yScale: rect.height / 2,
+        borderColor: color,
+        borderOpacity: opacity,
+        borderWidth: strokeWidth,
+        ...(borderDashArray ? { borderDashArray } : {}),
+        ...(fillColor ? { color: fillColor, opacity } : {}),
+      });
+    }
   }
   return { drawn: true };
 }
@@ -338,8 +364,8 @@ function drawTextbox(
   }
 }
 
-/** 箭头：从 line.start → line.end 画主线 + 三角箭头 */
-function drawArrow(
+/** 直线 / 单向箭头 / 双向箭头：共用线宽、虚线和不透明度。 */
+function drawLineShape(
   page: PDFPage,
   annotation: PdfAnnotation,
   bounds: PdfRect,
@@ -347,21 +373,42 @@ function drawArrow(
   opacity: number,
 ): { drawn: true } | { drawn: false; reason: string } {
   if (!annotation.line) {
-    return { drawn: false, reason: "箭头批注缺少 line 字段" };
+    return { drawn: false, reason: `${annotation.type} 批注缺少 line 字段` };
   }
   const start = clampPoint(annotation.line.start, bounds);
   const end = clampPoint(annotation.line.end, bounds);
+  const strokeWidth = resolveStrokeWidth(annotation);
+  const dashArray = resolveDashArray(annotation, strokeWidth);
   page.drawLine({
     start,
     end,
-    thickness: STROKE_THICKNESS,
+    thickness: strokeWidth,
     color,
     opacity,
+    ...(dashArray ? { dashArray } : {}),
   });
-  const head = computeArrowHead(start, end, ARROW_HEAD_SIZE);
-  page.drawLine({ start: end, end: head.left, thickness: STROKE_THICKNESS, color, opacity });
-  page.drawLine({ start: end, end: head.right, thickness: STROKE_THICKNESS, color, opacity });
+  const arrowHeadSize = Math.max(ARROW_HEAD_SIZE, strokeWidth * 4);
+  if (annotation.type === "arrow" || annotation.type === "double-arrow") {
+    drawArrowHead(page, start, end, arrowHeadSize, strokeWidth, color, opacity);
+  }
+  if (annotation.type === "double-arrow") {
+    drawArrowHead(page, end, start, arrowHeadSize, strokeWidth, color, opacity);
+  }
   return { drawn: true };
+}
+
+function drawArrowHead(
+  page: PDFPage,
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  size: number,
+  thickness: number,
+  color: ReturnType<typeof rgb>,
+  opacity: number,
+): void {
+  const head = computeArrowHead(start, end, size);
+  page.drawLine({ start: end, end: head.left, thickness, color, opacity });
+  page.drawLine({ start: end, end: head.right, thickness, color, opacity });
 }
 
 /** 墨迹：把每个 stroke 串联为 svg path，drawSvgPath 一次绘出 */
@@ -396,7 +443,10 @@ function drawInk(
     opacity,
     borderColor: color,
     borderOpacity: opacity,
-    borderWidth: INK_THICKNESS,
+    borderWidth: resolveStrokeWidth(annotation, INK_THICKNESS),
+    ...(resolveDashArray(annotation, resolveStrokeWidth(annotation, INK_THICKNESS))
+      ? { borderDashArray: resolveDashArray(annotation, resolveStrokeWidth(annotation, INK_THICKNESS)) }
+      : {}),
   });
   return { drawn: true };
 }
@@ -573,6 +623,20 @@ function normalizeOpacity(value: number | undefined, fallback: number): number {
     return fallback;
   }
   return Math.min(1, Math.max(0, value));
+}
+
+function resolveStrokeWidth(annotation: PdfAnnotation, fallback = STROKE_THICKNESS): number {
+  const value = annotation.style?.strokeWidth;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(24, Math.max(0.5, value));
+}
+
+function resolveDashArray(annotation: PdfAnnotation, strokeWidth: number): number[] | undefined {
+  return annotation.style?.strokeStyle === "dashed"
+    ? [strokeWidth * 3, strokeWidth * 2]
+    : undefined;
 }
 
 function safeTextWidth(font: PDFFont, text: string, size: number): number {

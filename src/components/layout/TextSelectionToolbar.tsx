@@ -51,8 +51,7 @@ const ACTIONS: ActionDescriptor[] = [
   { id: "annotate-strikeout", label: "删除线", glyph: "̶", enabled: true, hint: "对选中文本应用删除线批注" },
   { id: "annotate-note", label: "便签", glyph: "💬", enabled: true, hint: "在选中文本旁添加便签" },
   { id: "copy", label: "复制", glyph: "⧉", enabled: true, hint: "复制选中文本到剪贴板" },
-  // ISS-061 阶段 2：翻译 / 朗读真接入（v0.2 不再 disabled）
-  { id: "annotate-translate", label: "翻译", glyph: "A", enabled: true, hint: "对选中文本请求翻译占位" },
+  { id: "annotate-translate", label: "翻译", glyph: "A", enabled: false, hint: "翻译服务尚未接入" },
   { id: "annotate-read-aloud", label: "朗读", glyph: "♪", enabled: true, hint: "朗读选中文本" },
 ];
 
@@ -134,19 +133,6 @@ export function TextSelectionToolbar({ bounds, onAction, onClose, color, noteCon
             },
           }),
         );
-      }
-
-      // 翻译（v0.2 占位：把原文 + 说明写进剪贴板，等真翻译 API 接入）
-      if (action.id === "annotate-translate") {
-        const placeholder = `翻译（占位 · 待接入翻译 API）\n原文：${text}`;
-        try {
-          void navigator.clipboard?.writeText(placeholder);
-        } catch {
-          // jsdom / 非安全上下文 clipboard 可能不可用，忽略
-        }
-        onToast?.(`翻译：已把原文写入剪贴板（占位）`);
-        onAction(action.id as AnnotationAction | CopyAction);
-        return;
       }
 
       // 朗读（Web Speech API speechSynthesis）

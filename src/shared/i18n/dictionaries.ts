@@ -68,6 +68,14 @@ export interface Dictionary {
     viewModeOptions: Record<PdfViewMode, string>;
     textLayerStatusOptions: Record<TextLayerStatus, string>;
   };
+  readerError: {
+    /** 错误卡片标题（损坏 / 加密等加载失败通用） */
+    title: string;
+    /** 隐藏 file input 的无障碍标签 */
+    fileInputAria: string;
+    /** 「重新选择文件」主按钮 */
+    retryButton: string;
+  };
   feedback: {
     convertImagesPending: string;
     convertWordPending: string;
@@ -154,6 +162,11 @@ const zhCN: Dictionary = {
       missing: "缺失",
       poor: "较差",
     },
+  },
+  readerError: {
+    title: "无法打开此 PDF",
+    fileInputAria: "重新选择 PDF 文件",
+    retryButton: "重新选择文件",
   },
   feedback: {
     convertImagesPending: "图片转 PDF 功能开发中，等待 OCR pipeline / img2pdf engine 接入。",
@@ -247,6 +260,11 @@ const en: Dictionary = {
       missing: "Missing",
       poor: "Poor",
     },
+  },
+  readerError: {
+    title: "Unable to open this PDF",
+    fileInputAria: "Select another PDF file",
+    retryButton: "Choose another file",
   },
   feedback: {
     convertImagesPending: "Images to PDF is under development. Awaiting OCR pipeline / img2pdf engine integration.",

@@ -19,6 +19,7 @@ import {
   formsPanelDrawerMediaQuery,
 } from "../breakpoints";
 import type { FormController } from "../useFormController";
+import { decodeSignatureDataUrl } from "../signatureImage";
 import { SignatureLibraryPicker } from "./SignatureLibraryPicker";
 import "./FormsPanel.css";
 
@@ -127,27 +128,11 @@ export function FormsPanel({ controller, layoutMode = "auto" }: FormsPanelProps)
 
   // ISS-070 阶段 3：从签名库（signatureStore）选历史签名 → 转 bytes → setSignatureImage
   function handleSelectLibrarySignature(dataUrl: string): void {
-    const detectedType: "png" | "jpg" | null = dataUrl.startsWith("data:image/png")
-      ? "png"
-      : dataUrl.startsWith("data:image/jpeg")
-        ? "jpg"
-        : null;
-    if (!detectedType) {
-      setErrorMessage("签名库里的签名格式异常，必须是 PNG 或 JPG。");
-      return;
-    }
     try {
-      const base64 = dataUrl.split(",")[1] ?? "";
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i += 1) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      setSignatureImage(bytes, detectedType);
-    } catch {
-      // DEC-119 review P1-3：localStorage 数据损坏 / 非法 base64 时 atob 抛 DOMException，
-      // 不让整个 FormsPanel 渲染崩；提示用户重新新建签名。
-      setErrorMessage("签名库数据损坏，请重新新建签名。");
+      const decoded = decodeSignatureDataUrl(dataUrl);
+      setSignatureImage(decoded.bytes, decoded.type);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "签名库数据损坏，请重新新建签名。");
     }
   }
 

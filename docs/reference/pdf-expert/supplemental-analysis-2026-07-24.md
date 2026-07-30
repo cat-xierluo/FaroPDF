@@ -10,7 +10,7 @@
 | 页面管理 | `captures/cropped/G02-page-management-grid-a.png` / `-b.png` | 5 个真实页面卡片同排，第一页蓝色选中；7 个页面操作入口 | measured |
 | 批注 | `captures/cropped/G03-annotate-a.png` / `-b.png` | 批注上下文工具条、左侧大纲面板、中央页面 | measured |
 | 矩形工具 | `captures/cropped/G04-shape-rectangle-a.png` / `-b.png` | 右侧矩形工具面板和完整形状样式控件 | measured |
-| 编辑画布 | `captures/cropped/G05-edit-grid-a.png` / `-b.png` | 编辑模式是文本/图像/链接/隐藏上下文工具条，不是页面卡片网格 | measured |
+| 编辑画布 | `captures/cropped/G05-edit-grid-a.png` / `-b.png` | 编辑模式保留 272pt 大纲左栏，中央区从 x=272 开始；页面按整窗中心线对齐，L4 是文本/图像/链接/隐藏，不是页面卡片网格 | measured |
 
 每组 a/b 都用 `ImageMagick compare -metric AE` 做 reference-vs-reference 检查，差异像素为 0。此结果只证明本次两次采集稳定，不证明 FaroPDF 已对齐。
 
@@ -33,16 +33,16 @@ read default
 
 所有坐标均为 1280×832 逻辑点的人工量测，误差约 ±4pt；详细值在 `measurements.json`。
 
-- L2：窗口标题栏约 29pt，包含 tab 与窗口控制。
-- L3：默认主工具栏约 32pt；批注、页面管理、编辑等入口处于同一行。
-- L4：上下文工具条约 65pt，只有批注/编辑/页面管理等模式出现；read default 不应凭空增加 L4。
-- L5a：批注截图中的大纲面板约 211pt 宽；它是大纲，不是缩略图。
-- L5c：页面画布保持 A4 纵向比例；页面管理状态不显示阅读页，而是全宽卡片网格。
-- L5b：矩形工具右栏约 480pt 宽，位于中央画布右侧；可见 preview、shape selector、stroke width、border type、opacity、stroke/fill color、collapse footer。
+- L2：窗口标题栏 40pt，包含 tab 与窗口控制。
+- L3：默认主工具栏 40pt；批注、页面管理、编辑等入口处于同一行。
+- L4：2026-07-28 二次逐行像素校准推翻早先 29/32/33pt 口径；批注/编辑约 43pt，页面管理约 44pt。read default 不应凭空增加 L4。
+- L5a：批注与编辑截图中的大纲面板经独立像素复核约 272pt（原 211pt 落在面板内部）；它是大纲，不是缩略图。
+- L5c：编辑中央区从 x=272 开始、宽约 1008pt，但页面通过半栏宽补偿保持整窗居中；页面管理状态不显示阅读页，而是全宽卡片网格。
+- L5b：矩形工具右栏经独立像素复核约 380pt；搜索结果栏二次复核为 240pt。两者不可作为全局右栏默认值互相借用。
 
 ## 对 FaroPDF 实现的直接约束
 
-1. `EditModeGridView` 的页面卡片模式应由页面管理入口驱动；不能将“编辑模式文本工具条”和“页面管理卡片网格”合并成一个状态。
+1. 页面卡片模式由独立 `pages` / `PageOrganizerWorkspace` 驱动；已卸载的 `EditModeGridView` 只是 deprecated skeleton，不能再充当规格源，也不能将“编辑模式文本工具条”和“页面管理卡片网格”合并成一个状态。
 2. 页面管理截图显示 5 张真实页面缩略图，且第一页有蓝色选中框；卡片内容必须来自 PDF 页面渲染，不能用统一渐变占位图。
 3. 批注截图仅证明左侧大纲 + 中央页面 + 批注工具条；不要据此自动打开 RightPanel。
 4. 形状右栏的可见控件顺序是实现 contract，`矩形` 是当前选择；其他形状的具体默认样式和落点行为仍需单独证据。
@@ -58,7 +58,7 @@ read default
 
 - 入库：`captures/raw/N-CROP-L3-search-a.png` / `-b.png`；`captures/cropped/N-CROP-L3-search-a.png` / `-b.png`。
 - 状态：固定 1280×832 logical window；完整 L3 主工具栏可见；左侧为“大纲”面板，右侧为搜索结果面板；查询 `Purpose`，显示“已找到：2”，第 1、2 页均有命中高亮。
-- 量测：标题栏 29pt、L3 32pt、左大纲约 272pt、右搜索栏约 480pt；详细 bbox 写入 `measurements.json`。
+- 量测：标题栏 40pt、L3 40pt、左大纲约 273pt、右搜索栏约 240pt；详细 bbox 写入 `measurements.json`。
 - 稳定性：`compare -metric AE` 为 148 个差异像素；差异来自搜索字段 caret/IME 浮泡的瞬态变化，语义布局稳定，因此保持 `measured`，不升级 `accepted-golden`。
 - 限制：window-only crop 不含 macOS 菜单栏；raw 保留菜单栏但同时包含桌面背景和备份通知。raw 只能作为过程审计，不能作为 golden。
 

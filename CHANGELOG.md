@@ -1,4 +1,64 @@
+## 未发版 · 损坏 PDF 错误卡片与归一化错误码闭环（2026-07-30，DEC-192）
+
+- **修复 silent failure**：打开损坏或无效 PDF 时不再回到空 Welcome 屏，改为展示 `role="alert"` 的中文错误卡片（标题「无法打开此 PDF」+ 归一化错误文案 + 「重新选择文件」入口），支持拖拽放入新文件。
+- **错误码归一化**：`shared/error.ts` 的 `normalizeError` 现在按 `error.name` 识别 PDF.js 异常——`InvalidPDFException` → `PdfParseError`、`PasswordException` → `EncryptionError`；损坏 PDF 的 PDF.js 英文原文不再透传给用户。
+- **共享错误文案**：把 `SecurityPanel` 私有的 `friendlyMessageForCode` 提取到 `shared/errorMessages.ts`，reader 加载失败与加解密面板共用同一套 9 类中文友好文案，消除分叉。
+- **可复现 fixture**：新增 `tests/fixtures/reader/generate-corrupt.mjs`，生成截断 PDF 稳定触发 PDF.js `InvalidPDFException`，供实机与 CI 验证。
+- **验收边界**：本轮达到 M5「文件损坏」`behavior-complete`；accepted-golden=0，不声明 `visually-verified`。密码 PDF / 权限不足 / OCR 失败仍为 M5 后续项。
+
+## 未发版 · 任务源与决策索引治理（2026-07-30，DEC-191）
+
+- `docs/TASKS.md` 按最新 AGENTS / doc-curator 规则只保留最近 5 条进度摘要，当前唯一推进序列与下一候选异常态保持在顶部。
+- 修复 DECISIONS 的 ISS 归档排序，并从可追溯历史 commit 恢复 DEC-074～096 最小索引；不重写旧决策语义。
+- 文档硬门禁恢复通过；活跃卡数量和文件行数仍作为 adaptive maintenance 提示保留，后续单独审计归档。
+
+## 未发版 · 页面书签 sidecar 与刷新恢复闭环（2026-07-30，DEC-190）
+
+- **入口统一接线**：L5a 摘要栏“书签”tab、独立书签 utility panel 和原生 `view-add-bookmark` 命令共用同一领域状态；移除“开发中”占位和 recentFiles.lastPage 假书签。
+- **完整页面行为**：支持添加当前页、重复添加幂等、按页排序、当前页标记、点击跳页和删除；没有文档时按钮和命令 fail-closed，大纲写回未接入时加号保持 disabled。
+- **隐私与安全**：书签保存在按 fingerprint / path 安全摘要隔离的 localStorage sidecar；storage key 只包含哈希，sidecar 不保存原 PDF 路径或文件名，也不改写原始 PDF。
+- **真实交互证据**：Playwright 在五页 `reference.pdf` 上添加第 1/3 页、验证重复添加、跳页、刷新重开恢复、第二份 PDF 隔离和删除；console/page error 均为 0，截图位于 `/private/tmp/faropdf-bookmark-audit-20260730/bookmark-roundtrip.png`。
+- **验收边界**：R04 只粗证 L5a tab 信息架构，书签内容 surface 仍无 accepted-golden；本轮达到 `behavior-complete`，不声明 `visually-verified`。
+
+## 未发版 · 形状批注样式与 PDF 往返闭环（2026-07-30，DEC-189）
+
+- **右栏真实接线**：形状、线型、线宽、不透明度、边框色和填充色进入统一 `AnnotationToolState`；选择形状会 arm 对应画布工具，不再维护与批注模块无关的本地 UI state。
+- **六类形状完整覆盖**：矩形、椭圆、直线、单向箭头、双向箭头和铅笔均能在 overlay 预览、sidecar 恢复，并由 pdf-lib 写入新 PDF；虚线、线宽、颜色、填充和透明度保持一致。
+- **坐标与页框修正**：overlay 按当前页 `.page-container` 的真实 bbox 定位，并把 DOM 左上坐标转换为 PDF 左下用户空间；修复过去覆盖整个 workspace、落点和导出位置可能偏移的问题。
+- **真实往返证据**：Playwright 绘制蓝底红色虚线椭圆与双向箭头，刷新重开后样式和位置保持；overlay/canvas bbox 完全一致。扁平副本重开为 5 页，元数据确认绘制 2/2，console/page error 均为 0。
+- **导出元数据修复**：批注 writer 在 `save()` 前写入 creator/producer/keywords，`faropdf:annotation-count` 和 `faropdf:annotation-drawn` 现在真实存在于产物中。
+
+## 未发版 · AcroForm 表单工作副本闭环（2026-07-30，DEC-188）
+
+- **连续操作不丢失**：Forms controller 首次读取原始 PDF 后建立内存工作副本；后续填写、勾选、签名和扁平化均消费上一操作的 bytes，不再每次回退到原始文件。
+- **签名入口真实接线**：签名库 data URL 统一校验并解码为 PNG/JPG bytes；forms 模式选择签名后进入真实字段嵌入流程，不再只显示“后续接入”的反馈。
+- **真实往返证据**：新增无敏感信息的 4 字段 AcroForm fixture。Playwright 从 FaroPDF UI 连续下载填写、勾选、签名和扁平副本；重开确认姓名值保留、复选框为 true、签名 XObject 存在，最终 PDF 为 1 页且 0 个可编辑字段，console/page error 均为 0。
+- **安全边界**：所有步骤只下载新 PDF，不修改或覆盖 reader 持有的原始 bytes；自由拖放签名位置仍未实现，文档不再把它误报为已完成。
+
+## 未发版 · Shell 层级、密度与画布几何纠偏（2026-07-28，DEC-186）
+
+- **量测纠错**：逐行像素取色推翻先前 29/32/33pt 基线，canonical 改为 L2=40pt、L3=40pt、annotate/edit L4=43pt、页面管理 L4=44pt；页面 bbox 与页卡 canvas 通过白色连通域复核。
+- **功能层级**：L3 重组为 navigation / zoom / workflows / collaboration / search 五段；导出、填写签名和 OCR 与批注/编辑同属核心工作流，低频命令与设置收入口菜单。标题栏与画布改为参考态的中性深色层级，按钮间距、激活态和大纲空态同步收紧；G05 编辑态恢复 272px 大纲左栏，L3 与原生 PDF 编辑菜单统一进入该结果态；搜索从 L3 浮层改为 measured 240px L5b 结果栏。
+- **阅读画布**：single 只渲染当前页；50% 运行态按 measured density calibration 对齐参考 48% 页面 bbox。read/annotate/edit/pages 隐藏无参考依据的底部状态栏，OCR 等依赖状态信息的工作流继续保留。
+- **页面管理**：`PageOrganizerWorkspace` 使用 `reader.renderThumbnail` 渲染 5 张真实 PDF canvas，默认选中当前页；1280×832 下页卡位置、尺寸、间距与 G02 measured 对齐。拖拽重排、写回与导出重开仍属 M3。
+- **可失败门禁**：`verify:pdf-expert-visual` 从 24 项扩展到 73 项，新增 L3 五段 x/width、页面 bbox/单页计数、G05 编辑大纲与中央画布、页卡 bbox/真实 canvas、搜索三列及参考态状态栏断言；最新 run 73/73 PASS。`verify:ui-layout` 两视口 PASS，typecheck、118 项聚焦测试、AppShell edit/native 2 项定向测试与 build PASS。
+- **独立回验**：S4 首轮发现 G05 假绿，回验又发现原生 `pdf-edit-*` 会二次折叠左栏与 `canvas` bbox 语义重叠；整改后按 reference/协议/矩阵/量测/实现/report 三轮复核，最终严格 PASS。
+- **验证限制**：全仓 lint 唯一错误仍位于用户已有改动 `src/modules/reader/readerReducer.test.ts:244` 的 `prefer-const`；本轮未修改该文件。本轮相关 ESLint 与 AppShell edit/native 定向测试均通过；AppShell 全文件 Vitest 的既有 open-handle 仍未冒充 PASS。accepted-golden 仍为 0，因此最高等级为 `wired + geometry/density-verified`，不声明 `visually-verified`。
+
+## 未发版 · PDF Expert 状态机与验证器纠偏（2026-07-28，DEC-185；几何基线已由 DEC-186 校准）
+
+> 历史初校记录：本节的 29/32/33pt、搜索 480px 和 24 项结果已被 DEC-186 的二次像素校准与 73 项门禁取代；状态机拆分等其余决定继续有效。
+
+- **模式拆分**：`T 编辑` 进入独立 `edit` mode，保持单页 PDF 画布并显示 `文本 / 图像 / 链接 / 隐藏` L4；尚未接通的内容编辑工具显式禁用。独立“页面管理”入口进入 `pages` mode 并挂载 `PageOrganizerWorkspace`，不再激活 `T 编辑`。
+- **面板纠偏**：批注默认态不再自动打开图章右栏；移除无证据的 forms→shape fallback。右栏基础默认恢复 320px；搜索使用 measured 480px、形状使用独立像素复核约 380px，不再跨 surface 借宽度。
+- **层级初校（已被 DEC-186 取代）**：当时按 measured 29/32/33pt 拆分；二次逐行像素复核后改为 40/40/43–44pt。深色主题、48% 缩放的采集口径继续有效。
+- **验证器修复**：`verify:pdf-expert-visual` 改为逐层 bbox + surface 语义断言，覆盖 read/annotate/edit/pages；删除“用搜索 480px 验批注图章栏”和“把 L2+L3+L4 绑到单个 toolbar DOM”的假断言。`verify:ui-layout` 同步验证 edit/pages 独立路由。
+- **验证**：typecheck 通过；Toolbar/RightPanel/命令/栏宽 72 项、App 15 项、新增 AppShell 4 项通过；`verify:ui-layout` 两视口 exit 0 并落盘本次 artifact 清单；`verify:pdf-expert-visual` 24/24 exit 0。actual 统一为深色、单页、第 1 页、50%（FaroPDF 最接近参考 48% 的 UI 步进），并复现 G03 左侧大纲与 G02 第 1 页选中态。accepted-golden 仍为 0，因此不声明 `visually-verified`。
+- **独立复审**：S4 对状态机、证据、actual/report 和当前规范完成两轮纠偏后严格 PASS；M2/M2.1 仅关闭 measured 几何/语义门禁，M1 accepted-golden 与 M3 页面管理行为闭环继续保留为待办。
+
 ## 未发版 · 栏宽校准与 M2 验证器扩展（2026-07-25，DEC-184）
+
+> 历史结果：DEC-185 已撤销“480px 是全局默认右栏”及“annotate 默认打开右栏”的推断；DEC-186 又将搜索面板从旧量测 480px 校正为现行 240px。左栏 272px 继续有效。
 
 基于补采 N-CROP-L3-SEARCH 的 measured bbox（左栏 272pt + 右栏 480pt）校准栏宽默认值并扩展 M2 验证器。
 
@@ -1052,3 +1112,11 @@ v0.3 follow-ups（已在 `docs/RELEASE.md §4` 文档化，不阻塞 beta.1）�
 - 新增 `N-CROP-L3-SEARCH` a/b raw 与 window-only crop：完整 L3 工具栏、左侧大纲、右侧搜索结果栏、`Purpose` 两页命中高亮。
 - 更新 `manifest.json`、`measurements.json`、状态矩阵、覆盖缺口和补采分析；该组保持 `measured`，不宣称 `accepted-golden`。
 - 记录真实文字层拖选未触发浮动工具栏、当前会话缩略图入口 disabled 的负面证据；`ISS-NEW-N-SEL` 与 `ISS-NEW-N-THUMB` 继续保持缺口。
+## 未发版 · 功能框架真实性与页面/OCR/导出闭环（2026-07-30，DEC-187）
+
+- **验收目标调整**：PDF Expert 改为功能框架参考，不再把像素一致、accepted-golden 或截图补采作为 M3～M5 的功能前置；完成标准改为入口接真实模块、产物可重开、未实现能力 fail-closed。
+- **页面管理**：真实选择/多选、拖拽重排、旋转、删除、撤销和 `*-organized.pdf` 导出接线；Playwright 下载后重开确认 5 页且第一页旋转 90°。复制/粘贴显式禁用。
+- **功能真实性**：T 编辑、图片/Word 转换、翻译及 planned 原生命令不再产生假状态/假反馈；“文档助手/共享”改为真实“摘要/导出与交付”。
+- **右栏与批注**：文档摘要接当前 PDF bytes/metadata；OCR 状态与页码范围接真实 controller；批注 sidecar 使用 localStorage 持久化并在不可用时回退内存。
+- **中文导出修复**：修复 Vite 字体 URL、Node 测试 fallback 和 `@pdf-lib/fontkit` CJS interop，默认中文文字水印可实际导出有效 5 页 PDF。
+- **产物元数据**：页面 execute 导出写入 `faropdf:page-operations-applied`，不再错误标成 `plan-only`。

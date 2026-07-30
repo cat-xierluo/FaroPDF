@@ -1,6 +1,6 @@
 # PDF Expert 复刻覆盖缺口
 
-最后更新：2026-07-24（补采批次入库）
+最后更新：2026-07-28（M2.2 Shell 层级、密度与 G05 证据链纠偏）
 
 ## P0：阻塞所有视觉完成声明
 
@@ -9,17 +9,17 @@
 | capture truth | 15 张首批图片重新分级：6 raw-Aminus + 5 raw-B（1 raw-B-low-confidence）+ 4 raw-C；accepted-golden 仍为 0 | 按 ISS-NEW-N / ISS-NEW-M 推进；M1 完整重采不阻塞当前面板修正批次 | ISS-NEW-N |
 | normalization | 2026-07-24 补采 6 组已按固定窗口生成 2560×1664 window-only crop；搜索态 raw 仍含桌面背景 | `N-CROP-L3-SEARCH` 已补完整 L3 + 搜索结果双栏的 measured crop；CROP 的菜单栏与 accepted-golden 门禁仍待 M1 统一 | ISS-NEW-N-CROP |
 | measurement | 新增 `measurements.json`，记录 1280×832 逻辑 bbox、人工误差 ±4pt；ZAI bbox MCP 不可用 | M1 独立复核并补自动量测 | ISS-NEW-N-CROP |
-| visual verdict | 现有脚本只测几何，无黄金图视觉 diff | M2 验证器（M1 完成后建立） | ISS-NEW-M M2 |
+| visual verdict | M2 已有 73 项 measured 门禁：L2/L3/L4、L3 五组、页面 bbox/单页计数、G05 编辑大纲/中央画布、5 张真实页卡、搜索 273/767/240 三列及状态栏可见性；仍无 accepted-golden 像素 diff | M1 准入 golden 后增加 reference 图像回归并收紧阈值 | ISS-NEW-M M1/M2 |
 | state | thumbnails（左栏真缩略图 + 当前页高亮）仍无可靠图；N-PAGE 是整页页面管理网格 | ISS-NEW-N-THUMB 补采；不得把 N-PAGE 当 Sidebar thumbnails | ISS-NEW-N-THUMB |
 | state | text selection 浮动工具条无图；本轮真实文字层拖选仍未触发 | 找到可复现的原生选区触发路径后再补采 | ISS-NEW-N-SEL |
 | state | shape 右栏已补采矩形激活态；R12 仍是 stamp 负面证据 | N-SHAPE-RECTANGLE 可支撑 measured 面板合同；绘制/其他形状仍由 ISS-NEW-N-SHAPE 后续补齐 | ISS-NEW-N-SHAPE |
-| state | annotate 右栏真实布局、welcome 真目标状态、forms、export、L5a+L5b 同屏、OCR 运行态、双栏 | 当前 raw 不支持；归档为后续任务，由 ISS-NEW-N 子卡或 M4/M5 推进 | ISS-NEW-M M4/M5 |
-| interaction | edit 拖动开始、drop indicator、写回和导出重开无证据 | 采完整序列并做 PDF 顺序 round-trip（依赖 ISS-NEW-N-THUMB / SHAPE 等前置） | ISS-NEW-M M3 |
+| state | annotate 的可选签名/图章右栏、welcome 真目标状态、forms、export、OCR 运行态 | 当前 raw 不支持；不得拿搜索 240pt 或 shape 380pt 代替其他 panel | ISS-NEW-M M4/M5 |
+| interaction | 页面管理拖动开始、drop indicator、写回和导出重开无证据 | 基于 G02/M1 页面管理专属状态采完整序列并做 PDF 顺序 round-trip；ISS-NEW-N-THUMB 只服务左侧栏，不是 M3 前置 | ISS-NEW-M M3 |
 | runtime | FaroPDF 仍有多个 noop/placeholder/toast-only | M3～M5 解锁后，以 `implementation-map.md` 为清单逐项接通；M1 不改代码 | ISS-NEW-M M3+ |
 
 ## P0+：ISS-NEW-N 补采硬缺口（无图就无法做对应修正）
 
-以下 2 个 surface 在本次补采后仍无可信图；CROP 已有搜索态 measured 证据但尚未满足菜单栏/accepted-golden 门禁，SHAPE 也已有 measured 证据。归档为 ISS-NEW-N 子卡，由后续 worker 执行：
+以下 4 个子卡仍未完全闭环；CROP 已有搜索态 measured 证据但尚未满足菜单栏/accepted-golden 门禁，SHAPE 也只覆盖矩形激活态。归档为 ISS-NEW-N 子卡，由后续 worker 执行：
 
 - **ISS-NEW-N-CROP**（窗口已 crop 的 L3 工具栏全展开参考）
   - 阻塞：`L3 toolbar 自适应断点`、`窗口外边距`、`左右栏与中央分割线精确宽度`

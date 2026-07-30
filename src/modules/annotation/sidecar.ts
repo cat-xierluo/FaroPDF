@@ -236,10 +236,18 @@ function readStyle(value: unknown): PdfAnnotationStyle {
 
   return {
     ...(value.strokeWidth !== undefined ? { strokeWidth: readPositiveNumber(value.strokeWidth, "style.strokeWidth") } : {}),
+    ...(value.strokeStyle !== undefined ? { strokeStyle: readStrokeStyle(value.strokeStyle) } : {}),
     ...(value.fontSize !== undefined ? { fontSize: readPositiveNumber(value.fontSize, "style.fontSize") } : {}),
     ...(value.fontFamily !== undefined ? { fontFamily: readString(value.fontFamily, "style.fontFamily") } : {}),
     ...(value.fillColor !== undefined ? { fillColor: readString(value.fillColor, "style.fillColor") } : {}),
   };
+}
+
+function readStrokeStyle(value: unknown): "solid" | "dashed" {
+  if (value !== "solid" && value !== "dashed") {
+    throw new Error("Invalid annotation sidecar: style.strokeStyle must be solid or dashed");
+  }
+  return value;
 }
 
 function readLine(value: unknown): PdfAnnotationLine {

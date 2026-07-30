@@ -1,4 +1,4 @@
-import type { PdfAnnotationType, PdfStampName } from "../../shared/pdf/annotation";
+import type { PdfAnnotationStrokeStyle, PdfAnnotationType, PdfStampName } from "../../shared/pdf/annotation";
 import { STAMP_TEMPLATES } from "./stamps";
 
 /** 批注工具的视觉模式 */
@@ -70,12 +70,38 @@ export const ANNOTATION_COLOR_SWATCHES: AnnotationColorSwatch[] = [
 
 export const DEFAULT_ANNOTATION_COLOR = ANNOTATION_COLOR_SWATCHES[0].value;
 
+export type AnnotationShapeToolType = "rectangle" | "ellipse" | "arrow" | "double-arrow" | "line" | "ink";
+
+export interface AnnotationShapeStyle {
+  toolType: AnnotationShapeToolType;
+  strokeStyle: PdfAnnotationStrokeStyle;
+  strokeWidth: number;
+  opacity: number;
+  strokeColor: string;
+  fillColor: string;
+}
+
+export const DEFAULT_ANNOTATION_SHAPE_STYLE: AnnotationShapeStyle = {
+  toolType: "rectangle",
+  strokeStyle: "solid",
+  strokeWidth: 2,
+  opacity: 1,
+  strokeColor: "#000000",
+  fillColor: "transparent",
+};
+
+export function isAnnotationShapeTool(type: PdfAnnotationType | null | undefined): type is AnnotationShapeToolType {
+  return type === "rectangle" || type === "ellipse" || type === "arrow" || type === "double-arrow" || type === "line" || type === "ink";
+}
+
 /** 当前已选中的工具和样式偏好 */
 export interface AnnotationToolState {
   /** 当前 arm 的工具类型；null 表示"select"模式，不画新批注 */
   activeToolType: PdfAnnotationType | null;
   /** 当前画笔颜色 */
   color: string;
+  /** 形状右栏与画布共用的样式状态；opacity 使用 0..1。 */
+  shapeStyle: AnnotationShapeStyle;
   /** stamp 工具下选中的图章模板 */
   stampName: PdfStampName;
   /** stamp 工具下用户输入的图章文字 */
@@ -88,6 +114,7 @@ export function createInitialAnnotationToolState(): AnnotationToolState {
   return {
     activeToolType: null,
     color: DEFAULT_ANNOTATION_COLOR,
+    shapeStyle: { ...DEFAULT_ANNOTATION_SHAPE_STYLE },
     stampName: "reviewed",
     stampLabel: STAMP_TEMPLATES.reviewed.defaultLabel,
   };
@@ -110,6 +137,9 @@ export function armAnnotationTool(
   return {
     ...state,
     activeToolType: isAlreadyActive ? null : type,
+    ...(isAnnotationShapeTool(type)
+      ? { shapeStyle: { ...(state.shapeStyle ?? DEFAULT_ANNOTATION_SHAPE_STYLE), toolType: type } }
+      : {}),
     ...(descriptor.requiresStampSelection ? { stampLabel: nextStampLabel } : {}),
   };
 }
@@ -119,7 +149,29 @@ export function disarmAnnotationTool(state: AnnotationToolState): AnnotationTool
 }
 
 export function setAnnotationColor(state: AnnotationToolState, color: string): AnnotationToolState {
-  return { ...state, color };
+  return {
+    ...state,
+    color,
+    ...(isAnnotationShapeTool(state.activeToolType)
+      ? { shapeStyle: { ...(state.shapeStyle ?? DEFAULT_ANNOTATION_SHAPE_STYLE), strokeColor: color } }
+      : {}),
+  };
+}
+
+export function setAnnotationShapeStyle(
+  state: AnnotationToolState,
+  shapeStyle: AnnotationShapeStyle,
+): AnnotationToolState {
+  return {
+    ...state,
+    activeToolType: shapeStyle.toolType,
+    color: shapeStyle.strokeColor,
+    shapeStyle: {
+      ...shapeStyle,
+      strokeWidth: Math.min(12, Math.max(1, shapeStyle.strokeWidth)),
+      opacity: Math.min(1, Math.max(0.1, shapeStyle.opacity)),
+    },
+  };
 }
 
 export function setAnnotationStampName(state: AnnotationToolState, stampName: PdfStampName): AnnotationToolState {

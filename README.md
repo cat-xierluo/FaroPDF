@@ -38,11 +38,12 @@ open /Applications/FaroPDF.app
 
 以下能力基于 v0.1.1 实际交付范围（详见 `CHANGELOG.md`）：
 
-> 下列清单描述 FaroPDF 已存在的功能模块，不代表已经完成 PDF Expert 高保真复刻。复刻正按 `skeleton → wired → behavior-complete → visually-verified` 重新验收；首批 15 张候选截图均非 golden，正式分类为 11 raw + 4 rejected，accepted-golden 为 0。现状、证据和下一步见 [`docs/reference/pdf-expert/`](docs/reference/pdf-expert/README.md) 与 [`docs/TASKS.md`](docs/TASKS.md) 的 ISS-NEW-M。
+> PDF Expert 只作为功能框架和信息架构参考，不追求像素级一比一。当前验收重点是入口接真实模块、写入产物可重开、未实现功能明确禁用。现状和下一步见 [`docs/reference/pdf-expert/`](docs/reference/pdf-expert/README.md) 与 [`docs/TASKS.md`](docs/TASKS.md) 的 ISS-NEW-M。
 
 ### 阅读与检索
 
-- L2 tab bar + L3 五段工具栏；`A 批注`、`T 编辑` 常驻主模式入口，导出、填写签名、OCR 从 `工具` 工作流菜单进入
+- L2 tab bar + L3 五段工具栏；导航、缩放、核心工作流、摘要/交付和搜索按功能层级排布
+- `T 编辑` 内容引擎未接入，入口明确禁用；“页面管理”使用独立页面网格和真实缩略图，拖拽重排、旋转、删除、撤销和另存副本已接真实 PDF 写回
 - read 模式不显示 L4；左右栏出现时中央阅读区始终保持在 L5a 与 L5b 之间
 - 打开本地 PDF（对话框 / 拖拽），PDF.js worker 独立加载，不阻塞主线程
 - 页面虚拟化：只渲染可见页和邻近页，大卷宗打开轻快
@@ -50,6 +51,7 @@ open /Applications/FaroPDF.app
 - 8 项缩放预设（50/75/100/125/150/200% / 适合宽度 / 适合页面）+ 顺 / 逆时针 90° 旋转
 - 键盘翻页（PageUp / PageDown / 方向键 / Space / Home / End）
 - 左侧文档摘要：真实缩略图、按页码跳转、当前页高亮、紧凑批注 / 搜索 / OCR 状态标记
+- 个人页面书签：添加当前页、重复添加幂等、按页排序、当前页标记、点击跳页、删除与刷新恢复；按 PDF 隔离且不改写原文件
 - 阅读位置本地恢复（按 PDF fingerprint 持久化 currentPage / zoom / viewMode / rotation）
 - 全文搜索：按需建立页文本索引、命中列表、上下文片段、当前页轻量高亮、上下一个命中跳转
 - 搜索结果层：索引计数、命中页码 chip、当前命中高亮、自动滚到对应页
@@ -57,13 +59,14 @@ open /Applications/FaroPDF.app
 
 ### 批注
 
-- 9 种批注类型：高亮 / 下划线 / 删除线 / 备注 / 文本框 / 矩形 / 箭头 / 手写 / 图章
+- 12 种批注类型：高亮 / 下划线 / 删除线 / 备注 / 文本框 / 矩形 / 椭圆 / 直线 / 单向箭头 / 双向箭头 / 手写 / 图章
+- 形状右栏真实控制线型、线宽、不透明度、边框色和填充色；刷新从 sidecar 恢复，扁平化后写入新 PDF
 - 6 色色板 + 5 套图章模板（矩形 / 圆角 / 椭圆 / 横幅 4 种 shape）
 - 批注侧边栏：批注列表 + 当前页 / 总页数 + 选中跳页
-- AnnotationOverlay 挂到阅读区（点击 / 拖拽 / 手写 3 种交互模式）
+- AnnotationOverlay 对齐当前页真实 canvas bbox（点击 / 拖拽 / 手写 3 种交互模式），DOM 坐标会转换到 PDF 用户空间
 - AnnotationToolbar 挂到上下文工具条
 - 中文图章真实绘制（思源黑体 SC + pdf-lib fontkit 嵌入）
-- 默认保存为可编辑 sidecar（JSON，schema version 1）；导出时可扁平化到 PDF
+- 默认保存为可编辑 sidecar（当前使用 localStorage adapter，schema version 1，存储不可用时回退内存）；导出时可扁平化到 PDF
 - 批注摘要导出为 Markdown / HTML（不包含真实用户文件名）
 
 ### 页面整理
@@ -71,7 +74,7 @@ open /Applications/FaroPDF.app
 - 页面旋转、删除、重排（pdf-lib 真实改写）
 - 多选 + shift+click 区间选择 + 删除前 RiskConfirmDialog
 - 另存为新 PDF 时弹 ExportRiskDialog（不覆盖原始文件）
-- 占位 Undo 按钮（计数 + 视觉 enabled 切换）
+- 真实 Undo 状态栈；页面复制/粘贴在剪贴板实现前明确禁用
 - 默认输出 `*-organized.pdf`，绝不覆盖原始 PDF
 
 ### OCR / 扫描
@@ -90,19 +93,19 @@ open /Applications/FaroPDF.app
 ### 导出
 
 - 导出引擎（pdf-lib）：复制、删除、重排、旋转真实改写
-- 表单扁平化：`form.flatten()`，单次 `PDFDocument.load` 后批量执行 fill / sign / flatten
+- 表单填写与扁平化：同一内存工作副本累计 fill / sign / flatten，每一步只下载新 PDF；真实 AcroForm fixture 已完成 UI 导出和重开验证
 - 批注扁平化：plan-only 与 draw 双策略，draw 走 `writeAnnotationPdf`
 - 文字 / 图片水印、页眉页脚（全部页面 / 奇数页 / 偶数页，页眉 / 页脚位置）、Bates 编号、普通页码写入 PDF
 - 证据图片 A4 编排：JPEG / PNG 真实拾取、PDF 页面真实嵌入、按 A4 1 / 2 / 3 / 4 张每页自动编排
-- 压缩预设 plan-only（真实图像重编码留 follow-up）
+- 压缩预设会生成真实新 PDF：对象流保存、JPEG DCTDecode 图像重编码和目标体积检查已接入；DPI 降采样仍留 follow-up
 - 默认输出 `*-delivery.pdf` / `*-organized.pdf` / `*-evidence-pack.pdf` 等新文件
 
 ### 表单签署
 
 - 读取 AcroForm 字段（text / dropdown / checkbox / radio）
-- FormsPanel 浮层：按字段类型分组渲染 + 填值编辑器
-- 签名图片（PNG / JPG）+ 签名位置调整
-- 表单扁平化导出（单条失败封装为 `status: "failed"`，不中断后续操作）
+- FormsPanel 左侧工具面板：按字段类型分组渲染 + 填值编辑器
+- 签名图片（PNG / JPG）嵌入已有字段位置；自由拖放签名位置仍未实现
+- 同一会话连续填写、勾选、签名和表单扁平化不会回退到原始 bytes；单条失败封装为 `status: "failed"`
 - reader 暴露 `getFileBytes` / `saveUpdatedBytes`，导出走浏览器原生 `<a download>`
 
 ### 设置

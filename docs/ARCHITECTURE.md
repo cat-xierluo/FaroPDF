@@ -1,6 +1,6 @@
 # FaroPDF 架构文档
 
-> Last updated: 2026-07-23
+> Last updated: 2026-07-30
 
 ## 技术栈
 
@@ -61,7 +61,7 @@ PDF.js page.render(canvas) + text layer + annotation overlay
   ↓
 搜索按需读取页文本并建立内存索引；批注/页面/导出/OCR 写入各自队列
   ↓
-search state / sidecar / page operation queue / export job queue / OCR job queue
+search state / annotation sidecar / bookmark sidecar / page operation queue / export job queue / OCR job queue
   ↓
 导出时由 pdfOperationEngine 读取 PDF bytes，用 pdf-lib 生成新 PDF bytes；路径型导出再写入新输出路径
 ```
@@ -83,13 +83,14 @@ macOS 原生菜单由 `src-tauri/src/lib.rs` 使用 Tauri v2 `MenuBuilder` / `Su
 
 ### 工具启动器与上下文工具条
 
-前端业务命令统一由 `src/shared/app/commands.ts` 描述。L3 顶栏固定为 5 段，并常驻 `A 批注` 与 `T 编辑` 两个主模式入口；export / forms / OCR 等低频工作流继续通过 `工具` 启动器进入。
+前端业务命令统一由 `src/shared/app/commands.ts` 描述。`availability` 把命令区分为 `ready` 与 `planned`；planned 命令在工具菜单 disabled，原生菜单进入执行层后也 fail-closed。L3 顶栏固定为 5 段；`T 编辑` 在内容引擎接入前保留功能地图位置但显式禁用。
 
 进入任务模式后，`AppShell` 按 `activeMode` 渲染第二行上下文工具条或独立工作台：
 
 - `read`：不渲染 L4，L5c 使用所有未被显式侧栏占用的空间。
 - `annotate`：显示批注上下文工具条和批注 overlay。
-- `pages`：作为当前 `T 编辑` 的内部 mode，L5c 切换为响应式页面卡片网格。现有固定 5 列实现是待修缺陷，不属于架构合同。
+- `edit`：由 `T 编辑` 进入；L5c 保持单页 ReaderCanvas，L4 为文本/图像/链接/隐藏。直接内容编辑未接通时工具显式禁用。
+- `pages`：由独立“页面管理”入口进入；L5c 挂载 `PageOrganizerWorkspace`，不激活 `T 编辑`。
 - `export`：显示导出上下文工具条，并挂右侧 `ExportDeliveryPanel`。
 - `forms`：显示填写和签名上下文工具条，扁平化等低频动作进入 FormsPanel。
 - `ocr`：独占主工作区，显示 OCR 工具条和 OCR 任务 / 质量报告工作台。
@@ -205,11 +206,13 @@ export interface PdfAnnotation {
 
 ### AnnotationSidecar
 
-批注第一版采用可编辑 sidecar，不直接写回原始 PDF。默认路径为原 PDF 所在目录下的 `.faropdf/annotations/<document-key>.annotations.json`：
+批注第一版采用可编辑 sidecar，不直接写回原始 PDF。当前 App 使用按文档 key 隔离的 `localStorage` adapter 持久化，并在存储不可用时回退到内存；未来桌面文件 adapter 可写入原 PDF 同目录的 `.faropdf/annotations/`：
 
 - 有 PDF fingerprint 时使用 fingerprint 派生安全文件名。
 - 无 fingerprint 时使用源路径哈希兜底，不把真实文件名写进 sidecar 文件名。
 - sidecar 内容只保存 `fingerprint`、`pageCount`、schema version、时间戳和批注数组，不保存源 PDF 文件名。
+- 形状样式使用 `PdfAnnotationStyle.strokeWidth / strokeStyle / fillColor` 与 annotation `opacity`；`AnnotationToolState.shapeStyle` 是右栏和 overlay 的单一真相源，sidecar 重开后可直接回显。
+- AnnotationOverlay 以当前页 `.page-container` 相对 workspace 的真实 bbox 定位；事件坐标从 DOM 左上原点翻转为 PDF 左下用户空间，因此 overlay 与 pdf-lib writer 共用同一套几何值。
 - Markdown / HTML 批注摘要使用 `PDF <fingerprint>` 或通用标签，不包含真实用户文件名。
 
 ```ts
@@ -220,6 +223,34 @@ export interface AnnotationSidecar {
     pageCount?: number;
   };
   annotations: PdfAnnotation[];
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### BookmarkSidecar
+
+个人页面书签与 PDF 自带 outline 分开建模。`src/modules/bookmarks/` 负责添加、幂等去重、排序、删除和持久化；L5a 摘要栏、独立书签面板与 `view-add-bookmark` 命令共用同一 controller。第一版只保存 sidecar，不改写原始 PDF：
+
+- 有 fingerprint 时按 fingerprint 派生文档身份，无 fingerprint 时用 path 兜底；localStorage key 始终只保留身份哈希。
+- sidecar value 只保存 fingerprint、页数、书签页索引 / 标签和时间戳，不保存 PDF 路径或文件名。
+- 同页重复添加返回既有书签，不产生重复记录；加载时剔除超出当前页数的旧记录。
+- localStorage 不可用时回退进程内存；写入失败在 UI 显示错误，不伪装成功。
+
+```ts
+export interface BookmarkSidecar {
+  schemaVersion: 1;
+  document: {
+    fingerprint?: string;
+    pageCount: number;
+  };
+  bookmarks: Array<{
+    id: string;
+    pageIndex: number;
+    label: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -364,7 +395,9 @@ export interface PdfExportResult {
 
 - `pdfOperationEngine` 不写文件，只返回新 PDF bytes；`pdfExportService` 在路径型导出时拒绝 `outputPath === inputPath`。
 - `flatten-form` 使用 pdf-lib `form.flatten()`，可生成不可编辑表单提交版 bytes；UI 入口归属填写和签名面板，不进入导出二级工具条。
+- Forms controller 首次从 `reader.getFileBytes()` 建立内存工作副本；字段填写、勾选、签名和扁平化依次消费上一操作的 bytes。每一步可下载新副本，但不会把下载动作误当成 reader 原始 bytes 已更新，也不会覆盖源 PDF。
 - `flatten-annotations` 支持 `plan-only` 摘要模式和 `draw` 真实绘制模式；批注侧栏的 `扁平化导出` 走 `draw`，默认保存 `*-annotations-flattened.pdf` 新副本，不覆盖原始 PDF。
+- 批注 draw writer 覆盖 12 类批注；矩形/椭圆支持填充和虚线，直线/单向箭头/双向箭头共享线型和线宽，铅笔复用同一 stroke style。creator/producer/annotation-count 元数据必须在 `save()` 前写入。
 - `page-operations` 支持 `execute` 真实改写页面顺序、旋转和删除；裁剪、插入和合并仍待后续导出深化接入。
 - `watermark`、`page-number`、`bates-number` 使用 pdf-lib 写入新 PDF bytes；CJK 文本通过 Source Han Sans 字体路径嵌入。页眉页脚复用两个 text watermark operation，页眉映射到 `top-left` / `top-center` / `top-right`，页脚映射到 `bottom-left` / `bottom-center` / `bottom-right`，应用范围通过 `PdfWatermarkOperation.pageIndexes` 支持全部页面 / 奇数页 / 偶数页。
 - 导出模式 UI 通过 `ExportDeliveryPanel` 复用 `reader.getFileBytes()` 和 `reader.saveUpdatedBytes()` 调用 `watermark` / `page-number` / `bates-number` / `compress` operation，默认下载 `*-text-watermarked.pdf` / `*-image-watermarked.pdf` / `*-header-footer.pdf` / `*-page-numbered.pdf` / `*-bates.pdf` / `*-compressed.pdf`，不覆盖原始 PDF。
@@ -614,6 +647,7 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 | `pdfRenderScheduler` | 页面虚拟化、渲染队列、取消不可见页渲染 |
 | `pdfTextService` | 文本层检测、按需全文索引、搜索命中 |
 | `annotationService` | sidecar 批注模型、编辑、导出摘要 |
+| `bookmarkService` | 按文档隔离的个人页面书签 sidecar、添加 / 删除 / 跳页与刷新恢复 |
 | `pdfExportService` | 路径型导出安全校验、仅新建写入、批注/页面操作计划和表单导出 |
 | `pdfOperationEngine` | 抽象 PDF 写入能力，第一版用 pdf-lib 起步复制 PDF、扁平化表单、写入水印/页码/Bates 并生成导出计划，预留更强引擎替换空间 |
 | `formService` | AcroForm 字段读取、填写、签名图片写入、表单扁平化和批量表单操作 |
@@ -640,6 +674,7 @@ Foundation Gate 已落地以下边界，后续 worker 默认只修改自己任�
 
 - 原始 PDF 默认不可变。
 - 批注默认保存到 sidecar，导出时再写入新 PDF。
+- 个人页面书签默认保存到独立 sidecar，不写入原 PDF，也不与 PDF outline 混用。
 - 页面整理、OCR、压缩、扁平化表单默认输出新 PDF。
 - 水印、Bates 编号、页码和批注扁平化默认输出新 PDF。
 - 覆盖原文件必须由用户显式选择并二次确认。
@@ -656,7 +691,7 @@ OCR 不直接内置到前端。前端 `src/modules/ocr/service/bridge.ts` 通过
 - Adapter 覆盖 `local-ocrmypdf`、`legal-skills`、`paddleocr`、`mineru`；云端 provider 必须有用户本次明确 consent、安全 apiKeyRef 和 HTTPS endpoint，本机调试仅允许 `localhost`、真实 127.0.0.0/8 IPv4 和 `::1` loopback HTTP；真实密钥串、远端明文 HTTP、伪装成 `127.*` 的域名和非法 endpoint 不会调用 Tauri command。bridge 请求会携带脱敏 `privacyAuditRecord`。
 - 端到端覆盖：`tests/e2e/ocr-e2e.test.ts`（前端 fixture + 真实 ocrmypdf + 真实 pdftotext + 真实质量报告）+ `src-tauri/src/lib.rs` `mod ocr_bridge_tests`（Rust 集成测试 + 真实 OCR + 任务队列持久化）。缺工具时静默跳过。
 - 历史（不再适用）：`docs/ARCHITECTURE.md` 之前表述 "当前第一版只建立 bridge/stub，不执行真实 OCR"，与代码实情不符（ISS-007 E2E 联调 worker 已在 0.1.0-alpha.10 落实真实接入，DEC-050 / PR #27）。DEC-095 修订此处。
-- `src-tauri/src/lib.rs` 提供 `start_ocr_job` command stub，Rust 侧重复校验 provider、页码范围、输出策略、默认 `*-ocr.pdf` 新输出路径和云端 OCR 的 `privacyAuditRecord.consentStatus=granted`，返回 queued job。
+- `src-tauri/src/lib.rs` 提供真实 `start_ocr_job` command，Rust 侧重复校验 provider、页码范围、输出策略、默认 `*-ocr.pdf` 新输出路径和云端 OCR 的 `privacyAuditRecord.consentStatus=granted`，随后分发本地进程或云端 provider 并维护任务队列。
 - 错误信息不包含完整敏感 PDF 路径，带逗号或中文标点的 PDF 路径也会在展示前脱敏；API Key 只使用引用或脱敏占位，不写入日志或错误报告。
 
 外部 OCR provider 的 endpoint、模型参数和密钥引用由设置页管理。API Key 不写入公开仓库，不在 UI 中完整展示，不在日志或错误报告中输出。
@@ -669,7 +704,7 @@ OCR 不直接内置到前端。前端 `src/modules/ocr/service/bridge.ts` 通过
 - 错误原因或回退路径。
 - OCR 后搜索质量检查结果，包括阈值结果和问题页原因。
 
-后续真实执行阶段再接入本地 `ocrmypdf` / Legal Skills、PaddleOCR/MinerU 请求、双层 PDF 写入，并把真实 PDF 文本提取、文件体积和耗时统计接入 ISS-017 质量检查报告。
+本地 `ocrmypdf`、双层 PDF 输出、`pdftotext` 提取和质量报告已由真实 E2E 覆盖；PaddleOCR/MinerU 仍需在用户明确 consent 和有效 provider 配置下逐环境验收。
 
 ## PDF 算法来源
 
@@ -711,28 +746,30 @@ FaroPDF 可复用本机 `legal-skills` 中成熟 PDF 脚本的算法，但不直
 - `captures/raw/` 保存原始采集；其中存在误标和失败画面。
 - `manifest.json` 记录 observed state、可信度和禁止推论。
 - `golden/` 当前没有 accepted 图片。
-- bbox、规范化窗口 crop、视觉 diff 和完整状态覆盖尚未建立。
+- G01–G05 已建立固定 `1280×832` window-only crop、人工 bbox 与 reference a/b 稳定性 diff；accepted-golden、FaroPDF 对参考图的图像回归和完整状态覆盖仍未建立。
 
 ### UI 运行时
 
 | 模块 | 当前架构事实 | 未完成 |
 | --- | --- | --- |
-| Shell | L2/L3 分行；L3 五个语义区；L5 DOM 固定左/中/右 | 只通过几何门禁，未视觉对齐 |
+| Shell | L2/L3 各 40px 分行；L3 为 navigation/zoom/workflows/collaboration/search 五区；L5 DOM 固定左/中/右 | measured 几何/密度门禁通过，accepted-golden 视觉对齐仍缺 |
 | Read | read 不渲染 L4；PDF.js 阅读能力存在 | 双页和主题缺可靠 reference |
-| Sidebar | 左栏容器和多个 panel 已存在 | thumbnails/outline/annotation/bookmark 需逐态视觉和行为复核 |
-| Edit | `T 编辑` 进入 `EditModeGridView` | 当前是固定 5 列、空白缩略图、硬编码 A4 和 noop reorder |
-| RightPanel | mode-driven 容器和多个 panel component 已存在 | `docSummary=null`、OCR noop、shape placeholder 等仍在 |
-| Search/Annotate | 业务模块和部分 UI 已接线 | 参考状态、转换、保存重开和视觉验收不完整 |
+| Sidebar | 左栏容器和多个 panel 已存在；大纲参考态已接线；个人页面书签已完成添加、幂等、排序、跳页、删除、刷新恢复与文档隔离 | thumbnails/outline/annotations 继续逐态行为复核；bookmarks 视觉证据仍 missing，不能声明 visually-verified |
+| Edit | `T 编辑` 进入独立 `edit` mode，保留 G05 measured 的 272px 大纲左栏、整窗居中的单页 ReaderCanvas 与编辑 L4 | 文本/图像/链接/隐藏写回引擎尚未接入，当前按钮显式禁用 |
+| Page management | 独立 `pages` mode；真实缩略图、选择/多选、拖拽、删除、旋转、撤销和 execute 导出已接入，产物已重开解析 | 页面剪贴板、真实尺寸标签和更多异常态 |
+| RightPanel | mode-driven 容器；文档摘要、OCR 状态/页码范围和 shape-style 已接真实数据/state/controller | 其余右栏 surface 与异常态仍需逐项验收；bookmarks 属于 L5a，不再误列到 RightPanel |
+| Search/Annotate | 搜索业务已接线；形状批注完成右栏、overlay、sidecar、PDF writer 和重开闭环 | 其余批注辅助命令、参考视觉和异常态仍不完整 |
 | Forms/Export/OCR | 有独立业务模块和部分真实输出 | 不能从“底座存在”推导完整工作流或视觉完成 |
-| Validation | typecheck/test/build + L3/L5 geometry script | 缺 L2/L3 顺序断言、accepted-golden visual diff 和 PDF round-trip gate |
+| Validation | typecheck/test/build + Playwright 真实交互 + PDF 产物重开解析 + OCR 真 pipeline；73 项 measured 门禁继续保留 | accepted-golden image diff 为可选视觉优化；仍缺部分 surface/异常态 |
 
 逐组件等级与 placeholder 以 `docs/reference/pdf-expert/implementation-map.md` 为准。
 
 ### 不变量与待量测项
 
 - 当前代码不变量：L5a → L5c → L5b，中央列始终是弹性列。
-- 目标不变量：`T 编辑` 使用响应式页面卡片网格，不固定列数。
-- 待量测：参考窗口尺寸、左右栏宽度、页卡最小宽度、gap、断点、字体、颜色、图标和动画。
+- 目标不变量：`edit` 与 `pages` 是独立状态；`T 编辑` 不得进入页面卡片网格。
+- 页面管理网格必须响应式且使用真实缩略图；当前 1280px measured 状态为五卡同排，未量测断点不得解释为全局固定五列。
+- 已量测：`1280×832` 参考窗口、L2/L3/L4 高度、outline/search/shape 栏宽与页面卡片近似尺寸；待 M1 复核或补量测：accepted-golden crop 一致性、页面卡片断点、其他面板、字体、颜色、图标和动画。
 - 架构变更不得先于证据校准；下一步顺序由 `docs/TASKS.md` ISS-NEW-M 定义。
 
 ## 文档健康监控（doc-curator）

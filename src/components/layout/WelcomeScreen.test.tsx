@@ -28,24 +28,26 @@ describe("WelcomeScreen 渲染", () => {
     expect(screen.queryByTestId("welcome-recent-grid")).not.toBeInTheDocument();
   });
 
-  test("点击「图片转 PDF」卡片触发 onConvertFromImages", async () => {
+  test("图片转 PDF 引擎未接入时入口明确禁用", async () => {
     const user = userEvent.setup();
     const onConvertFromImages = vi.fn();
     render(<WelcomeScreen recentFiles={[]} onConvertFromImages={onConvertFromImages} />);
 
     await user.click(screen.getByTestId("welcome-convert-images"));
 
-    expect(onConvertFromImages).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("welcome-convert-images")).toBeDisabled();
+    expect(onConvertFromImages).not.toHaveBeenCalled();
   });
 
-  test("点击「Word 转 PDF」卡片触发 onConvertFromWord", async () => {
+  test("Word 转 PDF 引擎未接入时入口明确禁用", async () => {
     const user = userEvent.setup();
     const onConvertFromWord = vi.fn();
     render(<WelcomeScreen recentFiles={[]} onConvertFromWord={onConvertFromWord} />);
 
     await user.click(screen.getByTestId("welcome-convert-word"));
 
-    expect(onConvertFromWord).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("welcome-convert-word")).toBeDisabled();
+    expect(onConvertFromWord).not.toHaveBeenCalled();
   });
 
   test("点击「选择文件」按钮触发隐藏 file input", async () => {

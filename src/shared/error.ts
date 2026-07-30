@@ -37,7 +37,7 @@ export interface AppError {
  *
  * - 已是 AppError 形态（含 `code` + `message`）→ 原样返回
  * - 字符串错误（Rust 旧 `Result<T, String>` 模式）→ 包成 `{ code: "Unknown", message: ... }`
- * - `Error` 实例 → 同上
+ * - `Error` 实例 → 先按 PDF.js 异常类型（`error.name`）映射到结构化 ErrCode，否则 `Unknown`
  * - 其他 → fallback
  */
 export function normalizeError(raw: unknown): AppError {
@@ -55,9 +55,35 @@ export function normalizeError(raw: unknown): AppError {
     return { code: "Unknown", message: raw };
   }
   if (raw instanceof Error) {
+    // ISS-NEW-M M5：PDF.js 加载异常通过 error.name 暴露类型，先于 message 识别，
+    // 让损坏 / 加密等 PDF 异常态落到结构化 ErrCode，便于前端走中文友好文案分支。
+    const pdfjsCode = classifyPdfjsException(raw);
+    if (pdfjsCode) {
+      return { code: pdfjsCode, message: raw.message };
+    }
     return { code: "Unknown", message: raw.message };
   }
   return { code: "Unknown", message: String(raw ?? "Unknown error") };
+}
+
+/**
+ * 按 `error.name` 识别 PDF.js 抛出的加载异常类型。
+ *
+ * PDF.js 的 `InvalidPDFException`（损坏）、`PasswordException`（加密）、
+ * `UnknownErrorException` 在构造时设置自身 `name`，本函数据此返回 ErrCode；
+ * 命中失败返回 `null`（交由调用方走 fallback）。
+ */
+export function classifyPdfjsException(error: Error): ErrCode | null {
+  switch (error.name) {
+    case "InvalidPDFException":
+      return "PdfParseError";
+    case "PasswordException":
+      return "EncryptionError";
+    case "UnknownErrorException":
+      return "Unknown";
+    default:
+      return null;
+  }
 }
 
 /** 格式化 AppError 为单行展示文案。 */

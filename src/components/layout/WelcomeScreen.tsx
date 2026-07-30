@@ -23,9 +23,9 @@ export interface WelcomeScreenProps {
   onOpenRecent?: (entry: RecentPdfFile) => void;
   /** 用户点击「清除最近」时回调。 */
   onClearRecent?: () => void;
-  /** 用户点击「图片转 PDF」卡片时回调（占位）。 */
+  /** 预留的图片转换回调；引擎接入前入口保持禁用。 */
   onConvertFromImages?: () => void;
-  /** 用户点击「Word 转 PDF」卡片时回调（占位）。 */
+  /** 预留的 Word 转换回调；引擎接入前入口保持禁用。 */
   onConvertFromWord?: () => void;
 }
 
@@ -44,8 +44,6 @@ export function WelcomeScreen({
   onOpenFile,
   onOpenRecent,
   onClearRecent,
-  onConvertFromImages,
-  onConvertFromWord,
 }: WelcomeScreenProps) {
   const dict = useI18n();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -80,22 +78,24 @@ export function WelcomeScreen({
           <button
             className="welcome-convert-card"
             data-testid="welcome-convert-images"
-            onClick={onConvertFromImages}
+            disabled
+            title="图片转 PDF 引擎尚未接入"
             type="button"
           >
             <span className="welcome-convert-card__icon" aria-hidden="true">🖼️</span>
             <span className="welcome-convert-card__title">{dict.welcome.convertImagesTitle}</span>
-            <span className="welcome-convert-card__subtitle">{dict.welcome.convertImagesSubtitle}</span>
+            <span className="welcome-convert-card__subtitle">待接入 · {dict.welcome.convertImagesSubtitle}</span>
           </button>
           <button
             className="welcome-convert-card"
             data-testid="welcome-convert-word"
-            onClick={onConvertFromWord}
+            disabled
+            title="Word 转 PDF 引擎尚未接入"
             type="button"
           >
             <span className="welcome-convert-card__icon" aria-hidden="true">📄</span>
             <span className="welcome-convert-card__title">{dict.welcome.convertWordTitle}</span>
-            <span className="welcome-convert-card__subtitle">{dict.welcome.convertWordSubtitle}</span>
+            <span className="welcome-convert-card__subtitle">待接入 · {dict.welcome.convertWordSubtitle}</span>
           </button>
         </div>
       </section>

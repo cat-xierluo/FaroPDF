@@ -1,18 +1,25 @@
-export type AppModeId = "read" | "annotate" | "export" | "forms" | "ocr" | "pages";
+/**
+ * 顶层工作模式。
+ *
+ * `edit` 是单页 PDF 内容编辑画布；`pages` 是独立的页面管理网格。
+ * 两者由 PDF Expert 3.9.2 的 N-EDIT-CANVAS / N-PAGE-MANAGEMENT-GRID
+ * measured 证据明确区分，不得再次合并。
+ */
+export type AppModeId = "read" | "annotate" | "edit" | "export" | "forms" | "ocr" | "pages";
 
-/** ISS-NEW-A 阶段 1：Toolbar 5 段 id（与 Toolbar.tsx data-section 一一对应）。
- *  - sidebar-toggles: 侧栏切换 4 个按钮（摘要 / 页面 / 视图设置 / 书签）
- *  - file:           打开按钮（隐藏 file input）
- *  - reading:        页码导航 + 缩放 +/- + 视图模式 4-icon toggle
- *  - mode:           A 批注 / T 编辑 按钮
- *  - right:          搜索框 + 工具 launcher + 设置
+/** M2.2：Toolbar 5 个语义段（与 Toolbar.tsx data-section 一一对应）。
+ *  - navigation:    摘要 / 页面管理 / 视图设置
+ *  - zoom:          当前缩放 + +/-
+ *  - workflows:     批注 / 编辑 / 导出 / 填写签名 / OCR / 更多工具
+ *  - collaboration: 摘要 / 导出与交付
+ *  - search:        全文搜索
  */
 export type AppToolbarSectionId =
-  | "sidebar-toggles"
-  | "file"
-  | "reading"
-  | "mode"
-  | "right";
+  | "navigation"
+  | "zoom"
+  | "workflows"
+  | "collaboration"
+  | "search";
 
 export type UtilityPanelId =
   | "summary"
@@ -22,7 +29,7 @@ export type UtilityPanelId =
   | "forms"
   /** ISS-064：文档安全面板（设置 / 移除密码），从导出工具启动器入口进入 */
   | "security"
-  /** ISS-NEW-A 阶段 2 收口（2026-06-22）：侧栏书签面板（占位 — 真实书签列表 + 添加 / 跳转 留后续）。 */
+  /** L5a 页面书签面板：添加 / 删除 / 跳转与按文档 sidecar 持久化。 */
   | "bookmark"
   | "none";
 
@@ -67,6 +74,8 @@ export interface AnnotationDraftSubmission {
   pageIndex: number;
   rects: import("../../shared/pdf/annotation").PdfRect[];
   color: string;
+  opacity?: number;
+  style?: import("../../shared/pdf/annotation").PdfAnnotationStyle;
   content?: string;
   quote?: string;
   line?: import("../../shared/pdf/annotation").PdfAnnotationLine;

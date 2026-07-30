@@ -151,7 +151,7 @@ export function TitlebarTabs(props: TitlebarTabsProps): ReactElement | null {
   };
 
   return (
-    <div className="titlebar-tabs" role="tablist" aria-label="打开的文件">
+    <div className="titlebar-tabs" data-testid="titlebar-tabs" role="tablist" aria-label="打开的文件">
       {tabs.map((tab, index) => {
         const isActive = tab.id === activeTabId;
         const isRenaming = renamingTabId === tab.id;

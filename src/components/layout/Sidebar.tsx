@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Bookmark, Files, ListTree, MessageSquareText, Plus, Trash2 } from "lucide-react";
 import type { PdfAnnotation, PdfAnnotationType } from "../../shared/pdf/annotation";
+import type { PdfPageBookmark } from "../../shared/pdf/bookmark";
 import type { PdfViewMode, ZoomPresetId } from "../../shared/pdf/types";
 import { ZOOM_PRESETS } from "../../shared/pdf/types";
 
@@ -11,7 +13,13 @@ export type RenderThumbnailFn = (
 ) => Promise<void>;
 
 const summaryTabs = ["书签", "大纲", "批注列表", "缩略图"] as const;
-type SummaryTab = (typeof summaryTabs)[number];
+export type SummaryTab = (typeof summaryTabs)[number];
+const summaryTabIcons = {
+  书签: Bookmark,
+  大纲: ListTree,
+  批注列表: MessageSquareText,
+  缩略图: Files,
+} as const;
 const viewModeOptions: Array<{ id: PdfViewMode; label: string }> = [
   { id: "continuous", label: "连续" },
   { id: "single", label: "单页" },
@@ -77,6 +85,18 @@ interface DocumentSummaryPanelProps {
   pagesWithHits?: Set<number>;
   /** 是否需要 OCR（来自 document.ocrStatus === "needed"） */
   ocrNeeded?: boolean;
+  /** 进入特定工作流时应显示的参考 tab；变化时同步一次，用户仍可继续切换。 */
+  preferredTab?: SummaryTab;
+  /** 当前文档的个人页面书签。 */
+  bookmarks?: PdfPageBookmark[];
+  /** 为当前页添加书签。 */
+  onAddBookmark?: () => void;
+  /** 删除指定书签。 */
+  onRemoveBookmark?: (bookmarkId: string) => void;
+  /** 书签使用 1-based 页码跳转，和 reader.setCurrentPage 契约一致。 */
+  onSelectBookmarkPage?: (pageNumber: number) => void;
+  /** sidecar 读写失败时在面板内显示，不伪装成功。 */
+  bookmarkError?: string | null;
 }
 
 export function DocumentSummaryPanel({
@@ -88,23 +108,40 @@ export function DocumentSummaryPanel({
   renderThumbnail,
   pagesWithHits,
   ocrNeeded,
+  preferredTab,
+  bookmarks,
+  onAddBookmark,
+  onRemoveBookmark,
+  onSelectBookmarkPage,
+  bookmarkError,
 }: DocumentSummaryPanelProps) {
-  const [activeTab, setActiveTab] = useState<SummaryTab>("缩略图");
+  const [activeTab, setActiveTab] = useState<SummaryTab>(preferredTab ?? "缩略图");
+
+  useEffect(() => {
+    if (preferredTab) {
+      setActiveTab(preferredTab);
+    }
+  }, [preferredTab]);
 
   return (
     <aside className="utility-panel document-summary" aria-label="文档摘要">
       <div className="summary-tabs" role="tablist" aria-label="文档摘要视图">
-        {summaryTabs.map((tab) => (
-          <button
-            aria-selected={activeTab === tab}
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            role="tab"
-            type="button"
-          >
-            {tab}
-          </button>
-        ))}
+        {summaryTabs.map((tab) => {
+          const TabIcon = summaryTabIcons[tab];
+          return (
+            <button
+              aria-label={tab}
+              aria-selected={activeTab === tab}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              role="tab"
+              title={tab}
+              type="button"
+            >
+              <TabIcon aria-hidden="true" size={15} strokeWidth={1.7} />
+            </button>
+          );
+        })}
       </div>
 
       {activeTab === "缩略图" ? (
@@ -124,10 +161,153 @@ export function DocumentSummaryPanel({
           annotations={annotations}
           onSelectPage={onSelectPage}
         />
+      ) : activeTab === "书签" ? (
+        <BookmarkPanel
+          bookmarks={bookmarks ?? []}
+          currentPage={currentPage}
+          embedded
+          errorMessage={bookmarkError}
+          hasDocument={hasDocument}
+          onAddBookmark={onAddBookmark}
+          onRemoveBookmark={onRemoveBookmark}
+          onSelectPage={onSelectBookmarkPage}
+        />
+      ) : activeTab === "大纲" ? (
+        <div className="summary-outline" role="tabpanel" aria-label={activeTab}>
+          <header className="summary-outline__header">
+            <h2>{activeTab}</h2>
+            <button
+              aria-label="添加大纲项目（尚未接入）"
+              disabled
+              title="大纲写回尚未接入"
+              type="button"
+            >
+              <Plus aria-hidden="true" size={16} />
+            </button>
+          </header>
+          <div className="summary-outline__empty">
+            <div className="summary-outline__illustration" aria-hidden="true">
+              <span className="summary-outline__sheet summary-outline__sheet--back" />
+              <span className="summary-outline__sheet summary-outline__sheet--front">
+                <i />
+                <i />
+                <i />
+                <i />
+              </span>
+            </div>
+            <p>
+              {activeTab === "大纲"
+                ? "右击文本并从菜单选择 添加大纲项目。"
+                : "点击上方加号，为当前页面添加书签。"}
+            </p>
+          </div>
+        </div>
       ) : (
         <div className="summary-empty" role="tabpanel">
           <p>{activeTab}会在打开 PDF 后显示。</p>
         </div>
+      )}
+    </aside>
+  );
+}
+
+export function BookmarkPanel({
+  bookmarks,
+  currentPage,
+  embedded = false,
+  errorMessage,
+  hasDocument,
+  onAddBookmark,
+  onRemoveBookmark,
+  onSelectPage,
+}: {
+  bookmarks: PdfPageBookmark[];
+  currentPage?: number;
+  embedded?: boolean;
+  errorMessage?: string | null;
+  hasDocument: boolean;
+  onAddBookmark?: () => void;
+  onRemoveBookmark?: (bookmarkId: string) => void;
+  onSelectPage?: (pageNumber: number) => void;
+}) {
+  return (
+    <aside
+      aria-label="书签面板"
+      className={`${embedded ? "summary-outline" : "utility-panel"} bookmark-panel`}
+      data-testid="bookmark-panel"
+      role={embedded ? "tabpanel" : undefined}
+    >
+      <header className="summary-outline__header bookmark-panel__header">
+        <h2>书签</h2>
+        <button
+          aria-label="添加当前页书签"
+          data-testid="bookmark-add-current"
+          disabled={!hasDocument || !onAddBookmark}
+          onClick={onAddBookmark}
+          title={hasDocument ? "为当前页面添加书签" : "请先打开 PDF"}
+          type="button"
+        >
+          <Plus aria-hidden="true" size={16} />
+        </button>
+      </header>
+      {errorMessage ? (
+        <p className="bookmark-panel__error" role="alert">{errorMessage}</p>
+      ) : null}
+      {!hasDocument ? (
+        <div className="summary-empty bookmark-panel__empty" role="status">
+          <p>打开 PDF 后可以添加页面书签。</p>
+        </div>
+      ) : bookmarks.length === 0 ? (
+        <div className="summary-outline__empty bookmark-panel__empty" role="status">
+          <div className="summary-outline__illustration" aria-hidden="true">
+            <span className="summary-outline__sheet summary-outline__sheet--back" />
+            <span className="summary-outline__sheet summary-outline__sheet--front">
+              <i />
+              <i />
+              <i />
+              <i />
+            </span>
+          </div>
+          <p>点击上方加号，为当前页面添加书签。</p>
+        </div>
+      ) : (
+        <ol aria-label="页面书签" className="bookmark-list" data-testid="bookmark-list">
+          {bookmarks.map((bookmark) => {
+            const pageNumber = bookmark.pageIndex + 1;
+            const isCurrent = currentPage === pageNumber;
+            return (
+              <li
+                className={`bookmark-list__item${isCurrent ? " bookmark-list__item--current" : ""}`}
+                data-page-number={pageNumber}
+                key={bookmark.id}
+              >
+                <button
+                  aria-current={isCurrent ? "page" : undefined}
+                  aria-label={`跳转到${bookmark.label}`}
+                  className="bookmark-list__jump"
+                  disabled={!onSelectPage}
+                  onClick={() => onSelectPage?.(pageNumber)}
+                  title={onSelectPage ? `跳转到${bookmark.label}` : "跳页能力不可用"}
+                  type="button"
+                >
+                  <Bookmark aria-hidden="true" size={15} />
+                  <span>{bookmark.label}</span>
+                  {isCurrent ? <small>当前页</small> : null}
+                </button>
+                <button
+                  aria-label={`删除${bookmark.label}书签`}
+                  className="bookmark-list__delete"
+                  disabled={!onRemoveBookmark}
+                  onClick={() => onRemoveBookmark?.(bookmark.id)}
+                  title={onRemoveBookmark ? `删除${bookmark.label}书签` : "删除能力不可用"}
+                  type="button"
+                >
+                  <Trash2 aria-hidden="true" size={14} />
+                </button>
+              </li>
+            );
+          })}
+        </ol>
       )}
     </aside>
   );

@@ -90,6 +90,7 @@ export function useFormController(reader: ReaderController, options: UseFormCont
   const [signatureImageType, setSignatureImageType] = useState<PdfSignatureImageType | null>(null);
 
   const lastDocumentIdRef = useRef<string | null>(null);
+  const workingBytesRef = useRef<Uint8Array | null>(null);
 
   // 文档切换时重置全部状态
   useEffect(() => {
@@ -104,11 +105,35 @@ export function useFormController(reader: ReaderController, options: UseFormCont
       setDraftValue("");
       setSignatureImageBytes(null);
       setSignatureImageType(null);
+      workingBytesRef.current = null;
     }
   }, [reader.state.document?.documentId]);
 
+  /**
+   * 表单会话始终在同一份内存工作副本上累计操作。首次访问时才读取 reader 的原始
+   * bytes；填写、签名或批量操作成功后由调用方把结果回写到 workingBytesRef。
+   * 这里只返回副本，避免 pdf-lib 或测试替身意外改写缓存本身。
+   */
+  const getWorkingBytes = useCallback(async (): Promise<Uint8Array | null> => {
+    if (workingBytesRef.current) {
+      return new Uint8Array(workingBytesRef.current);
+    }
+    const sourceBytes = await reader.getFileBytes();
+    if (!sourceBytes) {
+      return null;
+    }
+    workingBytesRef.current = new Uint8Array(sourceBytes);
+    return new Uint8Array(workingBytesRef.current);
+  }, [reader.getFileBytes]);
+
+  const updateWorkingBytes = useCallback((bytes: Uint8Array): Uint8Array => {
+    const copy = new Uint8Array(bytes);
+    workingBytesRef.current = copy;
+    return new Uint8Array(copy);
+  }, []);
+
   const refreshFormState = useCallback(async () => {
-    const bytes = await reader.getFileBytes();
+    const bytes = await getWorkingBytes();
     if (!bytes) {
       setErrorMessage("尚未打开 PDF，无法读取表单字段。");
       return;
@@ -129,7 +154,7 @@ export function useFormController(reader: ReaderController, options: UseFormCont
     } finally {
       setLoading(false);
     }
-  }, [reader, service]);
+  }, [getWorkingBytes, service]);
 
   const openPanel = useCallback(
     (mode: Exclude<FormPanelMode, "none">) => {
@@ -159,8 +184,10 @@ export function useFormController(reader: ReaderController, options: UseFormCont
 
   const selectField = useCallback((fieldId: string) => {
     setSelectedFieldId(fieldId);
+    const field = formState?.fields.find((entry) => entry.id === fieldId);
+    setDraftValue(field?.value ?? "");
     setErrorMessage(null);
-  }, []);
+  }, [formState]);
 
   const clearSignatureImage = useCallback(() => {
     setSignatureImageBytes(null);
@@ -177,7 +204,7 @@ export function useFormController(reader: ReaderController, options: UseFormCont
       setErrorMessage("请先选择要填写的字段。");
       return;
     }
-    const bytes = await reader.getFileBytes();
+    const bytes = await getWorkingBytes();
     if (!bytes) {
       setErrorMessage("尚未打开 PDF，无法填写字段。");
       return;
@@ -188,8 +215,9 @@ export function useFormController(reader: ReaderController, options: UseFormCont
     try {
       const updatedBytes = await service.fillFormField(bytes, { fieldId: selectedFieldId, value: draftValue });
       await reader.saveUpdatedBytes(updatedBytes, suggestOutputName(reader.getCurrentFileName(), "filled"));
+      const workingBytes = updateWorkingBytes(updatedBytes);
       // 重新读取表单状态以反映新值
-      const refreshed = await service.readFormFields(updatedBytes);
+      const refreshed = await service.readFormFields(workingBytes);
       setFormState(refreshed);
       setSuccessMessage(`字段 "${selectedFieldId}" 已填写并导出。`);
     } catch (error) {
@@ -197,7 +225,7 @@ export function useFormController(reader: ReaderController, options: UseFormCont
     } finally {
       setLoading(false);
     }
-  }, [draftValue, reader, selectedFieldId, service]);
+  }, [draftValue, getWorkingBytes, reader.getCurrentFileName, reader.saveUpdatedBytes, selectedFieldId, service, updateWorkingBytes]);
 
   const applySignature = useCallback(async () => {
     if (!selectedFieldId) {
@@ -208,7 +236,7 @@ export function useFormController(reader: ReaderController, options: UseFormCont
       setErrorMessage("请先选择签名图片。");
       return;
     }
-    const bytes = await reader.getFileBytes();
+    const bytes = await getWorkingBytes();
     if (!bytes) {
       setErrorMessage("尚未打开 PDF，无法签名。");
       return;
@@ -223,7 +251,8 @@ export function useFormController(reader: ReaderController, options: UseFormCont
         imageType: signatureImageType,
       });
       await reader.saveUpdatedBytes(updatedBytes, suggestOutputName(reader.getCurrentFileName(), "signed"));
-      const refreshed = await service.readFormFields(updatedBytes);
+      const workingBytes = updateWorkingBytes(updatedBytes);
+      const refreshed = await service.readFormFields(workingBytes);
       setFormState(refreshed);
       setSuccessMessage(`签名字段 "${selectedFieldId}" 已嵌入图片并导出。`);
     } catch (error) {
@@ -231,11 +260,11 @@ export function useFormController(reader: ReaderController, options: UseFormCont
     } finally {
       setLoading(false);
     }
-  }, [reader, selectedFieldId, service, signatureImageBytes, signatureImageType]);
+  }, [getWorkingBytes, reader.getCurrentFileName, reader.saveUpdatedBytes, selectedFieldId, service, signatureImageBytes, signatureImageType, updateWorkingBytes]);
 
   const applyBatchAndSave = useCallback(
     async (operations: PdfFormOperation[], suggestedSuffix: string) => {
-      const bytes = await reader.getFileBytes();
+      const bytes = await getWorkingBytes();
       if (!bytes) {
         setErrorMessage("尚未打开 PDF，无法执行批量操作。");
         return;
@@ -255,7 +284,8 @@ export function useFormController(reader: ReaderController, options: UseFormCont
           requestedAt: new Date().toISOString(),
         });
         await reader.saveUpdatedBytes(result.bytes, suggestOutputName(reader.getCurrentFileName(), suggestedSuffix));
-        const refreshed = await service.readFormFields(result.bytes);
+        const workingBytes = updateWorkingBytes(result.bytes);
+        const refreshed = await service.readFormFields(workingBytes);
         setFormState(refreshed);
         const failed = result.results.filter((entry) => entry.status === "failed");
         if (failed.length > 0) {
@@ -269,11 +299,11 @@ export function useFormController(reader: ReaderController, options: UseFormCont
         setLoading(false);
       }
     },
-    [reader, service],
+    [getWorkingBytes, reader.getCurrentFileName, reader.saveUpdatedBytes, service, updateWorkingBytes],
   );
 
   const flattenAndSave = useCallback(async () => {
-    const bytes = await reader.getFileBytes();
+    const bytes = await getWorkingBytes();
     if (!bytes) {
       setErrorMessage("尚未打开 PDF，无法扁平化。");
       return;
@@ -284,6 +314,7 @@ export function useFormController(reader: ReaderController, options: UseFormCont
     try {
       const { bytes: flattenedBytes, summary } = await service.flattenForm(bytes);
       await reader.saveUpdatedBytes(flattenedBytes, suggestOutputName(reader.getCurrentFileName(), "flattened"));
+      updateWorkingBytes(flattenedBytes);
       // 扁平化后字段全部消失
       setFormState({ fields: [], fieldCount: 0, fillable: false });
       setSuccessMessage(`已扁平化 ${summary.fieldCountBeforeFlatten} 个字段并导出。`);
@@ -292,7 +323,7 @@ export function useFormController(reader: ReaderController, options: UseFormCont
     } finally {
       setLoading(false);
     }
-  }, [reader, service]);
+  }, [getWorkingBytes, reader.getCurrentFileName, reader.saveUpdatedBytes, service, updateWorkingBytes]);
 
   const clearMessages = useCallback(() => {
     setErrorMessage(null);

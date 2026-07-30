@@ -5,7 +5,11 @@ export {
   parseAnnotationSidecar,
   serializeAnnotationSidecar,
 } from "./sidecar";
-export { AnnotationRepository, createMemoryAnnotationStorage } from "./repository";
+export {
+  AnnotationRepository,
+  createLocalStorageAnnotationStorage,
+  createMemoryAnnotationStorage,
+} from "./repository";
 export { AnnotationService } from "./service";
 export {
   buildAnnotationSummary,
@@ -17,14 +21,17 @@ export {
   ANNOTATION_TOOL_MAP,
   ANNOTATION_COLOR_SWATCHES,
   DEFAULT_ANNOTATION_COLOR,
+  DEFAULT_ANNOTATION_SHAPE_STYLE,
   armAnnotationTool,
   createInitialAnnotationToolState,
   disarmAnnotationTool,
+  isAnnotationShapeTool,
   setAnnotationColor,
+  setAnnotationShapeStyle,
   setAnnotationStampLabel,
   setAnnotationStampName,
 } from "./toolbarModel";
-export type { AnnotationColorSwatch, AnnotationToolDescriptor, AnnotationToolInteraction, AnnotationToolState } from "./toolbarModel";
+export type { AnnotationColorSwatch, AnnotationShapeStyle, AnnotationShapeToolType, AnnotationToolDescriptor, AnnotationToolInteraction, AnnotationToolState } from "./toolbarModel";
 export {
   annotationBoundingRect,
   clampRectToBounds,

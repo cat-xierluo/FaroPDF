@@ -1,7 +1,7 @@
 # FaroPDF 设计系统
 
-> Last updated: 2026-07-23
-> 版本：3.0 — PDF Expert 证据分级与高保真门禁
+> Last updated: 2026-07-30
+> 版本：3.1 — PDF Expert 功能框架优先与真实性门禁
 
 ## 设计目标
 
@@ -71,9 +71,9 @@ FaroPDF 是一个 PDF 阅读器，不是 Markdown 编辑器，也不是全能文
 
 ## 3. 布局架构
 
-### PDF Expert 高保真复刻边界
+### PDF Expert 参考边界
 
-FaroPDF 以 PDF Expert 的 macOS 信息架构、可见几何、模式语义、面板联动和核心工作流作为高保真基线，不再只做松散的「信息架构参考」。受版本控制的证据、状态矩阵和完成门禁位于 `docs/reference/pdf-expert/`。
+FaroPDF 以 PDF Expert 的 macOS 信息架构、模式语义、面板联动和核心工作流作为功能参考。2026-07-30 用户明确不要求像素级或一比一视觉一致；颜色、间距和图标差异不阻塞功能完成。受版本控制的截图与量测仍用于可选视觉优化。
 
 允许差异仅限：
 
@@ -87,44 +87,47 @@ FaroPDF 以 PDF Expert 的 macOS 信息架构、可见几何、模式语义、�
 ┌──────────────────────────────────────────────┐
 │ L2 Tabs: close · filename · +                 │
 ├──────────────────────────────────────────────┤
-│ L3: sidebar · file · reading · mode · right  │
+│ L3: navigation · zoom · workflows · collab · search │
 ├──────────────────────────────────────────────┤
 │ L4: mode tools（read 时为空）                 │
 ├──────────┬───────────────────────┬───────────┤
-│ L5a Left │ L5c PDF / Edit Grid   │ L5b Right │
+│ L5a Left │ L5c PDF/Edit/Page Grid│ L5b Right │
 │ optional │ always in the middle  │ optional  │
 ├──────────┴───────────────────────┴───────────┤
-│ Status Bar: page / zoom / text layer / dirty │
+│ Status Bar: workflow-specific; reference read/edit/pages hide │
 └──────────────────────────────────────────────┘
 ```
 
-### Toolbar（48px）
+### Toolbar（40px）
 
-L2 tab bar 与 L3 toolbar 是两个独立行。L3 严格使用 5 段：`sidebar-toggles / file / reading / mode / right`。
+L2 tab bar 与 L3 toolbar 是两个独立的 40px 行。L3 严格使用 5 段：`navigation / zoom / workflows / collaboration / search`。
 
 | 区域 | 内容 |
 | --- | --- |
-| 左区 | 缩略图、大纲、批注、书签 4 个 sidebar toggle |
-| 文件区 | 打开 |
-| 阅读区 | 页码、4-icon 视图模式、缩放百分比、缩小 / 放大 |
-| 模式区 | `A 批注`、`T 编辑`；模式专用附加动作按状态出现 |
-| 右区 | 全文搜索、工具、设置 |
+| 导航区 | 文档摘要、页面管理、视图设置 |
+| 缩放区 | 当前缩放百分比、缩小、放大 |
+| 核心工作流区 | `A 批注`、`T 编辑`、导出、填写和签名、扫描和文本识别、更多工具 |
+| 协作区 | 摘要、导出与交付 |
+| 搜索区 | 常驻全文搜索输入框 |
 
 规则：
 
 - 无品牌区域（logo / 名称不占工具栏空间）。
 - 图标优先，短标签辅助；图标按钮使用 `title` 属性提供无障碍文本。
-- `A 批注`、`T 编辑` 是 L3 常驻主模式入口；OCR、填写签名、导出仍可由 `工具` 启动器进入。
+- `A 批注`、`T 编辑`、导出、填写签名和 OCR 是 L3 直接入口；低频命令和设置由更多工具菜单承载。
 - read 模式不渲染 L4；annotate / edit / OCR / forms / export 按状态渲染对应 L4。
-- `T 编辑` 必须进入页面编辑网格，不得映射为 forms 或只显示提示。
+- 内容编辑引擎接入后，`T 编辑` 必须进入单页内容编辑画布并显示 `文本 / 图像 / 链接 / 隐藏` L4；引擎未接通前，入口必须保持禁用并明确说明。
+- 所有命令分为 `ready / partial / planned`；`planned` 必须 disabled 或由执行层 fail-closed，禁止用 toast、计数或状态切换冒充成功。
+- 页面管理是左侧独立入口，进入页面卡片网格；不得与 `T 编辑` 复用 active mode。
 - 左右栏默认折叠；任一侧栏出现时只能压缩 L5c，不能改变 L5a → L5c → L5b 的顺序。
 
-### Utility Pane（当前临时默认：左 290px / 右 320px）
+### Utility Pane（当前基础默认：左 272px / 右 320px）
 
 - 默认不显示；用户点击工具栏左侧按钮时展开对应面板。
 - 缩略图、大纲、批注和书签共用 L5a。
+- 页面书签与 PDF 自带大纲分开：书签是用户按页维护的本地 sidecar，支持添加当前页、跳转和删除；同页重复添加保持幂等，不在 UI 中制造重复条目。
 - 设置页使用全屏 Portal 浮层，不占用左侧区域。
-- 当前 `panelWidthStore` 默认左 290px、右 320px；这是 FaroPDF 实现现状，不是 PDF Expert 目标量测值。目标宽度、可调范围和断点由 M1 重采后确定。
+- 当前 `panelWidthStore` 基础默认左 272px、右 320px。已量测的搜索右栏单独使用 240px，形状右栏单独使用约 380px；不得把某个 surface 的宽度当作全局右栏宽度。其余 panel 的精确宽度仍由 M1 补采确定。
 - 缩略图标记当前页、搜索命中、批注存在和 OCR 状态。
 - 大卷宗下缩略图必须懒加载。
 
@@ -132,7 +135,7 @@ L2 tab bar 与 L3 toolbar 是两个独立行。L3 严格使用 5 段：`sidebar-
 
 - 支持连续、单页、双页和适合宽度。
 - 当前页保持清晰边界，但不使用厚重阴影。
-- 搜索命中使用半透明高亮，当前命中使用 `outline: 2px solid var(--accent)`。
+- 搜索命中使用半透明高亮；当前命中由命中层和右栏选中态表达，不给整页增加蓝色外框。
 - 单页/双页模式下点击页边空白翻页（左半 → 上一页，右半 → 下一页）。
 
 ### Task Workspaces
@@ -142,13 +145,14 @@ L2 tab bar 与 L3 toolbar 是两个独立行。L3 严格使用 5 段：`sidebar-
 - 搜索：顶部关键词输入；命中结果进入 L5b。
 - 批注：上下文工具条（高亮、下划线、删除线、笔记、图章、签名）；批注扁平化归入侧栏确认，不进入导出二级工具条。
 - OCR：上下文工具条（识别文本、输出双层 PDF、质量检查）+ 独立工作区。
-- `T 编辑`：L5c 切换为响应式页面卡片网格；页面命令位于 L4。列数由 measured spec 和可用宽度决定，禁止固定写成 5 列。未接通动作不得以可用按钮或成功提示冒充。
+- `T 编辑`：G05 measured 参考态保留 272px 大纲左栏，L5c 保持以整窗中心线对齐的单页 ReaderCanvas，L4 显示 `文本 / 图像 / 链接 / 隐藏`。当前只达到 `skeleton`；未接通动作不得以可用按钮或成功提示冒充。
+- 页面管理：L5c 切换为响应式页面卡片网格；页面命令位于其独立操作栏。列数由 measured spec 和可用宽度决定，禁止固定写成 5 列。
 - 导出：交付工具优先（水印、页眉页脚、页码、Bates、压缩、扁平化）；水印 / 页眉页脚 / 编号 / 压缩参数进入导出模式右侧面板，不平铺到顶栏。
 - 表单：上下文工具条只展示已接通动作（读取字段、填写、签名、扁平化导出）；表单扁平化从工具启动器 / 原生菜单进入填写和签名面板确认，不平铺到顶栏。
 
 ### 完成等级
 
-UI 任务使用 `skeleton → wired → behavior-complete → visually-verified` 四级状态。只有通过真实应用的几何、截图和交互验收后才可记为完成；具体定义见 `docs/reference/pdf-expert/acceptance-contract.md`。
+UI 任务仍可记录 `skeleton → wired → behavior-complete → visually-verified`，但产品功能完成以 `behavior-complete` 为准：入口接真实模块、产物可重开、错误可见。`visually-verified` 是可选精修等级，不再阻塞功能交付。
 
 ## 4. 组件样式
 
@@ -156,9 +160,9 @@ UI 任务使用 `skeleton → wired → behavior-complete → visually-verified`
 
 | 类别 | 高度 | 边框 | 最小宽度 | 用途 |
 | --- | --- | --- | --- | --- |
-| `.tool-button` | 32px | 1px solid border | 62px | 工具栏主按钮 |
-| `.tool-button--primary` | 32px | accent 色 | 62px | 主操作（选择文件、前往 OCR） |
-| `.tool-button--compact` | 32px | 无边框 | — | 布局按钮（摘要、管理、视图） |
+| `.tool-button` | 28px | 1px solid border | 58px | 工具栏主按钮 |
+| `.tool-button--primary` | 28px | accent 色 | 58px | 主操作（选择文件、前往 OCR） |
+| `.tool-button--compact` | 28px | 无边框 | 32px | 布局按钮（摘要、管理、视图） |
 | `.context-tool` | 30px | 1px solid border | — | 上下文工具条 |
 | `.context-tool--primary` | 30px | accent + accent-soft 填充 | — | 上下文主操作 |
 
@@ -190,14 +194,14 @@ UI 任务使用 `skeleton → wired → behavior-complete → visually-verified`
 
 ## 5. 信息密度
 
-- 工具栏高度 48px（克制化后从 56px 降低）。
+- L2 titlebar、L3 主工具栏均为 40px；annotate/edit 的 L4 为 43px，页面管理 L4 为 44px；read 不渲染 L4。
 - 设置面板圆角 10px，最大宽度 960px，最大高度 720px。
 - 设置导航项 8px padding，行高 18px。
 - 列表项最小高度 34px。
 - 搜索浮层最大高度 `min(460px, calc(100vh - 112px))`。
-- 上下文工具条最小高度 42px。
-- 状态栏高度约 28px。
-- 所有间距遵循 4px/6px/8px/12px/16px/20px 体系，不使用奇数值。
+- 上下文工具条高度按 surface 使用 43px 或 44px。
+- read/annotate/edit/pages 参考态隐藏状态栏；OCR 等仍需要状态信息的工作流保留现有状态栏。
+- spacing token 遵循 4px/6px/8px/12px/16px/20px 体系；40/43/44px 属于 measured 层高例外，不拿层高反推 spacing。
 
 ## 6. 交互规则
 
@@ -326,7 +330,9 @@ macOS 原生菜单栏使用 Tauri v2 Menu API 配置中文标签：
 ## 13. 批注交互
 
 - 选择文本后出现浮动批注条：高亮、下划线、删除线、备注。
-- 批注工具栏提供矩形、箭头、文本框、手写、图章。
+- 批注工具栏提供矩形、椭圆、直线、单向/双向箭头、文本框、手写和图章；arm 形状时打开 shape 右栏，切回非形状工具时关闭该右栏。
+- shape 右栏的线型、线宽、不透明度、边框色与填充色必须进入批注领域状态和 sidecar，不能只改变控件选中态；填充色只作用于矩形/椭圆，线条类忽略填充。
+- 批注 overlay 必须与当前页容器 bbox 重合，并把 DOM 左上坐标转换为 PDF 左下用户空间；不得覆盖整个 workspace 后再按页面尺寸缩放。
 - 批注列表按页码排序，可按颜色、类型和关键词筛选。
 - 删除批注要可撤销。
 - 批注摘要导出时保留页码、类型、内容和上下文。
@@ -375,10 +381,10 @@ FaroPDF 不复用 Folia 的 Markdown 编辑布局：
 ### 18.1 已确认的信息架构
 
 - L2 tab bar 位于 L3 toolbar 上方。
-- L3 有五个语义区域：sidebar / file / reading / mode / right。
-- read 状态未见 L4；其他 mode 是否显示 L4 必须逐态取证。
+- L3 有五个语义区域：navigation / zoom / workflows / collaboration / search。
+- read 状态不显示 L4；annotate/edit 的 measured L4 为 43px，页面管理的 measured L4 为 44px，其他 mode 继续逐态取证。
 - L5 的稳定顺序是左栏 / 中央内容 / 右栏；两栏均为可选。
-- 中央内容在 read 为 PDF，在 edit 为页面卡片网格。
+- 中央内容在 read/edit 为单页 PDF；页面管理才切换为页面卡片网格。
 - 搜索、签名、图章等状态存在右侧上下文面板。
 
 这些是信息架构目标，不代表 FaroPDF 已经视觉对齐。
@@ -388,7 +394,7 @@ FaroPDF 不复用 Folia 的 Markdown 编辑布局：
 - 没有 accepted-golden，不能确定精确色值、字号、icon、padding、gap、阴影、圆角和动画。
 - R15 只证明所捕获窗口下为 4+1 页卡；不能推导固定 5 列。
 - R04 是大纲而不是缩略图；R05 没进入批注；R14 是 welcome 而不是批注摘要。
-- 双页、真实 thumbnails、annotate、text selection、forms、export、双栏同屏和拖动过程仍缺可靠证据。
+- 双页、左栏真实 thumbnails、text selection、forms、export 和拖动过程仍缺可靠证据；annotate、edit 大纲结果态、页面管理五卡与搜索双栏已有 measured 证据，但仍非 accepted-golden。
 - raw 图片普遍带桌面背景，不能直接做全图像素比较。
 
 ### 18.3 FaroPDF 当前视觉策略
@@ -401,7 +407,7 @@ FaroPDF 不复用 Folia 的 Markdown 编辑布局：
 ## 19. 当前设计差距与推进边界
 
 - 全局 shell 已通过部分几何门禁，但主题、密度和图标尚未视觉验证。
-- edit grid 是 skeleton：固定 5 列、空白渐变缩略图、硬编码 A4、额外局部说明条和 noop reorder 均需纠正。
+- `edit` 仍是内容编辑 skeleton（L4 显式禁用），但 G05 的大纲左栏与单页几何已接线；页面管理已独立挂载 `PageOrganizerWorkspace` 并渲染真实 PDF canvas，硬编码 A4 文案和 placeholder 页面动作仍需在 M3 纠正。
 - RightPanel 是混合状态：容器存在不等于 summary、OCR、shape、签名、图章和搜索全部完成。
 - forms/export 有功能底座，但缺参考状态与视觉验收。
 - Welcome、文本选区、多 tab、菜单和异常状态都需要按证据等级重新验收。
@@ -416,7 +422,7 @@ FaroPDF 不复用 Folia 的 Markdown 编辑布局：
 | 使用浏览器默认蓝色 focus ring | 统一 accent 色 focus-visible |
 | 硬编码色值 | 使用 CSS 变量 |
 | 常驻侧边栏空面板 | 默认关闭，按需展开 |
-| 工具栏高度超过 56px | 保持 48px |
+| 把 L2/L3/L4 合并成单层工具栏 | 保持 40px / 40px / 43–44px 分层；read 不渲染 L4 |
 | 使用 box-shadow 建立层级 | 使用颜色差异（surface vs surface-strong） |
 | 新增组件不更新本文档 | 所有 UI 变更必须先确认设计规则 |
 | 大面积 CSS 动画 / bounce | 无动画，仅 scrollIntoView smooth |
@@ -431,7 +437,7 @@ FaroPDF 不复用 Folia 的 Markdown 编辑布局：
 
 1. 是否使用了 CSS 变量而非硬编码色值？
 2. focus-visible 是否统一使用 accent 体系？
-3. 新组件高度是否对齐现有密度（32px 按钮 / 34px 输入框）？
+3. 新组件高度是否对齐现有密度（L3 28px 按钮 / 34px 输入框）？
 4. 圆角是否在 6–10px 范围内？
 5. 是否引入了新颜色？如果是，是否必要且已更新颜色体系？
 6. 侧边栏是否保持默认关闭？

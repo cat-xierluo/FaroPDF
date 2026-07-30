@@ -32,6 +32,10 @@ async function chooseTool(user: ReturnType<typeof userEvent.setup>, label: strin
   await user.click(within(menu).getByRole("menuitem", { name: label }));
 }
 
+async function openSettings(user: ReturnType<typeof userEvent.setup>) {
+  await chooseTool(user, "设置");
+}
+
 describe("FaroPDF app shell", () => {
   beforeEach(() => {
     document.documentElement.removeAttribute("data-theme");
@@ -61,12 +65,11 @@ describe("FaroPDF app shell", () => {
     expect(
       screen.getByRole("application", { name: "FaroPDF PDF 工作台" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "打开" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "工具" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "导出" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "批注" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "填写和签名" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "OCR" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导出" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "A 批注" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "填写和签名" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "扫描和文本识别" })).toBeInTheDocument();
     // ISS-030：侧边栏默认关闭，未打开 PDF 时不显示空侧边栏
     expect(screen.queryByRole("complementary", { name: "文档摘要" })).not.toBeInTheDocument();
     expect(screen.getByRole("main", { name: "PDF 阅读区" })).toBeInTheDocument();
@@ -93,13 +96,16 @@ describe("FaroPDF app shell", () => {
 
     await user.click(screen.getByRole("button", { name: "页面管理" }));
 
-    // ISS-NEW-I（DEC-147）：pages 模式由 PageOrganizerWorkspace 切到 EditModeGridView，
-    // main role 改名为「编辑模式网格」；空态文案相应改为「打开 PDF 后进入 T 编辑」。
-    expect(screen.getByRole("main", { name: "编辑模式网格" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "打开 PDF 后进入 T 编辑" })).toBeInTheDocument();
-    expect(screen.queryByRole("toolbar", { name: "编辑模式工具条" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "另存为新 PDF" })).not.toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "页面管理工作台" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "打开 PDF 后管理页面" })).toBeInTheDocument();
+    expect(screen.queryByRole("toolbar", { name: "编辑工具条" })).not.toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "文档摘要" })).not.toBeInTheDocument();
+
+    const editButton = screen.getByRole("button", { name: "T 编辑" });
+    expect(editButton).toBeDisabled();
+    await user.click(editButton);
+    expect(screen.queryByRole("toolbar", { name: "编辑工具条" })).not.toBeInTheDocument();
+    expect(screen.getByRole("main", { name: "页面管理工作台" })).toBeInTheDocument();
   });
 
   test("uses PDF Expert style mode toolbars for export, signing, and OCR", async () => {
@@ -151,7 +157,7 @@ describe("FaroPDF app shell", () => {
     expect(screen.getByRole("button", { name: "双页" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "双页" })).toHaveAttribute("aria-pressed", "false");
 
-    await user.click(screen.getByRole("button", { name: "设置" }));
+    await openSettings(user);
 
     // 设置浮层走 Portal 浮层，role="dialog" + aria-modal="true"；不再是侧栏 aside。
     const dialog = screen.getByRole("dialog", { name: "设置对话框" });
@@ -172,7 +178,7 @@ describe("FaroPDF app shell", () => {
     expect(document.documentElement).toHaveAttribute("data-theme", "light");
     expect(screen.queryByRole("button", { name: "深色模式" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "设置" }));
+    await openSettings(user);
     const dialog = screen.getByRole("dialog", { name: "设置对话框" });
     await user.selectOptions(within(dialog).getByLabelText("外观"), "dark");
 

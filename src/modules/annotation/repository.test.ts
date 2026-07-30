@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { AnnotationRepository, createMemoryAnnotationStorage } from "./repository";
+import {
+  AnnotationRepository,
+  createLocalStorageAnnotationStorage,
+  createMemoryAnnotationStorage,
+} from "./repository";
 import { AnnotationService } from "./service";
 import type { AnnotationDocumentRef, PdfAnnotationInput } from "../../shared/pdf/annotation";
 
@@ -102,6 +106,38 @@ describe("annotation repository and service", () => {
     const repository = new AnnotationRepository({ storage, now: fixedClock });
 
     await expect(repository.load(documentRef)).rejects.toThrow("Invalid annotation sidecar JSON");
+  });
+
+  test("persists sidecars across repository instances without exposing the source path in storage keys", async () => {
+    const values = new Map<string, string>();
+    const localStorageLike = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    };
+    const firstService = new AnnotationService({
+      repository: new AnnotationRepository({
+        storage: createLocalStorageAnnotationStorage(localStorageLike),
+        now: fixedClock,
+      }),
+      createId: fixedIds,
+      now: fixedClock,
+    });
+    await firstService.addAnnotation(documentRef, {
+      type: "note",
+      pageIndex: 0,
+      rects: [{ x: 20, y: 30, width: 24, height: 24 }],
+      color: "#f2b84b",
+      content: "跨重载保留",
+    });
+
+    const secondService = new AnnotationService({
+      repository: new AnnotationRepository({
+        storage: createLocalStorageAnnotationStorage(localStorageLike),
+        now: fixedClock,
+      }),
+    });
+    expect(await secondService.listAnnotations(documentRef)).toHaveLength(1);
+    expect(Array.from(values.keys()).join(" ")).not.toContain("/Users/lawyer/cases/source.pdf");
   });
 
   test("rejects invalid annotation data before writing sidecar content", async () => {

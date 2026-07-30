@@ -1,0 +1,64 @@
+/* ISS-NEW-M M5：阅读区加载失败错误卡片样式。
+ * 复用全局 token（--surface / --danger / --accent / --border），自动跟随深色模式。
+ * 布局参照 WelcomeScreen：整窗居中、内容克制、单一主按钮。 */
+
+.reader-error {
+  align-items: center;
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 auto;
+  max-width: 480px;
+  padding: 40px 32px;
+  text-align: center;
+}
+
+.reader-error__icon {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.reader-error__title {
+  color: var(--danger);
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.reader-error__message {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+  word-break: break-word;
+}
+
+.reader-error__retry {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 8px;
+  padding: 12px 28px;
+  transition: background-color 120ms ease, transform 80ms ease;
+}
+
+.reader-error__retry:hover {
+  background: color-mix(in srgb, var(--accent) 88%, black 12%);
+}
+
+.reader-error__retry:active {
+  transform: translateY(1px);
+}
+
+.reader-error__retry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

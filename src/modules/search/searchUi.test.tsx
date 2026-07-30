@@ -85,12 +85,12 @@ describe("search UI integration", () => {
 
     const searchResults = await screen.findByRole("region", { name: "搜索结果" });
     expect(searchResults).toBeInTheDocument();
-    expect(screen.getByText(/命中 1 \/ 2（2 处）/)).toBeInTheDocument();
-    expect(within(searchResults).getByRole("button", { name: /第 1 页/ })).toBeInTheDocument();
-    expect(within(searchResults).getByRole("button", { name: /第 3 页/ })).toBeInTheDocument();
+    expect(within(searchResults).getByTestId("search-results-count")).toHaveTextContent("2");
+    expect(within(searchResults).getAllByTestId("search-results-item")).toHaveLength(2);
+    expect(within(searchResults).getAllByText("Line 1")).toHaveLength(2);
     expect(screen.getByText("当前页高亮：合同")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "下一个" }));
+    await user.click(screen.getByRole("button", { name: "下一个命中" }));
 
     expect(await screen.findByText("页码：3 / 3")).toBeInTheDocument();
   });
