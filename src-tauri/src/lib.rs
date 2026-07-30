@@ -45,7 +45,7 @@ struct NativeMenuCommandPayload<'a> {
     id: &'a str,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 struct NativePdfFileResponse {
     bytes: Vec<u8>,
     name: String,
@@ -86,10 +86,10 @@ fn read_app_settings(app_handle: AppHandle) -> Result<Option<Value>, String> {
 }
 
 #[tauri::command]
-fn read_pdf_file_from_path(path: String) -> Result<NativePdfFileResponse, String> {
+fn read_pdf_file_from_path(path: String) -> Result<NativePdfFileResponse, AppError> {
     let trimmed_path = path.trim();
     if trimmed_path.is_empty() {
-        return Err("未选择 PDF 文件。".to_string());
+        return Err(AppError::new(ErrCode::InvalidInput, "未选择 PDF 文件。"));
     }
 
     let input_path = PathBuf::from(trimmed_path);
@@ -99,10 +99,16 @@ fn read_pdf_file_from_path(path: String) -> Result<NativePdfFileResponse, String
         .map(|extension| extension.eq_ignore_ascii_case("pdf"))
         .unwrap_or(false);
     if !is_pdf {
-        return Err("请选择 PDF 文件。".to_string());
+        return Err(AppError::new(ErrCode::InvalidInput, "请选择 PDF 文件。"));
     }
 
-    let bytes = fs::read(&input_path).map_err(|_| "无法读取所选 PDF 文件。".to_string())?;
+    // ISS-NEW-M M5：用 From<io::Error> 自动把 io::ErrorKind 映射到 ErrCode
+    //（NotFound→FileNotFound，PermissionDenied→PermissionDenied，其他→IoError），
+    // 替换原来 map_err(|_| ...) 把所有 IO 错误混为「无法读取」的混淆。
+    // 路径脱敏进 context，不泄露完整路径给前端。
+    let bytes = fs::read(&input_path).map_err(|e| {
+        AppError::from(e).with_context("path", redact_path_for_error(&input_path))
+    })?;
     let name = input_path
         .file_name()
         .and_then(|name| name.to_str())
@@ -2962,5 +2968,76 @@ mod password_command_error_tests {
         let err = result.unwrap_err();
         assert_eq!(err.code, ErrCode::InvalidInput);
         assert!(err.message.contains("没有设置密码"));
+    }
+}
+
+#[cfg(test)]
+mod read_pdf_file_command_tests {
+    //! ISS-NEW-M M5：read_pdf_file_from_path 迁移到 `Result<_, AppError>` 后，
+    //! 校验 io::ErrorKind → ErrCode 映射（NotFound/PermissionDenied/其他）与脱敏 context。
+    //! PermissionDenied 的纯文件系统单测在跨平台 CI 上 flaky（chmod 行为差异），
+    //! 其映射正确性由 error.rs 的 from_io_error_maps_kind 保证，这里聚焦 command 层。
+    use super::*;
+
+    #[test]
+    fn empty_path_returns_invalid_input() {
+        let result = read_pdf_file_from_path("   ".to_string());
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrCode::InvalidInput);
+        assert!(err.message.contains("未选择"));
+    }
+
+    #[test]
+    fn non_pdf_extension_returns_invalid_input() {
+        let result = read_pdf_file_from_path("/tmp/notes.txt".to_string());
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrCode::InvalidInput);
+        assert!(err.message.contains("PDF"));
+    }
+
+    #[test]
+    fn missing_pdf_returns_file_not_found_with_redacted_path() {
+        let result = read_pdf_file_from_path("/tmp/faropdf-does-not-exist-2026.pdf".to_string());
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.code, ErrCode::FileNotFound);
+        // 脱敏 context：path 应是 [path:<basename>] 形态，不含完整路径
+        let path_ctx = err.context.get("path").expect("context.path 必填");
+        assert!(path_ctx.starts_with("[path:"), "path 应脱敏: {path_ctx}");
+        assert!(
+            !path_ctx.contains("/tmp/faropdf-does-not-exist-2026"),
+            "不应泄露完整路径: {path_ctx}"
+        );
+    }
+
+    #[test]
+    fn readable_temp_pdf_returns_bytes() {
+        use std::io::Write;
+        // 用 std::env::temp_dir 手动管理临时文件，避免引入 tempfile 依赖。
+        let unique = format!(
+            "faropdf-test-{}-{}.pdf",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let pdf_path = std::env::temp_dir().join(&unique);
+        {
+            let mut f = std::fs::File::create(&pdf_path).expect("create temp pdf");
+            f.write_all(b"%PDF-1.4\n%eof\n").expect("write");
+            f.flush().expect("flush");
+        }
+
+        let result = read_pdf_file_from_path(pdf_path.to_string_lossy().to_string());
+        // 清理临时文件（无论测试成败）
+        let _ = std::fs::remove_file(&pdf_path);
+
+        assert!(result.is_ok(), "应成功读取: {:?}", result.err());
+        let resp = result.unwrap();
+        assert!(!resp.bytes.is_empty());
+        assert!(resp.name.ends_with(".pdf"));
     }
 }

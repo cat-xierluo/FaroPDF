@@ -200,6 +200,13 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     dispatch({ type: "reader/passwordCancel" });
   }, []);
 
+  // ISS-NEW-M M5：外部（如 App.tsx 的 Tauri 文件读取 catch）在读取阶段就失败时，
+  // 把归一化后的中文错误文案推到 reader 错误态，复用 DEC-192 的 ReaderErrorScreen 展示。
+  const reportOpenError = useCallback((errorMessage: string) => {
+    cachedFileRef.current = null;
+    dispatch({ type: "reader/loadFailed", payload: { errorMessage } });
+  }, []);
+
   // 文档加载成功后恢复上次的阅读会话
   useEffect(() => {
     const document = state.document;
@@ -432,6 +439,7 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     openNativeFile,
     submitPassword,
     cancelPassword,
+    reportOpenError,
     setCurrentPage,
     goBack,
     goToHistory,

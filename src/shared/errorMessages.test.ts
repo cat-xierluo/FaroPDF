@@ -82,3 +82,34 @@ describe("classifyPdfjsException + normalizeError（PDF.js 异常归一化链路
     expect(normalizeError(appErr)).toEqual(appErr);
   });
 });
+
+describe("ISS-NEW-M M5 权限不足：Rust AppError → 前端归一化链路", () => {
+  // Tauri invoke reject 时，Rust 的 AppError（含 code/message/context）经 serde 序列化
+  // 后传给前端。normalizeError 识别 {code,message} 形态后原样保留 code，
+  // friendlyMessageForCode 按 code 给中文文案。这证明权限不足闭环的前端归一化正确，
+  // 无需真实 Tauri / 文件系统。
+  test("read_pdf_file_from_path 抛 PermissionDenied → 前端归一化为「权限不足」", () => {
+    const rustAppError = {
+      code: "PermissionDenied",
+      message: "IO 错误: permission denied",
+      context: { path: "[path:secret.pdf]" },
+    };
+    const normalized = normalizeError(rustAppError);
+    expect(normalized.code).toBe("PermissionDenied");
+    expect(friendlyMessageForCode(normalized)).toBe("权限不足，请检查文件 / 目录权限。");
+  });
+
+  test("read_pdf_file_from_path 抛 FileNotFound → 前端归一化为「文件不存在」", () => {
+    const rustAppError = {
+      code: "FileNotFound",
+      message: "IO 错误: entity not found",
+      context: { path: "[path:missing.pdf]" },
+    };
+    const normalized = normalizeError(rustAppError);
+    expect(normalized.code).toBe("FileNotFound");
+    expect(friendlyMessageForCode(normalized)).toBe(
+      "文件不存在或路径已变更，请重新打开 PDF 后重试。",
+    );
+  });
+});
+

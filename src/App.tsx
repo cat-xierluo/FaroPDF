@@ -18,6 +18,8 @@ import { useOcrWorkspaceController } from "./modules/ocr";
 import type { PdfAnnotation } from "./shared";
 import type { AppCommandSignal } from "./shared/app/commands";
 import { subscribeNativeMenuCommands } from "./shared/app/nativeMenuBridge";
+import { normalizeError } from "./shared/error";
+import { friendlyMessageForCode } from "./shared/errorMessages";
 import type { AppSettings } from "./shared/settings/types";
 import { createDefaultAppSettings } from "./shared/settings/defaults";
 import "./styles/app.css";
@@ -98,7 +100,11 @@ export function PendingDetachRestore({ reader }: { reader: ReaderController }): 
     void readPdfFileFromPath(filePath)
       .then((file) => reader.openNativeFile(file).then(() => reader.setCurrentPage(lastPage)))
       .catch((error: unknown) => {
+        // ISS-NEW-M M5：Tauri 读文件失败（权限不足 / 文件不存在等）走归一化中文错误态，
+        // 不再只 console.error。Rust 返回 AppError（含 code），normalizeError 识别后
+        // friendlyMessageForCode 按 code（PermissionDenied/FileNotFound/...）给中文文案。
         console.error("[ISS-NEW-F] pending-detach restore failed:", error);
+        reader.reportOpenError(friendlyMessageForCode(normalizeError(error)));
       })
       .finally(() => {
         try {
@@ -299,7 +305,11 @@ function App() {
               void readerRef.current.openNativeFile(file);
             }
           })
-          .catch(() => undefined);
+          .catch((error: unknown) => {
+            // ISS-NEW-M M5：选文件对话框 / 读文件失败（权限不足 / 文件不存在等）走归一化
+            // 中文错误态，不再吞掉。用户取消对话框（无错误）不会进 catch。
+            readerRef.current.reportOpenError(friendlyMessageForCode(normalizeError(error)));
+          });
         return;
       }
 
