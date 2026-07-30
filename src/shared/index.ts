@@ -61,6 +61,7 @@ export type {
   PdfFlattenAnnotationsOperation,
   PdfFlattenFormOperation,
   PdfInsertPagesOperation,
+  PdfInsertBlankPagesOperation,
   PdfMergePdfsOperation,
   PdfFormFlatteningSummary,
   PdfImageWatermarkSpec,

@@ -9,6 +9,7 @@ import type {
   PdfExtractPagesOperation,
   PdfFormFlatteningSummary,
   PdfInsertPagesOperation,
+  PdfInsertBlankPagesOperation,
   PdfMergePdfsOperation,
   PdfOutputPlacement,
   PdfOutputToolPlanEntry,
@@ -124,11 +125,15 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
       // ISS-NEW-A: insert-pages / merge-pdfs / extract-pages 改写 workingPdf 后继续后续 operation
       // 互斥: 一次只允许 1 个(取第一个), 多个时报错
       const rewriteOps = request.operations.filter(
-        (op) => op.type === "insert-pages" || op.type === "merge-pdfs" || op.type === "extract-pages",
+        (op) =>
+          op.type === "insert-pages" ||
+          op.type === "merge-pdfs" ||
+          op.type === "extract-pages" ||
+          op.type === "insert-blank-pages",
       );
       if (rewriteOps.length > 1) {
         throw new Error(
-          `insert-pages / merge-pdfs / extract-pages 互斥, 一次只允许 1 个, 实际 ${rewriteOps.length} 个。`,
+          `insert-pages / merge-pdfs / extract-pages / insert-blank-pages 互斥, 一次只允许 1 个, 实际 ${rewriteOps.length} 个。`,
         );
       }
       if (rewriteOps.length === 1) {
@@ -136,12 +141,17 @@ export function createPdfOperationEngine(options: PdfOperationEngineOptions = {}
         const beforeCount = workingPdf.getPageCount();
         const additionalSources = request.additionalSources ?? [];
         let label: string;
-        let rewriteType: "insert-pages" | "merge-pdfs" | "extract-pages";
+        let rewriteType: "insert-pages" | "merge-pdfs" | "extract-pages" | "insert-blank-pages";
         if (rewriteOp.type === "insert-pages") {
           workingPdf = await applyInsertPages(workingPdf, rewriteOp);
           label = `插入 ${rewriteOp.insertAtIndex} 位置`;
           summary.insertedPageCount = workingPdf.getPageCount() - beforeCount;
           rewriteType = "insert-pages";
+        } else if (rewriteOp.type === "insert-blank-pages") {
+          workingPdf = await applyInsertBlankPages(workingPdf, rewriteOp);
+          label = `插入 ${rewriteOp.count} 张空白页到 ${rewriteOp.insertAtIndex} 位置`;
+          summary.insertedPageCount = workingPdf.getPageCount() - beforeCount;
+          rewriteType = "insert-blank-pages";
         } else if (rewriteOp.type === "merge-pdfs") {
           workingPdf = await applyMergePdfs(workingPdf, rewriteOp, additionalSources);
           label = `合并 ${additionalSources.length} 份附加 PDF`;
@@ -955,6 +965,31 @@ async function applyInsertPages(
   // 简化: 用 pdf-lib 0-based insertPage(index, page) 循环
   for (let i = 0; i < copied.length; i += 1) {
     workingPdf.insertPage(operation.insertAtIndex + i, copied[i]);
+  }
+  return workingPdf;
+}
+
+/**
+ * ISS-NEW-M M3：插入空白页。在 `insertAtIndex`（0-based）之后插入 `count` 张空白页，
+ * 默认 A4 纵向尺寸（595.28 × 841.89 pt）。pdf-lib 的 addPage/insertPage 会自动分配新 page ref。
+ */
+async function applyInsertBlankPages(
+  workingPdf: PDFDocument,
+  operation: PdfInsertBlankPagesOperation,
+): Promise<PDFDocument> {
+  if (!Number.isInteger(operation.count) || operation.count <= 0) {
+    throw new Error(`insert-blank-pages 数量必须是正整数, 实际 ${operation.count}。`);
+  }
+  const totalPages = workingPdf.getPageCount();
+  if (operation.insertAtIndex < 0 || operation.insertAtIndex > totalPages) {
+    throw new Error(
+      `insert-blank-pages 插入位置越界: insertAtIndex=${operation.insertAtIndex}, 总页数=${totalPages}`,
+    );
+  }
+  const [width, height] = operation.pageSize ?? [595.28, 841.89];
+  for (let i = 0; i < operation.count; i += 1) {
+    // insertPage(index, page?) 支持传入尺寸创建空白页（pdf-lib 0-based）
+    workingPdf.insertPage(operation.insertAtIndex + i, [width, height]);
   }
   return workingPdf;
 }
