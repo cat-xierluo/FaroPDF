@@ -1331,7 +1331,55 @@ describe("pdf operation engine — ISS-NEW-A 插入 / 合并 / 提取", () => {
     ).rejects.toThrow("extract-pages 缺少 pageRange");
   });
 
-  test("insert-pages / merge-pdfs / extract-pages 互斥, 多个时报错", async () => {
+  test("ISS-NEW-M M3: insert-blank-pages 在指定位置插入 N 张空白页", async () => {
+    const main = await createPdfWithBlankPages(3);
+    const engine = createPdfOperationEngine();
+
+    const result = await engine.exportPdf({
+      id: "export-blank-1",
+      source: { bytes: main },
+      destination: { type: "bytes" },
+      operations: [
+        { id: "op-blank-1", type: "insert-blank-pages", insertAtIndex: 1, count: 2 },
+      ],
+      requestedAt: "2026-06-14T00:00:00.000Z",
+    });
+
+    const outputPdf = await PDFDocument.load(result.bytes);
+    expect(outputPdf.getPageCount()).toBe(5); // 3 + 2
+    expect(result.summary.insertedPageCount).toBe(2);
+    expect(result.summary.rewritePlan?.type).toBe("insert-blank-pages");
+    expect(result.summary.rewritePlan?.status).toBe("applied");
+  });
+
+  test("ISS-NEW-M M3: insert-blank-pages 数量非正整数报错 + 位置越界报错", async () => {
+    const main = await createPdfWithBlankPages(2);
+    const engine = createPdfOperationEngine();
+    await expect(
+      engine.exportPdf({
+        id: "export-blank-err-1",
+        source: { bytes: main },
+        destination: { type: "bytes" },
+        operations: [
+          { id: "op-blank-err-1", type: "insert-blank-pages", insertAtIndex: 0, count: 0 },
+        ],
+        requestedAt: "2026-06-14T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("数量必须是正整数");
+    await expect(
+      engine.exportPdf({
+        id: "export-blank-err-2",
+        source: { bytes: await createPdfWithBlankPages(2) },
+        destination: { type: "bytes" },
+        operations: [
+          { id: "op-blank-err-2", type: "insert-blank-pages", insertAtIndex: 5, count: 1 },
+        ],
+        requestedAt: "2026-06-14T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("插入位置越界");
+  });
+
+  test("insert-pages / merge-pdfs / extract-pages / insert-blank-pages 互斥, 多个时报错", async () => {
     const main = await createPdfWithBlankPages(2);
     const extra = await createPdfWithBlankPages(1);
     const engine = createPdfOperationEngine();

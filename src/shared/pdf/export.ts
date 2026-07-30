@@ -43,6 +43,7 @@ export type PdfExportOperation =
   | PdfBatesNumberOperation
   | PdfCompressionOperation
   | PdfInsertPagesOperation
+  | PdfInsertBlankPagesOperation
   | PdfMergePdfsOperation
   | PdfExtractPagesOperation;
 
@@ -156,6 +157,21 @@ export interface PdfInsertPagesOperation {
   insertAtIndex: number;
   /** 可选：1-based 页码范围（如 "1-3"）只取该范围；省略则取全部页。 */
   pageRange?: string;
+}
+
+/**
+ * ISS-NEW-M M3：插入空白页。在 `insertAtIndex`（0-based）之后插入 `count` 张空白页，
+ * 默认 A4 纵向尺寸。与 insert-pages（插入已有 PDF）互补，互斥一次只允许 1 个 rewrite op。
+ */
+export interface PdfInsertBlankPagesOperation {
+  id: string;
+  type: "insert-blank-pages";
+  /** 插入位置：0-based，插入到该页之后（=totalPages 时追加到末尾）。 */
+  insertAtIndex: number;
+  /** 插入空白页数量，正整数。 */
+  count: number;
+  /** 可选：页面尺寸 [width, height]（PDF points），默认 A4 纵向 [595.28, 841.89]。 */
+  pageSize?: [number, number];
 }
 
 export interface PdfMergePdfsOperation {
@@ -274,7 +290,7 @@ export interface PdfExportSummary {
 
 export interface PdfRewritePlan {
   operationId: string;
-  type: "insert-pages" | "merge-pdfs" | "extract-pages";
+  type: "insert-pages" | "merge-pdfs" | "extract-pages" | "insert-blank-pages";
   pageIndexes: number[];
   status: PdfOutputToolStatus;
   label: string;

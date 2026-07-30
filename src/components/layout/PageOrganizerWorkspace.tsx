@@ -716,6 +716,9 @@ function InsertPdfDialog({
   const [pageRange, setPageRange] = useState<string>("");
   const [outputName, setOutputName] = useState<string>(() => buildDerivedFileName(reader, "-inserted"));
   const [localError, setLocalError] = useState<string | null>(null);
+  // ISS-NEW-M M3：插入模式——pdf（插入已有 PDF）或 blank（插入空白页）。
+  const [mode, setMode] = useState<"pdf" | "blank">("pdf");
+  const [blankCount, setBlankCount] = useState<string>("1");
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const next = event.target.files?.[0] ?? null;
@@ -727,10 +730,6 @@ function InsertPdfDialog({
   const handleConfirm = async () => {
     setLocalError(null);
     onError(null);
-    if (!file) {
-      setLocalError("请选择要插入的 PDF 文件。");
-      return;
-    }
     const insertAtNumber = Number.parseInt(insertAt, 10);
     if (!Number.isInteger(insertAtNumber) || insertAtNumber < 1) {
       setLocalError("插入位置必须是 ≥ 1 的整数。");
@@ -743,6 +742,54 @@ function InsertPdfDialog({
     const trimmedName = outputName.trim();
     if (!trimmedName) {
       setLocalError("输出文件名不能为空。");
+      return;
+    }
+
+    if (mode === "blank") {
+      const count = Number.parseInt(blankCount, 10);
+      if (!Number.isInteger(count) || count <= 0) {
+        setLocalError("空白页数量必须是 ≥ 1 的整数。");
+        return;
+      }
+      const sourceBytes = await reader.getFileBytes();
+      if (!sourceBytes) {
+        setLocalError("当前 PDF 源字节不可读。");
+        return;
+      }
+      onBusyChange(true);
+      try {
+        const result = await engine.exportPdf({
+          id: `insert-blank-pages-${Date.now()}`,
+          source: {
+            bytes: sourceBytes,
+            ...(reader.state.document?.fingerprint ? { fingerprint: reader.state.document.fingerprint } : {}),
+          },
+          destination: { type: "bytes" },
+          operations: [
+            {
+              id: "insert-blank-pages-op",
+              type: "insert-blank-pages",
+              insertAtIndex: insertAtNumber - 1,
+              count,
+            },
+          ],
+          requestedAt: new Date().toISOString(),
+        });
+        await reader.saveUpdatedBytes(result.bytes, trimmedName);
+        onSuccess();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setLocalError(message);
+        onError(`插入空白页失败：${message}`);
+      } finally {
+        onBusyChange(false);
+      }
+      return;
+    }
+
+    // mode === "pdf"
+    if (!file) {
+      setLocalError("请选择要插入的 PDF 文件。");
       return;
     }
     const sourceBytes = await reader.getFileBytes();
@@ -785,8 +832,8 @@ function InsertPdfDialog({
   return (
     <div className="page-organizer__dialog" role="dialog" aria-modal="true" aria-label="插入 PDF">
       <div className="page-organizer__dialog-card">
-        <h2>插入 PDF</h2>
-        <p>选择另一份 PDF 插入到当前文档的指定位置，输出为新 PDF（不覆盖原文件）。</p>
+        <h2>插入页</h2>
+        <p>选择另一份 PDF 或插入空白页到当前文档的指定位置，输出为新 PDF（不覆盖原文件）。</p>
         <form
           className="page-organizer__form"
           onSubmit={(event) => {
@@ -794,16 +841,67 @@ function InsertPdfDialog({
             void handleConfirm();
           }}
         >
-          <label className="page-organizer__form-field">
-            <span>待插入的 PDF</span>
-            <input
-              accept="application/pdf,.pdf"
-              data-testid="insert-pdf-file"
-              disabled={busy}
-              onChange={handleFileChange}
-              type="file"
-            />
-          </label>
+          <div className="page-organizer__form-field" role="group" aria-label="插入模式">
+            <label>
+              <input
+                checked={mode === "pdf"}
+                data-testid="insert-mode-pdf"
+                disabled={busy}
+                onChange={() => setMode("pdf")}
+                type="radio"
+                name="insert-mode"
+              />
+              <span>插入已有 PDF</span>
+            </label>
+            <label>
+              <input
+                checked={mode === "blank"}
+                data-testid="insert-mode-blank"
+                disabled={busy}
+                onChange={() => setMode("blank")}
+                type="radio"
+                name="insert-mode"
+              />
+              <span>插入空白页（A4）</span>
+            </label>
+          </div>
+          {mode === "pdf" ? (
+            <>
+              <label className="page-organizer__form-field">
+                <span>待插入的 PDF</span>
+                <input
+                  accept="application/pdf,.pdf"
+                  data-testid="insert-pdf-file"
+                  disabled={busy}
+                  onChange={handleFileChange}
+                  type="file"
+                />
+              </label>
+              <label className="page-organizer__form-field">
+                <span>页码范围（可选，如 1-3, 5）</span>
+                <input
+                  data-testid="insert-pdf-range"
+                  disabled={busy}
+                  onChange={(event) => setPageRange(event.target.value)}
+                  placeholder="省略则插入全部页"
+                  type="text"
+                  value={pageRange}
+                />
+              </label>
+            </>
+          ) : (
+            <label className="page-organizer__form-field">
+              <span>空白页数量</span>
+              <input
+                data-testid="insert-blank-count"
+                disabled={busy}
+                min={1}
+                onChange={(event) => setBlankCount(event.target.value)}
+                type="number"
+                value={blankCount}
+              />
+            </label>
+          )}
           <label className="page-organizer__form-field">
             <span>插入位置（1-based）</span>
             <input
@@ -813,17 +911,6 @@ function InsertPdfDialog({
               onChange={(event) => setInsertAt(event.target.value)}
               type="number"
               value={insertAt}
-            />
-          </label>
-          <label className="page-organizer__form-field">
-            <span>页码范围（可选，如 1-3, 5）</span>
-            <input
-              data-testid="insert-pdf-range"
-              disabled={busy}
-              onChange={(event) => setPageRange(event.target.value)}
-              placeholder="省略则插入全部页"
-              type="text"
-              value={pageRange}
             />
           </label>
           <label className="page-organizer__form-field">
