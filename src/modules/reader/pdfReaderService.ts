@@ -1,4 +1,4 @@
-import type { ReaderByteLoadInput, ReaderLoadedMetadata } from "../../shared/pdf/reader";
+import type { OutlineNode, ReaderByteLoadInput, ReaderLoadedMetadata } from "../../shared/pdf/reader";
 import type { PdfPageText } from "../../shared/pdf/text";
 import type { PdfPageViewport, TextLayerStatus } from "../../shared/pdf/types";
 import { configurePdfjsWorker } from "./pdfjsWorker";
@@ -31,6 +31,10 @@ interface PdfJsDocumentLike {
   numPages: number;
   fingerprints?: Array<string | null>;
   getPage(pageNumber: number): Promise<PdfJsPageLike>;
+  // ISS-NEW-M M4：outline 读取 + destination → pageIndex 解析
+  getOutline?(): Promise<unknown[] | null>;
+  getDestination?(name: string): Promise<unknown[] | null>;
+  getPageIndex?(ref: unknown): Promise<number>;
 }
 
 /** ISS-069 端到端发现：auto-toc 算法需要 PDF.js 原始 TextContent（带 items 位置/字号）。
@@ -72,6 +76,8 @@ export interface LoadedPdfDocument {
   ) => Promise<void>;
   /** 将指定页以缩略图尺寸渲染到 canvas；maxWidth 约束最长边。失败时抛出错误。 */
   renderThumbnail: (pageIndex: number, canvas: HTMLCanvasElement, maxWidth: number) => Promise<void>;
+  /** ISS-NEW-M M4：读取 PDF outline（书签 destination）并归一化为树。无 outline 时返回空数组。 */
+  getOutline: () => Promise<OutlineNode[]>;
   destroy: () => Promise<void>;
 }
 
@@ -165,6 +171,81 @@ async function renderThumbnail(
   const renderContext = { canvasContext: context, viewport };
   const renderResult = (page as unknown as { render(ctx: typeof renderContext): { promise: Promise<void> } }).render(renderContext);
   await renderResult.promise;
+}
+
+/**
+ * ISS-NEW-M M4：把 PDF.js outline item（含 title / dest / items）递归归一化为 OutlineNode。
+ * dest 可能是命名 string（需 getDestination）或 explicit array（[pageRef, ...]）；
+ * 解析失败（无 dest / getPageIndex 不可用 / dest 损坏）时 pageNumber 为 undefined。
+ */
+interface PdfJsOutlineItemLike {
+  title?: string;
+  dest?: string | unknown[];
+  items?: PdfJsOutlineItemLike[];
+}
+
+async function resolveDestination(
+  document: PdfJsDocumentLike,
+  item: PdfJsOutlineItemLike,
+): Promise<number | undefined> {
+  const dest = item.dest;
+  if (dest == null || !document.getPageIndex) {
+    return undefined;
+  }
+  let explicitDest: unknown[] | null = null;
+  if (typeof dest === "string") {
+    explicitDest = document.getDestination ? await document.getDestination(dest) : null;
+  } else if (Array.isArray(dest)) {
+    explicitDest = dest;
+  }
+  const pageRef = Array.isArray(explicitDest) ? explicitDest[0] : undefined;
+  if (pageRef == null) {
+    return undefined;
+  }
+  try {
+    // getPageIndex 接受 page ref，返回 0-based；+1 转为展示用 1-based 页码。
+    const index = await document.getPageIndex(pageRef);
+    if (Number.isInteger(index) && index >= 0 && index < document.numPages) {
+      return index + 1;
+    }
+  } catch {
+    // 损坏的 destination ref：忽略，保持 undefined。
+  }
+  return undefined;
+}
+
+async function readOutlineTree(
+  document: PdfJsDocumentLike,
+): Promise<OutlineNode[]> {
+  if (!document.getOutline) {
+    return [];
+  }
+  const rawOutline = await document.getOutline();
+  if (!Array.isArray(rawOutline) || rawOutline.length === 0) {
+    return [];
+  }
+
+  async function buildNodes(
+    items: PdfJsOutlineItemLike[],
+    depth: number,
+  ): Promise<OutlineNode[]> {
+    const nodes: OutlineNode[] = [];
+    for (const item of items) {
+      const pageNumber = await resolveDestination(document, item);
+      const children = Array.isArray(item.items) && item.items.length > 0
+        ? await buildNodes(item.items, depth + 1)
+        : [];
+      nodes.push({
+        title: (item.title ?? "").trim() || "未命名",
+        pageNumber,
+        depth,
+        children,
+      });
+    }
+    return nodes;
+  }
+
+  return buildNodes(rawOutline as PdfJsOutlineItemLike[], 0);
 }
 
 async function readPageText(document: PdfJsDocumentLike, pageIndex: number): Promise<PdfPageText> {
@@ -355,6 +436,7 @@ export async function loadPdfFromBytes(
     },
     renderPageToCanvas: (pageIndex, canvas, zoom, options) => renderPageToCanvas(document, pageIndex, canvas, zoom, options),
     renderThumbnail: (pageIndex, canvas, maxWidth) => renderThumbnail(document, pageIndex, canvas, maxWidth),
+    getOutline: () => readOutlineTree(document),
     destroy: () => loadingTask.destroy?.() ?? Promise.resolve(),
   };
 }
