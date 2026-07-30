@@ -75,6 +75,18 @@ export interface Dictionary {
     fileInputAria: string;
     /** 「重新选择文件」主按钮 */
     retryButton: string;
+    /** 密码提示态标题 */
+    passwordTitle: string;
+    /** 首次需要密码时的提示 */
+    passwordNeeded: string;
+    /** 密码错误时的提示 */
+    passwordIncorrect: string;
+    /** 密码输入框 placeholder */
+    passwordPlaceholder: string;
+    /** 密码提交按钮 */
+    passwordSubmit: string;
+    /** 取消密码输入按钮 */
+    passwordCancel: string;
   };
   feedback: {
     convertImagesPending: string;
@@ -167,6 +179,12 @@ const zhCN: Dictionary = {
     title: "无法打开此 PDF",
     fileInputAria: "重新选择 PDF 文件",
     retryButton: "重新选择文件",
+    passwordTitle: "此 PDF 已加密",
+    passwordNeeded: "请输入密码以打开此 PDF。",
+    passwordIncorrect: "密码错误，请重新输入。",
+    passwordPlaceholder: "输入 PDF 密码",
+    passwordSubmit: "打开",
+    passwordCancel: "取消",
   },
   feedback: {
     convertImagesPending: "图片转 PDF 功能开发中，等待 OCR pipeline / img2pdf engine 接入。",
@@ -265,6 +283,12 @@ const en: Dictionary = {
     title: "Unable to open this PDF",
     fileInputAria: "Select another PDF file",
     retryButton: "Choose another file",
+    passwordTitle: "This PDF is encrypted",
+    passwordNeeded: "Enter the password to open this PDF.",
+    passwordIncorrect: "Incorrect password, please try again.",
+    passwordPlaceholder: "Enter PDF password",
+    passwordSubmit: "Open",
+    passwordCancel: "Cancel",
   },
   feedback: {
     convertImagesPending: "Images to PDF is under development. Awaiting OCR pipeline / img2pdf engine integration.",

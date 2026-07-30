@@ -498,3 +498,133 @@ describe("useReaderController 加载失败归一化（ISS-NEW-M M5）", () => {
     expect(ref.current?.state.errorMessage).toBe("network timeout");
   });
 });
+
+// ISS-NEW-M M5：加密 PDF 密码输入闭环。
+// 模拟 PDF.js PasswordException（name + code），验证 passwordPrompt 态、submitPassword
+// 重试循环（错密码再 prompt / 对密码 loadSucceeded）与 cancelPassword 回 error。
+describe("useReaderController 加密 PDF 密码闭环（ISS-NEW-M M5）", () => {
+  beforeEach(() => {
+    vi.mocked(loadPdfFromBytes).mockReset();
+    vi.mocked(loadPdfFromFile).mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function makePasswordException(code: number, message: string): Error {
+    const err = new Error(message);
+    err.name = "PasswordException";
+    (err as Error & { code?: number }).code = code;
+    return err;
+  }
+
+  test("openNativeFile 加载加密 PDF（code=1）→ 进入 passwordPrompt 态，不清除 cachedFileRef", async () => {
+    vi.mocked(loadPdfFromBytes).mockRejectedValueOnce(makePasswordException(1, "No password given"));
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} />);
+
+    await act(async () => {
+      await ref.current?.openNativeFile({
+        bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+        name: "encrypted.pdf",
+        path: "/case/encrypted.pdf",
+      });
+    });
+
+    expect(ref.current?.state.passwordChallenge).toEqual({ reason: 1 });
+    // 未进 error 态，document 仍 null
+    expect(ref.current?.state.status).not.toBe("error");
+    expect(ref.current?.state.document).toBeNull();
+  });
+
+  test("openFile 加密 PDF（code=1）→ passwordPrompt（openFile 链路同样识别）", async () => {
+    vi.mocked(loadPdfFromFile).mockRejectedValueOnce(makePasswordException(1, "No password given"));
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} />);
+    const file = new File([new Uint8Array([1])], "enc.pdf", { type: "application/pdf" });
+    await act(async () => {
+      await ref.current?.openFile(file);
+    });
+    expect(ref.current?.state.passwordChallenge).toEqual({ reason: 1 });
+  });
+
+  test("submitPassword 正确密码 → loadSucceeded，清除 passwordChallenge", async () => {
+    // 第一次（openNativeFile）抛 NEED_PASSWORD，第二次（submitPassword 带密码）成功
+    vi.mocked(loadPdfFromBytes)
+      .mockRejectedValueOnce(makePasswordException(1, "No password given"))
+      .mockResolvedValueOnce(createLoadedDocument({ fileName: "encrypted.pdf", filePath: "/case/encrypted.pdf" }));
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} />);
+
+    await act(async () => {
+      await ref.current?.openNativeFile({ bytes: new Uint8Array([1]), name: "encrypted.pdf", path: "/case/encrypted.pdf" });
+    });
+    expect(ref.current?.state.passwordChallenge).toEqual({ reason: 1 });
+
+    await act(async () => {
+      await ref.current?.submitPassword("test123");
+    });
+
+    expect(ref.current?.state.passwordChallenge).toBeUndefined();
+    expect(ref.current?.state.status).toBe("ready");
+    expect(ref.current?.state.document?.name).toBe("encrypted.pdf");
+    // 第二次调用带 password
+    const lastCall = vi.mocked(loadPdfFromBytes).mock.calls.at(-1);
+    expect(lastCall?.[2]).toEqual({ password: "test123" });
+  });
+
+  test("submitPassword 错误密码（code=2）→ 再次 passwordPrompt，可继续重试", async () => {
+    vi.mocked(loadPdfFromBytes)
+      .mockRejectedValueOnce(makePasswordException(1, "No password given"))
+      .mockRejectedValueOnce(makePasswordException(2, "Incorrect Password"))
+      .mockResolvedValueOnce(createLoadedDocument({ fileName: "encrypted.pdf" }));
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} />);
+
+    await act(async () => {
+      await ref.current?.openNativeFile({ bytes: new Uint8Array([1]), name: "encrypted.pdf", path: "/e.pdf" });
+    });
+    expect(ref.current?.state.passwordChallenge).toEqual({ reason: 1 });
+
+    // 错密码 → reason 变 2
+    await act(async () => {
+      await ref.current?.submitPassword("wrong");
+    });
+    expect(ref.current?.state.passwordChallenge).toEqual({ reason: 2 });
+
+    // 对密码 → 成功
+    await act(async () => {
+      await ref.current?.submitPassword("test123");
+    });
+    expect(ref.current?.state.status).toBe("ready");
+    expect(ref.current?.state.passwordChallenge).toBeUndefined();
+  });
+
+  test("cancelPassword → 回到 error 态，清除 passwordChallenge", async () => {
+    vi.mocked(loadPdfFromBytes).mockRejectedValueOnce(makePasswordException(1, "No password given"));
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} />);
+
+    await act(async () => {
+      await ref.current?.openNativeFile({ bytes: new Uint8Array([1]), name: "encrypted.pdf", path: "/e.pdf" });
+    });
+    expect(ref.current?.state.passwordChallenge).toEqual({ reason: 1 });
+
+    act(() => ref.current?.cancelPassword());
+    expect(ref.current?.state.passwordChallenge).toBeUndefined();
+    expect(ref.current?.state.status).toBe("error");
+    expect(ref.current?.state.errorMessage).toContain("取消");
+  });
+
+  test("submitPassword 未处于密码态（无 cachedFileRef）→ no-op", async () => {
+    const ref: ControllerRef = { current: null };
+    render(<Harness controllerRef={ref} />);
+    await act(async () => {
+      await ref.current?.submitPassword("test123");
+    });
+    // 无异常、无状态变化
+    expect(ref.current?.state.passwordChallenge).toBeUndefined();
+    expect(loadPdfFromBytes).not.toHaveBeenCalled();
+  });
+});
