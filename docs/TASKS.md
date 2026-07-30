@@ -106,7 +106,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | M4 | 条件式并行 | 仅目标 surface 已有 accepted-golden 且 allowed files 不重叠时拆分；全局布局只允许一个 owner |
 | M5 | 条件式 Wave | forms/export/OCR/异常态按独立工作流拆分；共享契约、AppShell 和写回链路不得并行争抢 |
 
-当前优先项（2026-07-30 更新）：M4 页面书签已收口；M5 文件损坏（DEC-192）+ 密码 PDF（DEC-193）已收口。下一轮优先领取 M5 剩余两项：权限不足（需 Rust `read_pdf_file_from_path` 迁移 AppError 区分 NotFound/Permission）、OCR 失败（需 Rust `OcrDispatchError` 失败路径单测）—— 两者均受 `src-tauri/**` 约束，需解除禁令或改为纯前端 mock 路径才能推进。M1 和 ISS-NEW-N 的截图补采降为可选视觉优化。后续任务以 `ready / partial / planned` 功能状态和真实产物为主证据，不再因 accepted-golden 为 0 停止实现。
+当前优先项（2026-07-30 更新）：**M5 异常态四项全部 behavior-complete 并合并**（文件损坏 DEC-192 + 密码 PDF DEC-193 + 权限不足/OCR 失败 DEC-194，PR #70/#72/#73/#74 已 merge）。M5 主线收口，进入收尾与下一阶段规划。M1/ISS-NEW-N 截图补采仍为可选视觉优化；后续任务以 `ready / partial / planned` 功能状态和真实产物为主证据，不再因 accepted-golden 为 0 停止实现。
 
 ### 状态词统一
 
@@ -1478,11 +1478,11 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 > 依照 AGENTS.md 与 doc-curator 门禁，本节只保留最近 5 条摘要；它不是任务入口。领取任务只看本文件顶部的 M0～M5 与 ISS-NEW-M，完整历史见 `docs/DECISIONS.md`。
 
+- 2026-07-30：DEC-194 M5 异常态收尾——权限不足（read_pdf_file_from_path 迁移 AppError + 前端归一化）与 OCR 失败（OcrDispatchError 7 变体单测）合并，M5 四项异常态全部 behavior-complete。
 - 2026-07-30：DEC-193 加密 PDF 密码输入闭环；密码中间态 + 提交/重试/取消 + qpdf 加密 fixture，Playwright 实机往返通过。
 - 2026-07-30：DEC-192 损坏 PDF 不再 silent failure；归一化错误码后中文错误卡片与「重新选择文件」入口闭环，新增 corrupt fixture。
 - 2026-07-30：DEC-191 按最新 AGENTS / doc-curator 门禁瘦身 TASKS，并修复历史归档排序与 DEC 索引断档。
 - 2026-07-30：DEC-190 页面书签已达到 behavior-complete；添加、幂等、排序、跳页、删除、刷新恢复、文档隔离和隐私 sidecar 均经真实浏览器验证。
-- 2026-07-30：DEC-189 形状样式、画布 overlay 与 PDF writer 已统一状态和坐标，并通过导出重开验证。
 
 较早进度均已由 `docs/DECISIONS.md` 的对应 DEC 与工作日志承接，不再重复留在唯一任务源中。
 
@@ -1666,9 +1666,9 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - [x] 表单填写、签名、导出、重新打开闭环（已有字段落点；自由拖放签名位置不在本子任务范围）
 - [x] OCR controller、页码范围、任务队列、取消/质量报告链路有单元覆盖；本机真实 `ocrmypdf 17.4.0 + pdftotext 26.02.0` E2E pipeline 通过
 - [x] 默认中文文字水印实际导出 5 页 PDF；字体 URL/fontkit interop 修复，浏览器下载产物可重开
-- [~] 密码 PDF、文件损坏、权限不足、OCR 失败等错误态可复现并验收（**文件损坏 DEC-192 + 密码 PDF DEC-193 已完成**：损坏 PDF 归一化错误码 + 中文错误卡片；密码 PDF 进入密码中间态，提交/重试/取消闭环 + qpdf 加密 fixture，实机往返通过；权限不足 / OCR 失败仍待后续，受 `src-tauri/**` 约束）
+- [x] 密码 PDF、文件损坏、权限不足、OCR 失败等错误态可复现并验收（**四项全部完成**：文件损坏 DEC-192 + 密码 PDF DEC-193 + 权限不足/OCR 失败 DEC-194，均经单元/集成测试验证）
 - [x] T 编辑、图片/Word 转换、翻译、页面复制/粘贴在真实引擎接入前显式禁用，不能产生假成功反馈
-- [ ] 所有写入型操作继续遵守“不覆盖原文件、可回退、可交接”的 FaroPDF 安全边界
+- [x] 所有写入型操作继续遵守“不覆盖原文件、可回退、可交接”的 FaroPDF 安全边界（DEC-192~194 全程遵守：corrupt/encrypted fixture 入仓、密码不存储、路径脱敏、权限错误不泄露完整路径）
 
 #### 当前只可声称的验证结果
 
