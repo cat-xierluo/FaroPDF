@@ -21,6 +21,13 @@ export interface ReaderState {
    * 测试 fixture 可省略（默认视为 []）。 */
   history?: number[];
   errorMessage?: string;
+  /**
+   * ISS-NEW-M M5：加密 PDF 打开时进入「等待密码」中间态。
+   * `reason` 对齐 PDF.js PasswordResponses：1 = NEED_PASSWORD（未提供密码），
+   * 2 = INCORRECT_PASSWORD（密码错误）。UI 据此渲染密码输入框与提示；未进入该态时为 undefined。
+   * status 保持 loading，仅当 passwordChallenge 存在时 UI 优先渲染密码输入而非错误卡片。
+   */
+  passwordChallenge?: { reason: number };
   defaults: {
     zoom: number;
     viewMode: PdfViewMode;
@@ -31,6 +38,8 @@ export type ReaderAction =
   | { type: "reader/loadStarted"; payload: { fileName: string } }
   | { type: "reader/loadSucceeded"; payload: { documentId: string; metadata: ReaderLoadedMetadata } }
   | { type: "reader/loadFailed"; payload: { errorMessage: string } }
+  | { type: "reader/passwordPrompt"; payload: { reason: number } }
+  | { type: "reader/passwordCancel" }
   | { type: "reader/setCurrentPage"; payload: { currentPage: number; skipHistoryPush?: boolean } }
   | { type: "reader/setZoom"; payload: { zoom: number } }
   | { type: "reader/setViewMode"; payload: { viewMode: PdfViewMode } }
@@ -98,6 +107,7 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
         ...state,
         status: "loading",
         errorMessage: undefined,
+        passwordChallenge: undefined,
         document: null,
         pageViewports: [],
         renderRange: calculateReaderRenderRange({
@@ -132,6 +142,7 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
         renderRange: updateRenderRange(document),
         history: [],
         errorMessage: undefined,
+        passwordChallenge: undefined,
       };
     }
     case "reader/loadFailed":
@@ -146,6 +157,24 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
           viewMode: state.defaults.viewMode,
         }),
         errorMessage: action.payload.errorMessage,
+        passwordChallenge: undefined,
+      };
+    case "reader/passwordPrompt":
+      // 加密 PDF：保留 status=loading 语义（文档仍在尝试打开），UI 据此渲染密码输入。
+      return {
+        ...state,
+        passwordChallenge: { reason: action.payload.reason },
+        errorMessage: undefined,
+      };
+    case "reader/passwordCancel":
+      // 用户放弃输入密码：回到 error 态，提示需要密码。
+      return {
+        ...state,
+        status: "error",
+        passwordChallenge: undefined,
+        document: null,
+        pageViewports: [],
+        errorMessage: "已取消密码输入，无法打开加密 PDF。",
       };
     case "reader/setCurrentPage": {
       if (!state.document) {

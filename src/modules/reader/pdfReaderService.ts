@@ -316,9 +316,13 @@ function createAbortError(): DOMException {
 export async function loadPdfFromBytes(
   input: ReaderByteLoadInput,
   adapter: PdfJsReaderAdapter = defaultAdapter,
+  options?: { password?: string },
 ): Promise<LoadedPdfDocument> {
   await adapter.configureWorker();
-  const loadingTask = await adapter.getDocument({ data: input.data });
+  const loadingTask = await adapter.getDocument({
+    data: input.data,
+    ...(options?.password ? { password: options.password } : {}),
+  });
   const document = await loadingTask.promise;
   const firstPage = await document.getPage(1);
   const firstViewport = firstPage.getViewport({ scale: 1 });
