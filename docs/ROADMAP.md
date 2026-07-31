@@ -80,8 +80,8 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 - [x] 支持页面旋转、删除、重排和撤销。（M3 DEC-097/098/195 已完整闭环：真实缩略图、选择/多选、拖拽重排、删除/旋转、撤销栈、复制/粘贴剪贴板、`*-organized.pdf` 真实改写 + 导出重开验证 + Playwright 实机）
 - [x] 支持插入 PDF、提取页码范围（ISS-NEW-A 引擎 + UI 端到端完成：insert-pages / extract-pages 走 pdf-lib `copyPages` + `insertPage` / `addPage` 真实改写，互斥一次只允许 1 个；引擎单测断言真实输出页数 + UI 确认调 `saveUpdatedBytes` 下载）。**插入空白页**尚无独立入口（当前只支持插入已有 PDF），留后续。
 - [x] 支持多个 PDF 合并（ISS-NEW-A `merge-pdfs` 通过 `additionalSources` 多文件拾取 + 顺序追加 pdf-lib `addPage` 真实改写，UI 多选 + 确认下载，引擎单测断言合并后页数）。
-- [ ] 支持裁剪、拆分双页扫描、添加普通页码和 Bates 编号。
-- [ ] 支持证据图片和 PDF 页面按 A4 多图编排。（已建立 plan-only A4 编排计划器；真实目录拾取和像素渲染待接入）
+- [ ] 支持裁剪、拆分双页扫描（ISS-066 部分完成：splitPagesByGrid / trimPageMargins 算法已 ship + SplitPagesDialog UI；缩略图拖断点 UI 留 v0.3）。
+- [x] 支持添加普通页码和 Bates 编号（ISS-039：page-number / bates-number operation + ExportDeliveryPanel 设置面板，按样式/位置/起始号/前缀/位数导出新副本）。
 - [ ] 支持页级检查索引、文书边界 manifest 和规范命名建议。
 - [x] 所有页面整理默认另存为新 PDF，不覆盖原始文件。（M3/M5 全程遵守：旋转/删除/重排/剪贴板/异常态均输出 `*-organized.pdf` / 新副本，DEC-097~195 一致执行）
 
