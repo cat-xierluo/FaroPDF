@@ -26,28 +26,10 @@
 //   node scripts/build-icons.mjs src-tauri/icons/icon-source.png src-tauri/icons docs
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, existsSync, statSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, existsSync, statSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const TAURI_PNG_OUT = [
-  '32x32.png',
-  '128x128.png',
-  '128x128@2x.png',
-  'icon.png',
-];
-const MSIX_OUT = [
-  'Square30x30Logo.png',
-  'Square44x44Logo.png',
-  'Square71x71Logo.png',
-  'Square89x89Logo.png',
-  'Square107x107Logo.png',
-  'Square142x142Logo.png',
-  'Square150x150Logo.png',
-  'Square284x284Logo.png',
-  'Square310x310Logo.png',
-  'StoreLogo.png',
-];
 const ICNS_SIZES = [16, 32, 64, 128, 256, 512, 1024];
 const ICO_SIZES = [16, 24, 32, 48, 64, 128];
 

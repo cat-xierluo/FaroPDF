@@ -241,7 +241,7 @@ describe("readerReducer", () => {
     });
 
     test("goBack 对超出 pageCount 的 history 条目应用 clampPage", () => {
-      let state = loadAndNavigate([5]);
+      const state = loadAndNavigate([5]);
       // 假设 pageCount=12, history=[1]，goBack → currentPage=1, history=[]
       // 这里测试：如果 history 里有超界值（极端情况），clamp 仍然生效
       const afterBack = readerReducer(state, { type: "reader/goBack" });
@@ -282,11 +282,15 @@ describe("readerReducer", () => {
           payload: { currentPage: i },
         });
       }
-      expect(state.history).toHaveLength(50);
+      // ReaderState.history 在类型上是 number[] | undefined（允许测试 fixture
+      // 省略默认视为 []），但本测试从 createInitialReaderState() 出发一路 reducer
+      // 下来 history 实际一定是数组；用 ?? [] 让 TS narrowing 通过，语义不丢。
+      const history = state.history ?? [];
+      expect(history).toHaveLength(50);
       // 最新 push 100 在头部
-      expect(state.history[0]).toBe(100);
+      expect(history[0]).toBe(100);
       // 最旧被丢（应该是 51，前 50 项 [100..51] 保留）
-      expect(state.history[49]).toBe(51);
+      expect(history[49]).toBe(51);
     });
   });
 });
