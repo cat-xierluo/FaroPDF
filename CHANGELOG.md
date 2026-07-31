@@ -847,11 +847,11 @@ v0.3 follow-ups（已在 `docs/RELEASE.md §4` 文档化，不阻塞 beta.1）�
 
 ## 0.1.0-alpha.14 - 2026-06-05
 
-- LICENSE + 项目身份收尾（DEC-054 / `chore/add-license-and-author`）：补齐项目正式身份三件套（开源协议 + 作者名 + 项目图标）。
-  - **新增** `LICENSE`（191 行，标准 Apache License 2.0 文本）：从 [Folia](https://github.com/cat-xierluo/Folia) `LICENSE` 复制（Apache-2.0 文本是标准协议，不需按项目改文件本身）。完整协议文本落地后，README §许可 可去掉 TODO 占位。
+- LICENSE + 项目身份收尾（DEC-054 / `chore/add-license-and-author`）：补齐项目正式身份三件套（许可证 + 作者名 + 项目图标）。
+  - **新增** `LICENSE`（FaroPDF Source-Available Personal Use License 1.0 文本）：源码可见 + 个人免费 + 商用授权。完整协议文本落地后，README §许可 可去掉 TODO 占位。（注：本条历史曾落地 Apache-2.0 文本，2026-07-31 已统一变更为 Source-Available，详见顶部「许可证变更」条目。）
   - **修改** `package.json` author.name：`"maoking"`（GitHub 用户名） → `"杨卫薪律师"`（与 README §作者 + DEC-051 AuthorCard + DEC-052 §2.6 实际展示名一致）。user explicit 指示「author name 的话，以这个 read me 的为主优先」。`author.url` 保持 `https://github.com/cat-xierluo`（GitHub 个人页不变）。
   - **新增** `docs/icon.svg`（2.1KB）+ `docs/icon.png`（512×512，33KB）+ `docs/icon-128.png`（128×128，5.6KB）：项目图标 SVG 源 + PNG 衍生。设计主题：灯塔（呼应 `Faro` = 灯塔 / 指引之意，与 Folia 灯塔 logo 一脉相承）+ 红白条灯塔塔身 + 黄灯光晕 + 深蓝圆角方形 app-icon 风格底 + 右下角低透明度 "FaroPDF" 水印。`rsvg-convert` 从 SVG 衍出 PNG 两种尺寸（512 retina + 128 README inline）。
-  - **修改** `README.md`：顶部加 `<p align="center"><img src="docs/icon-128.png" alt="FaroPDF" width="128" height="128"></p>`；§许可 替换 TODO 占位为「本项目基于 Apache License 2.0 开源，与 Folia 保持一致。完整协议见 `LICENSE`」。
+  - **修改** `README.md`：顶部加 `<p align="center"><img src="docs/icon-128.png" alt="FaroPDF" width="128" height="128"></p>`；§许可 替换 TODO 占位为「本项目为源码可见（Source-Available）项目，个人非商业免费、商用需授权。完整协议见 `LICENSE`」。
   - **不修改** `src/**` / `src-tauri/**` / 锁文件 / 任何业务模块 / 任何构建配置 / DEC-053 已收口的 `config/` 子目录。
 - 范围严格遵守：仅 `LICENSE`（新增）+ `package.json`（author.name 改 1 行）+ `docs/icon.{svg,png}` + `docs/icon-128.png`（4 文件新增）+ `README.md`（顶部加 img + §许可 重写）+ 3 个文档（CHANGELOG / DECISIONS / TASKS）。
 - 同步 `docs/DECISIONS.md` 追加 DEC-054（身份收尾 / 与 Folia 对齐 / author.name 优先级 / icon 设计说明）；`docs/TASKS.md` 追加 ISS-028 个人主页任务卡（chore / future work，本 PR 不实现）。
@@ -883,7 +883,7 @@ v0.3 follow-ups（已在 `docs/RELEASE.md §4` 文档化，不阻塞 beta.1）�
   - **功能清单严格对照 0.1.0-alpha.0 ~ 0.1.0-alpha.11 CHANGELOG 实际交付范围**：阅读与检索（PDF.js 加载、worker 独立、4 视图模式、8 缩放预设、旋转、键盘翻页、缩略图、阅读位置本地恢复、搜索结果层、扫描件 OCR 提示）、批注（9 类型 + 6 色 + 5 图章模板 + sidecar + 中文图章真实绘制 + AnnotationOverlay/Toolbar/Sidebar 挂到 AppShell + Markdown/HTML 摘要）、页面整理（旋转 / 删除 / 重排真实改写 + 多选 + 风险确认 + 默认另存）、OCR 扫描（ocrmypdf 本地后端 + PaddleOCR/MinerU 云端 + 4 command + 任务队列持久化 + 9 态质量检查 + 扫描预处理 lopdf 真实清洁）、导出（pdf-lib 真实改写 + 表单 / 批注 flatten + 水印 / Bates / 页码 + 证据图片 A4 编排 + 压缩 plan-only）、表单签署（AcroForm 读取 + fill/sign/flatten 批量 + FormsPanel 浮层 + 签名图片）、设置（保存目录 / OCR provider / 隐私确认 / API Key 脱敏 / 9 态更新检查）。
   - **不发明未交付能力**：所有 feature bullet 都能在 `CHANGELOG.md` 找到对应版本号；不确定的能力（如真实高亮绘制、增量更新、Keychain 集成、autoUpdateCheck 设置项）**不**写入 README。
   - **下载与安装** 标「**待发布**」：ISS-021 全平台打包与自动更新流水线已就位（`docs/RELEASE.md`），但**尚未生成任何公开 release**；macOS 首次运行 `xattr -dr com.apple.quarantine` 标「未来指引」而非「当前步骤」。
-  - **许可** 标「**TODO**」：当前仓库未提交 LICENSE 文件；建议与 Folia 对齐采用 Apache-2.0，但需首个 release 前 PM 确认与定稿；**不**在本 PR 创建 LICENSE。
+  - **许可** 标「**TODO**」：当前仓库未提交 LICENSE 文件；采用源码可见（Source-Available）许可证，需首个 release 前 PM 确认与定稿；**不**在本 PR 创建 LICENSE。
   - **作者卡**：沿用 ISS-023 / DEC-051 收口的 AuthorCard 数据：作者展示名「**杨卫薪律师**」+ GitHub `[cat-xierluo](https://github.com/cat-xierluo)` + 微信 `ywxlaw`；`package.json` author.name 是 `maoking`（GitHub 用户名），README 以 AuthorCard 实际展示名为准。
   - **图标**：`docs/icon.png` 不存在（搜索 `*.png` 确认），README 不插入 logo `<img>` 标签，避免 404 资源引用。
   - 同步 `docs/DECISIONS.md` 追加 DEC-052（README 重写方案 + 范围 + 验证）；`docs/TASKS.md` **未改**（README 重写不在活跃 ISS 任务源，由 PM 直接派发 worker）；`docs/ROADMAP.md` **未改**。
