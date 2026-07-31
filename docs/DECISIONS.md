@@ -2090,7 +2090,7 @@ ISS-023 任务卡（`docs/TASKS.md` §"ISS-023"）原验收要求分两块：
 6. **作者**（沿用 ISS-023 / DEC-051 AuthorCard 数据：**杨卫薪律师** + GitHub `[cat-xierluo](https://github.com/cat-xierluo)` + 微信 `ywxlaw`；**不**写 `package.json` author.name 的 `maoking`，因为 AuthorCard 实际展示名是杨卫薪律师，`maoking` 是 GitHub 用户名）；
 7. **开发环境**（Node.js + npm + Rust stable + Xcode CLT for macOS + Tauri CLI 已作为 devDep 安装）；
 8. **构建**（`npm run build` 前端 + `npm run tauri build` 桌面 + 产物 `src-tauri/target/release/bundle/` + 引用 `docs/RELEASE.md`）；
-9. **许可**（**TODO** —— 当前仓库未提交 LICENSE 文件，建议与 Folia 对齐采用 Apache-2.0，但需首个 release 前 PM 确认与定稿；**不**在本 PR 创建 LICENSE）；
+9. **许可**（**TODO** —— 当前仓库未提交 LICENSE 文件，采用源码可见（Source-Available）许可证，需首个 release 前 PM 确认与定稿；**不**在本 PR 创建 LICENSE）；
 10. **文档**（AGENTS.md / docs/ROADMAP.md / docs/TASKS.md / docs/DECISIONS.md / docs/ARCHITECTURE.md / docs/DESIGN.md / docs/RELEASE.md / CHANGELOG.md）。
 
 #### 2.2 严格不发明未交付能力
@@ -2114,7 +2114,7 @@ ISS-023 任务卡（`docs/TASKS.md` §"ISS-023"）原验收要求分两块：
 #### 2.4 许可标「TODO」而非默认某种协议
 
 - 当前仓库未提交 `LICENSE` 文件；项目首版贡献者协议与发布协议尚未与 PM 确认。
-- 建议与 Folia 对齐采用 **Apache License 2.0**（因为 Folia 已采用），但需首个 release 前 PM 拍板。
+- 建议采用 **Source-Available Personal Use License**（源码可见 + 个人免费 + 商用授权），需首个 release 前 PM 拍板。
 - 本 PR **不**创建 LICENSE 文件（避免 PM 后续改协议时需删除 / 替换文件引入 git 历史噪音）。
 
 #### 2.5 图标
@@ -2175,7 +2175,7 @@ ISS-023 任务卡（`docs/TASKS.md` §"ISS-023"）原验收要求分两块：
 
 - README 与 `docs/RELEASE.md` 同步：首个 release 发布时由 PM 把「待发布」标替换为真实 release URL；macOS 首次运行步骤以 `docs/RELEASE.md` 实际指引为准。
 - 官网入口：v0.3 阶段（ROADMAP §"v0.3 性能与发布"）若搭建独立官网页面，再补 `cat-xierluo.github.io` 入口到 README §"官方仓库"。
-- LICENSE 落地：首个 release 前 PM 确认采用 Apache-2.0 后单独 PR 创建 `LICENSE` 文件 + 把 README §"许可" 替换为实际协议名称。
+- LICENSE 落地：首个 release 前 PM 确认采用 Source-Available 后单独 PR 创建 `LICENSE` 文件 + 把 README §"许可" 替换为实际协议名称。
 - README 维护责任：每条 ISS 收口时由 PM 决定是否同步更新 README（涉及功能可见性变更的 ISS 建议同步）；docs-only 维护 PR 可走 `docs/*` 分支不依赖 ISS 任务源。
 
 ## DEC-053 根目录配置收束到 `config/` 子目录
@@ -2334,7 +2334,7 @@ Vite 以 cwd 为 project root，`--config config/vite.config.ts` 不影响 root 
 - 关联任务：ISS-028（个人主页规划，本 DEC 不实现）
 - 关联分支：`chore/add-license-and-author`
 
-承接 DEC-052（README 重写，§许可 标 TODO）、DEC-053（根目录配置收束，提到 `LICENSE` 留待首版 release 落地）后，本决策记录项目正式身份三件套（开源协议 + 作者名 + 项目图标）的最终对齐方案，**与 Folia 项目保持一致**（同一作者、同一协议、同一图标风格家族）。
+承接 DEC-052（README 重写，§许可 标 TODO）、DEC-053（根目录配置收束，提到 `LICENSE` 留待首版 release 落地）后，本决策记录项目正式身份三件套（许可证 + 作者名 + 项目图标）的最终对齐方案。注：许可证原计划与 Folia 对齐，后于 2026-07-31 改为 Source-Available，两仓协议不再一致。
 
 ### 1. 背景
 
@@ -2344,12 +2344,12 @@ Vite 以 cwd 为 project root，`--config config/vite.config.ts` 不影响 root 
 
 ### 2. 决策
 
-#### 2.1 LICENSE 沿用 Folia 的 Apache-2.0 文本
+#### 2.1 LICENSE 采用 Source-Available Personal Use License
 
-- Folia 仓库已有 `LICENSE`（191 行，标准 Apache License 2.0 文本）。
-- **Apache-2.0 文本是标准协议**，不需按项目改文件本身（不像 MIT / BSD 需要在文件顶部写版权年份和持有人）。
-- **直接复制** Folia 的 `LICENSE` 文本到 FaroPDF 仓库根（`diff -q` 无差异）。
-- 理由：同一作者、同一协议、Folia 已采用，**最大化对齐**；Apache-2.0 包含专利授权 + 商标剥离 + 责任限制，比 MIT / BSD 更适合法律工具类项目。
+- FaroPDF 采用 **FaroPDF Source-Available Personal Use License 1.0**：源码可见 + 个人非商业免费 + 商用 / 组织生产环境需另行授权。
+- 该许可证按项目定制（版权人 Yang Weixin、商用联系微信 ywxlaw 已写入文本），与宽松开源协议不同：个人可自由学习 / 研究 / 自用，但企业部署、付费交付、托管 / SaaS / OEM、再分发等需获取商业授权。
+- 理由：法律工具类项目走「个人免费 + 商用授权」更可持续；保留专利 / 商标 / 责任限制条款保护作者。
+- 注：本决策历史曾采用 Apache-2.0 文本（与 Folia 对齐），2026-07-31 经用户确认统一变更为 Source-Available，见 CHANGELOG「许可证变更」条目。
 
 #### 2.2 `package.json` author.name 以 README 为准
 
@@ -2397,7 +2397,7 @@ README 顶部加 `<p align="center"><img src="docs/icon-128.png" alt="FaroPDF" w
 
 | 验证项 | 结果 | 备注 |
 | --- | --- | --- |
-| `diff -q` Folia LICENSE | ✅ 无差异 | 191 行标准 Apache-2.0 |
+| `LICENSE` 文本 | ✅ | FaroPDF Source-Available Personal Use License 1.0 |
 | PNG 像素 | ✅ | `sips -g pixelWidth -g pixelHeight` 512×512 / 128×128 |
 | `npm run typecheck` / `lint` / `test` / `build` | ✅ 干净 | 无业务代码 / 配置变更，预期 0 回归 |
 | README 引用 | ✅ | `<img src="docs/icon-128.png">` 不再 404 |
