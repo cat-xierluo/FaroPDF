@@ -214,7 +214,13 @@ npm run tauri build
 
 ## 许可
 
-本项目基于 **Apache License 2.0** 开源，与 [Folia](https://github.com/cat-xierluo/Folia) 保持一致。完整协议见 [`LICENSE`](LICENSE)。
+> **本项目为「源码可见（Source-Available）」项目，非 OSI 开源协议。**
+
+- **个人非商业使用免费**：个人用于学习、研究、自用项目和私人实验，无需授权。
+- **组织生产环境或任何商业用途需另行获取商业授权**：包括企业/机构内部部署、付费咨询或交付、面向客户或受监管的业务流程、托管服务 / SaaS / OEM 集成、再分发等。
+- 商业授权请联系微信：`ywxlaw`。
+
+完整协议见 [`LICENSE`](LICENSE)。
 
 ## 文档
 
