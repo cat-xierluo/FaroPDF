@@ -53,9 +53,12 @@ interface ControllerRef {
   current: ReturnType<typeof useReaderController> | null;
 }
 
-function Harness({ controllerRef, sessionStorage }: { controllerRef: ControllerRef; sessionStorage?: ReturnType<typeof createMemoryReaderSessionStorage> }) {
+function Harness({ controllerRef, sessionStorage = createMemoryReaderSessionStorage() }: { controllerRef: ControllerRef; sessionStorage?: ReturnType<typeof createMemoryReaderSessionStorage> }) {
   const settings = createDefaultAppSettings();
-  const controller = useReaderController(settings, sessionStorage ? { sessionStorage } : undefined);
+  // 默认用 in-memory sessionStorage：避免跨测试 localStorage 污染（比如前面 test
+  // 写了 zoom=0.5 会让后续 useReaderController 默认走 createDefaultReaderSessionStorage
+  // 的 applySession 把 zoom 还原成 0.5，导致 zoomIn/zoomOut 等 test 失败）。
+  const controller = useReaderController(settings, { sessionStorage });
   controllerRef.current = controller;
   return null;
 }

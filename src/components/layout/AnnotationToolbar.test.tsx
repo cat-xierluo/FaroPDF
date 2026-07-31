@@ -50,7 +50,7 @@ describe("AnnotationToolbar", () => {
     renderToolbar();
 
     expect(screen.queryByRole("button", { name: "高亮", pressed: true })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "取消" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("取消当前批注工具")).not.toBeInTheDocument();
   });
 
   test("点击工具按钮 arm 该工具并显示取消按钮", async () => {
@@ -62,7 +62,9 @@ describe("AnnotationToolbar", () => {
     expect(onStateChange).toHaveBeenCalledTimes(1);
     const next = (onStateChange.mock.calls.at(-1) as [AnnotationToolState])[0];
     expect(next.activeToolType).toBe("highlight");
-    expect(screen.getByRole("button", { name: "取消" })).toBeInTheDocument();
+    // AnnotationToolbar 取消按钮实际 aria-label="取消当前批注工具"；用 getByLabelText
+    // 比 getByRole({ name: "取消" }) 更精确（后者需要完整 name 匹配）。
+    expect(screen.getByLabelText("取消当前批注工具")).toBeInTheDocument();
   });
 
   test("armed 状态下再次点击同工具不会自动 disarm（由用户点击取消按钮 disarm）", async () => {
