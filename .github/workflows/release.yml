@@ -10,19 +10,20 @@ on:
 #
 # 触发条件：推送形如 vX.Y.Z（stable）或 vX.Y.Z-prerelease（alpha / beta / rc）的 tag（带 v 前缀）。
 #
-# 流程（Folia 模板，对齐 tauri-apps/tauri-action@v0 + releaseDraft + Gitee sync）：
+# 流程（Folia 模板，对齐 tauri-apps/tauri-action@v0 + releaseDraft）：
 #   1. build 矩阵（macos-aarch64 / macos-x64 / windows-x64）各自跑 tauri-action：
 #      - macOS 拆 2 个独立 build（不再 universal）
 #      - tauri-action 自动：pnpm install / cargo tauri build / 签 .sig 旁车 / 上传 draft release
 #      - Windows 走 NSIS .exe（不发 .msi；与 Folia 一致）
-#   2. publish job 拉 draft release 的 *.sig → 跑 `npm run updater:manifest` 拼 latest.json →
-#      上传 latest.json → --draft=false 公开 → Gitee 镜像同步
+#   2. publish job 拉 draft release 的 *.sig → 跑 `pnpm run updater:manifest` 拼 latest.json →
+#      上传 latest.json → --draft=false 公开。
+#      若 updater 四件套（createUpdaterArtifacts / updater.active / signing key / pubkey）
+#      未齐备，build 不产 *.sig，publish 跳过 latest.json 生成但仍公开 release。
 #
 # 关键环境变量（GitHub Secrets）：
 #   - TAURI_SIGNING_PRIVATE_KEY          tauri signer generate 输出的私钥文件原文（一层 base64）
 #   - TAURI_SIGNING_PRIVATE_KEY_PASSWORD 私钥密码
 #   - GITHUB_TOKEN                       默认提供，用于创建 / 公开 release
-#   - GITEE_TOKEN + GITEE_OWNER           Gitee 镜像同步（缺则跳过，continue-on-error）
 #
 # 关联：DEC-070（v0.1.0 4 轮 CI 修复复盘）/ DEC-071（v0.1.1 Folia 对齐设计）。
 
@@ -66,7 +67,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Install pnpm dependencies
         run: pnpm install --frozen-lockfile
@@ -81,17 +82,25 @@ jobs:
           releaseName: "FaroPDF ${{ github.ref_name }}"
           releaseDraft: true
           prerelease: false
-          includeUpdaterJson: false
+          # includeUpdaterJson 必须 true：让 tauri-action 在所有 updater 启用的
+          # 平台（macos-aarch64/x64 / windows-x64）生成 + 上传 .app.tar.gz /
+          # .nsis.zip + 对应 .sig，并生成 latest.json。设 false 会导致 macOS
+          # runner 没生成 .app.tar.gz.sig，publish job 报
+          # "Missing updater signatures for required platforms"（对齐 Folia v0.4.0 修复）。
+          includeUpdaterJson: true
           args: ${{ matrix.args }}
 
   publish:
     needs: build
     runs-on: ubuntu-latest
-    # v0.1.2 暂禁用 publish job: 真实 pubkey 未生成 (DEC-070 续 TODO),
-    # createUpdaterArtifacts: false 后 *.sig 不再生成, latest.json 拼装会失败。
-    # 后续用户本地 `cargo tauri signer generate` + 上传 priv key 到 TAURI_SIGNING_PRIVATE_KEY
-    # + 替换 tauri.conf.json pubkey 字段 → 删 if: false 行。
-    if: false
+    # publish job 负责：拉 build job 上传的 *.sig → 拼 latest.json（updater manifest）
+    # → 上传 latest.json → 把 release 草稿公开。
+    #
+    # updater 自动更新闭环需要：createUpdaterArtifacts: true + updater.active: true
+    # + TAURI_SIGNING_PRIVATE_KEY secret + tauri.conf.json pubkey 四件套齐备。
+    # 任一缺失时，build job 不会产 *.sig，下方 SIGS_FOUND 判空会跳过 latest.json
+    # 生成并仍把 release 公开（用户可手动下载，只是无法应用内自动更新）。
+    # 四件套齐备后 latest.json 才会真正生成，updater 才闭环。
     steps:
       - uses: actions/checkout@v4
 
@@ -102,12 +111,17 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
       - name: Install pnpm dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate latest.json
+      - name: Generate latest.json (or skip if no signatures yet)
+        id: manifest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -116,7 +130,19 @@ jobs:
           REPO="${{ github.repository }}"
 
           mkdir -p sigs
-          gh release download "$TAG" --repo "$REPO" --pattern "*.sig" --dir sigs
+          # build job 在 updater 四件套未齐备时不会产 *.sig，gh release download
+          # 会以非零退出码失败；用 || true 容错，后面按 sigs 目录是否为空分支。
+          gh release download "$TAG" --repo "$REPO" --pattern "*.sig" --dir sigs || true
+
+          SIG_COUNT=$(find sigs -type f -name '*.sig' | wc -l | tr -d ' ')
+          echo "Found ${SIG_COUNT} signature file(s)"
+
+          if [ "$SIG_COUNT" -eq 0 ]; then
+            echo "no-sigs=true" >> "$GITHUB_OUTPUT"
+            echo " updater 四件套未齐备（createUpdaterArtifacts / updater.active / signing key / pubkey），"
+            echo "跳过 latest.json 生成；release 仍会公开供手动下载。"
+            exit 0
+          fi
 
           FAROPDF_SIGNATURE_DIR=sigs \
           FAROPDF_UPDATE_VERSION="$VERSION" \
@@ -128,114 +154,19 @@ jobs:
           pnpm run updater:manifest
 
       - name: Show generated latest.json
-        if: always()
+        if: always() && steps.manifest.outputs.no-sigs != 'true'
         run: cat latest.json
 
       - name: Upload latest.json and publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.ref_name }}" latest.json \
-            --repo "${{ github.repository }}" --clobber
+          if [ "${{ steps.manifest.outputs.no-sigs }}" != "true" ] && [ -f latest.json ]; then
+            gh release upload "${{ github.ref_name }}" latest.json \
+              --repo "${{ github.repository }}" --clobber
+          else
+            echo "Skipping latest.json upload (updater not fully configured)"
+          fi
           gh release edit "${{ github.ref_name }}" \
             --draft=false --repo "${{ github.repository }}"
 
-      - name: Sync to Gitee
-        continue-on-error: true
-        timeout-minutes: 20
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-          GITEE_OWNER: ${{ secrets.GITEE_OWNER }}
-        run: |
-          if [ -z "${GITEE_TOKEN}" ] || [ -z "${GITEE_OWNER}" ]; then
-            echo "Gitee secrets are not configured, skipping sync"
-            exit 0
-          fi
-
-          TAG="${{ github.ref_name }}"
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          REPO="${GITEE_OWNER}/FaroPDF"
-
-          curl_gitee() {
-            curl --silent --show-error --connect-timeout 20 --max-time 90 --retry 1 --retry-delay 2 "$@"
-          }
-
-          extract_release_id() {
-            RELEASE_RESPONSE="$1" python3 - <<'PY'
-          import json
-          import os
-          try:
-              print(json.loads(os.environ.get("RELEASE_RESPONSE", "")).get("id", ""))
-          except Exception:
-              print("")
-          PY
-          }
-
-          # Create Gitee release (or reuse existing one)
-          RELEASE_RESPONSE=$(curl_gitee -X POST \
-            "https://gitee.com/api/v5/repos/${REPO}/releases" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"access_token\": \"${GITEE_TOKEN}\",
-              \"tag_name\": \"${TAG}\",
-              \"name\": \"FaroPDF ${VERSION}\",
-              \"body\": \"FaroPDF ${VERSION} - 自动同步自 GitHub\",
-              \"target_commitish\": \"main\",
-              \"prerelease\": false
-            }" || true)
-          RELEASE_ID=$(extract_release_id "$RELEASE_RESPONSE")
-
-          if [ -z "$RELEASE_ID" ]; then
-            echo "Gitee release may already exist, trying to reuse ${TAG}"
-            RELEASE_RESPONSE=$(curl_gitee \
-              "https://gitee.com/api/v5/repos/${REPO}/releases/tags/${TAG}?access_token=${GITEE_TOKEN}" || true)
-            RELEASE_ID=$(extract_release_id "$RELEASE_RESPONSE")
-          fi
-
-          if [ -z "$RELEASE_ID" ]; then
-            echo "Failed to create Gitee release, skipping sync"
-            exit 0
-          fi
-          echo "Gitee release ID: ${RELEASE_ID}"
-
-          # Download GitHub release assets (excluding latest.json)
-          mkdir -p release-assets
-          if ! timeout 300s gh release download "$TAG" --repo "${{ github.repository }}" --dir release-assets; then
-            echo "Failed to download GitHub release assets, skipping Gitee sync"
-            exit 0
-          fi
-
-          # Upload build artifacts to Gitee (skip latest.json, we'll generate a Gitee version)
-          for FILE in release-assets/*; do
-            FILENAME=$(basename "$FILE")
-            if [ "$FILENAME" = "latest.json" ]; then continue; fi
-            echo "Uploading ${FILENAME} to Gitee..."
-            if ! curl_gitee --fail-with-body -X POST \
-              "https://gitee.com/api/v5/repos/${REPO}/releases/${RELEASE_ID}/attach_files" \
-              -F "access_token=${GITEE_TOKEN}" \
-              -F "file=@${FILE}" > /dev/null; then
-              echo "Failed to upload ${FILENAME} to Gitee, continuing"
-            fi
-          done
-
-          # Generate Gitee-specific latest.json with exact tag download URLs
-          FAROPDF_SIGNATURE_DIR=sigs \
-          FAROPDF_UPDATE_VERSION="$VERSION" \
-          FAROPDF_UPDATE_TAG="$TAG" \
-          FAROPDF_UPDATE_NOTES="FaroPDF $VERSION" \
-          FAROPDF_UPDATE_GITEE_REPO="https://gitee.com/${REPO}" \
-          FAROPDF_MANIFEST_OUTPUT=/tmp/latest-github.json \
-          FAROPDF_GITEE_MANIFEST_OUTPUT=latest-gitee.json \
-          FAROPDF_REQUIRE_PLATFORMS="darwin-aarch64,darwin-x86_64,windows-x86_64" \
-          pnpm run updater:manifest
-
-          # Upload Gitee latest.json (named latest.json on Gitee)
-          if ! curl_gitee --fail-with-body -X POST \
-            "https://gitee.com/api/v5/repos/${REPO}/releases/${RELEASE_ID}/attach_files" \
-            -F "access_token=${GITEE_TOKEN}" \
-            -F "file=@latest-gitee.json;filename=latest.json" > /dev/null; then
-            echo "Failed to upload latest.json to Gitee, continuing"
-          fi
-
-          echo "Gitee release sync complete"
