@@ -68,3 +68,6 @@ tmp/*.log
 
 # 本机调研材料（PDF Expert 截图批次 89MB，流程已沉淀到 .claude/skills/computer-use + docs/DESIGN.md §18）
 research/
+
+# PDF Expert 复刻参考素材（本地内部使用，含第三方软件截图，不上传公开仓库）
+docs/reference/pdf-expert/
