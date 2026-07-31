@@ -1,7 +1,7 @@
 /**
  * ISS-059 Phase 1：顶部 Tab bar 组件
  *
- * 1:1 复刻 PDF Expert `01-full-pdf-open.png`：
+ * 顶部 Tab bar 行为：
  * - 文件 tab 行（X 关闭按钮 + 文件名 + 右侧 +号新建）
  * - 当前 tab 高亮 + 文档名
  * - 双击进入 inline rename（Enter 提交 / Esc 取消）

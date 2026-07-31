@@ -187,7 +187,6 @@ npm run dev
 npm run typecheck   # TypeScript 类型检查
 npm test            # Vitest 单测
 npm run lint        # ESLint
-npm run verify:ui-layout # 启动 Vite + Playwright，只验证两种视口的 L3/L5 结构几何与模式切换
 ```
 
 ## 构建

@@ -59,7 +59,7 @@ describe("FaroPDF app shell", () => {
     expect(appMocks.openNativePdfFileDialog).toHaveBeenCalledTimes(1);
   });
 
-  test("renders a PDF Expert style reading workspace as the first screen", () => {
+  test("renders a reading workspace as the first screen", () => {
     render(<App />);
 
     expect(
@@ -108,7 +108,7 @@ describe("FaroPDF app shell", () => {
     expect(screen.getByRole("main", { name: "页面管理工作台" })).toBeInTheDocument();
   });
 
-  test("uses PDF Expert style mode toolbars for export, signing, and OCR", async () => {
+  test("uses mode toolbars for export, signing, and OCR", async () => {
     const user = userEvent.setup();
     render(<App />);
 

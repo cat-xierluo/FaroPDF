@@ -5,9 +5,8 @@ import "./EditModeGridView.css";
 
 /** T 编辑模式的历史 skeleton。
  *
- * DEC-173 已撤销旧 catalog 的“PDF Expert 固定 5 列”结论。当前组件仍包含固定列 CSS、
- * 空白渐变、硬编码 A4、额外局部工具条和 placeholder 回调，这些都是 ISS-NEW-M M3
- * 的待修现状，不是目标规格。M1 完成量测前不得据此反推页面卡片布局。
+ * 当前组件仍包含固定列 CSS、空白渐变、硬编码 A4、额外局部工具条和 placeholder 回调，
+ * 这些都是待修现状，不是目标规格。不得据此反推页面卡片布局。
  */
 
 export interface EditModeGridViewProps {

@@ -37,7 +37,7 @@ function highlightSnippet(snippet: string, query: string): ReactElement {
   if (!trimmed) {
     return <>{snippet}</>;
   }
-  // 当前本地高亮实现；不声称与 PDF Expert 视觉一致。
+  // 当前本地高亮实现。
   const lower = snippet.toLowerCase();
   const needle = trimmed.toLowerCase();
   const segments: Array<{ text: string; matched: boolean }> = [];

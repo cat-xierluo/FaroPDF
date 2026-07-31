@@ -6,7 +6,7 @@ import type {
   AppThemePreference,
   DefaultSavePolicy,
   PageNumberIndicator,
-  PdfExpertOpenMode,
+  PdfOpenMode,
   RecentPdfFile,
 } from "./types";
 
@@ -18,8 +18,8 @@ const allowedSavePolicies = new Set<DefaultSavePolicy>([
   "allow-overwrite-with-confirmation",
 ]);
 const allowedThemePreferences = new Set<AppThemePreference>(["light", "dark"]);
-const allowedPdfExpertOpenModes = new Set<PdfExpertOpenMode>([
-  "always-pdf-expert",
+const allowedPdfOpenModes = new Set<PdfOpenMode>([
+  "always-external",
   "system-default",
   "ask-each-time",
 ]);
@@ -85,8 +85,8 @@ export function createDefaultAppSettings(): AppSettings {
     ocrProviders: createDefaultOcrProviders(),
     autoUpdateCheck: true,
     language: "zh-CN",
-    // ISS-NEW-G（2026-06-22 收口）：PDF Expert Preferences 4 字段默认值。
-    pdfExpertOpenMode: "ask-each-time",
+    // ISS-NEW-G（2026-06-22 收口）：外部 PDF 打开方式偏好等 4 字段默认值。
+    pdfOpenMode: "ask-each-time",
     resumeLastPage: true,
     pageNumberIndicator: "current-of-total",
   };
@@ -177,9 +177,9 @@ export function normalizeAppSettings(input: unknown): AppSettings {
       typeof input.documentAuthor === "string" ? input.documentAuthor : undefined,
     defaultPdfViewer:
       typeof input.defaultPdfViewer === "string" ? input.defaultPdfViewer : undefined,
-    pdfExpertOpenMode: isPdfExpertOpenMode(input.pdfExpertOpenMode)
-      ? input.pdfExpertOpenMode
-      : defaults.pdfExpertOpenMode,
+    pdfOpenMode: isPdfOpenMode(input.pdfOpenMode)
+      ? input.pdfOpenMode
+      : defaults.pdfOpenMode,
     resumeLastPage:
       typeof input.resumeLastPage === "boolean" ? input.resumeLastPage : defaults.resumeLastPage,
     pageNumberIndicator: isPageNumberIndicator(input.pageNumberIndicator)
@@ -322,8 +322,8 @@ function isAppThemePreference(value: unknown): value is AppThemePreference {
   return typeof value === "string" && allowedThemePreferences.has(value as AppThemePreference);
 }
 
-function isPdfExpertOpenMode(value: unknown): value is PdfExpertOpenMode {
-  return typeof value === "string" && allowedPdfExpertOpenModes.has(value as PdfExpertOpenMode);
+function isPdfOpenMode(value: unknown): value is PdfOpenMode {
+  return typeof value === "string" && allowedPdfOpenModes.has(value as PdfOpenMode);
 }
 
 function isPageNumberIndicator(value: unknown): value is PageNumberIndicator {

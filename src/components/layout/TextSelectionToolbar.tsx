@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * PDF Expert 风格浮动文本工具条（ISS-061 起点）。
+ * 浮动文本工具条（ISS-061 起点）。
  *
  * 监控 document 的 selectionchange：选区位于 `rootRef` 容器内且非空时，浮出工具条；
  * 选区消失 / 离开阅读区 / 跨页时，工具条自动隐藏。

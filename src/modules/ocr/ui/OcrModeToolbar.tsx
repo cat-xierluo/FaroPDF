@@ -11,7 +11,7 @@ import "./ocrModeToolbar.css";
  *
  * 当前任务约束：`src/App.tsx`、全局样式、路由不可改。本组件作为
  * 可独立挂载的工具条交付，供后续 layout worker 在 context toolbar
- * 槽位接入。组件按 PDF Expert 风格实现"识别文本"、"输出双层 PDF"、
+ * 槽位接入。组件实现"识别文本"、"输出双层 PDF"、
  * "质量检查"三组核心动作，外加"任务列表"按钮供 UI 切换。
  *
  * Props 由调用方提供，不直接依赖 settings / 文件输入；OCR 模式工具

@@ -636,7 +636,7 @@ select.zoom-control {
   opacity: 0.7;
 }
 
-/* ISS-061：浮动文本工具条 — PDF Expert 风格选区微缩工具。
+/* ISS-061：浮动文本工具条 — 选区微缩工具。
  * fixed 定位，紧贴选区上方 / 下方；选区消失 / 用户主动关闭后隐藏。
  * 7 个动作（5 启用 + 2 disabled 占位）水平排列，紧凑像素密度。 */
 .text-selection-toolbar {

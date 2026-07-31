@@ -4,7 +4,7 @@ import { useI18n } from "../../shared/i18n/useI18n";
 import "./WelcomeScreen.css";
 
 /**
- * ISS-NEW-G（Wave 3 W1 / 2026-06-22 收口）：PDF Expert 风格 Welcome 屏。
+ * ISS-NEW-G（Wave 3 W1 / 2026-06-22 收口）：Welcome 屏（无 PDF 空态）。
  *
  * 严格子集（仅 Welcome）：
  *   1) 顶部「转换」区：2 张卡片「图片转 PDF」「Word 转 PDF」（占位 — 真实转换 out of scope）
