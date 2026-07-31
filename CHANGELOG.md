@@ -1,3 +1,12 @@
+## 未发版 · 许可证变更为 Source-Available（2026-07-31）
+
+- **许可证变更**：项目从 **Apache License 2.0**（宽松开源）改为 **FaroPDF Source-Available Personal Use License 1.0**（源码可见 + 个人免费 + 商用授权）。
+  - 个人非商业使用免费（学习 / 研究 / 自用项目 / 私人实验）。
+  - 组织生产环境或任何商业用途（企业部署、付费交付、托管 / SaaS / OEM、再分发等）需另行获取商业授权，联系微信 `ywxlaw`。
+  - 非 OSI 认证开源协议，对外使用「源码可见（Source-Available）」措辞。
+- `package.json` 加 `license: LicenseRef-FaroPDF-Source-Available-1.0`（SPDX 不识别自定义 NC 协议，用 LicenseRef 形式）。
+- README §许可 同步更新声明与商用授权渠道。
+
 ## 未发版 · M3 页面剪贴板复制/粘贴闭环（2026-07-30，DEC-195）
 
 - **页面可复制/粘贴**：页面管理工作台的「复制」「粘贴」按钮接通同文档剪贴板，不再 disabled。选中页 → 复制 → 粘贴，副本插入选中页后（页数 +1），可撤销。
