@@ -172,7 +172,7 @@ export function AnnotationOverlay({
     if (interaction === "drag" && draftRef.current?.kind === "drag") {
       const { start } = draftRef.current;
       draftRef.current = null;
-      onAnnotationDraft(buildDragDraft(activeToolType, start, point, viewport, activeColor, activeOpacity, activeStyle));
+      onAnnotationDraft(buildDragDraft(activeToolType, start, point, viewport, activeColor, activeOpacity, activeStyle, activeStampName && activeStampLabel ? { name: activeStampName, label: activeStampLabel, ...(activeStampImage ? { image: activeStampImage } : {}) } : undefined));
       return;
     }
 
@@ -240,7 +240,7 @@ const ANNOTATION_TOOL_INTERACTION: Record<PdfAnnotationType, "click" | "drag" | 
   rectangle: "drag",
   arrow: "drag",
   ink: "ink",
-  stamp: "click",
+  stamp: "drag",
 };
 
 interface DraftState {
@@ -297,9 +297,31 @@ function buildDragDraft(
   color: string | undefined,
   opacity?: number,
   style?: PdfAnnotationStyle,
+  stamp?: { name: PdfStampName; label: string; image?: string },
 ): AnnotationDraftInput {
   const resolvedColor = color ?? "#f6d66f";
   const rect = clampRect(pointsToRect(start, end), viewport);
+
+  // ISS-NEW-M / ROADMAP L111：签名/图章 drag 落点——拖出的矩形作为落点位置与尺寸。
+  // drag 太小时给一个最小尺寸（避免签名小到不可见），以 drag 起点-中心对齐。
+  if (type === "stamp" && stamp) {
+    const minW = 80;
+    const minH = 24;
+    const stampRect =
+      rect.width < minW || rect.height < minH
+        ? { x: rect.x, y: rect.y, width: Math.max(rect.width, minW), height: Math.max(rect.height, minH) }
+        : rect;
+    return {
+      type: "stamp",
+      rects: [stampRect],
+      color: resolvedColor,
+      stamp: {
+        label: stamp.label.trim() || "已阅",
+        name: stamp.name,
+        ...(stamp.image ? { image: stamp.image } : {}),
+      },
+    };
+  }
 
   if (type === "arrow" || type === "double-arrow" || type === "line") {
     return {
@@ -650,14 +672,12 @@ function StampGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyp
   }
 
   const template = resolveStampTemplate(annotation.stamp, annotation.stamp.name);
-  const inner = renderStampSvg(annotation.stamp.name, {
-    width: bounds.width,
-    height: bounds.height,
-    color: template.color,
-    label: template.label,
-  });
   const viewBoxWidth = 400;
   const viewBoxHeight = 100;
+
+  // ISS-NEW-M / ROADMAP L111：自定义签名/图章图片所见即所得。
+  // 有 image（base64 dataURL，签名库或 customStamp）时渲染 <img>；否则回退模板印章 SVG。
+  const hasImage = Boolean(annotation.stamp.image);
 
   return (
     <div
@@ -679,13 +699,28 @@ function StampGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyp
       }}
       tabIndex={onSelect ? 0 : -1}
     >
-      <svg
-        preserveAspectRatio="xMidYMid meet"
-        viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
-        dangerouslySetInnerHTML={{ __html: inner }}
-        width="100%"
-        height="100%"
-      />
+      {hasImage ? (
+        <img
+          alt={annotation.stamp.label || "签名"}
+          src={annotation.stamp.image}
+          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+        />
+      ) : (
+        <svg
+          preserveAspectRatio="xMidYMid meet"
+          viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
+          dangerouslySetInnerHTML={{
+            __html: renderStampSvg(annotation.stamp.name, {
+              width: bounds.width,
+              height: bounds.height,
+              color: template.color,
+              label: template.label,
+            }),
+          }}
+          width="100%"
+          height="100%"
+        />
+      )}
     </div>
   );
 }
