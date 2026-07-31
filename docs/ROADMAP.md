@@ -108,7 +108,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 - [x] 读取 AcroForm 字段并高亮可填写区域（`FormService.readFormFields`）。
 - [x] 支持文本框、复选框、单选框和下拉字段填写（`FormService.fillFormField` + `applyFormOperations` 批量）。
-- [ ] 支持签名图片、手写签名和签名位置调整（**部分**：PNG/JPG 可从文件或签名库嵌入已有字段并参与累计工作副本、扁平化和重开；自由拖放位置仍待实现）。
+- [x] 支持签名图片、手写签名和签名位置调整（PNG/JPG 从签名库嵌入已有 AcroForm 字段 + 累计工作副本/扁平化/重开；annotate 模式 drag 落点自由定位 + StampGlyph 所见即所得渲染真实图片，PR #84）。
 - [x] 支持表单扁平化导出（`FormService.flattenForm`，pdf-lib `form.flatten()`；ISS-043：三级 `表单扁平化` 入口进入填写和签名面板确认导出）。
 
 ### 8. 设置与安全
