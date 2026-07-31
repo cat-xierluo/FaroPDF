@@ -1,8 +1,8 @@
 /**
  * ISS-059 Phase 1：多 Tab bar 状态管理
  *
- * PDF Expert 风格：单窗口可开多个 PDF，顶部 tab bar 切换。当前打开/关闭/重命名/排序
- * 不持久化（关闭应用即清空），与 PDF Expert 行为一致。
+ * 多 Tab 风格：单窗口可开多个 PDF，顶部 tab bar 切换。当前打开/关闭/重命名/排序
+ * 不持久化（关闭应用即清空）。
  *
  * 设计取舍：
  * - 用 React Context + useReducer，不引 zustand 等新依赖（CLAUDE.md 不允许散弹新依赖）
@@ -27,7 +27,7 @@ export interface PdfTab {
   title: string;
   /** 完整文件路径（Tauri 打开时有，浏览器拖拽时为空） */
   filePath: string;
-  /** tab 自定义名（用户在 PDF Expert 同款 inline rename 改的） */
+  /** tab 自定义名（用户 inline rename 改的） */
   customTitle: string | null;
   /** 自打开后是否被修改（尚未实现 dirty 检测，先预留接口） */
   isDirty: boolean;
@@ -52,7 +52,7 @@ type TabAction =
   | { type: "SET_LAST_PAGE"; payload: { tabId: string; lastPage: number } };
 
 function generateTabId(filePath: string, fileName: string): string {
-  // 用 filePath + fileName + 时间戳生成。同一文件重复打开会开多个 tab（与 PDF Expert 一致）
+  // 用 filePath + fileName + 时间戳生成。同一文件重复打开会开多个 tab
   return `${fileName}::${filePath}::${Date.now()}::${Math.random().toString(36).slice(2, 8)}`;
 }
 
@@ -89,7 +89,7 @@ function reducer(state: TabState, action: TabAction): TabState {
       const tabs = state.tabs.filter((t) => t.id !== action.payload.tabId);
       let activeTabId = state.activeTabId;
       if (state.activeTabId === action.payload.tabId) {
-        // 关闭当前 tab → 激活相邻 tab（左侧优先，与 PDF Expert 一致）
+        // 关闭当前 tab → 激活相邻 tab（左侧优先）
         if (tabs.length === 0) {
           activeTabId = null;
         } else {

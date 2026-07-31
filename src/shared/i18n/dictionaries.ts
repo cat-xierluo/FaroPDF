@@ -2,7 +2,7 @@ import type {
   AppThemePreference,
   DefaultSavePolicy,
   PageNumberIndicator,
-  PdfExpertOpenMode,
+  PdfOpenMode,
 } from "../settings/types";
 import type { PdfViewMode, TextLayerStatus } from "../pdf/types";
 import type { OcrJobStatus } from "../ocr/types";
@@ -53,7 +53,7 @@ export interface Dictionary {
       documentAuthorPlaceholder: string;
       defaultPdfViewer: string;
       defaultPdfViewerPlaceholder: string;
-      pdfExpertOpenMode: string;
+      pdfOpenMode: string;
       resumeLastPage: string;
       pageNumberIndicator: string;
       recentSection: string;
@@ -61,7 +61,7 @@ export interface Dictionary {
     };
     savePolicyOptions: Record<DefaultSavePolicy, string>;
     themeOptions: Record<AppThemePreference, string>;
-    pdfExpertOpenModeOptions: Record<PdfExpertOpenMode, string>;
+    pdfOpenModeOptions: Record<PdfOpenMode, string>;
     pageNumberIndicatorOptions: Record<PageNumberIndicator, string>;
   };
   reader: {
@@ -134,7 +134,7 @@ const zhCN: Dictionary = {
       documentAuthorPlaceholder: "留空不预填",
       defaultPdfViewer: "默认 PDF 查看应用",
       defaultPdfViewerPlaceholder: "留空使用系统默认（如 Preview、Adobe Reader）",
-      pdfExpertOpenMode: "PDF Expert 打开方式",
+      pdfOpenMode: "外部 PDF 打开方式",
       resumeLastPage: "重新打开 PDF 时回到上次阅读位置",
       pageNumberIndicator: "页码指示符",
       recentSection: "最近文件",
@@ -149,8 +149,8 @@ const zhCN: Dictionary = {
       light: "浅色",
       dark: "深色",
     },
-    pdfExpertOpenModeOptions: {
-      "always-pdf-expert": "始终用 PDF Expert 打开",
+    pdfOpenModeOptions: {
+      "always-external": "始终用外部应用打开",
       "system-default": "使用系统默认应用",
       "ask-each-time": "每次询问",
     },
@@ -238,7 +238,7 @@ const en: Dictionary = {
       documentAuthorPlaceholder: "Leave empty to skip",
       defaultPdfViewer: "Default PDF viewer",
       defaultPdfViewerPlaceholder: "Leave empty to use the system default (e.g. Preview, Adobe Reader)",
-      pdfExpertOpenMode: "How PDF Expert opens files",
+      pdfOpenMode: "How external PDFs are opened",
       resumeLastPage: "Resume last page when reopening a PDF",
       pageNumberIndicator: "Page number indicator",
       recentSection: "Recent files",
@@ -253,8 +253,8 @@ const en: Dictionary = {
       light: "Light",
       dark: "Dark",
     },
-    pdfExpertOpenModeOptions: {
-      "always-pdf-expert": "Always use PDF Expert",
+    pdfOpenModeOptions: {
+      "always-external": "Always use the external app",
       "system-default": "Use the system default app",
       "ask-each-time": "Ask each time",
     },

@@ -277,7 +277,7 @@ describe("app command catalog", () => {
     }
   });
 
-  test("exposes a PDF Expert style tool launcher grouped by workflow", () => {
+  test("exposes a tool launcher grouped by workflow", () => {
     const sections = getToolLauncherSections();
     expect(sections.map((section) => section.id)).toEqual([
       "organize",

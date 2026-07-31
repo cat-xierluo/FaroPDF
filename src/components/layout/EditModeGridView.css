@@ -1,5 +1,5 @@
-/* T 编辑历史 skeleton。DEC-173 已撤销“PDF Expert 固定 5 列”规格；
- * 下列列数/断点只是待 M3 替换的当前实现，不是目标合同。 */
+/* T 编辑历史 skeleton。
+ * 下列列数/断点只是待后续替换的当前实现，不是目标合同。 */
 
 .edit-mode-grid {
   display: flex;

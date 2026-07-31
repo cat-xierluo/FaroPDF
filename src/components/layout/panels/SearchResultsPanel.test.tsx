@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { SearchResultsPanel, type SearchHitItem } from "./SearchResultsPanel";
 
 const HITS: ReadonlyArray<SearchHitItem> = [
-  { id: "h1", pageNumber: 1, lineNumber: 3, snippet: "PDF Expert 风格搜索测试 PDF" },
+  { id: "h1", pageNumber: 1, lineNumber: 3, snippet: "全文搜索测试 PDF 关键词" },
   { id: "h2", pageNumber: 4, lineNumber: 12, snippet: "PDF 编辑模式 T 编辑视图" },
   { id: "h3", pageNumber: 7, lineNumber: 28, snippet: "更多 PDF 搜索命中条目" },
 ];
@@ -29,9 +29,9 @@ describe("SearchResultsPanel (ISS-NEW-I 段 1-4)", () => {
   });
 
   test("输入框受控 → value 跟随 props", () => {
-    render(<SearchResultsPanel query="PDF Expert" results={HITS} />);
+    render(<SearchResultsPanel query="测试查询" results={HITS} />);
     const input = screen.getByTestId("search-results-query") as HTMLInputElement;
-    expect(input.value).toBe("PDF Expert");
+    expect(input.value).toBe("测试查询");
   });
 
   test("输入框 onChange → 触发 onChangeQuery", () => {

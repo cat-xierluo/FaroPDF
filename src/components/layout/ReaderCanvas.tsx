@@ -9,7 +9,7 @@ import type { RecentPdfFile } from "../../shared/settings/types";
 import { WelcomeScreen } from "./WelcomeScreen";
 import { ReaderErrorScreen } from "./ReaderErrorScreen";
 
-/** PDF Expert 的 UI 百分比不是 PDF.js 的 1 CSS px = 1 PDF pt。
+/** UI 百分比不是 PDF.js 的 1 CSS px = 1 PDF pt。
  * measured fixture 在 48% 时白页宽约 514px；FaroPDF 固定 50% 以此显示密度校准。
  * fit-width 已由容器宽度决定，不应用此固定倍率。
  */

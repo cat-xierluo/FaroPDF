@@ -41,7 +41,7 @@ describe("tabStore (ISS-059 Phase 1)", () => {
     expect(result.current.state.activeTabId).toBe(result.current.state.tabs[0].id);
   });
 
-  test("openTab 同一文件路径开 2 次 → 产生 2 个 tab (与 PDF Expert 一致)", () => {
+  test("openTab 同一文件路径开 2 次 → 产生 2 个 tab", () => {
     const { result } = renderHook(() => useTabStore(), { wrapper });
     act(() => {
       result.current.openTab("/case/a.pdf", "a.pdf");
@@ -66,7 +66,7 @@ describe("tabStore (ISS-059 Phase 1)", () => {
     expect(result.current.state.tabs).toHaveLength(2);
   });
 
-  test("closeTab 当前 tab → 自动激活左侧 tab（PDF Expert 行为）", () => {
+  test("closeTab 当前 tab → 自动激活左侧 tab", () => {
     const { result } = renderHook(() => useTabStore(), { wrapper });
     act(() => {
       result.current.openTab("/case/a.pdf", "a.pdf");

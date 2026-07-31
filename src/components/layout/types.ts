@@ -2,8 +2,7 @@
  * 顶层工作模式。
  *
  * `edit` 是单页 PDF 内容编辑画布；`pages` 是独立的页面管理网格。
- * 两者由 PDF Expert 3.9.2 的 N-EDIT-CANVAS / N-PAGE-MANAGEMENT-GRID
- * measured 证据明确区分，不得再次合并。
+ * 两者明确区分，不得合并。
  */
 export type AppModeId = "read" | "annotate" | "edit" | "export" | "forms" | "ocr" | "pages";
 

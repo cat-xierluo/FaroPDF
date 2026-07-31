@@ -4,7 +4,7 @@ import type {
   AppThemePreference,
   DefaultSavePolicy,
   PageNumberIndicator,
-  PdfExpertOpenMode,
+  PdfOpenMode,
 } from "../../../shared/settings/types";
 import { useI18n } from "../../../shared/i18n/useI18n";
 import type { SectionProps } from "./types";
@@ -15,11 +15,11 @@ interface GeneralSectionProps extends SectionProps {
 }
 
 /**
- * 「常规」section：默认保存策略 + 默认保存目录 + 最近文件列表 + PDF Expert Preferences 5 字段。
+ * 「常规」section：默认保存策略 + 默认保存目录 + 最近文件列表 + 5 个偏好字段。
  * 默认保存目录可手填文本，落后于持久化时由调用方兜底。
  *
  * ISS-NEW-G（2026-06-22 收口）：所有用户可见字符串从 useI18n() 字典查表。
- * 新增 4 字段：默认 PDF 查看应用 / PDF Expert 打开方式 / 回到页面 / 页码指示符。
+ * 新增 4 字段：默认 PDF 查看应用 / 外部 PDF 打开方式 / 回到页面 / 页码指示符。
  * "关闭文档时的保存方式" 对应现有 `defaultSavePolicy` 字段。
  */
 export function GeneralSection({ settings, onChange }: GeneralSectionProps) {
@@ -51,8 +51,8 @@ export function GeneralSection({ settings, onChange }: GeneralSectionProps) {
     });
   }
 
-  function updatePdfExpertOpenMode(mode: PdfExpertOpenMode) {
-    onChange({ ...settings, pdfExpertOpenMode: mode });
+  function updatePdfOpenMode(mode: PdfOpenMode) {
+    onChange({ ...settings, pdfOpenMode: mode });
   }
 
   function updateResumeLastPage(value: boolean) {
@@ -133,16 +133,16 @@ export function GeneralSection({ settings, onChange }: GeneralSectionProps) {
         />
       </label>
 
-      <label className="settings-field" htmlFor="pdf-expert-open-mode">
-        <span>{dict.settings.general.pdfExpertOpenMode}</span>
+      <label className="settings-field" htmlFor="pdf-open-mode">
+        <span>{dict.settings.general.pdfOpenMode}</span>
         <select
-          id="pdf-expert-open-mode"
-          onChange={(event) => updatePdfExpertOpenMode(event.currentTarget.value as PdfExpertOpenMode)}
-          value={settings.pdfExpertOpenMode}
+          id="pdf-open-mode"
+          onChange={(event) => updatePdfOpenMode(event.currentTarget.value as PdfOpenMode)}
+          value={settings.pdfOpenMode}
         >
-          {(Object.keys(dict.settings.pdfExpertOpenModeOptions) as PdfExpertOpenMode[]).map((mode) => (
+          {(Object.keys(dict.settings.pdfOpenModeOptions) as PdfOpenMode[]).map((mode) => (
             <option key={mode} value={mode}>
-              {dict.settings.pdfExpertOpenModeOptions[mode]}
+              {dict.settings.pdfOpenModeOptions[mode]}
             </option>
           ))}
         </select>
