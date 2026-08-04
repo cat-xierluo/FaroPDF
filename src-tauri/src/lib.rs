@@ -891,6 +891,9 @@ pub fn run() {
                     .separator()
                     .text("file-save-as", "另存为…")
                     .separator()
+                    // ISS-QA-06：原生菜单补「设置…」入口，emit settings-open → 前端 nativeMenuBridge 打开 SettingsPanel。
+                    .text("settings-open", "设置…")
+                    .separator()
                     .text("close-window", "关闭窗口")
                     .build()?)
                 .item(&SubmenuBuilder::new(app, "编辑")
@@ -1056,6 +1059,7 @@ pub fn run() {
                     }
                     "file-open"
                     | "file-save-as"
+                    | "settings-open"
                     | "view-summary"
                     | "view-pages"
                     | "view-settings"

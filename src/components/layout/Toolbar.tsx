@@ -212,6 +212,18 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onRightPanelChang
         <button aria-label="导出与交付" className="tool-button tool-button--icon tool-button--share" data-toolbar-section="collaboration" disabled={!document} onClick={() => enterMode("export")} title="导出与交付" type="button">
           <FileOutput size={16} />
         </button>
+        {/* ISS-QA-06：常驻设置齿轮，不再埋在「工具启动器」二级下拉里。设置是应用级偏好（OCR 后端 / 语言等），无文档也要可达，故不 disabled。 */}
+        <button
+          aria-label="设置"
+          aria-pressed={utilityPanel === "settings"}
+          className="tool-button tool-button--icon tool-button--compact"
+          data-toolbar-section="collaboration"
+          onClick={() => openUtilityPanel("settings")}
+          title="设置"
+          type="button"
+        >
+          <Settings size={16} />
+        </button>
       </div>
       <div className="toolbar__section toolbar__section--search" data-section="search" role="group" aria-label="全文搜索">
         <div className="toolbar-search-wrap" data-toolbar-section="search">

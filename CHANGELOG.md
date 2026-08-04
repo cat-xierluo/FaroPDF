@@ -3,6 +3,7 @@
 ### Fixed
 - **界面 emoji 清理（ISS-QA-03）**：阅读区错误卡片（密码锁 / 警告）、Welcome 转换卡片（图片 / 文档）、选区浮动工具条便签、批注侧栏与文档摘要面板的批注类型标记共 7 处彩色 emoji 全部替换为 lucide 单色描边图标（`Lock` / `AlertTriangle` / `Image` / `FileText` / `StickyNote`），与工具栏既有图标语言一致，符合律师专业工具定位。图标沿用原有 `aria-hidden` 语义，不改动可访问性标签。
 - **左侧栏面板配色归一（ISS-QA-05）**：书签、大纲、批注列表、缩略图、视图设置各面板此前分别硬编码深色 hex（`#353535` / `#414141` / `#3d3d3d` / `#a6a6a6` 等），面板间背景、边框和标题色不统一，且在浅色主题下失效。现统一到 `--panel-*` token（背景 / 内边距 / 标题字号色 / 分隔线），各面板复用同一组值；书签面板为对齐其他面板而加的覆盖规则随之删除。侧栏配色现随明暗主题正确切换。
+- **设置入口恢复（ISS-QA-06）**：设置此前唯一 UI 入口埋在工具栏「工具启动器」二级下拉里（点 `+` → 再点「设置」），且原生菜单栏未注册 `settings-open`，用户在界面上找不到「设置」，OCR 后端 / 语言 / 偏好全部不可达。现工具栏协作段补**常驻** Settings 齿轮按钮，`onClick` 直接 `openUtilityPanel("settings")`，不再藏二级菜单；设置是应用级偏好（无文档也要可达），故该齿轮不 `disabled`。同时 `lib.rs` 原生「文件」菜单补 `settings-open`（「设置…」）菜单项 + menu event handler match arm，emit 后经前端 `nativeMenuBridge`（已接 `command.id === "settings-open"`，`targetUtilityPanel:"settings"`）打开 SettingsPanel。两条路径（工具栏齿轮 / 原生菜单）都能打开设置面板。原有工具启动器内的设置二级入口保留为冗余路径，未删除。
 
 ## [0.2.0] - 2026-08-04
 
