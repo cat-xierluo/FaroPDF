@@ -62,10 +62,10 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | id | 现象 | 严重级 | 根因摘要（证据） | 主改动文件 | 完成线 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
 | ISS-QA-01 | 拖入 PDF 不打开 | [P0] | HTML5 onDrop 收不到系统文件；lib.rs 无 DragDrop | `lib.rs` + 前端 App 层 | behavior-complete | [待开工] 根因 PLAUSIBLE |
-| ISS-QA-02 | 打开显示「损坏」 | [P0] | pdfjs worker `?url` 打包后加载失败 → InvalidPDF | `pdfjsWorker.ts` / vite config | behavior-complete | [待开工] 根因 NOT_VERIFIED |
-| ISS-QA-03 | 界面 emoji | [P1] | 5 文件 6 处 emoji 字面量 | 5 个 tsx | grep 清零 + 视觉 | [待开工] 已确认 |
+| ISS-QA-02 | 打开显示「损坏」 | [P0] | [原根因被 W2 REFUTED] worker 失败不产出 InvalidPDF；真因 NOT_VERIFIED，静态指向 pdfjs-dist 6 解析回归（dev/prod 同现） | 见 `docs/QA-02-repro-report.md` | 实机判 A/B | [诊断完成 2026-08-04 main baa7a8b] 实机 A/B 待做 |
+| ISS-QA-03 | 界面 emoji | [P1] | 5 文件 6 处 emoji 字面量 | 5 个 tsx | grep 清零 + 视觉 | [已修复 main 8c5cc01 2026-08-04] 7 处→lucide，typecheck/lint 过，GUI 待验 |
 | ISS-QA-04 | 批注/编辑/导出/OCR 点击无展开 | [P0] | mode 切换强关 panel + 大量 stub + 三栏不连贯 | `AppShell.tsx` 为主 | behavior-complete | [待开工] 根因 PLAUSIBLE |
-| ISS-QA-05 | 左侧边栏颜色不统一 | [P1] | Sidebar 多 panel token 未归一 | `Sidebar.tsx` + `app.css` | 符合 DESIGN.md | [待开工] 已确认 |
+| ISS-QA-05 | 左侧边栏颜色不统一 | [P1] | Sidebar 多 panel token 未归一 | `Sidebar.tsx` + `app.css` | 符合 DESIGN.md | [已修复 main 8c5cc01 2026-08-04] 10 个 `--panel-*` token，typecheck/lint 过，GUI 待验 |
 | ISS-QA-06 | 设置入口不见了 | [P0] | 入口藏在二级菜单；原生菜单未注册 | `Toolbar.tsx` + `lib.rs` | behavior-complete | [待开工] 根因 PLAUSIBLE |
 
 ---
@@ -106,7 +106,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - **状态**：[待开工]　**类型**：缺陷修复　**完成线**：behavior-complete
 - **现象（用户视角）**：用「打开」按钮选择正常 PDF（其它阅读器可正常打开），FaroPDF 内显示「损坏 / 无法打开」。
-- **根因（待复现验证）**：
+- **根因（[原假设已被 W2 证伪 REFUTED 2026-08-04，下方原记录保留作历史；Wave 4 必须先读 `docs/QA-02-repro-report.md` 判 A/B 再改代码]）**：
   - worker 配置 `pdfjsWorker.ts:1`：`import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.mjs?url"`，`pdfjs-dist@6.0.227`。
   - Vite `?url` 在 dev 解析为 `http://localhost:1420/...`（正常）；**打包成 Tauri app 后** `frontendDist` 走 `tauri://` / `asset://`，module worker 在自定义协议下加载失败或路径漂移 → `getDocument` 中断 → 抛 `InvalidPDFException`。
   - 异常经 `shared/error.ts:60` `classifyPdfjsException` 归一化为 `PdfParseError`，命中 DEC-192「无法打开此 PDF」错误卡片。
