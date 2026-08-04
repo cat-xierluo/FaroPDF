@@ -61,7 +61,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 | id | 现象 | 严重级 | 根因摘要（证据） | 主改动文件 | 完成线 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| ISS-QA-01 | 拖入 PDF 不打开 | [P0] | HTML5 onDrop 收不到系统文件；lib.rs 无 DragDrop | `lib.rs` + 前端 App 层 | behavior-complete | [待开工] 根因 PLAUSIBLE |
+| ISS-QA-01 | 拖入 PDF 不打开 | [P0] | HTML5 onDrop 收不到系统文件；lib.rs 无 DragDrop | `lib.rs` + `App.tsx` | behavior-complete | [已修复 2026-08-04] Rust DragDrop emit + 前端 listen 复用 readPdfFileFromPath，typecheck/cargo check 过，GUI 待验 |
 | ISS-QA-02 | 打开显示「损坏」 | [P0] | [原根因被 W2 REFUTED] worker 失败不产出 InvalidPDF；真因 NOT_VERIFIED，静态指向 pdfjs-dist 6 解析回归（dev/prod 同现） | 见 `docs/QA-02-repro-report.md` | 实机判 A/B | [诊断完成 2026-08-04 main baa7a8b] 实机 A/B 待做 |
 | ISS-QA-03 | 界面 emoji | [P1] | 5 文件 6 处 emoji 字面量 | 5 个 tsx | grep 清零 + 视觉 | [已修复 main 8c5cc01 2026-08-04] 7 处→lucide，typecheck/lint 过，GUI 待验 |
 | ISS-QA-04 | 批注/编辑/导出/OCR 点击无展开 | [P0] | mode 切换强关 panel + 大量 stub + 三栏不连贯 | `AppShell.tsx` 为主 | behavior-complete | [待开工] 根因 PLAUSIBLE |
