@@ -1,3 +1,11 @@
+## 未发版 · updater 闭环 + Windows shell bash 回归 + keypair 一键脚本（2026-08-04，ISS-022）
+
+- **updater 闭环启用**：`tauri.conf.json` 的 `bundle.createUpdaterArtifacts` / `plugins.updater.active` 从 `false` → `true`，`plugins.updater.pubkey` 填入正式 keypair 公钥。打 tag 后 `release.yml` 自动产 `.app.tar.gz` / `.nsis.zip` + `.sig` 旁车 + `latest.json`，应用内自动更新闭环。（v2 plugin 拆分形式：`tauri-plugin-updater` crate + Rust 端 `lib.rs` 已注册，**不需要**给 tauri 主 crate 加 `features = ["updater"]`——`cargo check` 验证 tauri 2.11.2 主 crate 根本没有该 feature，updater 走独立 plugin crate。）
+- **release.yml Windows shell bash 回归**：DEC-070 修复过的 `shell: bash` 在 v0.1.1 整文件重写时漏回，本次补齐 `tauri-action` step，避免 PowerShell 反斜杠续行坑（DEC-070 第 1 轮踩过的坑）。
+- **keypair 一键脚本**：新增 `scripts/generate-updater-keypair.sh` + `pnpm updater:keygen` 命令，交互式跑完 keypair 生成 + GitHub Secret 灌注 + pubkey 输出；已存在的 keypair 先备份 `*.bak` 再问是否 `--force` 覆盖。
+- **.gitignore 护栏**：根目录 + `src-tauri/` 加 `*.key` / `*.key.pub` / `*.sig` / `tauri-key*` / `.tauri/` 排除规则，防本地误 commit 私钥。
+- **docs/RELEASE.md**：§3.1 加一键脚本引用；修正 pubkey 命令（`.pub` 文件本身就是 1 行 base64，直接 `cat`，删掉 macOS 不支持的 `base64 -w0` 绕路）。
+
 ## 未发版 · 许可证变更为 Source-Available（2026-07-31）
 
 - **许可证变更**：项目从 **Apache License 2.0**（宽松开源）改为 **FaroPDF Source-Available Personal Use License 1.0**（源码可见 + 个人免费 + 商用授权）。

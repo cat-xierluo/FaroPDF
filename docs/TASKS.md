@@ -1373,3 +1373,24 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [ ] 为反引号示例、外部路径和真实仓内链接建立可区分的测试 fixture，避免“修文档迎合误报”
   - [ ] 审计 46 张旧任务卡，将已完成项分批迁入 DECISIONS 归档；未完成项保留真实状态，不机械删除
   - [ ] 维护后全量 scan 无 hard；adaptive 项有明确接受或后续记录
+
+### ISS-022 updater 闭环启用 + Windows shell bash 回归 + keypair 脚本化
+
+- 优先级：P1（发布工程 follow-up，DEC-070/DEC-071 的收口）
+- 类型：发布工程 / 安全护栏
+- 来源：2026-08-04 PR 2 `feat/updater-closed-loop`；PR 90（release.yml Folia 对齐）合并后从 main 拉
+- 状态：**进行中（PR 待合并）**
+- 范围：把 v0.1.1 设计时留作「分两步策略」的 updater 4 件套补齐，让打 tag 后 release.yml 产 `.sig` + `latest.json`，应用内自动更新真正闭环。
+- 改动：
+  - `src-tauri/tauri.conf.json`：`bundle.createUpdaterArtifacts` / `plugins.updater.active` → `true`；`plugins.updater.pubkey` 填正式公钥
+  - `src-tauri/Cargo.toml`：**不改**。v2 plugin 拆分形式，updater 走独立 `tauri-plugin-updater` crate（已在 deps）+ Rust 端 `lib.rs:877` 已注册 `tauri_plugin_updater::Builder::new().build()`。`cargo check` 验证主 crate 无 `updater` feature，`features = []` 保持。
+  - `.github/workflows/release.yml`：`tauri-action` step 加 `shell: bash`（DEC-070 fix 在 v0.1.1 重写时漏回）
+  - `scripts/generate-updater-keypair.sh` + `package.json` `updater:keygen`：一键生成 + 灌 secret
+  - `.gitignore` + `src-tauri/.gitignore`：`*.key` / `*.key.pub` / `*.sig` / `tauri-key*` 排除护栏
+  - `docs/RELEASE.md` §3.1：加脚本引用 + 修正 pubkey 命令（`.pub` 文件本身 1 行 base64，直接 cat）
+- 验收：
+  - [ ] `cargo check --manifest-path src-tauri/Cargo.toml` 通过（updater feature 编译）
+  - [ ] `pnpm run typecheck && pnpm run lint && pnpm run build` 全绿
+  - [ ] PR 合并后打 tag `v0.2.0`，release.yml 产 3 平台 `.sig` + `latest.json`（SIG_COUNT > 0，不走 no-sigs 分支）
+  - [ ] 应用内「关于 → 检查更新」走通：检测到新版本 → 下载 → 签名验证 → 安装
+- 不在本 PR：ci.yml 门禁（vitest 4.1.8 退出悬挂单独 sprint 处理）、移动端、CODE_SIGNING 平台级签名

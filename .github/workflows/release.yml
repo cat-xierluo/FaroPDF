@@ -73,6 +73,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - uses: tauri-apps/tauri-action@v0
+        # DEC-070 fix 回归：Windows runner 默认 PowerShell，多行 `cargo tauri build`
+        # 反斜杠续行会被 PowerShell 当表达式吃掉。显式 shell: bash 让 tauri-action
+        # 内部 + 后续 step 都走 Git Bash（GitHub Actions Windows runner 自带）。
+        # 本 step 在 v0.1.1 整文件重写时（DEC-071）漏回，本次补齐。
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}

@@ -71,3 +71,11 @@ research/
 
 # PDF Expert 复刻参考素材（本地内部使用，含第三方软件截图，不上传公开仓库）
 docs/reference/pdf-expert/
+
+# Tauri updater keypair（NEVER commit：泄露 = 任何人可签伪造更新包）
+# 详见 docs/RELEASE.md「Keypair 一次配置」+ scripts/generate-updater-keypair.sh
+*.key
+*.key.pub
+*.sig
+tauri-key*
+.tauri/

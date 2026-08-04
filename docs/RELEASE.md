@@ -51,6 +51,11 @@ schema 遵循 tauri-plugin-updater v2 manifest：
 
 仅由仓库管理员在首次发布前完成。**私钥不进入版本库**。
 
+> **一键脚本（推荐）**：`pnpm updater:keygen`（`scripts/generate-updater-keypair.sh`）
+> 交互式跑完下面全流程：检查 tauri CLI → 读密码（不回显）→ 生成 keypair →
+> chmod 600 → 打印 pubkey → `gh secret set` 灌两个 secret → 提醒备份。已存在的
+> keypair 会先备份到 `*.bak` 再问是否 `--force` 覆盖。下面手工步骤供参考 / 排查。
+
 ```bash
 # 本地生成 ed25519 签名 keypair
 cargo tauri signer generate -p "<STRONG_PASSWORD>" -w ~/.tauri/faropdf.key
@@ -74,12 +79,15 @@ minisign 公钥 bytes，`str::from_utf8` 报 `invalid utf-8 sequence of 1 bytes
 from index 2`）。
 
 ```bash
-# 正确格式（一行 base64 字符串，含两行原文）：
-PUBKEY_B64=$(cat ~/.tauri/faropdf.key.pub | base64 -d | base64 -w0)
+# .pub 文件本身就是 1 行 base64（wc -l = 0，无换行符），直接整个内容当 pubkey 字段。
+# ⚠️ 不要 `cat | base64 -d | base64 -w0`——decode 再 encode 是绕路（结果碰巧相等），
+#    且 macOS 自带 base64 不支持 GNU 的 -w0，会报 invalid option。
+cat ~/.tauri/faropdf.key.pub
 
 # 写入 src-tauri/tauri.conf.json：
-#   plugins.updater.pubkey = "${PUBKEY_B64}"
-# 可验证：echo -n "$PUBKEY_B64" | base64 -d 应回显两行 minisign 公钥文本
+#   plugins.updater.pubkey = "<上面 cat 输出的整行 base64>"
+# 可验证：cat ~/.tauri/faropdf.key.pub | base64 -d 应回显两行 minisign 公钥文本
+# （untrusted comment: minisign public key: <KEYNUM>  +  RWS... blob）
 ```
 
 **写入 GitHub Secrets**（仓库 Settings → Secrets and variables → Actions）：
@@ -192,5 +200,6 @@ git push origin v0.1.1
 - `src/shared/update/` — 前端 update 契约（types / service / capability）
 - `src/modules/settings/sections/AboutSection.tsx` — 检查更新 UI（含 fallback 分支）
 - `scripts/create-updater-manifest.mjs` — `latest.json` 生成器
+- `scripts/generate-updater-keypair.sh` — 一键生成 keypair + 灌 GitHub Secret（§3.1）
 - `.github/workflows/release.yml` — 跨平台 CI 流水线
 - `docs/DECISIONS.md` DEC-048 — 架构与限制决策
