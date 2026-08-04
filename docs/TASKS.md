@@ -240,6 +240,26 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ---
 
+### 后续延伸 ISS（W5 走查 ISS-QA-04 时发现，2026-08-04）
+
+> ISS-QA-04 核心已修（Fix-1 mode-aware，main `f54d43a`）。完整 fail-closed + 右栏宽度核查需改 forbidden 域（Toolbar / shared），W5 worker 不能动，另立以下延伸 ISS。
+
+#### ISS-QA-04a　stub 入口完整 fail-closed（改 Toolbar / commands.ts）　[P1][体验]　[待开工]
+
+- **现象**：批注辅助 9 命令 / view-toggle / ocr-enhance-all / forms-flatten 等 stub 子命令点击只弹 toast「待接入」，未 disabled + tooltip，fail-closed 不完整。
+- **根因**：disabled + tooltip 需在 `src/components/layout/Toolbar.tsx`（mode 按钮渲染）+ `src/shared/app/commands.ts`（`availability` 字段）配置，W5 forbidden 域。
+- **范围**：`Toolbar.tsx` + `commands.ts`（`availability: "planned"`）。
+- **证据**：W5 RESULT §1 分类 ③。
+
+#### ISS-QA-04b　右栏宽度 panelWidthStore 默认值核查（src/shared）　[P1][体验]　[待开工]
+
+- **现象**：右栏 export-preview / ocr-queue 渲染真实面板，但若 `panelWidthStore` 默认 right 宽度 = 0，视觉折叠（看似「没展开」）。
+- **根因**：NOT_VERIFIED（W5 无法读 `src/shared` forbidden）；需核查 `panelWidthStore` 默认值 + `showRightPanel` 宽度派生。
+- **范围**：`src/shared`（panelWidthStore）+ 可能 `AppShell.tsx`。
+- **证据**：W5 RESULT §1 分类 ④。
+
+---
+
 ## 当前唯一推进序列（PDF Expert 功能框架对应）
 
 2026-07-30 用户明确调整验收目标：不要求像素级或一比一视觉复刻；PDF Expert 只作为信息架构和功能映射参考。P0 改为“入口与真实模块一一对应、写入结果可验证、未实现能力 fail-closed”。accepted-golden、截图补采和视觉 diff 保留为非阻塞质量项，不再阻塞 M3～M5 的功能推进。
