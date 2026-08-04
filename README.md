@@ -21,7 +21,7 @@
 - macOS Intel：下载带 `x64` / `x86_64` 字样的 `.dmg`
 - Windows：下载 `.exe` 安装包
 
-安装后 FaroPDF 会默认检查更新，也可以在"设置 / 关于"中手动检查或关闭自动检查。
+安装后 FaroPDF 会默认检查更新，也可以在"设置 / 关于"中手动检查或关闭自动检查。**v0.2.0 起自动更新完整闭环**：增量包下载 + minisign 签名验证 + 应用内一键安装，无需手动重装。
 
 ### macOS 首次运行
 
@@ -36,7 +36,7 @@ open /Applications/FaroPDF.app
 
 ## 当前状态
 
-FaroPDF 处于 v0.2 开发阶段（v0.1 基础版已封箱至 0.1.0-alpha.18）。当前已落定的核心能力：
+FaroPDF **v0.2.0 已发布**（v0.1 基础版封箱于 0.1.x）。v0.2.0 关键变化：updater 自动更新完整闭环（增量包 + 签名验证 + 应用内一键安装）、许可证变更为 Source-Available。当前在 v0.2.x 持续迭代。已落定的核心能力：
 
 - **阅读**：PDF.js 快速渲染、连续/单页/双页/适合宽度、缩放、旋转、键盘翻页、文字层检测、会话恢复。
 - **检索**：全文搜索（命中列表、上下一个、当前页高亮）、PDF 大纲（书签 destination）读取。
@@ -162,7 +162,7 @@ FaroPDF 是我在法律文档处理和 AI 协作实践中沉淀出来的独立 P
 
 本地开发需要先安装：
 
-- Node.js 与 npm
+- Node.js 与 pnpm（`pnpm` ≥ 10，项目用 pnpm 管理，**不要用 npm**——lockfile 是 `pnpm-lock.yaml`）
 - Rust stable toolchain
 - macOS 构建还需要 Xcode 或 Xcode Command Line Tools
 
@@ -171,22 +171,22 @@ Tauri CLI 已作为项目开发依赖安装（`@tauri-apps/cli`），不需要�
 启动桌面开发模式：
 
 ```bash
-npm install
-npm run tauri dev
+pnpm install
+pnpm tauri dev
 ```
 
 只调试前端页面时，也可以运行：
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 常用验证命令：
 
 ```bash
-npm run typecheck   # TypeScript 类型检查
-npm test            # Vitest 单测
-npm run lint        # ESLint
+pnpm run typecheck   # TypeScript 类型检查
+pnpm test            # Vitest 单测
+pnpm run lint        # ESLint
 ```
 
 ## 构建
@@ -194,16 +194,16 @@ npm run lint        # ESLint
 只验证前端构建：
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 本地打包桌面应用：
 
 ```bash
-npm run tauri build
+pnpm tauri build
 ```
 
-构建产物通常位于 `src-tauri/target/release/bundle/`（macOS 产出 `.dmg` / `.app`，Windows 产出 `.exe` / `.msi`，Linux 产出 `.AppImage` / `.deb`）。
+构建产物通常位于 `src-tauri/target/release/bundle/`（macOS 产出 `.dmg` / `.app`，Windows 产出 `.exe` NSIS 安装器，Linux 产出 `.AppImage` / `.deb`）。Windows 不发 `.msi`，与 `release.yml` `bundle.targets: ["app","dmg","nsis"]` 对齐。
 
 发布流程、产物矩阵、`latest.json` schema 与 keypair 管理见 `docs/RELEASE.md`。
 
@@ -231,4 +231,4 @@ npm run tauri build
 - `docs/DESIGN.md`：视觉与交互规范
 - `docs/reference/pdf-expert/`：PDF Expert 复刻的唯一证据入口、实现现状、验收门禁与重建指南
 - `docs/RELEASE.md`：发布流水线、`latest.json` schema 与 keypair 管理
-- `CHANGELOG.md`：用户可见变更记录（按 0.1.0-alpha.X 顺序）
+- `CHANGELOG.md`：用户可见变更记录（v0.1.x → v0.2.0 顺序）
