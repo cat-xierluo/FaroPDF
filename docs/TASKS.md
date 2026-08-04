@@ -42,126 +42,201 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ## v0.2.0 发布后实机回归缺陷（2026-08-04，ISS-QA-01 ~ ISS-QA-06）
 
-> 背景：用户安装 v0.2.0 后实机回归，发现 6 项阻塞级 / 体验级缺陷。本节是**排查记录 + 任务卡**，本轮仅做静态读码与根因定位，**尚未修复任何产品代码**。凡未在打包产物中实机复现的根因，均显式标注 `NOT_VERIFIED`，待修复 worker 在 Tauri 打包环境下验证后再关闭。
+> **批次状态**：[草案] 排查完成、任务卡已细化，待开工。
+> **来源**：用户实机安装 v0.2.0 后回归测试发现（2026-08-04 口述反馈）。
+> **排查方法**：PM 单 session 静态读码（`AppShell.tsx` / `Toolbar.tsx` / `ReaderCanvas.tsx` / `WelcomeScreen.tsx` / `pdfjsWorker.ts` / `src-tauri/src/lib.rs` / `commands.ts` / `capabilities/default.json`）+ grep 定位，**未启动 dev / 打包应用**。凡未在打包产物中实机复现的根因均标注 `NOT_VERIFIED`，修复 worker 必须先在打包环境复现再改。
+> **完成线**：功能项以 `behavior-complete` 为准（真实交互断言 + 打包产物验证；worker 自述 / typecheck / 单测 / build 不单独构成完成证据）；UI 项额外要求 `符合 docs/DESIGN.md`；未实现入口必须 **fail-closed**（明确禁用 + tooltip，非静默无响应）—— 见项目 AGENTS.md「UI 与多 Agent 协作门禁」。
+> **验证环境**：ISS-QA-01 / 02 / 04 / 06 必须在 `npm run tauri build` 产物里验证（dev 与打包行为可能不同，ISS-QA-02 根因即 dev/prod 差异）；ISS-QA-03 / 05 可在 dev + typecheck 验证。
+> **安全边界**：所有修复不得覆盖用户原始 PDF；新增打开路径走「读 bytes → 渲染」，不写回原文件（项目 AGENTS.md「PDF 安全边界」）。
 >
-> 排查方法：静态读码（AppShell / Toolbar / ReaderCanvas / WelcomeScreen / pdfjsWorker / lib.rs / commands.ts / capabilities）+ grep 定位，未启动 dev/打包应用。多 Agent 配额受限，本批以 PM 单 session 排查为主（与 memory `project_multi_agent_state` 一致）。
+> **worktree 分组建议**（项目 AGENTS.md「多 Agent 编排」）：
+> - 可同组并行（文件不重叠）：ISS-QA-03（纯 tsx 换图标）+ ISS-QA-05（纯 css token 归一）。
+> - 必须顺序或合并（共享 `src-tauri/src/lib.rs`）：ISS-QA-01（Rust 加 DragDrop）与 ISS-QA-06（Rust 加 `settings-open` 菜单）都改 lib.rs，**禁止同 worktree 并行**，建议同一 Rust 改动 PR 顺序推进。
+> - 共享 `AppShell.tsx` / `Toolbar.tsx`：ISS-QA-04（命令路由）与 ISS-QA-06（工具栏入口）有重叠，**同一 owner 顺序推进**。
+> - 独立：ISS-QA-02（pdfjs worker / vite 配置）单独 PR。
+>
+> **推进顺序**：QA-06（解锁设置可达）→ QA-02（核心阅读，打包复现）→ QA-01（核心入口）→ QA-04（功能展开，工作量最大）→ QA-03 / QA-05（视觉收尾，可并行）。
 
 ### 缺陷总览
 
-| id | 现象 | 严重级 | 根因摘要（证据） | 验证状态 |
-| --- | --- | --- | --- | --- |
-| ISS-QA-01 | PDF 文件拖入窗口不打开 | [P0][阻塞] | 前端用 HTML5 `onDrop`+`dataTransfer.files`，Tauri webview 收不到系统级文件拖拽；src-tauri 无 `DragDrop` 事件处理 | 根因 PLAUSIBLE，未打包复现 |
-| ISS-QA-02 | 打开 PDF 显示「损坏的文件」 | [P0][阻塞] | pdfjs worker 走 `pdf.worker.mjs?url`，打包后在 asset/file 协议下 worker 加载失败 → `getDocument` 抛 `InvalidPDFException` → 命中 DEC-192 错误卡片 | NOT_VERIFIED（需打包复现 dev vs prod 差异） |
-| ISS-QA-03 | 界面出现 emoji，不够高级 | [P1][体验] | 5 文件 6 处 emoji 字面量未替换为 lucide 图标 | 已确认（grep 全量） |
-| ISS-QA-04 | 批注/编辑/导出/扫描与文本识别点击后无功能展开 | [P0][阻塞] | mode 按钮接线正常但切换后 utility panel 被强关 + 大量子命令是 `setCommandFeedback("…待后续 worker 接入…")` 占位 stub + 三栏渲染条件不连贯 | 根因 PLAUSIBLE，需实机走查 |
-| ISS-QA-05 | 左侧边栏（书签/大纲/批注列表/缩略图）颜色不统一 | [P1][体验] | Sidebar 多 panel 各自 className / 背景 token 未归一 | 已确认，待定 token 基线 |
-| ISS-QA-06 | 设置页面入口不见了 | [P0][阻塞] | 设置唯一 UI 入口埋在工具栏二级「tool-launcher-menu」下拉；原生菜单栏未注册 `settings-open`；launcher 触发按钮可见性存疑 | 根因 PLAUSIBLE，需实机确认 launcher 入口 |
+| id | 现象 | 严重级 | 根因摘要（证据） | 主改动文件 | 完成线 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| ISS-QA-01 | 拖入 PDF 不打开 | [P0] | HTML5 onDrop 收不到系统文件；lib.rs 无 DragDrop | `lib.rs` + 前端 App 层 | behavior-complete | [待开工] 根因 PLAUSIBLE |
+| ISS-QA-02 | 打开显示「损坏」 | [P0] | pdfjs worker `?url` 打包后加载失败 → InvalidPDF | `pdfjsWorker.ts` / vite config | behavior-complete | [待开工] 根因 NOT_VERIFIED |
+| ISS-QA-03 | 界面 emoji | [P1] | 5 文件 6 处 emoji 字面量 | 5 个 tsx | grep 清零 + 视觉 | [待开工] 已确认 |
+| ISS-QA-04 | 批注/编辑/导出/OCR 点击无展开 | [P0] | mode 切换强关 panel + 大量 stub + 三栏不连贯 | `AppShell.tsx` 为主 | behavior-complete | [待开工] 根因 PLAUSIBLE |
+| ISS-QA-05 | 左侧边栏颜色不统一 | [P1] | Sidebar 多 panel token 未归一 | `Sidebar.tsx` + `app.css` | 符合 DESIGN.md | [待开工] 已确认 |
+| ISS-QA-06 | 设置入口不见了 | [P0] | 入口藏在二级菜单；原生菜单未注册 | `Toolbar.tsx` + `lib.rs` | behavior-complete | [待开工] 根因 PLAUSIBLE |
 
 ---
 
-### ISS-QA-01　PDF 文件拖入窗口不打开　[P0][阻塞]
+### ISS-QA-01　PDF 文件拖入窗口不打开　[P0]
 
-- **现象**：从系统 Finder 把 `.pdf` 文件拖到 FaroPDF 窗口，无任何反应，文档不打开。
+- **状态**：[待开工]　**类型**：缺陷修复　**完成线**：behavior-complete
+- **现象（用户视角）**：从系统 Finder / 邮件附件把 `.pdf` 拖到 FaroPDF 窗口，无任何反应，文档不打开。律师高频从 Finder 拖卷宗，是核心入口。
 - **根因**：
-  - 前端拖拽走 HTML5 `onDrop` + `event.dataTransfer.files`，三处实现一致：
-    - `src/components/layout/ReaderCanvas.tsx:257` `handleDrop`
-    - `src/components/layout/WelcomeScreen.tsx:59` `handleDrop`
-    - `src/components/layout/ReaderErrorScreen.tsx:54` `handleDrop`
-  - 在 Tauri v2 webview 中，**从系统拖入的文件不会进入浏览器层 `dataTransfer.files`**——系统级文件拖拽是 webview 级事件，必须由 Rust 端监听 `WindowEvent::DragDrop`（或使用 `tauri-plugin-drag`），把文件路径 emit 给前端，前端再用路径读 bytes 打开。
-  - `src-tauri/src/lib.rs` 全文 grep 仅有 tab drag detach（`create_faropdf_window`）和 RAII guard，**无任何 `DragDrop` / `file-drop` 事件处理**。因此拖入时 `dataTransfer.files` 为空，`find()` 返回 `undefined`，`onOpenFile` 不被调用——完全匹配「拖入无反应」。
-- **影响**：律师高频从 Finder / 邮件附件拖卷宗，是核心入口；当前完全不可用。
-- **修复方向**：
-  1. Rust 端在 `lib.rs` `setup`/`on_window_event` 中监听 `WindowEvent::DragDrop`，过滤 `.pdf`，emit 事件（含路径）到前端。
-  2. 前端在 App 层监听该事件，复用现有「路径 → 读 bytes → `loadPdfFromBytes`」链路（注意 AppShell:1263 注释「真实路径打开（reader.openFile + 路径寻址）由后续 worker 接入」——可能需同时补 `readPdfFileFromPath` 的前端入口）。
-  3. 保留现有 HTML5 `onDrop` 作为 web/浏览器降级路径，不删除。
-- **验收**：打包后从 Finder 拖入正常 PDF → 正常打开渲染；拖入非 PDF → 忽略；拖入损坏 PDF → 命中 ISS-QA-02 的错误卡片而非静默。
-- **状态**：[待修复]。根因为 PLAUSIBLE（基于 Tauri v2 行为 + grep 证据），**未在打包产物中实机复现**。
+  - 前端三处拖拽走 HTML5 `onDrop` + `event.dataTransfer.files`：`ReaderCanvas.tsx:257`、`WelcomeScreen.tsx:59`、`ReaderErrorScreen.tsx:54`。
+  - Tauri v2 webview 中，**从系统拖入的文件不进入浏览器层 `dataTransfer.files`**——系统级文件拖拽是 webview 级事件，必须由 Rust 监听 `WindowEvent::DragDrop`（或 `tauri-plugin-drag`），把路径 emit 给前端。
+  - `src-tauri/src/lib.rs` 全文 grep 仅有 tab drag detach（`create_faropdf_window`）和 RAII guard，**无任何 DragDrop / file-drop 事件处理**。拖入时 `dataTransfer.files` 为空 → `find()` 返回 undefined → `onOpenFile` 不触发 → 完全匹配「拖入无反应」。
+  - 验证状态：根因 PLAUSIBLE（Tauri v2 行为 + grep 证据），**未打包复现**。
+- **输入依赖**：
+  - 前端需有「路径 → 读 bytes → `loadPdfFromBytes`」链路；注意 `AppShell.tsx:1263` 注释「真实路径打开（reader.openFile + 路径寻址）由后续 worker 接入」——可能需同时补 `readPdfFileFromPath` 前端入口（Rust 侧 `read_pdf_file_from_path` 已存在，见 CHANGELOG DEC-194）。
+  - 若新增前端路径读取，确认 `capabilities/default.json` 走既有 Rust command，避免新开 fs 权限面。
+- **范围**：
+  - in scope：Rust 监听 DragDrop + emit 路径；前端 App 层监听并调用既有打开链路；保留 HTML5 onDrop 作 web 降级。
+  - out of scope：拖入多文件批量打开（本轮单文件）；拖入非 PDF 的转换（图片/Word 转 PDF 属 ISS-NEW-G 占位）。
+- **推进步骤**：
+  1. **复现**：`npm run tauri build`，从 Finder 拖 PDF 到窗口，确认无反应 + devtools 看 `dataTransfer.files` 为空。
+  2. **Rust**：在 `lib.rs` `setup` / `on_window_event` 监听 `WindowEvent::DragDrop`，过滤 `.pdf`，emit 事件（含路径）到前端。
+  3. **前端**：App 层（`App.tsx` 或 `AppShell`）`listen` 该事件 → 取首个 `.pdf` 路径 → 调既有「路径 → bytes → `loadPdfFromBytes`」（缺则补 `readPdfFileFromPath` 入口）。
+  4. **保留** HTML5 `onDrop` 作浏览器/web 降级，不删。
+- **验收标准（behavior-complete）**：
+  - [ ] 打包产物：从 Finder 拖入正常 PDF → 正常打开渲染（页码/视图状态与「打开」按钮一致）。
+  - [ ] 拖入非 PDF → 忽略（不报错、不闪退）。
+  - [ ] 拖入损坏 PDF → 命中 ISS-QA-02 错误卡片而非静默。
+  - [ ] dev 模式（浏览器降级）HTML5 onDrop 仍可用。
+- **证据载体**：打包后 Playwright/手测截图 + console 无 error；路径脱敏不写日志。
+- **验证命令**：`cd src-tauri && cargo check`；`npm run typecheck`；`npm run tauri build` 后实机拖拽。
+- **阻塞 / 剩余**：若 `readPdfFileFromPath` 前端入口缺失，需先补（小工作量）。
+- **worktree**：与 ISS-QA-06 共享 `lib.rs`，顺序推进或合并到一个 Rust PR。
 
 ---
 
-### ISS-QA-02　打开 PDF 显示「损坏的文件」　[P0][阻塞]
+### ISS-QA-02　打开 PDF 显示「损坏的文件」　[P0]
 
-- **现象**：用「打开」按钮选择正常 PDF（其它阅读器可正常打开），FaroPDF 内显示为「损坏 / 无法打开」。
+- **状态**：[待开工]　**类型**：缺陷修复　**完成线**：behavior-complete
+- **现象（用户视角）**：用「打开」按钮选择正常 PDF（其它阅读器可正常打开），FaroPDF 内显示「损坏 / 无法打开」。
 - **根因（待复现验证）**：
-  - pdfjs worker 配置在 `src/modules/reader/pdfjsWorker.ts:1`：`import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.mjs?url"`，`pdfjs-dist@6.0.227`。
-  - Vite `?url` 在 **dev** 下解析为 `http://localhost:1420/...`，worker 正常加载；但 **打包成 Tauri app 后**，`frontendDist` 走 `tauri://` / `asset://` 协议，worker 以 module worker 加载时受协议/路径解析影响，存在 worker 加载失败或 `False` worker 模式风险 → `getDocument` 解析中断 → 抛 `InvalidPDFException`。
-  - 该异常经 `src/shared/error.ts:60` `classifyPdfjsException` 归一化为 `PdfParseError`，命中 DEC-192 的「无法打开此 PDF」错误卡片——即用户看到的「损坏」。
-  - `tauri.conf.json` `security.csp = null`（排除 CSP 拦截）；`capabilities/default.json` 仅 `core:default / dialog:allow-open / opener:default`，但「打开」按钮走 File 对象 → `loadPdfFromBytes`（AppShell:729 `loadPdfFromBytes`），不依赖 `fs` plugin，故 fs 权限缺失不解释此现象。
-- **待确认分支**：
-  1. dev 模式能否正常打开（若 dev 正常、打包失败 → 坐实 worker URL 协议问题）。
-  2. 打包后 console 是否有 worker 加载错误 / 是否 fallback 到 fake worker。
-  3. 是否所有 PDF 都「损坏」还是仅部分（排除 pdfjs-dist 6 对某些 PDF 特性兼容问题）。
-- **修复方向（候选）**：
-  - 改 worker 引入方式：用 `new Worker(new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url), { type: 'module' })` 显式构造，或 `GlobalWorkerOptions.workerPort` 传 Worker 实例，避免 `?url` 在自定义协议下的路径漂移。
-  - 或在打包配置中确保 worker 资产被正确拷贝到 `dist/` 且路径可解析。
-- **验收**：打包应用中打开 ≥3 份不同来源正常 PDF（含扫描件、文字层、加密解密后）均正常渲染；dev 与 prod 行为一致。
-- **状态**：[待修复]。根因 **NOT_VERIFIED**，需打包实机复现后定论（dev vs prod 对比是关键实验）。
+  - worker 配置 `pdfjsWorker.ts:1`：`import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.mjs?url"`，`pdfjs-dist@6.0.227`。
+  - Vite `?url` 在 dev 解析为 `http://localhost:1420/...`（正常）；**打包成 Tauri app 后** `frontendDist` 走 `tauri://` / `asset://`，module worker 在自定义协议下加载失败或路径漂移 → `getDocument` 中断 → 抛 `InvalidPDFException`。
+  - 异常经 `shared/error.ts:60` `classifyPdfjsException` 归一化为 `PdfParseError`，命中 DEC-192「无法打开此 PDF」错误卡片。
+  - `tauri.conf.json` `csp=null`（排除 CSP）；「打开」走 File → `loadPdfFromBytes`（`AppShell.tsx:729`），不依赖 fs，故 fs 权限不解释此现象。
+  - 验证状态：根因 **NOT_VERIFIED**，dev vs prod 对比是关键实验。
+- **输入依赖**：pdfjs-dist 6 worker 加载机制；vite `?url` 在 Tauri asset 协议下的行为；`config/vite.config.ts`。
+- **范围**：
+  - in scope：修正 worker 在打包产物下的加载方式；确保 dev/prod 一致。
+  - out of scope：pdfjs 版本升级（除非证实是 6.x 兼容 bug）；PDF 内容修复（只修加载，不改 PDF）。
+- **推进步骤**：
+  1. **复现（关键，先做）**：`npm run tauri dev` 打开正常 PDF（预期正常）→ `npm run tauri build` 产物打开同一 PDF（预期显示损坏）→ devtools 看 worker 加载错误 / 是否 fallback fake worker。**若 dev 也损坏，根因另寻**。
+  2. **样本**：测 ≥3 份不同来源 PDF（扫描件 / 文字层 / 解密后），排除 pdfjs-dist 6 对特定 PDF 的兼容问题。
+  3. **修复（候选，按复现结果选）**：改用 `new Worker(new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url), { type: 'module' })` + `GlobalWorkerOptions.workerPort`；或确保 worker 资产正确拷贝到 `dist/` 且在 asset 协议下路径可解析（查 `config/vite.config.ts`）。
+  4. **验证**：dev + 打包产物都能正常打开测试 PDF。
+- **验收标准（behavior-complete）**：
+  - [ ] 打包产物打开 ≥3 份不同来源正常 PDF 均正常渲染。
+  - [ ] dev 与 prod 行为一致。
+  - [ ] 真正损坏的 PDF 仍正确命中 DEC-192 错误卡片（不误判正常 PDF）。
+- **证据载体**：dev/prod 对照截图 + devtools worker Network/Console 输出。
+- **验证命令**：`npm run typecheck`；`npm run tauri dev`；`npm run tauri build` 后实机打开。
+- **阻塞 / 剩余**：根因未复现前不要改代码（避免盲改）。
+- **worktree**：独立 PR（pdfjs worker / vite，与其他 QA 文件不重叠）。
 
 ---
 
-### ISS-QA-03　界面 emoji 清理（统一换 lucide 图标）　[P1][体验]
+### ISS-QA-03　界面 emoji 清理（统一换 lucide 图标）　[P1]
 
-- **现象**：界面多处使用 emoji 字面量，与产品「律师专业工具」定位不符，显得不够高级。
-- **已定位（grep `src/**/*.{ts,tsx}` 全量，排除 test）**：
-  - `src/components/layout/ReaderErrorScreen.tsx:86` —— 🔒（密码输入框图标）
-  - `src/components/layout/WelcomeScreen.tsx:85` —— 🖼️（图片转 PDF 卡片图标）
-  - `src/components/layout/WelcomeScreen.tsx:96` —— 📄（Word 转 PDF 卡片图标）
-  - `src/components/layout/TextSelectionToolbar.tsx:52` —— 💬（便签 glyph）
-  - `src/components/layout/AnnotationSidebar.tsx:23` —— 💬（note 类型标记）
-  - `src/components/layout/Sidebar.tsx:58` —— 💬（note 类型标记）
-- **未覆盖**：CSS `content:` 与 `index.html` 中的 emoji 未全量复查（本轮 glob 未命中，但修复时需补查 `src/**/*.css`、`public/`、`index.html`）。
-- **修复方向**：统一替换为 `lucide-react`（已是项目依赖，`lucide-react@1.17.0`）。映射建议：🔒→`Lock`、🖼️→`Image`、📄→`FileText`、💬→`MessageSquare`/`StickyNote`。保持 `aria-hidden` 与现有 a11y 约定。
-- **验收**：grep `src/` 无残留 emoji（CJK 与 ASCII 标点除外）；打包界面无 emoji 渲染。
-- **状态**：[待修复]。证据已充分，可直接实现。
-
----
-
-### ISS-QA-04　批注/编辑/导出/扫描与文本识别点击后无功能展开　[P0][阻塞]
-
-- **现象**：工具栏点击「A 批注 / T 编辑 / 导出 / 扫描和文本识别」等模式或对应菜单项后，没有对应的功能面板/工具条展开。
-- **根因（多因，需分项走查）**：
-  1. **mode 按钮接线本身正常**：`src/components/layout/Toolbar.tsx:155-188`（A 批注 :161 / T 编辑 / 导出 :181 / 扫描和文本识别 :187）`onClick={() => enterMode(mode)}` → `onModeChange`（Toolbar:63）。但所有工作流按钮 `disabled={!document}`——**未打开 PDF 时点击无反应**（可能被用户误判为「坏了」）。
-  2. **切换 mode 时 utility panel 被强关**：`src/components/layout/AppShell.tsx:1134-1138`，命令路由末尾 `else if (group === "export" || "forms" || (mode 且 targetMode !== "annotate"))` → `onUtilityPanelChange("none")`。进入导出/编辑/OCR 等模式会把左侧 utility panel 关掉，视觉上「什么都没展开」。
-  3. **大量子命令仍是占位 stub**：AppShell 多处 `setCommandFeedback("…待后续 worker 接入…")`（:856 缩放工具 / :901 形状 submenu / :911 形状绘制 / :938 批注操作 / :1252 图片转 / :1257 Word 转 / :1263 路径打开）。CHANGELOG 也明确标注为 v0.2 占位反馈。点击这些只弹 toast，不展开真实功能。
-  4. **ContextToolbar 显示条件与 RightPanel 内容路由不连贯**：`showContextToolbar` 条件 `activeMode !== "pages" && activeMode !== "ocr"`（AppShell:191-192），即 OCR 模式不显示 L4；RightPanel 在 `activeMode === "ocr"` → `"ocr-queue"`、`"export"` → `"export-preview"`（AppShell:254-255），但若 RightPanel 默认折叠或宽度为 0，用户感知为「没展开」。
-- **影响**：核心工作流（批注/编辑/导出/OCR）入口可用性存疑，是 v0.2.0 最大的功能性口碑风险。
-- **修复方向**：
-  1. 先实机走查每个 mode 切换后「ContextToolbar / RightPanel / UtilityPanel」三栏的实际 DOM（推荐用项目既有 `verify:ui-layout` + Playwright），区分「按钮 disabled」「panel 被关」「stub 占位」「panel 折叠」四类，分别处理。
-  2. 对仍是 stub 的入口，统一为「明确 disabled + tooltip 说明未实装」或「展开真实面板」，消除「点了没反应」的模糊态。
-  3. 重审 AppShell:1136-1137 的 utility panel 强关逻辑是否过度。
-- **验收**：打开任一 PDF 后，点击 A 批注 / T 编辑 / 导出 / 扫描和文本识别，每个模式都有可见的功能面板或工具条展开（或明确 disabled 且有原因 tooltip）；占位项不再以「点了无反应」呈现。
-- **状态**：[待修复]。根因 PLAUSIBLE（多因叠加），需实机走查后再拆分子任务。
+- **状态**：[待开工]　**类型**：体验修复　**完成线**：grep 清零 + 视觉确认
+- **现象（用户视角）**：界面多处 emoji 字面量，与「律师专业工具」定位不符，显得不够高级。
+- **根因（已确认）**：5 文件 6 处 emoji 字面量未走图标库：
+  - `ReaderErrorScreen.tsx:86` 密码锁 emoji（密码输入框）
+  - `WelcomeScreen.tsx:85` 图片 emoji、`:96` 文档 emoji（转换卡片）
+  - `TextSelectionToolbar.tsx:52` 便签 emoji（glyph）
+  - `AnnotationSidebar.tsx:23` 便签 emoji、`Sidebar.tsx:58` 便签 emoji（note 标记）
+- **输入依赖**：`lucide-react@1.17.0`（已在依赖）。映射：密码锁→`Lock`、图片→`Image`、文档→`FileText`、便签→`StickyNote`（或 `MessageSquare`）。
+- **范围**：
+  - in scope：上述 6 处替换为 lucide 图标，保持 `aria-hidden` / a11y；补查 CSS `content:`、`public/`、`index.html` 残留 emoji。
+  - out of scope：图标体系重设计（仅 1:1 替换）；新增图标颜色/尺寸规范（属 DESIGN 范畴）。
+- **推进步骤**：
+  1. 逐处替换 emoji 为对应 lucide 组件，保持现有布局（图标尺寸对齐 `size={16}` 等）。
+  2. `grep -rPn` 覆盖 `src/` + `public/` + `index.html`（含 CSS `content:`）确认无残留。
+  3. dev 视觉确认 5 处渲染正常（无错位/留白）。
+- **验收标准**：
+  - [ ] grep `src/` + `public/` + `index.html` 无 emoji 残留（CJK / ASCII 标点除外）。
+  - [ ] 打包界面 5 处图标正常渲染，无 emoji。
+  - [ ] `npm run typecheck` + `npm run lint` 过。
+- **证据载体**：替换前后对照截图；grep 输出。
+- **验证命令**：`npm run typecheck`；`npm run lint`；`npm run dev` 视觉确认。
+- **worktree**：可与 ISS-QA-05 同组并行（纯前端，文件不重叠）。
 
 ---
 
-### ISS-QA-05　左侧边栏各 panel 颜色不统一　[P1][体验]
+### ISS-QA-04　批注/编辑/导出/扫描与文本识别点击后无功能展开　[P0]
 
-- **现象**：左侧边栏的「书签 / 大纲 / 批注列表 / 缩略图」等 panel，背景 / 边框 / 标题色各自为政，视觉不统一。
-- **根因**：`src/components/layout/Sidebar.tsx` 内多个 panel（`BookmarkPanel` / `DocumentSummaryPanel` / `ViewSettingsPanel` / 以及 `AnnotationSidebar.tsx` / 缩略图列表）使用各自 className（如 `utility-panel view-settings`、`bookmark-panel` 等），背景与标题样式未统一到同一组 design token。
-- **修复方向**：
-  1. 盘点 Sidebar 下所有 panel 的容器 className 与实际生效背景/边框/标题色。
-  2. 在 `src/styles/app.css` 定义统一的 utility-panel 容器 token（背景、内边距、标题字号/色、分隔线），各 panel 复用。
-  3. 对齐 `docs/DESIGN.md` 的侧栏色板（若未规定基线，需先定 baseline，按 DEC-186 中性深色壳层口径）。
-- **验收**：书签/大纲/批注列表/缩略图四 panel 在 read/annotate/edit 同一模式下背景、标题、分隔线视觉一致；切深浅主题一致。
-- **状态**：[待修复]。token 基线待定（可能需小 DESIGN 决策）。
+- **状态**：[待开工]　**类型**：缺陷修复（多因）　**完成线**：behavior-complete
+- **现象（用户视角）**：工具栏点击「A 批注 / T 编辑 / 导出 / 扫描和文本识别」等模式或菜单项后，没有对应功能面板/工具条展开。
+- **根因（多因，需实机分项走查）**：
+  1. mode 按钮接线正常：`Toolbar.tsx:155-188`（A 批注 `:161` / 导出 `:181` / OCR `:187`）`onClick={enterMode}` → `onModeChange`（`:63`）。但工作流按钮 `disabled={!document}`——**未打开 PDF 时点击无反应**（可能被误判为坏了）。
+  2. 切 mode 时 utility panel 被强关：`AppShell.tsx:1134-1138`，`else if (group=export/forms/mode 非 annotate)` → `onUtilityPanelChange("none")`，视觉上「什么都没展开」。
+  3. 大量子命令是 stub：AppShell 多处 `setCommandFeedback("…待后续 worker 接入…")`（`:856/:901/:911/:938/:1252/:1257/:1263`），点击只弹 toast 不展开真实功能（CHANGELOG 标注为 v0.2 占位）。
+  4. ContextToolbar/RightPanel 不连贯：`showContextToolbar` = `activeMode!=="pages" && !="ocr"`（`:191-192`，OCR 无 L4）；RightPanel `ocr→ocr-queue`、`export→export-preview`（`:254-255`），但若 RightPanel 折叠/宽 0，感知为「没展开」。
+  - 验证状态：根因 PLAUSIBLE（多因叠加），需实机走查后拆子任务。
+- **输入依赖**：`AppShell.tsx` 命令路由；`ContextToolbar` / `RightPanel` / `UtilityPanel` 三栏渲染条件；既有 `verify:ui-layout` + Playwright。
+- **范围**：
+  - in scope：实机走查每个 mode 切换后三栏 DOM，区分「按钮 disabled / panel 被关 / stub 占位 / panel 折叠」四类并分别处理；重审 `:1136-1137` 强关逻辑。
+  - out of scope：把所有 stub 实装成真功能（本轮只让入口语义清晰 + 面板正确展开，真实功能实装另立 ISS）。
+- **推进步骤**：
+  1. **走查（先做）**：打开任一 PDF，逐个点击 A 批注 / T 编辑 / 导出 / 扫描和文本识别 + 各子菜单，用 Playwright/手测记录每个 mode 切换后 ContextToolbar / RightPanel / UtilityPanel 的实际 DOM（复用 `npm run verify:ui-layout`）。产出「四类分类表」。
+  2. **分类处理**：按钮 disabled → 补 tooltip「请先打开 PDF」（fail-closed）；panel 被强关 → 修 `:1136-1137` 让进 export/ocr 等模式时展开对应 RightPanel；stub 占位 → 未实装统一 disabled + tooltip「未实装」；panel 折叠 → 确保 RightPanel 进模式后有默认宽度/可见。
+  3. **验证**：每个 mode 都有可见功能面板或明确 disabled + 原因。
+- **验收标准（behavior-complete）**：
+  - [ ] 打开 PDF 后，A 批注 / T 编辑 / 导出 / 扫描和文本识别每个 mode 都有可见功能面板或工具条展开。
+  - [ ] 未实装入口明确 disabled + tooltip 说明（fail-closed），无静默无响应。
+  - [ ] `npm run verify:ui-layout` 通过（如有相关断言）。
+- **证据载体**：走查分类表 + 修复前后 Playwright 截图；console 无 error。
+- **验证命令**：`npm run typecheck`；`npm run verify:ui-layout`；`npm run tauri build` 实机。
+- **阻塞 / 剩余**：工作量最大，建议走查后拆成 ISS-QA-04a / b / c 子任务。
+- **worktree**：与 ISS-QA-06 共享 `AppShell.tsx` / `Toolbar.tsx`，同一 owner 顺序推进。
 
 ---
 
-### ISS-QA-06　设置页面入口不见了　[P0][阻塞]
+### ISS-QA-05　左侧边栏各 panel 颜色不统一　[P1]
 
-- **现象**：用户在界面上找不到「设置」入口。
+- **状态**：[待开工]　**类型**：视觉修复　**完成线**：符合 docs/DESIGN.md
+- **现象（用户视角）**：左侧边栏「书签 / 大纲 / 批注列表 / 缩略图」等 panel 背景/边框/标题色各自为政，视觉不统一。
+- **根因（已确认）**：`Sidebar.tsx` 多 panel（BookmarkPanel / DocumentSummaryPanel / ViewSettingsPanel / AnnotationSidebar / 缩略图）各自 className（`utility-panel view-settings`、`bookmark-panel` 等），背景/标题样式未归一到同一组 design token。
+- **输入依赖**：`src/styles/app.css`（token 定义）；`docs/DESIGN.md`（侧栏色板基线，若无则按 DEC-186 中性深色壳层定 baseline）。
+- **范围**：
+  - in scope：盘点 Sidebar 所有 panel 容器样式，归一到统一 utility-panel token（背景/内边距/标题字号色/分隔线）。
+  - out of scope：重设计侧栏布局结构；新增 panel。
+- **推进步骤**：
+  1. 盘点：列出 Sidebar 下所有 panel className + 实际生效背景/边框/标题色。
+  2. 定 baseline：查 `docs/DESIGN.md` 侧栏色板；未规定则按 DEC-186 中性深色壳层定一组 token（小 DESIGN 决策，记 `docs/DECISIONS.md`）。
+  3. 在 `app.css` 定义统一 utility-panel token，各 panel 复用。
+  4. read / annotate / edit 三模式 + 深/浅主题视觉确认。
+- **验收标准**：
+  - [ ] 书签/大纲/批注列表/缩略图四 panel 在 read/annotate/edit 同模式下背景、标题、分隔线视觉一致。
+  - [ ] 深浅主题切换一致。
+  - [ ] `符合 docs/DESIGN.md`（或补 DESIGN baseline）。
+- **证据载体**：三模式 × 深浅主题截图对照。
+- **验证命令**：`npm run typecheck`；`npm run dev` 视觉确认。
+- **worktree**：可与 ISS-QA-03 同组并行（纯前端 css/tsx）。
+
+---
+
+### ISS-QA-06　设置页面入口不见了　[P0]
+
+- **状态**：[待开工]　**类型**：缺陷修复　**完成线**：behavior-complete
+- **现象（用户视角）**：在界面上找不到「设置」入口，无法进入设置（OCR 后端、语言、偏好等全部不可达）。
 - **根因**：
-  - 设置的唯一 UI 入口埋在工具栏的二级「工具启动器」下拉菜单里：`src/components/layout/Toolbar.tsx:281` `<button className="tool-launcher-menu__settings">`（Settings 齿轮图标），`onClick={onOpenSettings}` → `openUtilityPanel("settings")`（Toolbar:198，触发前 `setToolsMenuOpen(false)`）。
-  - 该 launcher menu 由 `toolsMenuOpen` state 控制；其触发按钮的可见性 / 触发条件**存疑**（需实机确认工具栏上是否能看到该下拉触发器——很可能是入口被折叠 / 条件渲染错误，导致用户根本打不开这个二级菜单）。
-  - **原生菜单栏未注册 `settings-open`**：`src-tauri/src/lib.rs` grep 仅 :984 `view-settings`（视图设置），无 `settings-open` 菜单项。即 macOS 菜单栏也进不去设置。
-  - 命令定义本身是对的：`src/shared/app/commands.ts:781-788` `settings-open` 有 `targetUtilityPanel: "settings"`；`SettingsPanel`（AppShell:1497）`open={utilityPanel === "settings"}`。因此只要能把 `utilityPanel` 切到 `"settings"` 就能打开——问题纯粹是「缺显式入口」。
-- **影响**：无法进入设置（OCR 后端配置、语言、偏好等全部不可达），连带 ISS-QA-02 排查受限。
-- **修复方向**：
-  1. 在工具栏显眼位置（如右侧 collaboration/right 段）放常驻 Settings 齿轮按钮，直接 `openUtilityPanel("settings")`，不再藏在二级菜单。
-  2. 在 `lib.rs` 原生菜单补 `settings-open` 注册（FaroPDF 菜单 / Edit 菜单 / 文件菜单任一合适位置），对齐 macOS 用户习惯。
-  3. 确认 `toolsMenuOpen` 触发按钮现状，决定是修复可见性还是直接废弃该二级菜单路径。
-- **验收**：工具栏可见齿轮入口 + 原生菜单项两条路径都能打开 SettingsPanel；设置浮层正确渲染且可关闭。
-- **状态**：[待修复]。根因 PLAUSIBLE，launcher 触发按钮可见性需实机确认。
+  - 设置唯一 UI 入口埋在工具栏二级「工具启动器」下拉：`Toolbar.tsx:281` `<button className="tool-launcher-menu__settings">`，`onClick={onOpenSettings}` → `openUtilityPanel("settings")`（`:198`）。该 launcher 由 `toolsMenuOpen` 控制，触发按钮可见性**存疑**（可能折叠/条件错误，用户打不开二级菜单）。
+  - **原生菜单栏未注册 `settings-open`**：`lib.rs` grep 仅 `:984` `view-settings`，无 `settings-open`。
+  - 命令定义本身对：`commands.ts:781-788` `settings-open` 有 `targetUtilityPanel:"settings"`；`SettingsPanel`（`AppShell.tsx:1497`）`open={utilityPanel==="settings"}`。即只要把 utilityPanel 切到 "settings" 就能打开——纯粹缺显式入口。
+  - 验证状态：根因 PLAUSIBLE，launcher 触发按钮可见性需实机确认。
+- **输入依赖**：`Toolbar.tsx`（工具栏布局）；`lib.rs`（原生菜单注册）；既有 `settings-open` 命令 + `SettingsPanel`。
+- **范围**：
+  - in scope：工具栏加常驻 Settings 齿轮入口（直接 `openUtilityPanel("settings")`）；原生菜单补 `settings-open` 注册；确认/修复 launcher 触发按钮可见性。
+  - out of scope：SettingsPanel 内容改造；设置项新增。
+- **推进步骤**：
+  1. **实机确认**：`npm run tauri dev` / build，看工具栏能否看到「工具启动器」下拉触发器，确认用户为何找不到。
+  2. 工具栏右侧（collaboration / right 段）加常驻 Settings 齿轮按钮，直接打开设置，不再藏二级菜单。
+  3. `lib.rs` 原生菜单（FaroPDF 菜单 / 文件菜单）补 `settings-open` 注册 + event handler match arm。
+  4. 决定 launcher 路径去留（修复可见性 or 废弃二级菜单）。
+- **验收标准（behavior-complete）**：
+  - [ ] 工具栏可见齿轮入口 + 原生菜单项两条路径都能打开 SettingsPanel。
+  - [ ] 设置浮层正确渲染、可关闭、可切 section。
+  - [ ] `npm run typecheck` + `cargo check` 过。
+- **证据载体**：工具栏齿轮 + 原生菜单打开设置的截图。
+- **验证命令**：`npm run typecheck`；`cd src-tauri && cargo check`；`npm run tauri build` 实机。
+- **worktree**：与 ISS-QA-01 共享 `lib.rs`、与 ISS-QA-04 共享 `Toolbar.tsx` / `AppShell.tsx`，顺序推进。
 
 ---
 
