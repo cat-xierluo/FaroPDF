@@ -99,8 +99,11 @@ function matchSigToPlatform(filename) {
 }
 
 function buildAssetUrl(repo, tag, assetName) {
-  const tagNoV = tag.replace(/^v/, "");
-  return `${repo.replace(/\/+$/, "")}/releases/download/${tagNoV}/${assetName}`;
+  // URL 用完整 tag（带 v 前缀，如 v0.2.0）：GitHub Releases 的 download
+  // 路径要求真实存在的 git tag。之前这里用 tagNoV（去 v）会让 URL 变成
+  // releases/download/0.2.0/...，tag 0.2.0 不存在 → updater 客户端 404。
+  // 对齐 Folia 同名脚本的 createManifest（用 tag 不去 v）。
+  return `${repo.replace(/\/+$/, "")}/releases/download/${tag}/${assetName}`;
 }
 
 function buildManifest({ version, pubDate, platforms }) {
