@@ -1,4 +1,5 @@
 import { useRef, type ChangeEvent, type CSSProperties, type DragEvent } from "react";
+import { FileText, Image } from "lucide-react";
 import type { RecentPdfFile } from "../../shared/settings/types";
 import { useI18n } from "../../shared/i18n/useI18n";
 import "./WelcomeScreen.css";
@@ -82,7 +83,9 @@ export function WelcomeScreen({
             title="图片转 PDF 引擎尚未接入"
             type="button"
           >
-            <span className="welcome-convert-card__icon" aria-hidden="true">🖼️</span>
+            <span className="welcome-convert-card__icon" aria-hidden="true">
+              <Image size={22} strokeWidth={1.6} />
+            </span>
             <span className="welcome-convert-card__title">{dict.welcome.convertImagesTitle}</span>
             <span className="welcome-convert-card__subtitle">待接入 · {dict.welcome.convertImagesSubtitle}</span>
           </button>
@@ -93,7 +96,9 @@ export function WelcomeScreen({
             title="Word 转 PDF 引擎尚未接入"
             type="button"
           >
-            <span className="welcome-convert-card__icon" aria-hidden="true">📄</span>
+            <span className="welcome-convert-card__icon" aria-hidden="true">
+              <FileText size={22} strokeWidth={1.6} />
+            </span>
             <span className="welcome-convert-card__title">{dict.welcome.convertWordTitle}</span>
             <span className="welcome-convert-card__subtitle">待接入 · {dict.welcome.convertWordSubtitle}</span>
           </button>

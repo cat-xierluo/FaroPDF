@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+import { StickyNote } from "lucide-react";
 import type { PdfAnnotation, PdfAnnotationType } from "../../shared/pdf/annotation";
 import {
   ANNOTATION_SIDEBAR_COLOR_CHOICES,
@@ -13,14 +14,15 @@ import {
 } from "../../modules/annotation/sidebarGroups";
 import { AnnotationSummaryPanel } from "../../modules/annotation-summary";
 
-const ANNOTATION_TYPE_ICONS: Record<PdfAnnotationType, string> = {
+/** 批注类型图标：排版符号保留字符，语义化图标用 lucide（ISS-QA-03 去 emoji）。 */
+const ANNOTATION_TYPE_ICONS: Record<PdfAnnotationType, ReactNode> = {
   highlight: "▮",
   ellipse: "○",
   "double-arrow": "↔",
   line: "／",
   underline: "＿",
   strikeout: "̶",
-  note: "💬",
+  note: <StickyNote size={14} strokeWidth={1.8} />,
   textbox: "T",
   rectangle: "▭",
   arrow: "→",

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
-import { Bookmark, Files, ListTree, MessageSquareText, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { Bookmark, Files, ListTree, MessageSquareText, Plus, StickyNote, Trash2 } from "lucide-react";
 import type { PdfAnnotation, PdfAnnotationType } from "../../shared/pdf/annotation";
 import type { PdfPageBookmark } from "../../shared/pdf/bookmark";
 import type { OutlineNode } from "../../shared/pdf/reader";
@@ -47,15 +47,15 @@ const ANNOTATION_TYPE_LABELS: Record<PdfAnnotationType, string> = {
   stamp: "图章",
 };
 
-/** 批注类型对应的图标符号 */
-const ANNOTATION_TYPE_ICONS: Record<PdfAnnotationType, string> = {
+/** 批注类型对应的图标：排版符号保留字符，语义化图标用 lucide（ISS-QA-03 去 emoji） */
+const ANNOTATION_TYPE_ICONS: Record<PdfAnnotationType, ReactNode> = {
   highlight: "▮",
   ellipse: "○",
   "double-arrow": "↔",
   line: "／",
   underline: "＿",
   strikeout: "̶",
-  note: "💬",
+  note: <StickyNote size={14} strokeWidth={1.8} />,
   textbox: "T",
   rectangle: "▭",
   arrow: "→",

@@ -1,4 +1,5 @@
 import { useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent, type FormEvent } from "react";
+import { AlertTriangle, Lock } from "lucide-react";
 import { useI18n } from "../../shared/i18n/useI18n";
 import "./ReaderErrorScreen.css";
 
@@ -83,7 +84,7 @@ export function ReaderErrorScreen({
           role="alert"
         >
           <span className="reader-error__icon" aria-hidden="true">
-            🔒
+            <Lock size={40} strokeWidth={1.5} />
           </span>
           <h2 className="reader-error__title">{dict.readerError.passwordTitle}</h2>
           <p className="reader-error__message" data-testid="reader-error-message">
@@ -139,7 +140,7 @@ export function ReaderErrorScreen({
         role="alert"
       >
         <span className="reader-error__icon" aria-hidden="true">
-          ⚠️
+          <AlertTriangle size={40} strokeWidth={1.5} />
         </span>
         <h2 className="reader-error__title">{dict.readerError.title}</h2>
         <p className="reader-error__message" data-testid="reader-error-message">

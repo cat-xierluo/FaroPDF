@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { StickyNote } from "lucide-react";
 
 /**
  * 浮动文本工具条（ISS-061 起点）。
@@ -40,7 +41,8 @@ export type CopyAction = "copy";
 interface ActionDescriptor {
   id: AnnotationAction | CopyAction | string;
   label: string;
-  glyph: string;
+  /** 图标内容：排版符号（▮ ＿ 等）保留字符，语义化图标改用 lucide 组件（ISS-QA-03 去 emoji）。 */
+  glyph: ReactNode;
   enabled: boolean;
   hint: string;
 }
@@ -49,7 +51,13 @@ const ACTIONS: ActionDescriptor[] = [
   { id: "annotate-highlight", label: "高亮", glyph: "▮", enabled: true, hint: "对选中文本应用高亮批注" },
   { id: "annotate-underline", label: "下划线", glyph: "＿", enabled: true, hint: "对选中文本应用下划线批注" },
   { id: "annotate-strikeout", label: "删除线", glyph: "̶", enabled: true, hint: "对选中文本应用删除线批注" },
-  { id: "annotate-note", label: "便签", glyph: "💬", enabled: true, hint: "在选中文本旁添加便签" },
+  {
+    id: "annotate-note",
+    label: "便签",
+    glyph: <StickyNote size={14} strokeWidth={1.8} />,
+    enabled: true,
+    hint: "在选中文本旁添加便签",
+  },
   { id: "copy", label: "复制", glyph: "⧉", enabled: true, hint: "复制选中文本到剪贴板" },
   { id: "annotate-translate", label: "翻译", glyph: "A", enabled: false, hint: "翻译服务尚未接入" },
   { id: "annotate-read-aloud", label: "朗读", glyph: "♪", enabled: true, hint: "朗读选中文本" },

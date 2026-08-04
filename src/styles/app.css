@@ -17,6 +17,21 @@
   --warning-border: #efd796;
   --warning-fg: #5f4b00;
   --page-chrome: #f6f7f8;
+
+  /* ISS-QA-05：侧栏 utility panel 统一 token（背景 / 内边距 / 标题 / 分隔线）。
+     各 panel（书签 / 大纲 / 批注列表 / 缩略图 / 视图设置）复用同一组值，
+     不再各自硬编码 hex，保证跨 panel 一致且随主题切换。 */
+  --panel-bg: var(--surface);
+  --panel-bg-soft: var(--surface-soft);
+  --panel-bg-raised: var(--surface-strong);
+  --panel-border: var(--border);
+  --panel-fg: var(--fg);
+  --panel-fg-muted: var(--muted);
+  --panel-padding: 10px 8px;
+  --panel-header-height: 35px;
+  --panel-title-size: 14px;
+  --panel-title-weight: 600;
+
   color-scheme: light;
   font-family: system-ui, "PingFang SC", "Microsoft YaHei UI", sans-serif;
   color: var(--fg);
@@ -709,9 +724,10 @@ select.zoom-control {
 
 .utility-panel {
   min-height: 0;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
-  padding: 10px;
+  border-right: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  color: var(--panel-fg);
+  padding: var(--panel-padding);
   overflow: auto;
 }
 
@@ -724,27 +740,30 @@ select.zoom-control {
   flex-direction: column;
   min-height: 0;
   height: 100%;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
+  border-right: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  color: var(--panel-fg);
 }
 
 .annotation-sidebar__header {
   display: grid;
   gap: 8px;
   padding: 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--panel-border);
 }
 
 .annotation-sidebar__header h2 {
   margin: 0;
-  font-size: 16px;
+  color: var(--panel-fg);
+  font-size: var(--panel-title-size);
+  font-weight: var(--panel-title-weight);
   line-height: 20px;
 }
 
 .annotation-sidebar__hint,
 .annotation-sidebar__status {
   margin: 0;
-  color: var(--muted);
+  color: var(--panel-fg-muted);
   font-size: 12px;
   line-height: 18px;
 }
@@ -955,7 +974,7 @@ select.zoom-control {
   padding: 0;
   border: 0;
   border-radius: 3px;
-  background: #353535;
+  background: var(--panel-bg-soft);
   overflow: hidden;
 }
 
@@ -966,16 +985,16 @@ select.zoom-control {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #b8b8b8;
+  color: var(--panel-fg-muted);
 }
 
 .summary-tabs button[aria-selected="true"] {
-  background: #414141;
-  color: #f1f1f1;
+  background: var(--panel-bg-raised);
+  color: var(--panel-fg);
 }
 
 .utility-panel.document-summary {
-  padding: 10px 8px;
+  padding: var(--panel-padding);
 }
 
 .summary-outline {
@@ -986,16 +1005,16 @@ select.zoom-control {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 35px;
+  min-height: var(--panel-header-height);
   padding: 0 9px 0 13px;
-  border-bottom: 1px solid #414141;
+  border-bottom: 1px solid var(--panel-border);
 }
 
 .summary-outline__header h2 {
   margin: 0;
-  color: #f0f0f0;
-  font-size: 14px;
-  font-weight: 600;
+  color: var(--panel-fg);
+  font-size: var(--panel-title-size);
+  font-weight: var(--panel-title-weight);
 }
 
 .summary-outline__header button {
@@ -1006,8 +1025,8 @@ select.zoom-control {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: #3d3d3d;
-  color: #d2d2d2;
+  background: var(--panel-bg-raised);
+  color: var(--panel-fg-muted);
 }
 
 .summary-outline__empty {
@@ -1015,7 +1034,7 @@ select.zoom-control {
   flex-direction: column;
   align-items: center;
   padding: 154px 20px 0;
-  color: #a6a6a6;
+  color: var(--panel-fg-muted);
   text-align: center;
 }
 
@@ -1030,15 +1049,15 @@ select.zoom-control {
   display: block;
   width: 74px;
   height: 101px;
-  border: 1px solid #5d5d5d;
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
-  background: #454545;
+  background: var(--panel-bg-raised);
 }
 
 .summary-outline__sheet--back {
   left: 8px;
   top: 0;
-  box-shadow: inset 0 0 0 1px #404040;
+  box-shadow: inset 0 0 0 1px var(--panel-border);
 }
 
 .summary-outline__sheet--front {
@@ -1051,7 +1070,7 @@ select.zoom-control {
   height: 61px;
   padding: 12px 10px;
   border-radius: 3px;
-  background: #3a3a3a;
+  background: var(--panel-bg-soft);
 }
 
 .summary-outline__sheet--front::before,
@@ -1059,18 +1078,18 @@ select.zoom-control {
   display: block;
   height: 3px;
   border-radius: 2px;
-  background: #747474;
+  background: var(--border-strong);
   content: "";
 }
 
 .summary-outline__sheet--front i:nth-child(3) {
   width: 70%;
-  background: #ef4e91;
+  background: var(--accent);
 }
 
 .summary-outline__empty p {
   margin: 14px 0 0;
-  color: #a7a7a7;
+  color: var(--panel-fg-muted);
   font-size: 13px;
   font-weight: 600;
   line-height: 20px;
@@ -1100,19 +1119,19 @@ select.zoom-control {
   padding: 5px 10px;
   border: 0;
   background: transparent;
-  color: #d2d2d2;
+  color: var(--panel-fg);
   font-size: 13px;
   text-align: left;
   cursor: pointer;
 }
 
 .summary-outline__entry:hover {
-  background: #2d2d2d;
+  background: var(--panel-bg-soft);
 }
 
 .summary-outline__entry--disabled {
   cursor: default;
-  color: #8a8a8a;
+  color: var(--panel-fg-muted);
 }
 
 .summary-outline__entry--disabled:hover {
@@ -1127,30 +1146,20 @@ select.zoom-control {
 
 .summary-outline__page {
   flex-shrink: 0;
-  color: #8a8a8a;
+  color: var(--panel-fg-muted);
   font-size: 12px;
 }
 
 .bookmark-panel:not(.summary-outline) {
-  padding: 10px 8px;
+  padding: var(--panel-padding);
 }
 
 .bookmark-panel:not(.summary-outline) .bookmark-panel__header {
   margin: -4px -8px 0;
 }
 
-.bookmark-panel .bookmark-panel__header {
-  border-color: var(--border);
-}
-
-.bookmark-panel .bookmark-panel__header h2 {
-  color: var(--fg);
-}
-
-.bookmark-panel .bookmark-panel__header button {
-  background: var(--surface-strong);
-  color: var(--fg);
-}
+/* ISS-QA-05：书签面板此前需要覆盖 .summary-outline__header 的硬编码深色值才能对齐
+   其他 panel；基础规则改用 --panel-* token 后覆盖已冗余，删除以保持单一来源。 */
 
 .bookmark-panel__header button:disabled {
   cursor: not-allowed;
@@ -1262,12 +1271,12 @@ select.zoom-control {
   grid-template-columns: 74px 1fr;
   align-items: center;
   gap: 10px;
-  color: var(--muted);
+  color: var(--panel-fg-muted);
   font-size: 12px;
 }
 
 .thumbnail-item span {
-  color: var(--fg);
+  color: var(--panel-fg);
   font-weight: 560;
 }
 
@@ -1320,7 +1329,7 @@ select.zoom-control {
 .thumbnail-page {
   width: 66px;
   height: 92px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--panel-border);
   border-radius: 4px;
   background: linear-gradient(var(--paper), var(--page-chrome));
 }
@@ -1333,13 +1342,15 @@ select.zoom-control {
 .summary-empty p,
 .utility-label {
   margin: 0 0 8px;
-  color: var(--muted);
+  color: var(--panel-fg-muted);
   font-size: 12px;
 }
 
 .view-settings h2 {
   margin: 4px 0 16px;
-  font-size: 15px;
+  color: var(--panel-fg);
+  font-size: var(--panel-title-size);
+  font-weight: var(--panel-title-weight);
   line-height: 20px;
 }
 
