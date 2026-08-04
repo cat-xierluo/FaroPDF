@@ -1133,9 +1133,21 @@ export function AppShell({
 
     if (command.targetUtilityPanel) {
       onUtilityPanelChange(command.targetUtilityPanel as UtilityPanelId);
-    } else if (command.group === "export" || command.group === "forms" || (command.group === "mode" && command.targetMode !== "annotate")) {
-      onUtilityPanelChange("none");
+    } else if (command.targetMode === "forms" || command.group === "forms") {
+      // ISS-QA-04：进 forms 模式的命令（group="mode" targetMode="forms"，无 targetUtilityPanel）
+      // 默认展开左侧 FormsPanel——forms 无右栏（defaultRightPanel 对 forms 派生 "none"），左栏
+      // FormsPanel 是其唯一功能展开面。之前 else-if 把 mode-非 annotate 一律强关到 "none"，
+      // forms 进入后视觉上「什么都没展开」。
+      onUtilityPanelChange("forms");
     }
+    // ISS-QA-04：移除原来 export / forms / mode-非 annotate → onUtilityPanelChange("none") 的强关：
+    // - group="export"（水印 / Bates / 压缩 / 页眉页脚 / 页码，无 targetUtilityPanel）：主区
+    //   ExportDeliveryPanel + 右栏 export-preview（defaultRightPanel 按 activeMode 派生）已是功能
+    //   展开面，左栏 utility panel 保留原值即可，无需强关；
+    // - group="mode" 进 export / ocr / pages：ocr / pages 左栏由 showUtilityPanel（activeMode!=="ocr"
+    //   && !=="pages"）自然隐藏，export 见上；
+    // - group="mode" 进 edit：左栏大纲 summary 有意保留（pdf-edit-* 走 availability="planned" 早返回）；
+    // - group="mode" 进 read：阅读态本应见 summary，不再被强关。
 
     if (command.feedback) {
       setCommandFeedback(command.feedback);
