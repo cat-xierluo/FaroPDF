@@ -45,6 +45,13 @@ struct NativeMenuCommandPayload<'a> {
     id: &'a str,
 }
 
+/// ISS-QA-01：系统 Finder 拖入 PDF 时，Rust 监听 `WindowEvent::DragDrop` 过滤首个 `.pdf`
+/// 后 emit 到前端的 payload。前端 `App.tsx` 顶层 `listen("faropdf://file-drop")` 消费。
+#[derive(Clone, Serialize)]
+struct FileDropPayload {
+    path: String,
+}
+
 #[derive(Debug, Serialize)]
 struct NativePdfFileResponse {
     bytes: Vec<u8>,
@@ -1141,6 +1148,33 @@ pub fn run() {
             });
 
             Ok(())
+        })
+        // ISS-QA-01：系统 Finder 拖入 PDF 打开。
+        // Tauri v2 webview 中系统文件拖拽不进入 HTML5 `dataTransfer.files`，必须由 Rust 监听
+        // `WindowEvent::DragDrop`，过滤首个 `.pdf` 后 emit `faropdf://file-drop`（payload { path }）
+        // 给前端。前端 `App.tsx` 顶层 listen 后走「路径 → read_pdf_file_from_path → openNativeFile」。
+        // 仅处理 `Drop`；`Enter`/`Over`/`Leave` 忽略。emit_to 限定到接收拖拽的窗口（多窗口不串扰）。
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::DragDrop(drag_event) = event {
+                if let tauri::DragDropEvent::Drop { paths, .. } = drag_event {
+                    let pdf_path = paths.iter().find(|p| {
+                        p.extension()
+                            .and_then(|ext| ext.to_str())
+                            .map(|ext| ext.eq_ignore_ascii_case("pdf"))
+                            .unwrap_or(false)
+                    });
+                    if let Some(path) = pdf_path {
+                        let payload = FileDropPayload {
+                            path: path.to_string_lossy().to_string(),
+                        };
+                        let _ = window.emit_to(
+                            tauri::EventTarget::labeled(window.label().to_string()),
+                            "faropdf://file-drop",
+                            payload,
+                        );
+                    }
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             read_app_settings,

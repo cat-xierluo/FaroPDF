@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { AppShell } from "./components/layout/AppShell";
 import type { AnnotationDraftSubmission, AppModeId, UtilityPanelId } from "./components/layout/types";
 import {
@@ -293,6 +294,43 @@ function App() {
 
       commandNonceRef.current += 1;
       setCommandSignal({ id, nonce: commandNonceRef.current });
+    }).then((nextUnlisten) => {
+      if (disposed) {
+        nextUnlisten();
+      } else {
+        unlisten = nextUnlisten;
+      }
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
+  // ISS-QA-01：系统 Finder 拖入 PDF 打开。
+  // Tauri v2 webview 中系统文件拖拽不进入 HTML5 `dataTransfer.files`，故由 Rust 监听
+  // `WindowEvent::DragDrop`（过滤首个 `.pdf`）emit `faropdf://file-drop`（payload { path }）。
+  // 这里顶层 listen，取 path → readPdfFileFromPath（路径→bytes）→ reader.openNativeFile。
+  // tab 注册由 AppShell 监听 reader.state.document 的 effect 自动处理，无需此处 openTab。
+  // HTML5 onDrop（ReaderCanvas/WelcomeScreen/ReaderErrorScreen）保留作 web 降级，不动。
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    void listen<{ path: string }>("faropdf://file-drop", (event) => {
+      const path = event.payload?.path;
+      if (!path) {
+        return;
+      }
+      void readPdfFileFromPath(path)
+        .then((file) => {
+          void readerRef.current.openNativeFile(file);
+        })
+        .catch((error: unknown) => {
+          // 与 native-menu file-open 同：读文件失败（权限不足/不存在/损坏）走归一化中文错误态。
+          readerRef.current.reportOpenError(friendlyMessageForCode(normalizeError(error)));
+        });
     }).then((nextUnlisten) => {
       if (disposed) {
         nextUnlisten();
