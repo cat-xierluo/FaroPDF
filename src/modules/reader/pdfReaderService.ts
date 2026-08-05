@@ -57,7 +57,7 @@ interface PdfJsLoadingTaskLike {
 }
 
 export interface PdfJsReaderAdapter {
-  configureWorker: () => string | Promise<string>;
+  configureWorker: () => void | Promise<void>;
   getDocument: (params: PdfDocumentInit) => PdfJsLoadingTaskLike | Promise<PdfJsLoadingTaskLike>;
 }
 

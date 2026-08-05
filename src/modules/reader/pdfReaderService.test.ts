@@ -34,7 +34,6 @@ function createAdapter() {
   const adapter: PdfJsReaderAdapter = {
     configureWorker: vi.fn(() => {
       calls.push("worker");
-      return "/assets/pdf.worker.mjs";
     }),
     getDocument: vi.fn((params) => {
       calls.push("getDocument");
@@ -196,7 +195,7 @@ describe("pdfReaderService", () => {
       getPage: vi.fn(async () => page),
     };
     const adapter: PdfJsReaderAdapter = {
-      configureWorker: vi.fn(() => "/assets/pdf.worker.mjs"),
+      configureWorker: vi.fn(async () => undefined),
       getDocument: vi.fn(() => ({ promise: Promise.resolve(document), destroy: vi.fn(async () => undefined) })),
     };
     const loaded = await loadPdfFromBytes({ data: new Uint8Array([1, 2, 3]), fileName: "abort.pdf" }, adapter);
