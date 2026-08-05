@@ -1,6 +1,8 @@
 ## 未发版
 
 ### Fixed
+- **扫描与文本识别配置页结构理顺（ISS-QA-11）**：OCR 模式配置页此前结构混乱——任务列表在主区域（`OcrJobList`「OCR 任务」）与右栏（`OcrQueuePanelView`「任务列表（N）」）**重复两份**且互相竞争；「状态」碎片化在工具条状态行、任务区 hint、右栏 dot 三处，没有独立分区；参数区（`OcrWorkspaceHeader`）用 h3 独立盒样式，与任务/报告区 h2 视觉语言不一致。本轮**只理顺结构，不重写引擎**：① 主区域 `OcrWorkspace` 新增独立**状态区** `OcrStatusStrip`（全宽 strip，整体状态 pill + 当前任务摘要 + 进度条 + 任务计数 + 错误），把散落的状态收口成「任务列表 + 参数 + 状态」三块清晰分区；② 参数区头部统一到共享 `.ocr-workspace__section-header` + h2「任务参数」，三区视觉一致；③ 右栏 `OcrQueuePanelView` 去重——标题「任务列表（N）」→「队列速览（N）」+ 提示「完整任务与质量报告见主区域」，明确它是速览伴侣而非权威列表，并补齐此前完全缺失的 `.ocr-queue*` 样式。`npm run typecheck` 通过；GUI 实机视觉确认留用户。
+
 - **界面 emoji 清理（ISS-QA-03）**：阅读区错误卡片（密码锁 / 警告）、Welcome 转换卡片（图片 / 文档）、选区浮动工具条便签、批注侧栏与文档摘要面板的批注类型标记共 7 处彩色 emoji 全部替换为 lucide 单色描边图标（`Lock` / `AlertTriangle` / `Image` / `FileText` / `StickyNote`），与工具栏既有图标语言一致，符合律师专业工具定位。图标沿用原有 `aria-hidden` 语义，不改动可访问性标签。
 - **左侧栏面板配色归一（ISS-QA-05）**：书签、大纲、批注列表、缩略图、视图设置各面板此前分别硬编码深色 hex（`#353535` / `#414141` / `#3d3d3d` / `#a6a6a6` 等），面板间背景、边框和标题色不统一，且在浅色主题下失效。现统一到 `--panel-*` token（背景 / 内边距 / 标题字号色 / 分隔线），各面板复用同一组值；书签面板为对齐其他面板而加的覆盖规则随之删除。侧栏配色现随明暗主题正确切换。
 - **设置入口恢复（ISS-QA-06）**：设置此前唯一 UI 入口埋在工具栏「工具启动器」二级下拉里（点 `+` → 再点「设置」），且原生菜单栏未注册 `settings-open`，用户在界面上找不到「设置」，OCR 后端 / 语言 / 偏好全部不可达。现工具栏协作段补**常驻** Settings 齿轮按钮，`onClick` 直接 `openUtilityPanel("settings")`，不再藏二级菜单；设置是应用级偏好（无文档也要可达），故该齿轮不 `disabled`。同时 `lib.rs` 原生「文件」菜单补 `settings-open`（「设置…」）菜单项 + menu event handler match arm，emit 后经前端 `nativeMenuBridge`（已接 `command.id === "settings-open"`，`targetUtilityPanel:"settings"`）打开 SettingsPanel。两条路径（工具栏齿轮 / 原生菜单）都能打开设置面板。原有工具启动器内的设置二级入口保留为冗余路径，未删除。

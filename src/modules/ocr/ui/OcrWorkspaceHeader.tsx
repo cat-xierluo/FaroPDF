@@ -42,7 +42,10 @@ export function OcrWorkspaceHeader({
 
   return (
     <section className="ocr-workspace__parameters" aria-label="OCR 任务参数">
-      <h3 className="ocr-workspace__parameters-title">任务参数</h3>
+      <header className="ocr-workspace__section-header">
+        <h2>任务参数</h2>
+        <p className="ocr-workspace__hint">启动 OCR 前确认后端、页码范围、输出策略与质量检查</p>
+      </header>
       <dl className="ocr-workspace__parameters-list">
         <div className="ocr-workspace__parameters-row">
           <dt>文档</dt>

@@ -5,9 +5,10 @@ import { formatOcrStatusLabel } from "../../../shared/ocr/jobQueue";
 /**
  * ISS-NEW-C 阶段 2 后续（2026-06-22 收口）：右栏「OCR 队列」面板。
  *
- * 范围：OCR 模式激活时显示任务列表（status dot + job name + status label + cancel 按钮）。
- * 不重复 OcrWorkspace 主区域的任务列表（OcrWorkspace 是 full-page 视图，本 panel
- * 是 right-pane 简化版，让用户在不离开 OCR 工具条上下文时也能看到任务进度）。
+ * 范围：OCR 模式右栏「队列速览」——status dot + job name + status label + cancel 按钮。
+ * ISS-QA-11：主区域 OcrWorkspace 已是权威任务列表（带质量报告），本 panel 是
+ * right-pane 速览版，标题刻意叫「队列速览」并提示「完整任务与质量报告见主区域」，
+ * 避免与主区域任务列表形成两个互相竞争的「任务列表」。
  *
  * 设计要点：
  *   1. 接收 jobs（OcrWorkspaceController.jobs）+ onCancelJob 可选回调
@@ -40,7 +41,10 @@ export function OcrQueuePanelView({ jobs, onCancelJob }: OcrQueuePanelViewProps)
 
   return (
     <section className="ocr-queue" aria-label="OCR 任务队列" data-testid="ocr-queue">
-      <h3 className="ocr-queue__title">任务列表（{jobs.length}）</h3>
+      <div className="ocr-queue__head">
+        <h3 className="ocr-queue__title">队列速览（{jobs.length}）</h3>
+        <p className="ocr-queue__hint">完整任务与质量报告见主区域</p>
+      </div>
       <ul className="ocr-queue__list" data-testid="ocr-queue-list">
         {jobs.map((job) => {
           const active = isActiveOcrStatus(job.status);

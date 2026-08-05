@@ -64,13 +64,6 @@
   gap: 8px;
 }
 
-.ocr-workspace__parameters-title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--fg);
-}
-
 .ocr-workspace__parameters-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -159,4 +152,77 @@
   border-left: 3px solid var(--danger);
   border-radius: 3px;
   padding: 4px 8px;
+}
+
+/* 状态区（ISS-QA-11）：全宽 strip，与参数区一致的盒样式，让「状态」成为独立分区。 */
+.ocr-workspace__status {
+  grid-column: 1 / -1;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-strong);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ocr-workspace__status-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.ocr-workspace__status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ocr-workspace__status-pill--running,
+.ocr-workspace__status-pill--completed {
+  color: #1f5a5f;
+  background: var(--accent-soft);
+  border-color: #b8d8db;
+}
+
+.ocr-workspace__status-pill--failed {
+  color: var(--danger);
+  background: rgba(168, 63, 63, 0.08);
+  border-color: var(--danger);
+}
+
+.ocr-workspace__status-pill--idle {
+  color: var(--muted);
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.ocr-workspace__status-text {
+  font-size: 13px;
+  color: var(--fg);
+}
+
+.ocr-workspace__status-progress {
+  flex: 1 1 160px;
+  min-width: 120px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.ocr-workspace__status-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 200ms ease;
 }
