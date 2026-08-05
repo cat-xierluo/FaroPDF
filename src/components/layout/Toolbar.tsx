@@ -257,38 +257,53 @@ function ToolLauncherMenu({
   onCommand: (commandId: AppCommandId) => void;
   onOpenSettings: () => void;
 }) {
+  // ISS-QA-12 / QA-09：「+」二级菜单不应重复 L3 工作流段的 mode 切换按钮
+  // （批注/导出/填写签名/扫描）和导航段的「页面管理」——它们已是工具条一级入口，
+  // 重复出现会让 launcher「功能多/与其他页重复」。mode-export 被去掉后，
+  // deliver 段也回归纯导出工具，结构不再混杂（QA-09）。
+  // 注：commands.ts 的 APP_TOOL_LAUNCHER_SECTIONS 数据保持不变（被 commands.test.ts 锁定），
+  // 仅在渲染层去重。
+  const isDuplicateL3Entry = (id: AppCommandId) =>
+    id === "view-pages" || id.startsWith("mode-");
+
   return (
     <div className="tool-launcher-menu" role="menu" aria-label="PDF 工具菜单">
       <div className="tool-launcher-menu__header">
         <strong>PDF 工具</strong>
       </div>
       <div className="tool-launcher-menu__grid">
-        {getToolLauncherSections().map((section) => (
-          <section className="tool-launcher-section" role="group" aria-label={section.label} key={section.id}>
-            <header title={section.summary}>
-              <strong>{section.label}</strong>
-            </header>
-            <div className="tool-launcher-section__commands">
-              {section.commands.map((command) => {
-                const planned = command.availability === "planned";
-                const disabled = planned || (command.requiresDocument && !hasDocument);
-                return (
-                  <button
-                    className="tool-launcher-command"
-                    disabled={disabled}
-                    key={command.id}
-                    onClick={() => onCommand(command.id)}
-                    role="menuitem"
-                    title={planned ? `${command.label}尚未接入真实功能` : command.description}
-                    type="button"
-                  >
-                    <span>{command.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+        {getToolLauncherSections().map((section) => {
+          const commands = section.commands.filter(
+            (command) => !isDuplicateL3Entry(command.id),
+          );
+          if (commands.length === 0) return null;
+          return (
+            <section className="tool-launcher-section" role="group" aria-label={section.label} key={section.id}>
+              <header title={section.summary}>
+                <strong>{section.label}</strong>
+              </header>
+              <div className="tool-launcher-section__commands">
+                {commands.map((command) => {
+                  const planned = command.availability === "planned";
+                  const disabled = planned || (command.requiresDocument && !hasDocument);
+                  return (
+                    <button
+                      className="tool-launcher-command"
+                      disabled={disabled}
+                      key={command.id}
+                      onClick={() => onCommand(command.id)}
+                      role="menuitem"
+                      title={planned ? `${command.label}尚未接入真实功能` : command.description}
+                      type="button"
+                    >
+                      <span>{command.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
       </div>
       <button className="tool-launcher-menu__settings" onClick={onOpenSettings} role="menuitem" type="button">
         <Settings size={15} />

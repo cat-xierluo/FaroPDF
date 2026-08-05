@@ -9,6 +9,9 @@
   height: 42px;
   gap: 0;
   padding: 0;
+  /* ISS-QA-07：作为 .annotation-toolbar-stamp（position:absolute）的 positioned 祖先，
+     让印章浮层锚定到工具条正下方居中，而不是脱离到视口顶部居中。 */
+  position: relative;
 }
 
 .annotation-toolbar-tools {
