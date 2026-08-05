@@ -62,7 +62,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | id | 现象 | 严重级 | 根因摘要（证据） | 主改动文件 | 完成线 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
 | ISS-QA-01 | 拖入 PDF 不打开 | [P0] | HTML5 onDrop 收不到系统文件；lib.rs 无 DragDrop | `lib.rs` + `App.tsx` | behavior-complete | [已修复 2026-08-04] Rust DragDrop emit + 前端 listen 复用 readPdfFileFromPath，typecheck/cargo check 过，GUI 待验 |
-| ISS-QA-02 | 打开显示「未知」+ 慢 + 缩略图不可用 | [P0] | 实机「未知」= worker 失败（W2 §0.4 origin 隐患），非 InvalidPDF；workerSrc 字符串不稳 | `pdfjsWorker.ts` | behavior-complete | [workerPort 修复 2026-08-05] workerSrc→workerPort Worker 实例，待实机确认 |
+| ISS-QA-02 | 打开显示「未知」+ 慢 + 缩略图不可用 | [P0] | 实机「未知」= worker 失败（W2 §0.4 origin 隐患），非 InvalidPDF；workerSrc 字符串不稳 | `pdfjsWorker.ts` | 诊断中（待真机证据） | [2026-08-05] e2e reader-renders.test.ts 证 loadPdfFromBytes pdfjs 逻辑无 bug → 根因 = Tauri WKWebView `tauri://` worker 加载链路（纠正 W2 后「真因 readTextLayerStatus」误判）；补 3 层 console 诊断；真修复待真机 devtools console 红字 |
 | ISS-QA-03 | 界面 emoji | [P1] | 5 文件 6 处 emoji 字面量 | 5 个 tsx | grep 清零 + 视觉 | [已修复 main 8c5cc01 2026-08-04] 7 处→lucide，typecheck/lint 过，GUI 待验 |
 | ISS-QA-04 | 批注/编辑/导出/OCR 点击无展开 | [P0] | mode 切换强关 panel（路径B executeCommand 1134-1138）+ stub + width 待查 | `AppShell.tsx` | behavior-complete | [已修复 2026-08-04] Fix-1 mode-aware 不强关（forms→FormsPanel），typecheck 过；stub 完整 fail-closed 需改 Toolbar（后续 ISS）+ width(panelWidthStore)待 shared 核查；GUI 待验 |
 | ISS-QA-05 | 左侧边栏颜色不统一 | [P1] | Sidebar 多 panel token 未归一 | `Sidebar.tsx` + `app.css` | 符合 DESIGN.md | [已修复 main 8c5cc01 2026-08-04] 10 个 `--panel-*` token，typecheck/lint 过，GUI 待验 |
@@ -104,7 +104,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ### ISS-QA-02　打开 PDF 显示「损坏的文件」　[P0]
 
-- **状态**：[待开工]　**类型**：缺陷修复　**完成线**：behavior-complete
+- **状态**：[诊断中：根因锁定，待真机 console]　**类型**：缺陷修复　**完成线**：behavior-complete　**本轮（2026-08-05）**：e2e `reader-renders.test.ts`（真 pdfjs + fixture）在 jsdom PASS = `loadPdfFromBytes` pdfjs 逻辑无 bug，**纠正 W2 后「真因 readTextLayerStatus getTextContent」误判**（其 catch 吞错不影响 loadPdfFromBytes 抛出，UI 不显示 textLayerStatus）；真根因 = `loadingTask.promise` reject（fake worker failed，错误模式同 test http: scheme / 真机 tauri:// scheme）= Tauri WKWebView worker 加载环境问题。补 3 层 console 诊断；真修复待真机 devtools console 红字定位 worker 失败具体类。详见 DEC-196。
 - **现象（用户视角）**：用「打开」按钮选择正常 PDF（其它阅读器可正常打开），FaroPDF 内显示「损坏 / 无法打开」。
 - **根因（[原假设已被 W2 证伪 REFUTED 2026-08-04，下方原记录保留作历史；Wave 4 必须先读 `docs/QA-02-repro-report.md` 判 A/B 再改代码]）**：
   - worker 配置 `pdfjsWorker.ts:1`：`import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.mjs?url"`，`pdfjs-dist@6.0.227`。

@@ -7735,3 +7735,10 @@ M5 异常态最终状态：文件损坏 ✅、密码 PDF ✅、权限不足 ✅�
 验证：Playwright 实机往返（5 页→复制→粘贴→页卡 5→6，零 console error）；导出集成测试（getPageCount +1 + widths 证明副本页内容正确）；pageOrganizer 全模块 132 测试 passed；typecheck 通过；lint 干净；vite build 成功。
 
 设计边界：跨文档粘贴留后续（涉及文件拾取 + 字节缓存生命周期，且现有「插入 PDF」对话框已覆盖跨文档需求）。validate 放宽是核心风险点，已用 132 测试 + 导出往返 + 实机三层兜底，确认未破坏 rotate/delete/reorder 既有语义。M3 纵向闭环核心行为至此全部完成。
+
+## DEC-196 QA-02 诊断方向纠正（2026-08-05）
+
+- **决策**：QA-02「打开 PDF 显示损坏」不再盲改 worker 方案；改为 e2e 证伪 pdfjs 逻辑假设 + 补 console 诊断可观测性 + 拿真机证据再精确修。
+- **理由**：上轮 workerPort 改动基于 W2 已 REFUTED 的 worker 假设，实机仍崩，陷入盲改循环（verification-loop 教训 6：无真机证据不判）。本轮建 e2e reader-renders.test.ts（真 pdfjs legacy + 真 fixture），在 vitest/jsdom 下 PASS = loadPdfFromBytes pdfjs 调用逻辑无 bug。纠正 summary 中「真因是 readTextLayerStatus 的 getTextContent」误判——readTextLayerStatus 的 catch 吞错不影响 loadPdfFromBytes 抛出，且 UI 根本不显示 textLayerStatus（grep 零命中）。真根因 = loadPdfFromBytes 在 loadingTask.promise reject（pdfjs fake worker failed，错误模式与 test http: scheme / 真机 tauri:// scheme 一致）= Tauri WKWebView 环境特有 worker 加载问题。
+- **影响**：补 3 层 console 诊断（pdfjsWorker Worker error 监听 + loadPdfFromBytes catch + readTextLayerStatus warn），真机 devtools 可定位 worker 失败具体类；e2e reader-renders.test.ts 作 QA-02 回归门禁；真修复（worker 方案选型）推迟到真机 console 红字后按类选（构造失败 / 加载失败 / InvalidPDF），不再盲改。附带修 QA-16 defaults.test.ts 回归；登记 App.test.tsx 2 个 Wave 3 pre-existing 回归（menuitem 批注/导出 / reportOpenError）待修。
+- **重新评估条件**：真机 devtools console 显示 worker 失败具体 error name 后，按类选 worker 方案（file/blob URL / disableWorker / Tauri asset 协议 / 内联 worker）；若 console 显示非 worker 问题（真 InvalidPDF / data 编码），方向再纠正。

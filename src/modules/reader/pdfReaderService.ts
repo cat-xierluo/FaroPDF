@@ -51,7 +51,7 @@ export interface PdfRawTextContent {
   }>;
 }
 
-interface PdfJsLoadingTaskLike {
+export interface PdfJsLoadingTaskLike {
   promise: Promise<PdfJsDocumentLike>;
   destroy?: () => Promise<void>;
 }
@@ -106,7 +106,10 @@ async function readTextLayerStatus(page: PdfJsPageLike): Promise<TextLayerStatus
   try {
     const textContent = await page.getTextContent();
     return extractTextItems(textContent).length > 0 ? "available" : "missing";
-  } catch {
+  } catch (error) {
+    // ISS-QA-02 诊断：textLayer 探测失败的真因（如有）打到 console，
+    // 替代静默返回 unknown（导致 textLayerStatus 不可解释）。
+    console.warn("[FaroPDF] textLayer 状态读取失败，标记 unknown：", error);
     return "unknown";
   }
 }
@@ -404,7 +407,15 @@ export async function loadPdfFromBytes(
     data: input.data,
     ...(options?.password ? { password: options.password } : {}),
   });
-  const document = await loadingTask.promise;
+  let document: PdfJsDocumentLike;
+  try {
+    document = await loadingTask.promise;
+  } catch (error) {
+    // ISS-QA-02 诊断：pdfjs 加载失败（worker 死 / 损坏 / 加密）的真因打到 console。
+    // 否则 UI 只归一化成「损坏 / 未知」，真机 devtools 看不到根因，陷入盲改循环。
+    console.error("[FaroPDF] pdfjs 文档加载失败（loadingTask.promise reject）：", error);
+    throw error;
+  }
   const firstPage = await document.getPage(1);
   const firstViewport = firstPage.getViewport({ scale: 1 });
   const initialViewport: PdfPageViewport = {

@@ -34,7 +34,9 @@ describe("default app settings", () => {
     ).toBe(true);
     expect(paddleocr?.endpoint).toBe("");
     expect(paddleocr?.apiKeyRef).toBe("");
-    expect(mineru?.endpoint).toBe("");
+    // ISS-QA-16：MinerU 默认 endpoint 预填官方地址（enabled 仍 false，需用户显式启用 +
+    // 配 apiKey 才生效）；disabled 语义由上方 requiresNetworkConsent + enabled=false 守。
+    expect(mineru?.endpoint).toBe("https://mineru.net/api/v4");
     expect(mineru?.apiKeyRef).toBe("");
   });
 
