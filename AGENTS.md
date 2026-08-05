@@ -165,6 +165,50 @@ PM 自己也要遵守：本会话内新增文件 / 改 docs / 修 build 脚本�
 
 **参照**：全局 `~/.codex/AGENTS.md` §3.1 实操验证（GUI / Web / 桌面：启动入口 + 代表性交互 + DOM 断言 / 截图）；本节是 FaroPDF 项目级具体化。
 
+## 验证体系（CI / e2e / fixture / etv / 断言深度，参照 Folia 实践）
+
+> FaroPDF 是 Tauri 桌面应用，验证体系参照同栈的 **Folia 项目**（`/Users/maoking/Library/Application Support/maoscripts/folia`）——它有完整 e2e + CI playwright job + fixture 矩阵 + 真实桌面 etv + 深度断言，改功能 e2e 兜底，所以进展不费力。本节把 Folia 那套验证体系落成 FaroPDF 规范，堵「`typecheck` 过就说修完 → 实机崩」的坑（2026-08-05 QA-02 教训）。
+
+### 验证层（完成线 = e2e 过，不只 typecheck）
+
+| 层 | 命令 | 证明什么 | 完成线 |
+|---|---|---|---|
+| 编译 | `npm run typecheck` / `lint` / `build` / `cd src-tauri && cargo check` | 代码能编译 | 前置门禁，**不充分** |
+| 单元 | `npm test`（vitest） | 单元逻辑 | 前置门禁 |
+| **e2e（功能）** | `npm run test:e2e`（Playwright，**待建**） | **功能真能用**（打开 PDF 渲染 / 拖入 / 交互） | **核心完成线** |
+| 结构 e2e | `npm run verify:ui-layout`（已有） | DOM bbox 结构 / 几何 | UI 改动门禁 |
+
+### CI/CD（e2e 必须在 CI，不只本地）
+
+- `.github/workflows/ci.yml` 应跑 `typecheck + lint + test + build + cargo check` **+ Playwright e2e job**（参照 Folia `ci.yml` playwright job：Chromium + 跑 spec + failure 上传 test-results artifact 7 天）。
+- **当前 FaroPDF CI 只跑编译层**（typecheck/lint/test/build），**e2e 不在 CI**（待补 playwright job）——这是「实机才发现坏」的根因之一。补 CI e2e 后，PR 合并前 e2e 必须绿。
+
+### fixture 矩阵（e2e 用受控 fixture，复现一致）
+
+`tests/fixtures/` 已具备多场景 fixture，e2e 直接用：
+- `expert/reference.pdf`（5 页 A4，纯英文文字层）—— 正常渲染基准
+- `reader/encrypted.pdf`（qpdf 256-bit 加密，密码 test123）—— 密码 PDF
+- `reader/corrupt.pdf`（截断，触发 InvalidPDF）—— 损坏错误态
+- `forms/reference-form.pdf`（AcroForm 4 字段）—— 表单
+- `ocr/scan-only-sample.pdf`（扫描件无文字层）—— OCR / `textLayerStatus=missing`
+
+### 真实桌面 etv（dev server e2e 不够，要真实 Tauri 运行时）
+
+- 参照 Folia `scripts/etv-folia.mjs`（`etv:dev` = `WEBKIT_INSPECTOR_SERVER=127.0.0.1:9222 tauri dev` / `etv:run` = `node scripts/etv-folia.mjs`）—— 真实 WKWebView 启动 + DOM 测量 + 截图。
+- **FaroPDF 待建** `scripts/etv-faropdf.mjs`：真实 Tauri 桌面验证（打开 PDF 渲染截图 / `textLayerStatus` / 拖入 / 关键交互），作为 dev server Playwright 之外的**真机门禁**（dev server 跑 vite localhost，Tauri 真实 WKWebView 行为可能不同——QA-02 workerPort 就是 prod/真机才暴露）。
+
+### 断言深度（防「伪渲染 / 假成功」，参照 Folia mermaid-fidelity）
+
+**不只断言「存在 canvas / 存在元素」，断言功能结果**：
+- **Reader**：canvas 像素非空（真渲染，非空白页）+ 页数正确 + `textLayerStatus ≠ "unknown"`（文字层检测成功，不是默认值）。
+- **拖入**：mock `faropdf://file-drop` 事件 → 断言 reader 进入 loaded 态（document 非空）。
+- **UI 交互**：点设置齿轮 → 断言 `SettingsPanel open`；mode 切换 → 断言对应 panel 出现（DOM bbox 非空）。
+- Folia 教训（`docs/TASKS.md:266`）：「Mermaid 不再仅用『存在 `<svg>`』验收；**节点文字可见 + `getBBox` 像素非空 + 安全属性剥离**」——FaroPDF reader 同理（canvas 像素 + `textLayerStatus`），防「有页面无内容」伪渲染。
+
+### 完成定义（落地）
+
+功能改动（reader / 拖入 / 批注 / 导出 / OCR / 设置 / UI 交互）必须：`typecheck` + `test` + **`test:e2e`（或 etv 真机）** + `verify:ui-layout`（UI）全过（CI 绿），才算 `behavior-complete`。**e2e 不过 = 未完成**（不 merge / 不 release / worker STATUS 不写 `done`）。
+
 ## 开发命令
 
 ```bash
