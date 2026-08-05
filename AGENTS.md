@@ -140,6 +140,30 @@ PM 自己也要遵守：本会话内新增文件 / 改 docs / 修 build 脚本�
 4. 不存在已知阻塞问题。
 5. 来源于 `docs/TASKS.md` 的任务已更新状态或归档。
 6. 涉及 UI 时已确认符合 `docs/DESIGN.md`。
+7. **功能改动必须自测通过（见 §自测纪律）**：`typecheck` / 单测 / `npm run build` 只证明「代码能编译」，**不证明「功能真能用」**。Reader / 拖入 / 批注 / 导出 / OCR / 设置 / UI 交互等功能改动，必须跑功能 e2e（或实机）确认核心路径可用，才算完成。**仅 typecheck 过就声称「修完」是误导**（2026-08-05 教训：QA-02 workerPort typecheck 全过，实机却「文字层未知」未解决，根因是 `textLayerStatus` 检测，不是 pdfjs worker）。
+
+## 自测纪律（e2e / 实机，2026-08-05 教训落地）
+
+> 教训：QA-02 workerPort 改完 `typecheck` PASS 就声称「修完」，实机却「文字层未知」（`textLayerStatus` 卡 `unknown`，根因不是 pdfjs worker）。**typecheck 过 ≠ 功能可用**。本节把「修改后自测」固化成纪律，堵这个盲区——这正是不开 dev / 不跑 e2e 就声称完成的解药。
+
+**核心规则**：
+
+1. **改完先自测，再提交 / PR / 声称完成**。功能改动必须跑**功能 e2e**（或实机）确认核心路径可用；`typecheck` / 单测 / `build` **不单独构成完成证据**，只是前置编译门禁。
+2. **e2e 覆盖（按改动域选）**：
+   - **Reader 改动**（pdfjs / worker / textLayer / 打开链路）：e2e 打开 `tests/fixtures/expert/reference.pdf` → 断言**页面真的渲染**（canvas 非空 / 页数 / `textLayerStatus ≠ "unknown"`）。
+   - **拖入**（DragDrop）：e2e mock `faropdf://file-drop` 事件 → 断言打开。
+   - **UI 交互**（设置 / 批注 / mode / Toolbar）：e2e 点击 → 断言面板 / 元素出现（Playwright DOM bbox）；结构断言用 `npm run verify:ui-layout`。
+   - **视觉**（颜色 / 间距 / emoji）：`verify:ui-layout`（DOM bbox）+ 人工实机（「好看 / 高级」是主观，不自动化）。
+3. **e2e 不过 = 任务未完成**：不提交 PR、不声称 `behavior-complete`、worker STATUS 不写 `done`；e2e 失败记 RESULT + 修到过为止。
+4. **worker prompt 必须列 e2e 命令**：派 worker 时 `--verify-cmd` 含**功能 e2e**（不只 `npm run typecheck`）；PM 收口复跑 e2e 才算验收。
+5. **dev webview 缓存坑**：实机 review 前 Tauri webview 要**硬刷新**（Cmd+Shift+R）或清缓存，否则看旧代码（UI「没变化」假象，2026-08-05 实测：改动 +336 行在 main，webview 缓存让用户看不到）。
+
+**e2e 命令**（项目已有 Playwright 1.60.0 + `verify:ui-layout`；功能 e2e 待补）：
+
+- `npm run verify:ui-layout` —— DOM 结构 / 几何断言（已有）。
+- `npm run verify:reader-e2e` —— **待建**：打开 PDF 渲染 / textLayerStatus / 拖入 / 关键交互（建议命名，作为 reader 改动的回归门禁）。
+
+**参照**：全局 `~/.codex/AGENTS.md` §3.1 实操验证（GUI / Web / 桌面：启动入口 + 代表性交互 + DOM 断言 / 截图）；本节是 FaroPDF 项目级具体化。
 
 ## 开发命令
 
