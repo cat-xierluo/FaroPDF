@@ -66,7 +66,11 @@
 }
 
 .signature-panel__thumbnail {
-  display: block;
+  /* ISS-QA-10：flex 居中取代 display:block，消除 inline img 的 baseline 缝隙，
+     保证签名在缩略图盒内水平+垂直绝对居中，与 SignatureLibraryPicker 一致。 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 60px;
   padding: 4px;
@@ -76,8 +80,8 @@
 }
 
 .signature-panel__thumbnail img {
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
 }
 

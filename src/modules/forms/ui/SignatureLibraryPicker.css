@@ -1,0 +1,46 @@
+/* ISS-070 阶段 3：签名库选择器（填写和签名面板 → SignatureEditor 内嵌）。
+ *
+ * ISS-QA-10 修复：此前 .signature-library-picker__* 完全无 CSS，缩略图按 img
+ * 原始尺寸渲染、未居中，与 SignaturePanel 的固定高度居中缩略图视觉不一致。
+ * 现复刻 SignaturePanel 的居中手法：固定尺寸盒 + flex 居中 + object-fit:contain，
+ * 确保填写/签名两处签名预览/选择居中一致。
+ */
+
+.signature-library-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.signature-library-picker__item {
+  /* flex 居中缩略图：与 .signature-panel__thumbnail 同款居中手法 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 40px;
+  padding: 3px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.12s ease;
+}
+
+.signature-library-picker__item:hover {
+  border-color: var(--accent, #276f76);
+}
+
+.signature-library-picker__thumb {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.signature-library-picker__empty {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}

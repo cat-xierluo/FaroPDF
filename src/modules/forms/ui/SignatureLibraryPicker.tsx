@@ -1,5 +1,6 @@
 import { useMemo, type ReactElement } from "react";
 import { listSignatures } from "../signatureStore";
+import "./SignatureLibraryPicker.css";
 
 export interface SignatureLibraryPickerProps {
   /** 用户选中某条历史签名时回调，传入 base64 data URL */
