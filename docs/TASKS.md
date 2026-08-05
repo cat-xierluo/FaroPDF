@@ -62,7 +62,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | id | 现象 | 严重级 | 根因摘要（证据） | 主改动文件 | 完成线 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
 | ISS-QA-01 | 拖入 PDF 不打开 | [P0] | HTML5 onDrop 收不到系统文件；lib.rs 无 DragDrop | `lib.rs` + `App.tsx` | behavior-complete | [已修复 2026-08-04] Rust DragDrop emit + 前端 listen 复用 readPdfFileFromPath，typecheck/cargo check 过，GUI 待验 |
-| ISS-QA-02 | 打开显示「损坏」 | [P0] | [原根因被 W2 REFUTED] worker 失败不产出 InvalidPDF；真因 NOT_VERIFIED，静态指向 pdfjs-dist 6 解析回归（dev/prod 同现） | 见 `docs/QA-02-repro-report.md` | 实机判 A/B | [诊断完成 2026-08-04 main baa7a8b] 实机 A/B 待做 |
+| ISS-QA-02 | 打开显示「未知」+ 慢 + 缩略图不可用 | [P0] | 实机「未知」= worker 失败（W2 §0.4 origin 隐患），非 InvalidPDF；workerSrc 字符串不稳 | `pdfjsWorker.ts` | behavior-complete | [workerPort 修复 2026-08-05] workerSrc→workerPort Worker 实例，待实机确认 |
 | ISS-QA-03 | 界面 emoji | [P1] | 5 文件 6 处 emoji 字面量 | 5 个 tsx | grep 清零 + 视觉 | [已修复 main 8c5cc01 2026-08-04] 7 处→lucide，typecheck/lint 过，GUI 待验 |
 | ISS-QA-04 | 批注/编辑/导出/OCR 点击无展开 | [P0] | mode 切换强关 panel（路径B executeCommand 1134-1138）+ stub + width 待查 | `AppShell.tsx` | behavior-complete | [已修复 2026-08-04] Fix-1 mode-aware 不强关（forms→FormsPanel），typecheck 过；stub 完整 fail-closed 需改 Toolbar（后续 ISS）+ width(panelWidthStore)待 shared 核查；GUI 待验 |
 | ISS-QA-05 | 左侧边栏颜色不统一 | [P1] | Sidebar 多 panel token 未归一 | `Sidebar.tsx` + `app.css` | 符合 DESIGN.md | [已修复 main 8c5cc01 2026-08-04] 10 个 `--panel-*` token，typecheck/lint 过，GUI 待验 |
@@ -257,6 +257,83 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - **根因**：NOT_VERIFIED（W5 无法读 `src/shared` forbidden）；需核查 `panelWidthStore` 默认值 + `showRightPanel` 宽度派生。
 - **范围**：`src/shared`（panelWidthStore）+ 可能 `AppShell.tsx`。
 - **证据**：W5 RESULT §1 分类 ④。
+
+---
+
+### v0.2.0 实机回归批次 2（2026-08-05 用户 GUI 实机反馈，ISS-QA-07 ~ ISS-QA-16）
+
+> 来源：用户 dev 实机验证 ISS-QA-01~06 后的新反馈。**已确认修好**：QA-01 拖入（慢但可）、QA-06 设置入口。**修复中**：QA-02 打开「未知」（workerPort）。其余为 UI/UX/定位/配置新涌现，根因多待静态排查（吸取教训：先静态 review 再实机，不浪费用户时间）。
+
+#### 缺陷总览
+
+| id | 现象 | 优先 | 主改动文件（推断） | 状态 |
+| --- | --- | --- | --- | --- |
+| ISS-QA-07 | 批注工具（高亮/下划线/删除线）出现在左上角，位置不对 | P1 | Toolbar / ContextToolbar / AnnotationToolbar CSS | 待排查 |
+| ISS-QA-08 | 批注有二级菜单、编辑没有（不一致） | P1 | Toolbar / commands.ts submenu | 待排查 |
+| ISS-QA-09 | 导出二级菜单很怪 | P1 | Toolbar / commands.ts | 待排查 |
+| ISS-QA-10 | 填写签名没居中一致 | P1 | SignaturePanel / FormsPanel CSS | 待排查 |
+| ISS-QA-11 | 扫描与文本识别配置页结构混乱 | P1 | OcrPanel / OcrWorkspace / RightPanel | 待排查 |
+| ISS-QA-12 | 扫描右侧加号按钮功能多/分类乱/与其他页重复 | P1 | ToolLauncherMenu（Toolbar 加号）/ commands | 待排查 |
+| ISS-QA-13 | 设置页 UI 参照 Folia（当前选项背景光泽难看） | P1 | settings/*.css | 待设计（参照 Folia） |
+| ISS-QA-14 | 关于界面参照 Folia（介绍 + 个人信息） | P1 | AboutSection | 待设计（参照 Folia） |
+| ISS-QA-15 | 定位改「面向知识工作者」（去律师/卷宗） | P1 | README / package.json / 关于 / WelcomeScreen | 待改 |
+| ISS-QA-16 | OCR endpoint 默认填 | P2 | defaults.ts | MinerU 已填默认；PaddleOCR 无默认（自部署） |
+
+---
+
+#### ISS-QA-07　批注工具出现在左上角（位置不对）　[P1][待排查]
+- 现象：批注工具（高亮/下划线/删除线）出现在窗口左上角，非工具栏批注 mode 的 L4 位置。
+- 待排查：Toolbar mode 段 / ContextToolbar（annotate L4）/ AnnotationToolbar 渲染挂载点 + CSS 布局；可能浮动/错位。
+- 验收：批注工具在批注 mode 的 L4 工具条位置，不浮在左上角。
+
+#### ISS-QA-08　批注有二级菜单、编辑没有（不一致）　[P1][待排查]
+- 现象：批注按钮有二级菜单（形状 submenu 等），编辑按钮没有。
+- 待排查：Toolbar annotate/edit mode 按钮的二级菜单注册（commands.ts submenu）；edit mode 是否应有 L4（文本/图像/链接/隐藏）。
+- 验收：批注/编辑入口的二级菜单行为一致（按 DESIGN，都有或都无）。
+
+#### ISS-QA-09　导出二级菜单很怪　[P1][待排查]
+- 现象：导出二级菜单视觉/结构怪。
+- 待排查：导出 submenu 注册 + 渲染；对照 PDF Expert 导出菜单。
+- 验收：导出二级菜单结构清晰，符合 DESIGN。
+
+#### ISS-QA-10　填写签名没居中一致　[P1][待排查]
+- 现象：填写和签名 mode 内容/面板没居中，视觉不一致。
+- 待排查：FormsPanel / SignaturePanel 布局 CSS；签名预览/选择居中。
+- 验收：填写签名面板内容居中一致。
+
+#### ISS-QA-11　扫描与文本识别配置页结构混乱　[P1][待排查]
+- 现象：OCR mode 配置页结构混乱。
+- 待排查：OcrPanel / OcrWorkspace / RightPanel（ocr-queue）结构；对照 PDF Expert OCR 面板。
+- 验收：OCR 配置页结构清晰（任务列表 + 参数 + 状态），符合 DESIGN。
+
+#### ISS-QA-12　扫描右侧加号按钮功能多/分类乱/与其他页重复　[P1][待排查]
+- 现象：扫描 mode 右侧加号按钮（ToolLauncherMenu）功能非常多，部分在其他页面也有、部分只此页有，分类不明确。
+- 待排查：ToolLauncherMenu（Toolbar.tsx:191 `+` 触发）命令清单；去重（与其他 mode 入口重复）；分类（扫描专属 vs 通用）。
+- 验收：加号按钮功能分类明确，无与其他页重复，职责单一。
+
+#### ISS-QA-13　设置页 UI 参照 Folia　[P1][待设计]
+- 现象：设置页选项背景色带光泽，不好看。
+- 方向：参照 Folia 项目设置页 UI（memory `feedback_faropdf_folia_alignment`：FaroPDF 跟 Folia 对齐）。
+- 范围：`src/modules/settings/*.css` + SettingsPanel 布局。
+- 验收：设置页视觉与 Folia 一致（去光泽、简洁），符合 DESIGN。
+
+#### ISS-QA-14　关于界面参照 Folia　[P1][待设计]
+- 现象：关于界面（介绍 + 个人信息）要参照 Folia。
+- 范围：AboutSection（settings about section）。
+- 验收：关于界面与 Folia 一致（介绍 + 作者信息），符合 DESIGN。
+
+#### ISS-QA-15　定位改「面向知识工作者」　[P1][待改]
+- 现象：当前定位「面向律师日常处理卷宗/证据/判决/合同/扫描材料」要改。
+- 改：全处「面向律师日常处理卷宗...」→「面向知识工作者」。
+- 范围：README.md / package.json description / 关于界面 / WelcomeScreen / 各 UI 文案（grep `律师|卷宗|证据|判决`）。
+- 验收：全处定位统一为「面向知识工作者」，无律师/卷宗字样。
+
+#### ISS-QA-16　OCR endpoint 默认填　[P2][部分完成 2026-08-05]
+- 现象：OCR provider endpoint 该默认填（用户只填 API key）。
+- 已做：MinerU endpoint 默认填 `https://mineru.net/api/v4`（固定官方，`defaults.ts:68`）；用户只填 API token。
+- 未做：PaddleOCR endpoint **无固定默认**（每用户从 aistudio.baidu.com/paddleocr/task 部署自己的 app，URL 各异），留空 + placeholder 提示「自部署 aistudio app URL」。
+- 来源：pdf-processor skill references（mineru-api-guide.md / paddleocr-api-guide.md）。
+- 验收：MinerU endpoint 默认填（用户只填 token）；PaddleOCR placeholder 提示自部署。
 
 ---
 

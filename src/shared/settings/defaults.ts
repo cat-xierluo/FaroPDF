@@ -65,7 +65,7 @@ function createDefaultOcrProviders(): OcrProviderConfig[] {
       id: "mineru",
       type: "mineru",
       displayName: "MinerU",
-      endpoint: "",
+      endpoint: "https://mineru.net/api/v4",
       apiKeyRef: "",
       enabled: false,
       requiresNetworkConsent: true,
