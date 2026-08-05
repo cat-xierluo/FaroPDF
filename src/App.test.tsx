@@ -26,6 +26,28 @@ vi.mock("./modules/reader/tauriPdfFileService", () => ({
   readPdfFileFromPath: appMocks.readPdfFileFromPath,
 }));
 
+// App.tsx 顶层 `listen("faropdf://file-drop", …)` 走真实 Tauri API，jsdom 环境不可用会
+// unhandled rejection 污染测试运行。mock 成返回 no-op unlisten。
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async () => () => undefined),
+}));
+
+/**
+ * ISS-QA-12 回归修复：launcher「+」二级菜单按 QA-12 去重（不再重复 L3 一级 mode 按钮），
+ * `mode-*` 项不再从 launcher 进入；模式改经工具栏一级按钮（A 批注 / 导出 / 填写和签名 / OCR）。
+ * 但一级按钮 `disabled={!document}`，且文档存在时 ReaderCanvas 会在 jsdom 里渲染 canvas 挂起。
+ * 因此测试不 mock 文档，改走原生菜单命令路由（真实 executeCommand → targetMode → onModeChange），
+ * 与「mode-*」命令一致：requiresDocument=false、无文档也能进模式，且 ReaderCanvas 保持空态不渲染。
+ * 用 enterModeViaNativeMenu() 触发，复用 appMocks.nativeMenuHandler。
+ */
+async function enterModeViaNativeMenu(user: ReturnType<typeof userEvent.setup>, commandId: string) {
+  // 原生菜单命令经 subscribeNativeMenuCommands → setCommandSignal → AppShell executeCommand 路由。
+  await act(async () => {
+    appMocks.nativeMenuHandler?.(commandId);
+  });
+  void user;
+}
+
 async function chooseTool(user: ReturnType<typeof userEvent.setup>, label: string | RegExp) {
   await user.click(screen.getByRole("button", { name: "工具" }));
   const menu = screen.getByRole("menu", { name: "PDF 工具菜单" });
@@ -88,7 +110,9 @@ describe("FaroPDF app shell", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await chooseTool(user, "批注");
+    // ISS-QA-12：launcher 去重后，mode-* 不再从「+」菜单进入，改走原生菜单命令路由
+    // （真实 executeCommand → targetMode → onModeChange），无需文档、不触发 canvas 渲染。
+    await enterModeViaNativeMenu(user, "mode-annotate");
 
     expect(screen.getByRole("toolbar", { name: "批注工具条" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "高亮" })).toBeInTheDocument();
@@ -112,7 +136,8 @@ describe("FaroPDF app shell", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await chooseTool(user, "导出");
+    // ISS-QA-12：launcher 去重后 mode-* 改走原生菜单命令路由（真实 executeCommand）。
+    await enterModeViaNativeMenu(user, "mode-export");
     const exportToolbar = screen.getByRole("toolbar", { name: "导出工具条" });
     expect(exportToolbar).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "交付工具" })).toBeInTheDocument();
@@ -122,7 +147,7 @@ describe("FaroPDF app shell", () => {
     expect(within(exportToolbar).queryByRole("button", { name: "Bates 编号" })).not.toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "格式转换" })).not.toBeInTheDocument();
 
-    await chooseTool(user, "填写和签名");
+    await enterModeViaNativeMenu(user, "mode-forms");
     const formsToolbar = screen.getByRole("toolbar", { name: "填写和签名工具条" });
     expect(formsToolbar).toBeInTheDocument();
     expect(within(formsToolbar).getByRole("group", { name: "表单工具" })).toBeInTheDocument();
@@ -133,7 +158,7 @@ describe("FaroPDF app shell", () => {
     expect(within(formsToolbar).queryByRole("button", { name: "日期" })).not.toBeInTheDocument();
     expect(within(formsToolbar).queryByRole("button", { name: "钩号" })).not.toBeInTheDocument();
 
-    await chooseTool(user, "OCR");
+    await enterModeViaNativeMenu(user, "mode-ocr");
     // OCR 模式 context toolbar 挂 OcrModeToolbar 组件：识别文本 / 输出双层 PDF / 质量检查
     expect(screen.getByRole("toolbar", { name: "OCR 工具条" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "识别文本" })).toBeInTheDocument();
@@ -353,10 +378,14 @@ describe("PendingDetachRestore (ISS-NEW-F 第 3 步 第 3 块)", () => {
   } {
     const setCurrentPageSpy = vi.fn();
     const openNativeFileSpy = vi.fn(async () => undefined);
+    // reportOpenError 也需 mock：readPdfFileFromPath 失败时 PendingDetachRestore 的
+    // catch 会调用它（否则 unhandled rejection 污染测试运行）。
+    const reportOpenErrorSpy = vi.fn();
     const reader = {
       state: { document: null },
       setCurrentPage: setCurrentPageSpy,
       openNativeFile: openNativeFileSpy,
+      reportOpenError: reportOpenErrorSpy,
     } as unknown as ReaderController;
     return { reader, setCurrentPageSpy, openNativeFileSpy };
   }
