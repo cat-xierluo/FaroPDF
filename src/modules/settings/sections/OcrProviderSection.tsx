@@ -103,7 +103,11 @@ export function OcrProviderSection({ settings, onChange }: OcrProviderSectionPro
               <input
                 id={`${provider.id}-endpoint`}
                 onChange={(event) => updateProvider(provider.id, { endpoint: event.currentTarget.value })}
-                placeholder="https://ocr.example/api"
+                placeholder={
+                  provider.id === "paddleocr"
+                    ? "自部署 aistudio app URL（https://aistudio.baidu.com/paddleocr/task）"
+                    : "https://ocr.example/api"
+                }
                 type="url"
                 value={provider.endpoint ?? ""}
               />
