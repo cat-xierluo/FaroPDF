@@ -85,7 +85,20 @@ const defaultAdapter: PdfJsReaderAdapter = {
   configureWorker: configurePdfjsWorker,
   getDocument: async (params) => {
     const { getDocument } = await import("pdfjs-dist");
-    return getDocument(params) as unknown as PdfJsLoadingTaskLike;
+    // ISS-QA-02 实机验证（2026-08-05）：真机 Tauri WKWebView 下
+    // `getTextContent()` 会抛 "UnknownErrorException: Ensure that the
+    // standardFontDataUrl API parameter is provided"——`textLayerStatus`
+    // 因此被 `readTextLayerStatus` catch 吞错返回 `unknown`，底部状态栏
+    // 显示「文字层未知」。e2e 在 jsdom 下用 legacy fake worker 不触发字体路径
+    // 所以 PASS；真机则必须传。Vite + pdfjs-dist 6 同包内 `standard_fonts/`
+    // 已是静态资源（pnpm 内 `node_modules/.pnpm/pdfjs-dist@6.0.227/.../standard_fonts/`），
+    // `new URL(..., import.meta.url)` 解析为根绝对路径 / Vite 资产 URL，
+    // 打包后随 `tauri://` / `asset://` 协议可达，与 `pdfjsWorker.ts` 的 worker URL 一致。
+    const standardFontDataUrl = new URL(
+      "pdfjs-dist/standard_fonts/",
+      import.meta.url,
+    ).href;
+    return getDocument({ ...params, standardFontDataUrl }) as unknown as PdfJsLoadingTaskLike;
   },
 };
 

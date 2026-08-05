@@ -129,6 +129,12 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - **验证命令**：`npm run typecheck`；`npm run tauri dev`；`npm run tauri build` 后实机打开。
 - **阻塞 / 剩余**：根因未复现前不要改代码（避免盲改）。
 - **worktree**：独立 PR（pdfjs worker / vite，与其他 QA 文件不重叠）。
+- **⚠ 实机验证复盘（2026-08-05，含失职如实记录）**：
+  - **核心失职**：ISS-QA-01~16 + workerPort + 诊断 log 全在源码 + commit，**从未 build 新 .app**。用户实机跑 `/Applications/FaroPDF.app` = **v0.2.0（Aug 4 13:08 build）**，不含 v0.2.0 之后任何 commit → 用户「看不到任何变化 / UI 没改 / PDF 还是文字层未知」**全部因为跑的是 v0.2.0 旧 build，不是最新代码**。改源码 ≠ 用户能跑上，这是 PM/验证流程的根本疏漏。
+  - **「文字层未知」精确定位**：非「PDF 打不开 / 损坏」。`ReaderCanvas.tsx:500` 底部状态行渲染 `文字层{textLayerStatusLabels[textLayerStatus]}`，`textLayerStatus=unknown` 时显示「文字层未知」。即 **PDF 实际能渲染打开**（worker 正常），只是 `readTextLayerStatus` 返回 `unknown`。**印证 W2「worker 非 root cause」，真根因回到 `readTextLayerStatus`**。
+  - **根因再纠正（第 2 次）**：上轮据「UI 不显示 textLayerStatus」判定 readTextLayerStatus 非根因——**判定错误**（grep 漏了 `ReaderCanvas.tsx:500` 的间接引用 `textLayerStatusLabels[textLayerStatus]`）。UI 实际显示 textLayerStatus。readTextLayerStatus 重回首要嫌疑。
+  - **main 代码状态**：e2e `reader-renders.test.ts` 对 reference.pdf 返回 `textLayerStatus ≠ unknown`（PASS），说明 main 的 `readTextLayerStatus` 可能已修（或 reference.pdf 特定不触发）。需 build 新 .app 让用户实机验证 main 行为。
+  - **教训（沉淀到 verification-loop）**：源码修复必须 build 产物给用户实机跑，否则「修复」对用户不可见。阶段 6 真机验证的前提是「用户跑的是含最新修复的 build」，不是用户日常装的旧 release。
 
 ---
 
