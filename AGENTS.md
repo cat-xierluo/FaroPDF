@@ -79,6 +79,7 @@ FaroPDF 的协作依赖 `.claude/skills/` 下的 Skill 统一协议、门禁和�
 | 多 Agent / subagent / worktree 并行 / 跨会话交接 | `multi-agent-orchestration`、`cross-agent-coordination` | worker 文件范围边界、PM 派工、跨平台归属与交接 |
 | `docs/TASKS.md` 任务领取、状态更新、归档迁移 | `cross-agent-coordination` | 任务状态机、归属和归档入口由该 Skill 管理 |
 | 发布与版本变更 | `release-workflow` | 版本号、CHANGELOG 与发版流程 |
+| 功能改动自测 / 声称「修完」/ 提交 PR 前 | `verification-gate` | 8 阶段验证门禁（编译层 1-4 前置 + e2e/真机 5-6 硬门禁 + 安全/Diff 7-8），§自测纪律与 §验证体系的 skill 化执行入口 |
 | 文档膨胀 / 归档不一致 / PR 创建后 / PR 合并后 | `doc-curator` | 文档瘦身 subagent 跑体检，必要时自动提 maintenance PR；post-action 触发，不阻断 PR |
 
 通用原则：
@@ -152,16 +153,17 @@ PM 自己也要遵守：本会话内新增文件 / 改 docs / 修 build 脚本�
 2. **e2e 覆盖（按改动域选）**：
    - **Reader 改动**（pdfjs / worker / textLayer / 打开链路）：e2e 打开 `tests/fixtures/expert/reference.pdf` → 断言**页面真的渲染**（canvas 非空 / 页数 / `textLayerStatus ≠ "unknown"`）。
    - **拖入**（DragDrop）：e2e mock `faropdf://file-drop` 事件 → 断言打开。
-   - **UI 交互**（设置 / 批注 / mode / Toolbar）：e2e 点击 → 断言面板 / 元素出现（Playwright DOM bbox）；结构断言用 `npm run verify:ui-layout`。
-   - **视觉**（颜色 / 间距 / emoji）：`verify:ui-layout`（DOM bbox）+ 人工实机（「好看 / 高级」是主观，不自动化）。
+   - **UI 交互**（设置 / 批注 / mode / Toolbar）：e2e 点击 → 断言面板 / 元素出现（Playwright DOM bbox）；结构断言用组件测试 + `test:e2e`（`verify:ui-layout` 已随 PDF Expert 素材下架移除，2026-07-31 commit `02b07aa`）。
+   - **视觉**（颜色 / 间距 / emoji）：DOM 断言 + 人工实机（「好看 / 高级」是主观，不自动化）。
 3. **e2e 不过 = 任务未完成**：不提交 PR、不声称 `behavior-complete`、worker STATUS 不写 `done`；e2e 失败记 RESULT + 修到过为止。
 4. **worker prompt 必须列 e2e 命令**：派 worker 时 `--verify-cmd` 含**功能 e2e**（不只 `npm run typecheck`）；PM 收口复跑 e2e 才算验收。
 5. **dev webview 缓存坑**：实机 review 前 Tauri webview 要**硬刷新**（Cmd+Shift+R）或清缓存，否则看旧代码（UI「没变化」假象，2026-08-05 实测：改动 +336 行在 main，webview 缓存让用户看不到）。
 
-**e2e 命令**（项目已有 Playwright 1.60.0 + `verify:ui-layout`；功能 e2e 待补）：
+**e2e 命令**（Playwright 1.60.0 + vitest e2e 已落地，2026-08-14 verification gate 补齐）：
 
-- `npm run verify:ui-layout` —— DOM 结构 / 几何断言（已有）。
-- `npm run verify:reader-e2e` —— **待建**：打开 PDF 渲染 / textLayerStatus / 拖入 / 关键交互（建议命名，作为 reader 改动的回归门禁）。
+- `npm run test:e2e` —— vitest + 真 pdfjs + fixture（reader-renders / forms / ocr，jsdom legacy fake worker，约 5s，CI test job 跑）。
+- `npm run verify:reader-e2e` —— **chromium 真 module Worker 门禁**（脚本自起 dev server：打开 `reference.pdf` 断言 `textLayerStatus="available"` + `corrupt.pdf` 抛 `InvalidPDFException`），reader / pdfjs / worker / 字体链路改动的回归门禁（QA-02「jsdom 过、真机崩」那层的拦截器），CI reader-e2e job 跑。
+- `npm run verify:ui-layout` —— **已移除**（2026-07-31 公开仓库准备，PDF Expert 几何验证脚本随第三方截图素材 git rm，commit `02b07aa`）；结构断言由组件测试 + `test:e2e` 承接。
 
 **参照**：全局 `~/.codex/AGENTS.md` §3.1 实操验证（GUI / Web / 桌面：启动入口 + 代表性交互 + DOM 断言 / 截图）；本节是 FaroPDF 项目级具体化。
 
@@ -174,14 +176,15 @@ PM 自己也要遵守：本会话内新增文件 / 改 docs / 修 build 脚本�
 | 层 | 命令 | 证明什么 | 完成线 |
 |---|---|---|---|
 | 编译 | `npm run typecheck` / `lint` / `build` / `cd src-tauri && cargo check` | 代码能编译 | 前置门禁，**不充分** |
-| 单元 | `npm test`（vitest） | 单元逻辑 | 前置门禁 |
-| **e2e（功能）** | `npm run test:e2e`（Playwright，**待建**） | **功能真能用**（打开 PDF 渲染 / 拖入 / 交互） | **核心完成线** |
-| 结构 e2e | `npm run verify:ui-layout`（已有） | DOM bbox 结构 / 几何 | UI 改动门禁 |
+| 单元 | `npm test`（vitest；全量退出悬挂未修，CI 暂只跑 `test:e2e` 子集） | 单元逻辑 | 前置门禁 |
+| **e2e（jsdom）** | `npm run test:e2e`（vitest + 真 pdfjs + fixture，7 用例） | pdfjs 逻辑 / 表单 / OCR 链路 | **核心完成线** |
+| **e2e（真 Worker）** | `npm run verify:reader-e2e`（chromium 真 module Worker + 字体 fetch） | **真 Worker / standardFontDataUrl 行为**（QA-02 层） | **核心完成线** |
+| 结构 | 组件测试 + `test:e2e` DOM 断言（`verify:ui-layout` 已移除，`02b07aa`） | DOM 结构 / 关键元素 | UI 改动门禁 |
 
 ### CI/CD（e2e 必须在 CI，不只本地）
 
-- `.github/workflows/ci.yml` 应跑 `typecheck + lint + test + build + cargo check` **+ Playwright e2e job**（参照 Folia `ci.yml` playwright job：Chromium + 跑 spec + failure 上传 test-results artifact 7 天）。
-- **当前 FaroPDF CI 只跑编译层**（typecheck/lint/test/build），**e2e 不在 CI**（待补 playwright job）——这是「实机才发现坏」的根因之一。补 CI e2e 后，PR 合并前 e2e 必须绿。
+- `.github/workflows/ci.yml` 已上 main（2026-08-14 verification gate 补齐）：`test` job（typecheck + lint + test:e2e + build）+ `reader-e2e` job（chromium 真 Worker，参照 Folia playwright job；failure 上传 artifact 7 天）。
+- **全量 `npm test` 暂不在 CI**：vitest 4.1.8 全量退出悬挂（open handles，TASKS 待补齐清单 D，本地 240s+ 不退出可复现）——修复后回到 CI。Tauri / cargo 构建由 release.yml 负责（macOS WKWebView 等 release-only 依赖不在 ubuntu runner 编译）。
 
 ### fixture 矩阵（e2e 用受控 fixture，复现一致）
 
@@ -195,7 +198,8 @@ PM 自己也要遵守：本会话内新增文件 / 改 docs / 修 build 脚本�
 ### 真实桌面 etv（dev server e2e 不够，要真实 Tauri 运行时）
 
 - 参照 Folia `scripts/etv-folia.mjs`（`etv:dev` = `WEBKIT_INSPECTOR_SERVER=127.0.0.1:9222 tauri dev` / `etv:run` = `node scripts/etv-folia.mjs`）—— 真实 WKWebView 启动 + DOM 测量 + 截图。
-- **FaroPDF 待建** `scripts/etv-faropdf.mjs`：真实 Tauri 桌面验证（打开 PDF 渲染截图 / `textLayerStatus` / 拖入 / 关键交互），作为 dev server Playwright 之外的**真机门禁**（dev server 跑 vite localhost，Tauri 真实 WKWebView 行为可能不同——QA-02 workerPort 就是 prod/真机才暴露）。
+- **FaroPDF 已建** `scripts/etv-faropdf.mjs`（2026-08-14）：`npm run etv:dev` 起真机 + `npm run etv:run` 跑 CDP 断言（app-boots：Toolbar 5 段 + Welcome/Canvas + 截图存档 `.playwright-mcp/`），作为 dev server Playwright 之外的**真机门禁**（dev server 跑 vite localhost，Tauri 真实 WKWebView 行为可能不同——QA-02 workerPort 就是 prod/真机才暴露）。
+- **已知限制**（DEC-196）：`WEBKIT_INSPECTOR_SERVER` 在 wry 当前 macOS 版本可能不生效——etv 连不上时脚本明确失败并给降级指引（`tauri build` 产物实机 + `verify:reader-e2e` 证据链），不允许静默跳过真机层。
 
 ### 断言深度（防「伪渲染 / 假成功」，参照 Folia mermaid-fidelity）
 
@@ -207,7 +211,7 @@ PM 自己也要遵守：本会话内新增文件 / 改 docs / 修 build 脚本�
 
 ### 完成定义（落地）
 
-功能改动（reader / 拖入 / 批注 / 导出 / OCR / 设置 / UI 交互）必须：`typecheck` + `test` + **`test:e2e`（或 etv 真机）** + `verify:ui-layout`（UI）全过（CI 绿），才算 `behavior-complete`。**e2e 不过 = 未完成**（不 merge / 不 release / worker STATUS 不写 `done`）。
+功能改动（reader / 拖入 / 批注 / 导出 / OCR / 设置 / UI 交互）必须：`typecheck` + `test:e2e` + **`verify:reader-e2e`（reader / pdfjs / worker / 字体链路改动）或 etv 真机** 全过（CI 绿），才算 `behavior-complete`。**e2e 不过 = 未完成**（不 merge / 不 release / worker STATUS 不写 `done`）。
 
 ## 开发命令
 

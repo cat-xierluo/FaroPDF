@@ -346,6 +346,25 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ---
 
+## ISS-VERIF-01　verification gate 机械门禁补齐　[P1][已完成 2026-08-14，DEC-198]
+
+> 2026-08-05 AGENTS.md「自测纪律 + 验证体系」规范落了，但机械门禁一半不存在：`verify:ui-layout` 已随公开仓库准备被删（`02b07aa`）、ci.yml 从未上 main、`verify:reader-e2e` / etv 待建、`verification-gate` skill 未 symlink、worker 默认 verify 注入缺 e2e。本卡补齐机械层，让规范可执行。
+
+- **已落地**：
+  - [x] `scripts/verify-reader-e2e.mjs` + `npm run verify:reader-e2e`：自起 dev server + chromium 真 module Worker（QA-02「jsdom 过、真机崩」层拦截器），实跑 PASS（`textLayerStatus="available"` + corrupt 抛 `InvalidPDFException` + exit 0 + 端口清理）。
+  - [x] `scripts/etv-faropdf.mjs` + `npm run etv:dev` / `etv:run`：CDP 直连真机门禁 v1（app-boots 断言 + 截图存档），连不上时明确失败 + 降级指引（不静默跳过）。
+  - [x] `.github/workflows/ci.yml` 上 main：`test` job（typecheck + lint + test:e2e + build）+ `reader-e2e` job（chromium 真 Worker + failure artifact）。
+  - [x] `.claude/skills/` symlink 补 `verification-gate` + `cross-agent-coordination`；AGENTS.md 触发表加 verification-gate 行。
+  - [x] AGENTS.md 自测纪律 / 验证体系两节命令表改为真实存在命令，标注 `verify:ui-layout` 已移除。
+  - [x] legal-skills `spawn-worker-deps.sh` 默认 verify 注入加 `test:e2e`（`grep -qx` 守卫）+ SKILL.md 同步；`test-spawn-worker-deps.sh` 7/7 PASS。
+- **残留（后续，不阻塞推进）**：
+  - [ ] CI 首跑验证（push 后 GitHub Actions 实际跑绿才算闭环；本地已验命令层）。
+  - [ ] 全量 vitest 退出悬挂修复（见下方待补齐清单 D）后，CI 从 `test:e2e` 子集扩回全量 `pnpm test`。
+  - [ ] etv WKWebView 链路依赖 wry 修复 `WEBKIT_INSPECTOR_SERVER`（DEC-196）；期间 etv 作可选层，真机以 `tauri build` 产物手测 + `verify:reader-e2e` 证据链为准。
+- **验证证据**：`verify:reader-e2e` PASS / `lint` 0 error / `typecheck` 过 / `test:e2e` 7/7（2026-08-14 实跑）。详见 DEC-198。
+
+---
+
 ## 当前唯一推进序列（PDF Expert 功能框架对应）
 
 2026-07-30 用户明确调整验收目标：不要求像素级或一比一视觉复刻；PDF Expert 只作为信息架构和功能映射参考。P0 改为“入口与真实模块一一对应、写入结果可验证、未实现能力 fail-closed”。accepted-golden、截图补采和视觉 diff 保留为非阻塞质量项，不再阻塞 M3～M5 的功能推进。
@@ -398,7 +417,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | M2 accepted-golden 扩展 | measured 层已按 L2/L3/L4 + surface 语义通过；尚无图像级 golden diff | `scripts/verify-pdf-expert-visual.mjs` | 2026-07-28 两套 Playwright 门禁 exit 0；M1 准入 golden 后再加入图像回归，不跨 surface 借宽度 |
 | P01/P02/P04/P06 实机确认 | active 蓝/modal/网格视觉未做实机截图确认 | `npm run dev` 手动 | M2 当前覆盖 L2/L3/L4 几何 + read/annotate/edit/pages 语义，不覆盖这些面板的像素/交互 |
 | readerReducer.test.ts | 用户未提交修改（可选链 `?.`），lint 报 prefer-const | `src/modules/reader/readerReducer.test.ts` | 非本会话工作，ISS-NEW-M 明确不触碰；留用户处理 |
-| Vitest 全量退出悬挂 | `npm test -- --run --reporter=dot` 大量用例继续输出、未见失败，但随后超过 90 秒无新输出且不退出 | 测试基础设施 / open handles | 2026-07-28 本次聚焦回归均 exit 0；全量运行被人工中止为 exit 130，不得记为全量通过。后续单独定位未清理 timer/worker/observer |
+| Vitest 全量退出悬挂 | `npm test -- --run --reporter=dot` 大量用例继续输出、未见失败，但随后超过 90 秒无新输出且不退出 | 测试基础设施 / open handles | 2026-07-28 本次聚焦回归均 exit 0；全量运行被人工中止为 exit 130，不得记为全量通过。后续单独定位未清理 timer/worker/observer。**2026-08-14 复测仍复现（240s+ 不退出）**；CI 暂以 `test:e2e` 子集绕开（DEC-198 ci.yml 注释），修复后 CI 扩回全量 |
 
 ### PDF Expert 阶段并发权
 

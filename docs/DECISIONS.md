@@ -212,6 +212,7 @@
 - DEC-195 M3 页面剪贴板：同文档复制/粘贴闭环（2026-07-30）
 - DEC-196 实机验证回写（2026-08-05，v0.2.0 + workerPort 后）
 - DEC-197 ISS-036 仓库公开，updater 闭环（2026-08-14）
+- DEC-198 verification gate 机械门禁补齐（2026-08-14）
 
 ### DOC维护
 - DEC-058 官网 / 文档站入口迁出到 personal-site 仓（跨仓 cleanup）
@@ -7996,3 +7997,23 @@ M5 异常态最终状态：文件损坏 ✅、密码 PDF ✅、权限不足 ✅�
 - **结果**：v0.2.0 实装用户点「检查更新」应见「可从 X 升级到 0.2.0」或「已是最新版本」。代码零改动（`tauri.conf.json` § plugins.updater.endpoints 无需调整）。
 - **不复发保证**：仓库公开是 GitHub 仓库级状态，不在 Git 仓库内——避免误回退到私有的唯一手段是 `gh repo edit --visibility private` 主动改回（操作员责任，无 code-level guard）。
 - **Refs**：ISS-036 / docs/TASKS.md
+
+## DEC-198 verification gate 机械门禁补齐（2026-08-14）
+
+- **触发**：用户确认「2026-08-05 那轮 verification gate 调整是否做完、后续推进是否有支撑」。盘点发现规范层（AGENTS.md §自测纪律 + §验证体系）已落，但**机械门禁缺口大**——规范里引用的命令一半不存在。
+- **盘点结论（缺口清单）**：
+  1. `npm run verify:ui-layout` **已不存在**——2026-07-31 仓库公开准备（commit `02b07aa`）删掉 `scripts/verify-pdf-expert-{layout,visual}.mjs`（依赖第三方截图素材）+ package.json 两个 script，但 AGENTS.md 仍写「已有」。
+  2. `.github/workflows/ci.yml` **不在 main**——曾建在本地分支 `chore/release-workflow-optimization`（`838630b`，参照 Folia）但从未合并，main 无任何 PR/push 门禁。
+  3. `verify:reader-e2e` / `scripts/etv-faropdf.mjs` 待建（AGENTS.md 自己标注的待办）。
+  4. legal-skills `verification-gate` skill（v1.0.2，8 阶段门禁）与 `cross-agent-coordination` skill 存在但**未 symlink 进 `.claude/skills/`**，AGENTS.md 触发表引用 `cross-agent-coordination` 是空引用、`verification-gate` 未列入触发表。
+  5. legal-skills `multi-agent-orchestration` 的 `inject_default_verify_commands` 只注入 `typecheck/lint/test/build`，不含 `test:e2e`——与 AGENTS.md 自测纪律第 4 条「worker prompt 必须列 e2e 命令」矛盾。
+- **本轮落地**：
+  - `scripts/verify-reader-e2e.mjs` + `package.json` `verify:reader-e2e`：自起 vite dev（1420 strictPort）→ 跑 `qa02-verify.mjs`（chromium 真 module Worker + 真 standardFontDataUrl fetch）→ 关 server 透传退出码。已有 dev server 在跑则复用、只清理自己起的进程。
+  - `scripts/etv-faropdf.mjs` + `etv:dev` / `etv:run`：参照 Folia `etv-folia.mjs` 的 CDP 直连（horseMD 裸 WebSocket 模式），v1 场景 = app-boots（Toolbar 5 段 data-section + Welcome/Canvas + readyState）+ 截图存档 `.playwright-mcp/`。连不上 CDP 时明确失败并给降级指引（不静默跳过真机层）；保留 DEC-196 的 wry `WEBKIT_INSPECTOR_SERVER` 不生效已知限制。
+  - `.github/workflows/ci.yml` 上 main：`test` job（typecheck + lint + **test:e2e** + build）+ `reader-e2e` job（chromium 真 Worker，failure 上传 artifact 7 天）。**全量 `npm test` 暂不进 CI**——vitest 4.1.8 全量退出悬挂仍复现（本轮实测 240s+ 不退出，与 TASKS 待补齐清单 D 一致），CI 只跑 `test:e2e` 子集（4.5s 正常退出）；全量单测待悬挂修复后回归 CI。
+  - `.claude/skills/` symlink 补齐 `verification-gate` + `cross-agent-coordination`（指向 legal-skills；`.claude/skills/` 本就 gitignore，属本地配置）。
+  - AGENTS.md 同步：自测纪律 / 验证体系两节的命令表改为真实存在的命令（`test:e2e` / `verify:reader-e2e`），标注 `verify:ui-layout` 已移除（`02b07aa`）；触发表新增 `verification-gate` 行。
+  - legal-skills 同步：`spawn-worker-deps.sh` `inject_default_verify_commands` 循环加 `test:e2e`（`grep -qx` 守卫，项目无该 script 自动跳过）+ SKILL.md §3.2 描述同步；`test-spawn-worker-deps.sh` 7/7 PASS（fixture 无 test:e2e，守卫正确跳过）。
+- **验证（实跑证据）**：`npm run verify:reader-e2e` 端到端 PASS（chromium `textLayerStatus="available"` / pageCount=5 / 422 字符 / corrupt 抛 `InvalidPDFException` / exit 0 / 端口 1420 清理干净）；`npm run lint` 0 error（新脚本 5 处 lint 当场修：`/* global */` + `process.exit` 跳过 finally 的 dev server 泄漏 bug）；`npm run typecheck` 过；`npm run test:e2e` 7/7。
+- **残留（不阻塞）**：CI 首跑要在 push 后 GitHub 侧验证；全量 vitest 悬挂修复前 CI 单测覆盖不全；etv WKWebView 真机链路受 wry 限制（DEC-196），`etv:run` 需 `WEBKIT_INSPECTOR_SERVER` 生效的 wry 版本或降级手测。
+- **Refs**：DEC-196（QA-02 教训）/ DEC-145（PR 收口纪律）/ AGENTS.md §自测纪律 §验证体系 / docs/TASKS.md ISS-VERIF-01
