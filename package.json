@@ -25,6 +25,7 @@
     "test:watch": "vitest --config config/vitest.config.ts",
     "test:e2e": "vitest run --config config/vitest.config.ts tests/e2e",
     "verify:reader-e2e": "node scripts/verify-reader-e2e.mjs",
+    "verify:prod-render": "node scripts/verify-prod-render.mjs",
     "etv:dev": "WEBKIT_INSPECTOR_SERVER=127.0.0.1:9222 tauri dev",
     "etv:run": "node scripts/etv-faropdf.mjs",
     "lint": "eslint . --config config/eslint.config.js",

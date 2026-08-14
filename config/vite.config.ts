@@ -63,6 +63,14 @@ function provideStandardFonts(): Plugin {
 export default defineConfig(async () => ({
   plugins: [react(), provideStandardFonts()],
 
+  // 构建戳：每次 vite build 生成新时间戳，前端启动时 console 打出
+  // 「[FaroPDF] frontend build: …」——用于真机 devtools 一眼确认
+  // 打包产物嵌的是哪版前端（tauri 资产嵌入是压缩的，静态 grep 不可靠；
+  // 2026-08-14 QA-02 第 3 版真机排查时定位「产物嵌入新旧不明」用）。
+  define: {
+    __FAROPDF_BUILD_ID__: JSON.stringify(new Date().toISOString()),
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
