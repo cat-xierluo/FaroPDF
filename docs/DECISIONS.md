@@ -213,6 +213,7 @@
 - DEC-196 实机验证回写（2026-08-05，v0.2.0 + workerPort 后）
 - DEC-197 ISS-036 仓库公开，updater 闭环（2026-08-14）
 - DEC-198 verification gate 机械门禁补齐（2026-08-14）
+- DEC-199 vitest 全量悬挂根因修复 + 3 条被掩盖断言（2026-08-14）
 
 ### DOC维护
 - DEC-058 官网 / 文档站入口迁出到 personal-site 仓（跨仓 cleanup）
@@ -8018,3 +8019,21 @@ M5 异常态最终状态：文件损坏 ✅、密码 PDF ✅、权限不足 ✅�
 - **残留（不阻塞）**：全量 vitest 悬挂修复前 CI 单测覆盖不全；etv WKWebView 真机链路受 wry 限制（DEC-196），`etv:run` 需 `WEBKIT_INSPECTOR_SERVER` 生效的 wry 版本或降级手测。
 - **CI 首跑闭环（2026-08-14 push 后验证）**：第 1 跑（run 31805952230）reader-e2e job ✅、test job ❌——`ocr-e2e.test.ts` fixture 生成的 node 候选硬编码 `/opt/homebrew/bin/node` 且不查存在性，ubuntu runner ENOENT（**CI 门禁当场抓到一个本地永远发现不了的环境假设 bug**）。修复（`05ea72e`）：候选改 `NODE_BINARY → process.execPath → PATH node` + existsSync 预检。第 2 跑（run 31806377855）**双 job 全部 success**。
 - **Refs**：DEC-196（QA-02 教训）/ DEC-145（PR 收口纪律）/ AGENTS.md §自测纪律 §验证体系 / docs/TASKS.md ISS-VERIF-01
+
+## DEC-199 vitest 全量悬挂根因修复 + 3 条被掩盖断言（2026-08-14）
+
+- **触发**：用户复核 verification gate「项目 + skill 都更新到位」，悬挂是 DEC-198 遗留最大项（TASKS 待补齐清单 D，2026-07-28 起复现，此前归因为 open handles）。
+- **诊断过程（可复用的方法论）**：
+  1. verbose 全量跑 + 45s 输出停滞检测 → 136 文件全部有 ✓（1479 用例）但 summary 不打印 → 不是「某测试没跑完」，是「全部完成后进程不退出」。
+  2. 单文件二分 → `AppShell.test.tsx` 单独跑也挂；`-t` 按 describe/test 二分（7 轮，每轮 ~70s 悬挂窗）→ 锁定单条测试「L2 tab 上移：TitlebarTabs 在有 tab 时先于 Toolbar 渲染」。
+  3. `ps` 看 worker CPU ~85%（忙等非 idle）+ macOS `sample` 抓原生栈：主线程卡 `uv__run_timers → RunTimers → MicrotaskQueue::RunMicrotasks` 出不来 = 无限微任务循环。
+  4. `kill -USR1` 开 node inspector + 裸 WebSocket CDP `Debugger.pause` 抓 JS 栈：`workLoopSync / performUnitOfWork ← flushActQueue ← act ← render` = React 在 act 队列里无限 reconcile。
+- **根因**：该测试的 `OpenTabsHarness` 写了 `useEffect(() => store.openTab(...), [store])` 无查重守卫。而 `tabStore` 的 `OPEN_TAB` **每次生成新 id 追加新 tab**（`generateTabId` 含 `Date.now()+random`，有意支持同文件多 tab，ISS-059）→ dispatch 新 state → TabProvider `value`（useMemo 依赖 state）引用变化 → effect 重跑 → 再 openTab → **effect↔dispatch 无限循环**；React 19 下经 act 队列变成微任务死循环，vitest fork worker 永不退出。生产代码无此问题——`AppShell.tsx:173` 真实接线有 `if (!exists)` 查重。
+- **修复**：
+  1. harness 补 `if (store.state.tabs.length === 0)` 查重守卫（对齐生产接线）。
+  2. 悬挂修复暴露 **3 条被掩盖的过期断言**（全量从不跑完 → 失败从未被看见）：①「核心工作流在 L3 直接可达」断言 launcher 含 menuitem 批注/导出/填写签名/OCR——QA-12（`553f5a1`）launcher 渲染层去重 mode-* 后已不存在；②「read toolbar keeps document tools」断言 group 组织页面/扫描 OCR——同去重后空段跳过；③「TitlebarTabs 渲染在 Toolbar 上方」用 `renderAppShell`（不开 tab）断言 titlebar-tabs 在 DOM——无 tab 时 TitlebarTabs 不渲染，必然失败。①②改为断言去重契约（L3 可达 + launcher 不重复），③补同款带守卫 harness + waitFor。
+  3. 顺手清 4 个 unhandled rejection：`App.tsx:321` `listen("faropdf://file-drop")` 在非 Tauri 运行时（jsdom / 浏览器 dev）reject（`__TAURI_INTERNALS__` undefined）→ 链尾补 `.catch(() => undefined)` 静默降级到 HTML5 onDrop（web 降级路径语义不变）。
+- **验证（实跑）**：全量 `npm test` **136 文件 / 1495 用例全过、0 Errors、~70s 正常退出**（修复前 240s+ 不退出）；typecheck / lint 0 error。
+- **影响**：CI `test` job 从 `test:e2e` 子集扩回全量 `pnpm test`；AGENTS.md 验证层表格 / CI 说明同步；TASKS 待补齐清单 D 闭环；ISS-VERIF-01 残留第 2 项勾销。
+- **教训（沉淀）**：「测试套件从不完成」比「测试失败」更危险——它同时掩盖真实失败（3 条）和制造虚假的「跑不完所以不算挂」。悬挂类问题的有效路径：停滞检测 → 单文件二分 → CPU + sample 判断忙/闲 → inspector pause 抓 JS 栈。
+- **Refs**：DEC-198（CI 子集绕开的临时态）/ ISS-059（tab store 语义）/ `553f5a1`（QA-12 去重）/ docs/TASKS.md 待补齐清单 D / ISS-VERIF-01

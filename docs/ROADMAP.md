@@ -28,7 +28,7 @@ FaroPDF 是一个清亮、快速、法律材料友好的 PDF 阅读器。它要�
 
 并发旁支（ISS-NEW-N，2026-07-23 启动）：历史批次曾按 6 张 raw-Aminus 安排 SignaturePanel / SetPasswordDialog / OcrPanelView / StampPanel / AnnotationToolbar 与旧 `EditModeGridView` 修正，并安排窗口 crop / 缩略图 / selection 浮条 / shape 6 段合同补采；旧状态机决策已撤销 `EditModeGridView` 路线，现行 DEC-186 又取代旧几何基线，页面管理实现统一使用 `PageOrganizerWorkspace`。当前可领取状态与文件边界只以 `docs/TASKS.md` 为准；未有 accepted-golden 的 surface 禁止宣称 `visually-verified`。
 
-当前 accepted-golden 为 0；既有 `verify:ui-layout` 只证明结构与几何，不表示视觉完成。历史进度日志保留为事实记录，但不覆盖 DEC-173 / DEC-177 / ISS-NEW-M / ISS-NEW-N。
+当前 accepted-golden 为 0；`verify:ui-layout` 曾只证明结构与几何、不表示视觉完成，且已于 2026-07-31 随 PDF Expert 素材下架移除（`02b07aa`）——现行结构/DOM 断言走 `npm run test:e2e` + 组件测试，reader 链路走 `npm run verify:reader-e2e`（DEC-198）。历史进度日志保留为事实记录，但不覆盖 DEC-173 / DEC-177 / ISS-NEW-M / ISS-NEW-N。
 
 ## v0.1 完整基础版
 

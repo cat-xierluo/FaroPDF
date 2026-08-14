@@ -176,15 +176,14 @@ PM 自己也要遵守：本会话内新增文件 / 改 docs / 修 build 脚本�
 | 层 | 命令 | 证明什么 | 完成线 |
 |---|---|---|---|
 | 编译 | `npm run typecheck` / `lint` / `build` / `cd src-tauri && cargo check` | 代码能编译 | 前置门禁，**不充分** |
-| 单元 | `npm test`（vitest；全量退出悬挂未修，CI 暂只跑 `test:e2e` 子集） | 单元逻辑 | 前置门禁 |
+| 单元 | `npm test`（vitest 全量，136 文件 / 1495 用例，~70s 正常退出——悬挂已修 DEC-199） | 单元逻辑 + e2e 子集 | 前置门禁 |
 | **e2e（jsdom）** | `npm run test:e2e`（vitest + 真 pdfjs + fixture，7 用例） | pdfjs 逻辑 / 表单 / OCR 链路 | **核心完成线** |
 | **e2e（真 Worker）** | `npm run verify:reader-e2e`（chromium 真 module Worker + 字体 fetch） | **真 Worker / standardFontDataUrl 行为**（QA-02 层） | **核心完成线** |
 | 结构 | 组件测试 + `test:e2e` DOM 断言（`verify:ui-layout` 已移除，`02b07aa`） | DOM 结构 / 关键元素 | UI 改动门禁 |
 
 ### CI/CD（e2e 必须在 CI，不只本地）
 
-- `.github/workflows/ci.yml` 已上 main（2026-08-14 verification gate 补齐）：`test` job（typecheck + lint + test:e2e + build）+ `reader-e2e` job（chromium 真 Worker，参照 Folia playwright job；failure 上传 artifact 7 天）。
-- **全量 `npm test` 暂不在 CI**：vitest 4.1.8 全量退出悬挂（open handles，TASKS 待补齐清单 D，本地 240s+ 不退出可复现）——修复后回到 CI。Tauri / cargo 构建由 release.yml 负责（macOS WKWebView 等 release-only 依赖不在 ubuntu runner 编译）。
+- `.github/workflows/ci.yml` 已上 main（2026-08-14 verification gate 补齐）：`test` job（typecheck + lint + **全量 `pnpm test`** + build）+ `reader-e2e` job（chromium 真 Worker，参照 Folia playwright job；failure 上传 artifact 7 天）。全量单测曾因 vitest 退出悬挂只跑 `test:e2e` 子集，悬挂修复（DEC-199）后已扩回全量。Tauri / cargo 构建由 release.yml 负责（macOS WKWebView 等 release-only 依赖不在 ubuntu runner 编译）。
 
 ### fixture 矩阵（e2e 用受控 fixture，复现一致）
 
@@ -220,6 +219,10 @@ npm install
 npm run dev
 npm run typecheck
 npm test
+npm run test:e2e          # e2e 子集（reader/forms/ocr，jsdom，CI 同款）
+npm run verify:reader-e2e # reader/pdfjs/worker/字体链路门禁（chromium 真 Worker，自起 dev server）
+npm run etv:dev           # 真机门禁前置：带 WKWebView inspector 的 tauri dev
+npm run etv:run           # 真机门禁：CDP 断言 app-boots + 截图（需先 etv:dev）
 npm run lint
 npm run build
 npm run tauri dev

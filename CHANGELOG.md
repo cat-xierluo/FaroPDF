@@ -1,5 +1,8 @@
 ## 未发版
 
+### Fixed
+- **全量 `npm test` 退出悬挂修复 + 3 条被掩盖断言（DEC-199）**：`npm test` 自 2026-07-28 起 240s+ 不退出（此前归因 open handles）。真根因：`AppShell.test.tsx`「L2 tab 上移」测试的 OpenTabsHarness 写 `useEffect(() => store.openTab(...), [store])` 无查重守卫，而 tabStore `OPEN_TAB` 每次生成新 id 追加新 tab（有意支持同文件多 tab）→ effect↔dispatch 无限循环，React 19 act 队列微任务死循环，vitest worker 永不退出（CPU ~85% 忙循环；macOS sample + node inspector pause 抓栈定位）。补查重守卫（对齐 `AppShell.tsx` 生产接线的 `if (!exists)`）后全量 **136 文件 / 1495 用例 ~70s 正常退出**。悬挂还掩盖了 3 条真实失败，同步修复：两条是 ISS-QA-12「+」菜单去重（`553f5a1`）后未更新的过期断言（改为断言去重新契约：L3 工作流可达 + launcher 不再重复 mode 切换 / 空段跳过）；一条「TitlebarTabs 渲染在 Toolbar 上方」在无 tab 时必然失败（TitlebarTabs 只在有 tab 时渲染），补带守卫 harness + waitFor。另清 4 个 unhandled rejection：`App.tsx` 的 Tauri `listen("faropdf://file-drop")` 在非 Tauri 运行时（浏览器 dev / vitest jsdom）reject，链尾补 `.catch(() => undefined)` 静默降级到 HTML5 onDrop（web 降级语义不变）。CI `test` job 由 `test:e2e` 子集扩回全量 `pnpm test`。
+
 ### Added
 - **verification gate 机械门禁补齐（ISS-VERIF-01 / DEC-198）**：把 2026-08-05「自测纪律 + 验证体系」规范落成可执行命令。① 新增 `npm run verify:reader-e2e`（`scripts/verify-reader-e2e.mjs`）：自动起 dev server → chromium 真 module Worker 打开 `reference.pdf` 断言 `textLayerStatus="available"` + `corrupt.pdf` 抛 `InvalidPDFException`，专拦「jsdom 过、真机崩」的 QA-02 类回归；② 新增 `npm run etv:dev` / `etv:run`（`scripts/etv-faropdf.mjs`）：CDP 直连真实 Tauri WKWebView 的真机门禁（app-boots 断言 + 截图存档），连不上时明确失败并给降级指引；③ `.github/workflows/ci.yml` 首次上 main：PR/push 跑 typecheck + lint + test:e2e + build，外加独立 `reader-e2e` job（chromium 真 Worker，failure 上传 artifact）；④ `verification-gate` / `cross-agent-coordination` skill 补进 `.claude/skills/`，AGENTS.md 触发表与命令表同步为真实存在命令（`verify:ui-layout` 已于公开仓库准备时移除）；⑤ legal-skills worker 默认 verify 注入加 `test:e2e`。验证：`verify:reader-e2e` 实跑 PASS / lint 0 error / typecheck / test:e2e 7/7。
 

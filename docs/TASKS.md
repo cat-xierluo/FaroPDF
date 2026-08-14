@@ -56,6 +56,8 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 > - 独立：ISS-QA-02（pdfjs worker / vite 配置）单独 PR。
 >
 > **推进顺序**：QA-06（解锁设置可达）→ QA-02（核心阅读，打包复现）→ QA-01（核心入口）→ QA-04（功能展开，工作量最大）→ QA-03 / QA-05（视觉收尾，可并行）。
+>
+> **命令时效注（2026-08-14，DEC-198）**：本批任务卡中出现的 `npm run verify:ui-layout` 已随公开仓库准备移除（`02b07aa`）——结构 / DOM 断言现由 `npm run test:e2e` + 组件测试承接，reader / pdfjs / worker 链路由 `npm run verify:reader-e2e`（chromium 真 Worker 门禁）承接，CI 由 `.github/workflows/ci.yml` 双 job 拦截。
 
 ### 缺陷总览
 
@@ -359,7 +361,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [x] legal-skills `spawn-worker-deps.sh` 默认 verify 注入加 `test:e2e`（`grep -qx` 守卫）+ SKILL.md 同步；`test-spawn-worker-deps.sh` 7/7 PASS。
 - **残留（后续，不阻塞推进）**：
   - [x] CI 首跑验证（2026-08-14 完成：第 1 跑抓出 ocr-e2e 硬编码 `/opt/homebrew/bin/node` 的环境假设 bug，`05ea72e` 修复后第 2 跑 run 31806377855 双 job 全绿）。
-  - [ ] 全量 vitest 退出悬挂修复（见下方待补齐清单 D）后，CI 从 `test:e2e` 子集扩回全量 `pnpm test`。
+  - [x] 全量 vitest 退出悬挂修复（2026-08-14 DEC-199：harness effect↔dispatch 无限循环，补查重守卫；3 条被掩盖的过期断言同步修复），CI 已从 `test:e2e` 子集扩回全量 `pnpm test`。
   - [ ] etv WKWebView 链路依赖 wry 修复 `WEBKIT_INSPECTOR_SERVER`（DEC-196）；期间 etv 作可选层，真机以 `tauri build` 产物手测 + `verify:reader-e2e` 证据链为准。
 - **验证证据**：`verify:reader-e2e` PASS / `lint` 0 error / `typecheck` 过 / `test:e2e` 7/7（2026-08-14 实跑）。详见 DEC-198。
 
@@ -417,7 +419,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 | M2 accepted-golden 扩展 | measured 层已按 L2/L3/L4 + surface 语义通过；尚无图像级 golden diff | `scripts/verify-pdf-expert-visual.mjs` | 2026-07-28 两套 Playwright 门禁 exit 0；M1 准入 golden 后再加入图像回归，不跨 surface 借宽度 |
 | P01/P02/P04/P06 实机确认 | active 蓝/modal/网格视觉未做实机截图确认 | `npm run dev` 手动 | M2 当前覆盖 L2/L3/L4 几何 + read/annotate/edit/pages 语义，不覆盖这些面板的像素/交互 |
 | readerReducer.test.ts | 用户未提交修改（可选链 `?.`），lint 报 prefer-const | `src/modules/reader/readerReducer.test.ts` | 非本会话工作，ISS-NEW-M 明确不触碰；留用户处理 |
-| Vitest 全量退出悬挂 | `npm test -- --run --reporter=dot` 大量用例继续输出、未见失败，但随后超过 90 秒无新输出且不退出 | 测试基础设施 / open handles | 2026-07-28 本次聚焦回归均 exit 0；全量运行被人工中止为 exit 130，不得记为全量通过。后续单独定位未清理 timer/worker/observer。**2026-08-14 复测仍复现（240s+ 不退出）**；CI 暂以 `test:e2e` 子集绕开（DEC-198 ci.yml 注释），修复后 CI 扩回全量 |
+| Vitest 全量退出悬挂 | `npm test -- --run --reporter=dot` 大量用例继续输出、未见失败，但随后超过 90 秒无新输出且不退出 | 测试基础设施 / open handles | **已修复 2026-08-14（DEC-199）**：根因非 open handles，是 `AppShell.test.tsx`「L2 tab 上移」测试 harness 的 `useEffect(openTab, [store])` 无查重守卫 → OPEN_TAB 每次生成新 tab + 新 state → effect↔dispatch 无限循环（React act 队列微任务死循环，worker CPU ~85% 永不退出）。补查重守卫后全量 136 文件 / 1495 用例 ~70s 正常退出；同时暴露并修复 3 条被悬挂掩盖的过期断言（QA-12 launcher 去重后未更新）。CI 已扩回全量 `pnpm test` |
 
 ### PDF Expert 阶段并发权
 
