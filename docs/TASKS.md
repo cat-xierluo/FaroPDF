@@ -1702,7 +1702,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 优先级：P1（发布工程 follow-up，DEC-070/DEC-071 的收口）
 - 类型：发布工程 / 安全护栏
 - 来源：2026-08-04 PR 2 `feat/updater-closed-loop`；PR 90（release.yml Folia 对齐）合并后从 main 拉
-- 状态：**进行中（PR 待合并）**
+- 状态：**代码与配置已全部合入 main（PR #91 `ddd91c0`，2026-08-14 复核：tauri.conf.json updater 四件套 + release.yml 签名 secret + keypair 脚本齐备）。剩余验收 = 下一次打 tag 发版时验证**：release.yml 产 3 平台 `.sig` + `latest.json`（不走 no-sigs 分支）+ 应用内「关于 → 检查更新」端到端。发版时机由用户决策（release-workflow 流程）。另注意：本地 `npm run tauri build` 因 `createUpdaterArtifacts:true` 需要 `TAURI_SIGNING_PRIVATE_KEY`（仅 CI secret 有），本地验证包用 `--config` 覆盖关闭该开关即可。
 - 范围：把 v0.1.1 设计时留作「分两步策略」的 updater 4 件套补齐，让打 tag 后 release.yml 产 `.sig` + `latest.json`，应用内自动更新真正闭环。
 - 改动：
   - `src-tauri/tauri.conf.json`：`bundle.createUpdaterArtifacts` / `plugins.updater.active` → `true`；`plugins.updater.pubkey` 填正式公钥
