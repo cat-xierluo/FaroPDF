@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   test:
-    name: typecheck / lint / e2e(jsdom) / build
+    name: typecheck / lint / test / build
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -52,13 +52,12 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
-      - name: Vitest e2e (jsdom)
-        # 只跑 tests/e2e（reader / forms / ocr 真实 fixture 链路，约 5s，正常退出）。
-        # 不跑全量 `pnpm test`：vitest 4.1.8 全量退出悬挂（open handles，
-        # docs/TASKS.md 待补齐清单 D，2026-07-28 起可复现，本地 240s+ 不退出），
-        # 全量单测待该问题修复后回到 CI。ocr-e2e 在无 ocrmypdf/pdftotext 的
-        # CI 环境自动 skip，不视为失败。
-        run: pnpm run test:e2e
+      - name: Vitest
+        # 全量 136 文件 / 1495 用例（含 tests/e2e 3 文件）。本地 ~70s 正常退出。
+        # 历史：vitest 4.1.8 全量退出悬挂已于 2026-08-14 修复（DEC-199：
+        # AppShell 测试 harness effect↔dispatch 无限循环），CI 从 test:e2e
+        # 子集扩回全量。ocr-e2e 在无 ocrmypdf/pdftotext 的 CI 环境自动 skip。
+        run: pnpm test
 
       - name: Build
         # 不产出 artifact，只验证 vite build 可成功；防止 chunk 拆分 / 资源路径
