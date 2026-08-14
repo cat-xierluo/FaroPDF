@@ -214,6 +214,7 @@
 - DEC-197 ISS-036 仓库公开，updater 闭环（2026-08-14）
 - DEC-198 verification gate 机械门禁补齐（2026-08-14）
 - DEC-199 vitest 全量悬挂根因修复 + 3 条被掩盖断言（2026-08-14）
+- DEC-200 QA-02 真机收口：legacy 构建 + DPR + 构建戳/产物门禁（2026-08-15）
 
 ### DOC维护
 - DEC-058 官网 / 文档站入口迁出到 personal-site 仓（跨仓 cleanup）
@@ -8037,3 +8038,19 @@ M5 异常态最终状态：文件损坏 ✅、密码 PDF ✅、权限不足 ✅�
 - **影响**：CI `test` job 从 `test:e2e` 子集扩回全量 `pnpm test`；AGENTS.md 验证层表格 / CI 说明同步；TASKS 待补齐清单 D 闭环；ISS-VERIF-01 残留第 2 项勾销。
 - **教训（沉淀）**：「测试套件从不完成」比「测试失败」更危险——它同时掩盖真实失败（3 条）和制造虚假的「跑不完所以不算挂」。悬挂类问题的有效路径：停滞检测 → 单文件二分 → CPU + sample 判断忙/闲 → inspector pause 抓 JS 栈。**已沉淀 skill**：legal-skills `verification-gate` v1.1.1（教训 11 掩盖效应 / 教训 12 诊断 playbook + effect↔dispatch 反模式 / e2e-practice 自起 dev server wrapper 配方，commit `48e01dd`），其他项目可直接复用。
 - **Refs**：DEC-198（CI 子集绕开的临时态）/ ISS-059（tab store 语义）/ `553f5a1`（QA-12 去重）/ docs/TASKS.md 待补齐清单 D / ISS-VERIF-01
+
+## DEC-200 QA-02 真机收口：四层洋葱 + 两个新缺陷（2026-08-15）
+
+- **触发**：用户实机（打包 WKWebView）连续三轮反馈「页面无法显示」→「文字层未知」→「能看了但模糊如图片、不能选中复制」。
+- **四层洋葱（每层都有真机证据或决定性本地证据）**：
+  1. **module worker 在 `tauri://` 下异步加载失败且死挂**：旧实现 worker error 只打日志不清 `workerPort`，pdfjs 消息发进死 worker → `getDocument` 永久挂起 → 纯空白无报错。修：`?worker&inline`（blob: URL 不依赖 scheme）+ error 事件主动清 port 降级 fake worker。
+  2. **blob worker 内根相对字体路径解析失败**：`standardFontDataUrl: "/standard_fonts/"` 在 blob: base 下解析不了（http origin 的 chromium 永远复现不了）。修：主线程 `new URL(..., document.baseURI)` 绝对化。
+  3. **引擎代差（用户 devtools console 定案）**：`TypeError: getOrInsertComputed is not a function`——pdfjs-dist 6 现代构建用 TC39 Map upsert 提案方法（Safari 26 才有），macOS 15 WKWebView 是 Safari 18 引擎。**本地三层门禁（jsdom legacy fake worker / chromium dev / chromium 产物）引擎全部新于真机，结构性覆盖不到。**修：全线切 `pdfjs-dist/legacy/build`（转译+polyfill，官方旧引擎路径；jsdom 测试层本就用 legacy）。
+  4. **Retina DPR 模糊（ISS-QA-17）**：canvas backing store 按 CSS px 1x 渲染，DPR=2 拉伸显示。修：backing × dpr + pdfjs `transform: [dpr,0,0,dpr,0,0]`；门禁加 DPR=2 断言。
+- **方法论沉淀（本轮真正的新工具）**：
+  - **构建戳**：vite define `__FAROPDF_BUILD_ID__` + 启动 console 打出。tauri 资产嵌入是**压缩**的，二进制静态 grep 无法判产物新旧（实测同一二进制同时含新旧 index 哈希，四个构建字节数完全相同——静态判产物是死路）；构建戳让真机 devtools 首行即确认版本。本轮第 1 轮靠它排除「测的是旧包」。
+  - **产物层门禁**：`verify:prod-render`（vite preview + chromium 真实 UI + 像素断言 + DPR2）补齐「dev server 之外的 build 产物」盲区。
+  - **cargo 资产嵌入不新鲜**：dist 变化不触发 lib 重编译（tauri-build rerun-if-changed 缺失），**验证构建必须 `cargo clean -p faropdf`**；DMG 打包脚本偶发失败不影响 .app。
+- **遗留（登记新卡）**：ISS-QA-18 阅读区无 pdfjs 文字层 DOM → 选区/复制不可用（`usePdfTextSelection` 在等一个从未渲染的文字层；ISS-061 工具条依赖它）。ISS-QA-17 已同轮修复。
+- **教训**：桌面 WebView 应用的「验证矩阵」必须包含**引擎代差**维度——chromium 全绿 ≠ WKWebView 过，pdfjs 这类重度使用新内置的库要按目标引擎选构建（legacy）；真机 console 是唯一决定性证据源，构建戳是打通它的前提。
+- **Refs**：DEC-196（诊断可观测性基建，本轮全部用上）/ DEC-198/199（门禁体系）/ ISS-QA-02 / ISS-QA-17 / ISS-QA-18

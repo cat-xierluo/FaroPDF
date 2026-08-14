@@ -179,6 +179,7 @@ PM 自己也要遵守：本会话内新增文件 / 改 docs / 修 build 脚本�
 | 单元 | `npm test`（vitest 全量，136 文件 / 1495 用例，~70s 正常退出——悬挂已修 DEC-199） | 单元逻辑 + e2e 子集 | 前置门禁 |
 | **e2e（jsdom）** | `npm run test:e2e`（vitest + 真 pdfjs + fixture，7 用例） | pdfjs 逻辑 / 表单 / OCR 链路 | **核心完成线** |
 | **e2e（真 Worker）** | `npm run verify:reader-e2e`（chromium 真 module Worker + 字体 fetch） | **真 Worker / standardFontDataUrl 行为**（QA-02 层） | **核心完成线** |
+| **产物层** | `npm run verify:prod-render`（vite preview build 产物 + chromium 真实 UI + **Retina DPR=2** 断言，2026-08-15 起） | **build 产物 asset 形态 + HiDPI 渲染**（dev 过 ≠ 打包过，DEC-200） | **核心完成线**（reader 改动） |
 | 结构 | 组件测试 + `test:e2e` DOM 断言（`verify:ui-layout` 已移除，`02b07aa`） | DOM 结构 / 关键元素 | UI 改动门禁 |
 
 ### CI/CD（e2e 必须在 CI，不只本地）
@@ -212,6 +213,12 @@ PM 自己也要遵守：本会话内新增文件 / 改 docs / 修 build 脚本�
 
 功能改动（reader / 拖入 / 批注 / 导出 / OCR / 设置 / UI 交互）必须：`typecheck` + `test:e2e` + **`verify:reader-e2e`（reader / pdfjs / worker / 字体链路改动）或 etv 真机** 全过（CI 绿），才算 `behavior-complete`。**e2e 不过 = 未完成**（不 merge / 不 release / worker STATUS 不写 `done`）。
 
+### 打包真机专项（DEC-200 教训，reader/UI 改动发版前必读）
+
+- **chromium 全绿 ≠ WKWebView 过**：引擎代差是独立维度——pdfjs 等重度使用新内置（如 `Map.prototype.getOrInsertComputed`，Safari 26 才有）的库，按目标引擎选构建（本项目已全线 `pdfjs-dist/legacy/build`）；chromium DPR 默认 1，Retina 行为用 `verify:prod-render` 的 DPR=2 场景拦。
+- **产物嵌入不可静态验证**：tauri 资产嵌入是压缩的（二进制 grep 无效，实测同时含新旧哈希），产物新旧用**构建戳**确认（启动 console `[FaroPDF] frontend build:` 时间戳）；**dist 变化不触发 lib 重编译**，验证构建必须 `cargo clean -p faropdf` 后 `tauri build`；DMG 打包脚本偶发失败不影响 .app。
+- **真机 console 是唯一决定性证据**：release devtools 已开（右键 → 检查），三层 `[FaroPDF]` 诊断日志已埋；无真机证据不改代码（DEC-196 教训，2026-08-15 四层洋葱每层都靠它收口）。
+
 ## 开发命令
 
 ```bash
@@ -221,6 +228,7 @@ npm run typecheck
 npm test
 npm run test:e2e          # e2e 子集（reader/forms/ocr，jsdom，CI 同款）
 npm run verify:reader-e2e # reader/pdfjs/worker/字体链路门禁（chromium 真 Worker，自起 dev server）
+npm run verify:prod-render # 产物层门禁（vite preview + chromium 真实 UI + Retina DPR=2 断言；先 npm run build）
 npm run etv:dev           # 真机门禁前置：带 WKWebView inspector 的 tauri dev
 npm run etv:run           # 真机门禁：CDP 断言 app-boots + 截图（需先 etv:dev）
 npm run lint

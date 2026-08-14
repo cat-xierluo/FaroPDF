@@ -106,7 +106,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ### ISS-QA-02　打开 PDF 显示「损坏的文件」　[P0]
 
-- **状态**：[已修复 2026-08-14，standardFontDataUrl 第 2 版：chromium 真 Worker PASS + e2e 7/7 + dist 资产验证；WKWebView 真机实拍 NOT_VERIFIED 留用户 build 后确认「文字层：可检测」]　**类型**：缺陷修复　**完成线**：behavior-complete　**历史诊断过程（2026-08-05）**：e2e `reader-renders.test.ts`（真 pdfjs + fixture）在 jsdom PASS = `loadPdfFromBytes` pdfjs 逻辑无 bug，**纠正 W2 后「真因 readTextLayerStatus getTextContent」误判**（其 catch 吞错不影响 loadPdfFromBytes 抛出，UI 不显示 textLayerStatus）；真根因 = `loadingTask.promise` reject（fake worker failed，错误模式同 test http: scheme / 真机 tauri:// scheme）= Tauri WKWebView worker 加载环境问题。补 3 层 console 诊断；真修复待真机 devtools console 红字定位 worker 失败具体类。详见 DEC-196。
+- **状态**：[已修复，真机确认 2026-08-15（页面恢复渲染）]　**类型**：缺陷修复　**完成线**：behavior-complete　**四层洋葱全程（DEC-200）**：① workerPort 修「打不开」→ ② standardFontDataUrl 修「文字层未知」（dev 层）→ ③ 打包真机再挂：module worker 在 tauri:// 下死挂（内联 blob worker 修）+ blob worker 字体相对路径解析失败（绝对 URL 修）+ **引擎代差**（pdfjs 6 现代构建用 Safari 26 才有的 Map upsert 方法，macOS 15 WKWebView 直接 TypeError——全线切 legacy 构建修，用户 devtools console 定案）。历史诊断过程（2026-08-05）：e2e `reader-renders.test.ts`（真 pdfjs + fixture）在 jsdom PASS = `loadPdfFromBytes` pdfjs 逻辑无 bug，**纠正 W2 后「真因 readTextLayerStatus getTextContent」误判**（其 catch 吞错不影响 loadPdfFromBytes 抛出，UI 不显示 textLayerStatus）；真根因 = `loadingTask.promise` reject（fake worker failed，错误模式同 test http: scheme / 真机 tauri:// scheme）= Tauri WKWebView worker 加载环境问题。补 3 层 console 诊断；真修复待真机 devtools console 红字定位 worker 失败具体类。详见 DEC-196 / DEC-200。
 - **现象（用户视角）**：用「打开」按钮选择正常 PDF（其它阅读器可正常打开），FaroPDF 内显示「损坏 / 无法打开」。
 - **根因（[原假设已被 W2 证伪 REFUTED 2026-08-04，下方原记录保留作历史；Wave 4 必须先读 `docs/QA-02-repro-report.md` 判 A/B 再改代码]）**：
   - worker 配置 `pdfjsWorker.ts:1`：`import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.mjs?url"`，`pdfjs-dist@6.0.227`。
@@ -347,6 +347,27 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 未做：PaddleOCR endpoint **无固定默认**（每用户从 aistudio.baidu.com/paddleocr/task 部署自己的 app，URL 各异），留空 + placeholder 提示「自部署 aistudio app URL」。
 - 来源：pdf-processor skill references（mineru-api-guide.md / paddleocr-api-guide.md）。
 - 验收：MinerU endpoint 默认填（用户只填 token）；PaddleOCR placeholder 提示自部署。
+
+---
+
+## v0.2.x 实机回归批次 3（2026-08-15，QA-02 收口同轮发现）
+
+> 来源：用户实机（打包 WKWebView）验证 QA-02 修复后的新反馈：「能看了，但渲染成模糊图片、内容没法选中和复制」。
+
+### ISS-QA-17　Retina 屏渲染模糊（渲染成低清图片）　[P1][已修复 2026-08-15]
+
+- 现象：打包真机（Retina）页面渲染模糊如低清截图。
+- 根因：`renderPageToCanvas` 把 canvas backing store 按 CSS 像素 1x 渲染，`devicePixelRatio=2` 的 WKWebView 把位图拉伸显示（chromium 门禁默认 DPR=1 复现不了）。
+- 修复：backing store × devicePixelRatio + pdfjs render `transform: [dpr,0,0,dpr,0,0]`，CSS 尺寸钉 viewport；`verify:prod-render` 门禁新增 DPR=2 场景断言（backing = css × dpr），此 bug 类机械拦截。
+- 验证：本地 DPR1/DPR2 双场景 PASS（backing 2056 = 1028×2 + 像素非空）；真机确认留用户（新包已含）。
+
+### ISS-QA-18　阅读区无 pdfjs 文字层 DOM → 无法选中/复制　[P1][待开工]
+
+- 现象：真机页面内容无法选中和复制（canvas 是位图，无文本可选）。
+- 根因（静态诊断）：阅读区只渲染 canvas + 文字层状态徽标，**pdfjs TextLayer（透明 span 层）从未渲染**；`TextSelectionToolbar` / `usePdfTextSelection`（ISS-061 阶段 2，AppShell.tsx:296 监听 workspace__main 选区）在等一个不存在的文字层——此前单测/组件测试用 mock DOM 覆盖，真机从未可用。
+- 修复方向：ReaderCanvas 按 viewport 渲染 pdfjs `TextLayer`（legacy 构建同源 API）：透明 span 对齐 canvas、随缩放/旋转同步、`user-select` 开启；与搜索高亮层、批注 overlay 的 z-order 对齐（DESIGN.md）。
+- 验收（behavior-complete）：真机/产物层 chromium 框选文字 → 浮动工具条出现（高亮/复制可执行）；复制到剪贴板内容正确；缩放后选区跟随；无文字层 PDF（纯扫描）不出浮条不报错（fail-closed）。
+- 关联：ISS-061（工具条已就绪，等文字层）、ISS-QA-02（legacy 构建 + DPR 修复是前置）。
 
 ---
 
