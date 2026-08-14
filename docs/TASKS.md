@@ -74,7 +74,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ### ISS-QA-01　PDF 文件拖入窗口不打开　[P0]
 
-- **状态**：[待开工]　**类型**：缺陷修复　**完成线**：behavior-complete
+- **状态**：[已修复 2026-08-04，Rust DragDrop + 前端 listen，typecheck/cargo check 过；GUI 实机确认留用户 build 新包走查]　**类型**：缺陷修复　**完成线**：behavior-complete
 - **现象（用户视角）**：从系统 Finder / 邮件附件把 `.pdf` 拖到 FaroPDF 窗口，无任何反应，文档不打开。律师高频从 Finder 拖卷宗，是核心入口。
 - **根因**：
   - 前端三处拖拽走 HTML5 `onDrop` + `event.dataTransfer.files`：`ReaderCanvas.tsx:257`、`WelcomeScreen.tsx:59`、`ReaderErrorScreen.tsx:54`。
@@ -106,7 +106,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ### ISS-QA-02　打开 PDF 显示「损坏的文件」　[P0]
 
-- **状态**：[诊断中：根因锁定，待真机 console]　**类型**：缺陷修复　**完成线**：behavior-complete　**本轮（2026-08-05）**：e2e `reader-renders.test.ts`（真 pdfjs + fixture）在 jsdom PASS = `loadPdfFromBytes` pdfjs 逻辑无 bug，**纠正 W2 后「真因 readTextLayerStatus getTextContent」误判**（其 catch 吞错不影响 loadPdfFromBytes 抛出，UI 不显示 textLayerStatus）；真根因 = `loadingTask.promise` reject（fake worker failed，错误模式同 test http: scheme / 真机 tauri:// scheme）= Tauri WKWebView worker 加载环境问题。补 3 层 console 诊断；真修复待真机 devtools console 红字定位 worker 失败具体类。详见 DEC-196。
+- **状态**：[已修复 2026-08-14，standardFontDataUrl 第 2 版：chromium 真 Worker PASS + e2e 7/7 + dist 资产验证；WKWebView 真机实拍 NOT_VERIFIED 留用户 build 后确认「文字层：可检测」]　**类型**：缺陷修复　**完成线**：behavior-complete　**历史诊断过程（2026-08-05）**：e2e `reader-renders.test.ts`（真 pdfjs + fixture）在 jsdom PASS = `loadPdfFromBytes` pdfjs 逻辑无 bug，**纠正 W2 后「真因 readTextLayerStatus getTextContent」误判**（其 catch 吞错不影响 loadPdfFromBytes 抛出，UI 不显示 textLayerStatus）；真根因 = `loadingTask.promise` reject（fake worker failed，错误模式同 test http: scheme / 真机 tauri:// scheme）= Tauri WKWebView worker 加载环境问题。补 3 层 console 诊断；真修复待真机 devtools console 红字定位 worker 失败具体类。详见 DEC-196。
 - **现象（用户视角）**：用「打开」按钮选择正常 PDF（其它阅读器可正常打开），FaroPDF 内显示「损坏 / 无法打开」。
 - **根因（[原假设已被 W2 证伪 REFUTED 2026-08-04，下方原记录保留作历史；Wave 4 必须先读 `docs/QA-02-repro-report.md` 判 A/B 再改代码]）**：
   - worker 配置 `pdfjsWorker.ts:1`：`import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.mjs?url"`，`pdfjs-dist@6.0.227`。
@@ -142,7 +142,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ### ISS-QA-03　界面 emoji 清理（统一换 lucide 图标）　[P1]
 
-- **状态**：[待开工]　**类型**：体验修复　**完成线**：grep 清零 + 视觉确认
+- **状态**：[已修复 main 8c5cc01 2026-08-04，7 处 emoji → lucide；GUI 实机确认留用户]　**类型**：体验修复　**完成线**：grep 清零 + 视觉确认
 - **现象（用户视角）**：界面多处 emoji 字面量，与「律师专业工具」定位不符，显得不够高级。
 - **根因（已确认）**：5 文件 6 处 emoji 字面量未走图标库：
   - `ReaderErrorScreen.tsx:86` 密码锁 emoji（密码输入框）
@@ -169,7 +169,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ### ISS-QA-04　批注/编辑/导出/扫描与文本识别点击后无功能展开　[P0]
 
-- **状态**：[待开工]　**类型**：缺陷修复（多因）　**完成线**：behavior-complete
+- **状态**：[已修复 f54d43a 2026-08-04 mode-aware + 04a/04b 核查闭环 2026-08-14；GUI 实机确认留用户]　**类型**：缺陷修复（多因）　**完成线**：behavior-complete
 - **现象（用户视角）**：工具栏点击「A 批注 / T 编辑 / 导出 / 扫描和文本识别」等模式或菜单项后，没有对应功能面板/工具条展开。
 - **根因（多因，需实机分项走查）**：
   1. mode 按钮接线正常：`Toolbar.tsx:155-188`（A 批注 `:161` / 导出 `:181` / OCR `:187`）`onClick={enterMode}` → `onModeChange`（`:63`）。但工作流按钮 `disabled={!document}`——**未打开 PDF 时点击无反应**（可能被误判为坏了）。
@@ -198,7 +198,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ### ISS-QA-05　左侧边栏各 panel 颜色不统一　[P1]
 
-- **状态**：[待开工]　**类型**：视觉修复　**完成线**：符合 docs/DESIGN.md
+- **状态**：[已修复 main 8c5cc01 2026-08-04，10 个 --panel-* token 归一；GUI 实机确认留用户]　**类型**：视觉修复　**完成线**：符合 docs/DESIGN.md
 - **现象（用户视角）**：左侧边栏「书签 / 大纲 / 批注列表 / 缩略图」等 panel 背景/边框/标题色各自为政，视觉不统一。
 - **根因（已确认）**：`Sidebar.tsx` 多 panel（BookmarkPanel / DocumentSummaryPanel / ViewSettingsPanel / AnnotationSidebar / 缩略图）各自 className（`utility-panel view-settings`、`bookmark-panel` 等），背景/标题样式未归一到同一组 design token。
 - **输入依赖**：`src/styles/app.css`（token 定义）；`docs/DESIGN.md`（侧栏色板基线，若无则按 DEC-186 中性深色壳层定 baseline）。
@@ -222,7 +222,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 ### ISS-QA-06　设置页面入口不见了　[P0]
 
-- **状态**：[待开工]　**类型**：缺陷修复　**完成线**：behavior-complete
+- **状态**：[已修复 main 13974db 2026-08-04，工具栏常驻齿轮 + 原生菜单 settings-open；GUI 实机确认留用户]　**类型**：缺陷修复　**完成线**：behavior-complete
 - **现象（用户视角）**：在界面上找不到「设置」入口，无法进入设置（OCR 后端、语言、偏好等全部不可达）。
 - **根因**：
   - 设置唯一 UI 入口埋在工具栏二级「工具启动器」下拉：`Toolbar.tsx:281` `<button className="tool-launcher-menu__settings">`，`onClick={onOpenSettings}` → `openUtilityPanel("settings")`（`:198`）。该 launcher 由 `toolsMenuOpen` 控制，触发按钮可见性**存疑**（可能折叠/条件错误，用户打不开二级菜单）。
@@ -273,25 +273,27 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 ### v0.2.0 实机回归批次 2（2026-08-05 用户 GUI 实机反馈，ISS-QA-07 ~ ISS-QA-16）
 
 > 来源：用户 dev 实机验证 ISS-QA-01~06 后的新反馈。**已确认修好**：QA-01 拖入（慢但可）、QA-06 设置入口。**修复中**：QA-02 打开「未知」（workerPort）。其余为 UI/UX/定位/配置新涌现，根因多待静态排查（吸取教训：先静态 review 再实机，不浪费用户时间）。
+>
+> **批次状态更新（2026-08-14 PM 复核）**：QA-07~15 已全部修复或按设计收口（CHANGELOG `## 未发版` Fixed 段逐项有记录）；QA-16 MinerU 已默认、PaddleOCR 自部署无固定默认属合理设计。GUI 实机确认统一留用户 build 新 .app 后一并走查（见 QA-02 的 NOT_VERIFIED 收口）。
 
 #### 缺陷总览
 
 | id | 现象 | 优先 | 主改动文件（推断） | 状态 |
 | --- | --- | --- | --- | --- |
-| ISS-QA-07 | 批注工具（高亮/下划线/删除线）出现在左上角，位置不对 | P1 | Toolbar / ContextToolbar / AnnotationToolbar CSS | 待排查 |
-| ISS-QA-08 | 批注有二级菜单、编辑没有（不一致） | P1 | Toolbar / commands.ts submenu | 待排查 |
-| ISS-QA-09 | 导出二级菜单很怪 | P1 | Toolbar / commands.ts | 待排查 |
-| ISS-QA-10 | 填写签名没居中一致 | P1 | SignaturePanel / FormsPanel CSS | 待排查 |
-| ISS-QA-11 | 扫描与文本识别配置页结构混乱 | P1 | OcrPanel / OcrWorkspace / RightPanel | 待排查 |
-| ISS-QA-12 | 扫描右侧加号按钮功能多/分类乱/与其他页重复 | P1 | ToolLauncherMenu（Toolbar 加号）/ commands | 待排查 |
-| ISS-QA-13 | 设置页 UI 参照 Folia（当前选项背景光泽难看） | P1 | settings/*.css | 待设计（参照 Folia） |
-| ISS-QA-14 | 关于界面参照 Folia（介绍 + 个人信息） | P1 | AboutSection | 待设计（参照 Folia） |
-| ISS-QA-15 | 定位改「面向知识工作者」（去律师/卷宗） | P1 | README / package.json / 关于 / WelcomeScreen | 待改 |
-| ISS-QA-16 | OCR endpoint 默认填 | P2 | defaults.ts | MinerU 已填默认；PaddleOCR 无默认（自部署） |
+| ISS-QA-07 | 批注工具（高亮/下划线/删除线）出现在左上角，位置不对 | P1 | Toolbar / ContextToolbar / AnnotationToolbar CSS | [已修复 55364a1 2026-08-05] AnnotationToolbar.css 补 `position:relative` 定位祖先，印章浮层锚定工具条正下方 |
+| ISS-QA-08 | 批注有二级菜单、编辑没有（不一致） | P1 | Toolbar / commands.ts submenu | [已排查 2026-08-14，非 bug] 编辑引擎未实装（ISS-015 暂缓），disabled+tooltip 是正确 fail-closed |
+| ISS-QA-09 | 导出二级菜单很怪 | P1 | Toolbar / commands.ts | [已修复 55364a1 2026-08-05] 随 QA-12 launcher 去重，deliver 段回归纯导出工具 |
+| ISS-QA-10 | 填写签名没居中一致 | P1 | SignaturePanel / FormsPanel CSS | [已修复 b0e404b 2026-08-05] SignatureLibraryPicker 补 CSS + 两处居中手法对齐 |
+| ISS-QA-11 | 扫描与文本识别配置页结构混乱 | P1 | OcrPanel / OcrWorkspace / RightPanel | [已修复 d69e86f 2026-08-05] 独立状态区 OcrStatusStrip + 参数区视觉统一 + 右栏改「队列速览」去重 |
+| ISS-QA-12 | 扫描右侧加号按钮功能多/分类乱/与其他页重复 | P1 | ToolLauncherMenu（Toolbar 加号）/ commands | [已修复 55364a1 2026-08-05] 渲染层过滤 mode-*/view-pages，空段跳过；App.test 回归 3b389f5 补修 |
+| ISS-QA-13 | 设置页 UI 参照 Folia（当前选项背景光泽难看） | P1 | settings/*.css | [已修复 d4246e5 2026-08-05] 选中态改 accent 竖条 + 10% tint，去饱和色块 |
+| ISS-QA-14 | 关于界面参照 Folia（介绍 + 个人信息） | P1 | AboutSection | [已修复 d4246e5 2026-08-05] 扁平化 info-panel 行 + 作者区分隔线 |
+| ISS-QA-15 | 定位改「面向知识工作者」（去律师/卷宗） | P1 | README / package.json / 关于 / WelcomeScreen | [已修复 2026-08-14] package.json / README 定位行 / 关于 / WelcomeScreen 均已改；本轮清 README:65 最后一处「卷宗」；作者署名「杨卫薪律师」非定位文案保留 |
+| ISS-QA-16 | OCR endpoint 默认填 | P2 | defaults.ts | [已按设计收口 2026-08-05] MinerU 默认 `https://mineru.net/api/v4`；PaddleOCR 自部署 URL 各异，留空 + placeholder 属合理设计 |
 
 ---
 
-#### ISS-QA-07　批注工具出现在左上角（位置不对）　[P1][待排查]
+#### ISS-QA-07　批注工具出现在左上角（位置不对）　[P1][已修复 55364a1 2026-08-05]
 - 现象：批注工具（高亮/下划线/删除线）出现在窗口左上角，非工具栏批注 mode 的 L4 位置。
 - 待排查：Toolbar mode 段 / ContextToolbar（annotate L4）/ AnnotationToolbar 渲染挂载点 + CSS 布局；可能浮动/错位。
 - 验收：批注工具在批注 mode 的 L4 工具条位置，不浮在左上角。
@@ -302,44 +304,44 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 验收：批注/编辑入口的二级菜单行为一致（按 DESIGN，都有或都无）。
 - **排查结论（2026-08-14 PM）**：非 bug，是功能成熟度差异。`Toolbar.tsx:168-178` T 编辑按钮硬编码 `disabled` + `title="内容编辑引擎尚未接入"`（无 onClick，不切 mode），edit mode 5 命令（pdf-edit-content/add-text/add-image/add-link/redact）全 `availability:"planned"`（引擎未接入，依赖 ISS-015 PDF 直接编辑，暂缓）。批注有二级菜单/L4 因批注工具已实装（AnnotationToolbar highlight/underline/形状）；编辑无菜单因编辑引擎未实装——强行给 edit 加二级菜单会违反 fail-closed（给未实装功能伪造入口）。待 ISS-015 落地后 edit 自然获得菜单，一致性自动达成。当前 T 按钮 disabled+tooltip 已是正确 fail-closed，无需改代码。
 
-#### ISS-QA-09　导出二级菜单很怪　[P1][待排查]
+#### ISS-QA-09　导出二级菜单很怪　[P1][已修复 55364a1 2026-08-05，随 QA-12 去重理顺]
 - 现象：导出二级菜单视觉/结构怪。
 - 待排查：导出 submenu 注册 + 渲染；对照 PDF Expert 导出菜单。
 - 验收：导出二级菜单结构清晰，符合 DESIGN。
 
-#### ISS-QA-10　填写签名没居中一致　[P1][待排查]
+#### ISS-QA-10　填写签名没居中一致　[P1][已修复 b0e404b 2026-08-05]
 - 现象：填写和签名 mode 内容/面板没居中，视觉不一致。
 - 待排查：FormsPanel / SignaturePanel 布局 CSS；签名预览/选择居中。
 - 验收：填写签名面板内容居中一致。
 
-#### ISS-QA-11　扫描与文本识别配置页结构混乱　[P1][待排查]
+#### ISS-QA-11　扫描与文本识别配置页结构混乱　[P1][已修复 d69e86f 2026-08-05]
 - 现象：OCR mode 配置页结构混乱。
 - 待排查：OcrPanel / OcrWorkspace / RightPanel（ocr-queue）结构；对照 PDF Expert OCR 面板。
 - 验收：OCR 配置页结构清晰（任务列表 + 参数 + 状态），符合 DESIGN。
 
-#### ISS-QA-12　扫描右侧加号按钮功能多/分类乱/与其他页重复　[P1][待排查]
+#### ISS-QA-12　扫描右侧加号按钮功能多/分类乱/与其他页重复　[P1][已修复 55364a1 2026-08-05]
 - 现象：扫描 mode 右侧加号按钮（ToolLauncherMenu）功能非常多，部分在其他页面也有、部分只此页有，分类不明确。
 - 待排查：ToolLauncherMenu（Toolbar.tsx:191 `+` 触发）命令清单；去重（与其他 mode 入口重复）；分类（扫描专属 vs 通用）。
 - 验收：加号按钮功能分类明确，无与其他页重复，职责单一。
 
-#### ISS-QA-13　设置页 UI 参照 Folia　[P1][待设计]
+#### ISS-QA-13　设置页 UI 参照 Folia　[P1][已修复 d4246e5 2026-08-05]
 - 现象：设置页选项背景色带光泽，不好看。
 - 方向：参照 Folia 项目设置页 UI（memory `feedback_faropdf_folia_alignment`：FaroPDF 跟 Folia 对齐）。
 - 范围：`src/modules/settings/*.css` + SettingsPanel 布局。
 - 验收：设置页视觉与 Folia 一致（去光泽、简洁），符合 DESIGN。
 
-#### ISS-QA-14　关于界面参照 Folia　[P1][待设计]
+#### ISS-QA-14　关于界面参照 Folia　[P1][已修复 d4246e5 2026-08-05]
 - 现象：关于界面（介绍 + 个人信息）要参照 Folia。
 - 范围：AboutSection（settings about section）。
 - 验收：关于界面与 Folia 一致（介绍 + 作者信息），符合 DESIGN。
 
-#### ISS-QA-15　定位改「面向知识工作者」　[P1][待改]
+#### ISS-QA-15　定位改「面向知识工作者」　[P1][已修复 2026-08-14，README:65 最后一处「卷宗」清除；作者署名保留]
 - 现象：当前定位「面向律师日常处理卷宗/证据/判决/合同/扫描材料」要改。
 - 改：全处「面向律师日常处理卷宗...」→「面向知识工作者」。
 - 范围：README.md / package.json description / 关于界面 / WelcomeScreen / 各 UI 文案（grep `律师|卷宗|证据|判决`）。
 - 验收：全处定位统一为「面向知识工作者」，无律师/卷宗字样。
 
-#### ISS-QA-16　OCR endpoint 默认填　[P2][部分完成 2026-08-05]
+#### ISS-QA-16　OCR endpoint 默认填　[P2][已按设计收口 2026-08-05]
 - 现象：OCR provider endpoint 该默认填（用户只填 API key）。
 - 已做：MinerU endpoint 默认填 `https://mineru.net/api/v4`（固定官方，`defaults.ts:68`）；用户只填 API token。
 - 未做：PaddleOCR endpoint **无固定默认**（每用户从 aistudio.baidu.com/paddleocr/task 部署自己的 app，URL 各异），留空 + placeholder 提示「自部署 aistudio app URL」。
