@@ -434,12 +434,13 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 - 优先级：P2
 - 类型：发布 / 缺陷
-- 状态：已知原因
+- 状态：✅ 已闭环 2026-08-14（仓库公开，代码零改动）
 - 来源：用户实际使用反馈
 - 描述：设置页"检查更新"始终显示失败。
 - 原因：仓库 `cat-xierluo/FaroPDF` 当前为 **private**，updater endpoint `https://github.com/cat-xierluo/FaroPDF/releases/latest/download/latest.json` 对未认证请求返回 404。
 - 解决方案：仓库公开后自动修复。若需在私有阶段测试更新，可改用 GitHub API + token 或私有 CDN 托管 `latest.json`（不在 v0.1 阻塞）。
 - 关键文件：`src-tauri/tauri.conf.json` § plugins.updater.endpoints、`src/modules/settings/sections/AboutSection.tsx`（更新状态 UI）。
+- **闭环确认（2026-08-14）**：用户决策路径 A — `gh repo edit cat-xierluo/FaroPDF --visibility public --accept-visibility-change-consequences` 执行成功，`isPrivate:false`。验证：`curl -L https://github.com/cat-xierluo/FaroPDF/releases/latest/download/latest.json` → HTTP 200，1788 bytes，tauri schema 正确（version + pub_date + 3 平台 signature/url 齐全）；.sig 旁车（macOS aarch64/x64 + Windows x64）均 200。代码零改动，updater 立即闭环。v0.2.0 用户实机点「检查更新」应显示「可从 X 升级到 0.2.0」或「已是最新版本」。
 
 ### ISS-015 直接编辑 PDF 原有文字、图片和链接
 

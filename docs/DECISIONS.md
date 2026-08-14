@@ -7752,3 +7752,22 @@ M5 异常态最终状态：文件损坏 ✅、密码 PDF ✅、权限不足 ✅�
 - **WKWebView 真机二次实拍仍未完成**：Safari 开发菜单未列出 FaroPDF WKWebView target（`WEBKIT_INSPECTOR_SERVER` 环境变量在 wry 当前 macOS 版本不生效），`document.title` 不映射到 Tauri 窗口标题，localStorage 诊断写入因 webview 缓存旧 JS 未触发。**chromium 真 Worker 证据 + 修复前真机「文字层未知」截图 + build 后 dist/standard_fonts 存在** 三者构成当前最强证据链；最终 WKWebView 实拍留用户 build 后实机确认（预期「文字层：可检测」）。
 - **完成度**：QA-02 修复代码已落（e2e 7/7 PASS + lint 0 错 + typecheck 过 + chromium 真 Worker PASS + dist 资产验证）。残留：WKWebView 最终实拍（需 build 产物 + 手动打开）。
 - **2026-08-14 PM 独立复跑确认（非上个 session 自报）**：重新起 vite dev → `scripts/qa02-verify.mjs`（chromium 真 module worker）reference.pdf `textLayerStatus="available"` / pageCount=5 / 422 字符，corrupt.pdf 抛 `InvalidPDFException`；`npm run build` 后 `dist/standard_fonts/` 实有 16 文件、curl `FoxitFixed.pfb` 200；`npm run lint` 0 error（顺手修 `scripts/qa02-realdevice.mjs` 4 处 lint：`/* global fetch */` + 两处空 catch + 删 `@ts-ignore`）；`npm run test:e2e` 7/7。另清理 `pdfReaderService.ts` catch 内遗留的 `alert("QA-02 DIAGNOSTIC…")` 调试桩。WKWebView 真机实拍仍 NOT_VERIFIED。
+
+## DEC-197 ISS-036 仓库公开，updater 闭环（2026-08-14）
+
+- **触发**：`docs/TASKS.md` ISS-036（设置页「检查更新」失败，P2）。
+- **根因**：`cat-xierluo/FaroPDF` 仓库 `isPrivate:true`，匿名 GET `https://github.com/cat-xierluo/FaroPDF/releases/latest/download/latest.json` 被 GitHub access control 拦截返回 404；release 资产（含 `latest.json` 1788 bytes + 三平台 `.sig`）实际存在但仅 authenticated 可访问。
+- **方案选型**（A/B/C/D 四路，三向 rejected）：
+  - ✅ A 仓库公开（用户决策，零代码改动）
+  - ⏸ D UI 文案准确化（保留私有时可用，本次不需要）
+  - ❌ B 改 GitHub API endpoint — `tauri-plugin-updater` 不支持鉴权 header + GitHub API 返回的 schema 不同于 tauri latest.json，plugin 会拒绝
+  - ❌ C 私有 CDN 托管 latest.json — 凭证管理安全债 + release.yml 改造工作量大
+- **执行**：`gh repo edit cat-xierluo/FaroPDF --visibility public --accept-visibility-change-consequences`（gh CLI 强制 flag，显式接受可见性变更后果）。
+- **验证（决定性证据）**：
+  - `gh repo view … --json isPrivate` → `{"isPrivate":false,"visibility":"PUBLIC"}`
+  - `curl -L https://github.com/cat-xierluo/FaroPDF/releases/latest/download/latest.json` → HTTP 200，1788 bytes
+  - JSON schema：`version:"0.2.0"`, `pub_date:"2026-08-04T…"`, `platforms` 含 darwin-aarch64/x86_64 + windows-x86_64 三平台（signature + url 齐全）
+  - `.sig` 旁车：`FaroPDF_aarch64.app.tar.gz.sig` / `FaroPDF_x64-setup.exe.sig` 等均 HTTP 200
+- **结果**：v0.2.0 实装用户点「检查更新」应见「可从 X 升级到 0.2.0」或「已是最新版本」。代码零改动（`tauri.conf.json` § plugins.updater.endpoints 无需调整）。
+- **不复发保证**：仓库公开是 GitHub 仓库级状态，不在 Git 仓库内——避免误回退到私有的唯一手段是 `gh repo edit --visibility private` 主动改回（操作员责任，无 code-level guard）。
+- **Refs**：ISS-036 / docs/TASKS.md
