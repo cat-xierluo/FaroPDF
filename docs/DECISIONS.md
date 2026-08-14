@@ -8035,5 +8035,5 @@ M5 异常态最终状态：文件损坏 ✅、密码 PDF ✅、权限不足 ✅�
   3. 顺手清 4 个 unhandled rejection：`App.tsx:321` `listen("faropdf://file-drop")` 在非 Tauri 运行时（jsdom / 浏览器 dev）reject（`__TAURI_INTERNALS__` undefined）→ 链尾补 `.catch(() => undefined)` 静默降级到 HTML5 onDrop（web 降级路径语义不变）。
 - **验证（实跑）**：全量 `npm test` **136 文件 / 1495 用例全过、0 Errors、~70s 正常退出**（修复前 240s+ 不退出）；typecheck / lint 0 error。
 - **影响**：CI `test` job 从 `test:e2e` 子集扩回全量 `pnpm test`；AGENTS.md 验证层表格 / CI 说明同步；TASKS 待补齐清单 D 闭环；ISS-VERIF-01 残留第 2 项勾销。
-- **教训（沉淀）**：「测试套件从不完成」比「测试失败」更危险——它同时掩盖真实失败（3 条）和制造虚假的「跑不完所以不算挂」。悬挂类问题的有效路径：停滞检测 → 单文件二分 → CPU + sample 判断忙/闲 → inspector pause 抓 JS 栈。
+- **教训（沉淀）**：「测试套件从不完成」比「测试失败」更危险——它同时掩盖真实失败（3 条）和制造虚假的「跑不完所以不算挂」。悬挂类问题的有效路径：停滞检测 → 单文件二分 → CPU + sample 判断忙/闲 → inspector pause 抓 JS 栈。**已沉淀 skill**：legal-skills `verification-gate` v1.1.1（教训 11 掩盖效应 / 教训 12 诊断 playbook + effect↔dispatch 反模式 / e2e-practice 自起 dev server wrapper 配方，commit `48e01dd`），其他项目可直接复用。
 - **Refs**：DEC-198（CI 子集绕开的临时态）/ ISS-059（tab store 语义）/ `553f5a1`（QA-12 去重）/ docs/TASKS.md 待补齐清单 D / ISS-VERIF-01
