@@ -337,7 +337,10 @@ function App() {
       } else {
         unlisten = nextUnlisten;
       }
-    });
+    }).catch(() => undefined);
+    // ^ 非 Tauri 运行时（浏览器 dev / vitest jsdom）无 __TAURI_INTERNALS__，
+    //   listen 会 reject（transformCallback undefined）——静默降级到 HTML5
+    //   onDrop（上方注释的 web 降级路径），不留 unhandled rejection 噪音。
 
     return () => {
       disposed = true;
