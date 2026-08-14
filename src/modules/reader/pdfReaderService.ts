@@ -84,15 +84,27 @@ export interface LoadedPdfDocument {
 const defaultAdapter: PdfJsReaderAdapter = {
   configureWorker: configurePdfjsWorker,
   getDocument: async (params) => {
-    const { getDocument } = await import("pdfjs-dist");
+    // ISS-QA-02 第 4 版（2026-08-15）：与 pdfjsWorker.ts 同步切 legacy 构建——
+    // 现代构建用 `Map.prototype.getOrInsertComputed`（Safari 26 才有），
+    // macOS 15 WKWebView 下 render/getTextContent 直接 TypeError。worker 与
+    // 主线程 API 必须同构建版本。
+    const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
     // ISS-QA-02 真机修复（2026-08-05）：真机 Tauri WKWebView 下
     // `getTextContent()` 抛 "UnknownErrorException: Ensure that the
     // standardFontDataUrl API parameter is provided"——`textLayerStatus`
     // 因此被 `readTextLayerStatus` catch 吞错返回 `unknown`，状态栏「文字层未知」。
     // `/standard_fonts/` 由 vite.config.ts `provideStandardFonts` plugin 提供：
-    // dev 用中间件映射 node_modules 真实文件，build 复制到 dist/standard_fonts/，
-    // tauri:// / http:// 根路径一致可达。字体目录 URL 必须以 `/` 结尾。
-    return getDocument({ ...params, standardFontDataUrl: "/standard_fonts/" }) as unknown as PdfJsLoadingTaskLike;
+    // dev 用中间件映射 node_modules 真实文件，build 复制到 dist/standard_fonts/。
+    //
+    // ISS-QA-02 第 3 版补充（2026-08-14，真机复测「文字层未知」）：worker 改为
+    // `?worker&inline`（blob: URL）后，pdfjs 在 worker 里 fetch 根相对路径
+    // "/standard_fonts/…" 会以 **blob URL** 为 base 解析——`blob:tauri://…` 不是
+    // 层级 URL，解析失败 → 字体拿不到 → getTextContent 抛错（http origin 的
+    // chromium 下永远复现不了，dev/preview 都过）。必须在主线程（页面 origin）
+    // 先解析成**绝对 URL** 再传给 pdfjs：tauri://localhost/standard_fonts/、
+    // http://localhost:1420/standard_fonts/ 一致可达。
+    const standardFontDataUrl = new URL("/standard_fonts/", document.baseURI).href;
+    return getDocument({ ...params, standardFontDataUrl }) as unknown as PdfJsLoadingTaskLike;
   },
 };
 
