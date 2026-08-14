@@ -79,6 +79,28 @@ async function runScenario(label, { deviceScaleFactor } = {}) {
     if (canvasInfo?.ctx && canvasInfo.nonZero > 100) break;
     await delay(500);
   }
+  // ISS-QA-18：文字层（可选中 span）真实 UI 断言——等 span 出现后程序化框选，
+  // 断言 window.getSelection() 能取到非空文本（选中/复制的能力基础）。
+  let selectionInfo = null;
+  for (let i = 0; i < 20; i++) {
+    selectionInfo = await page.evaluate(() => {
+      const span = document.querySelector(".pdf-text-layer span");
+      if (!span) return null;
+      const range = document.createRange();
+      range.selectNodeContents(span);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      return {
+        spanCount: document.querySelectorAll(".pdf-text-layer span").length,
+        selectedText: sel?.toString() ?? "",
+      };
+    });
+    if (selectionInfo && selectionInfo.spanCount > 0 && selectionInfo.selectedText.trim().length > 0) break;
+    await delay(500);
+  }
+  canvasInfo = canvasInfo ? { ...canvasInfo, selection: selectionInfo } : canvasInfo;
+  console.log(`[${label}] 文字层选区=`, JSON.stringify(selectionInfo));
   console.log(`[${label}] canvas=`, JSON.stringify(canvasInfo));
   console.log(`[${label}] console 尾部：`, consoleMsgs.slice(-6).join(" || ") || "(无)");
   await context.close();
@@ -94,10 +116,13 @@ try {
   // preview 进程已自行退出则无需清理。
 }
 const renderOk = (info) => Boolean(info?.ctx && info.nonZero > 100);
+const selectionOk = Boolean(
+  dpr1?.selection && dpr1.selection.spanCount > 0 && dpr1.selection.selectedText.trim().length > 0,
+);
 const retinaOk = Boolean(
   dpr2 && renderOk(dpr2) && Math.abs(dpr2.w - dpr2.cssW * dpr2.dpr) <= 2,
 );
-const ok = renderOk(dpr1) && retinaOk;
-console.log(`[判定] DPR1 渲染=${renderOk(dpr1)} DPR2 渲染=${renderOk(dpr2)} Retina 倍率=${retinaOk}（backing ${dpr2?.w} vs css ${dpr2?.cssW}×${dpr2?.dpr}）`);
-console.log(`\n=== ${ok ? "PASS：产物层渲染正常（含 Retina DPR=2）" : "FAIL：产物层复现空白/无 canvas/Retina 倍率不符"} ===`);
+const ok = renderOk(dpr1) && selectionOk && retinaOk;
+console.log(`[判定] DPR1 渲染=${renderOk(dpr1)} 文字层选区=${selectionOk} DPR2 渲染=${renderOk(dpr2)} Retina 倍率=${retinaOk}（backing ${dpr2?.w} vs css ${dpr2?.cssW}×${dpr2?.dpr}）`);
+console.log(`\n=== ${ok ? "PASS：产物层渲染正常（含 Retina DPR=2 + 文字层选区）" : "FAIL：产物层复现空白/无 canvas/Retina 倍率不符/无文字层"} ===`);
 process.exit(ok ? 0 : 1);

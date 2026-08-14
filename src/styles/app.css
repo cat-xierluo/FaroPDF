@@ -1904,3 +1904,42 @@ select.zoom-control {
   }
 
 }
+
+/* ── ISS-QA-18：pdfjs 文字层（透明可选中 span）────────────────────────────
+ * 几何域 = CSS px（--total-scale-factor 由 pdfReaderService.renderTextLayer
+ * 设为 viewport.scale，与 canvas 的 CSS 尺寸同域；canvas backing store 的
+ * DPR 放大不影响本层——矢量 span 天然清晰）。规则对照 pdf.js 官方
+ * .textLayer（pdf_viewer.css）裁剪适配。 */
+.pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 1;
+}
+
+.pdf-text-layer :is(span, br) {
+  color: transparent;
+  cursor: text;
+  position: absolute;
+  transform-origin: 0% 0%;
+  white-space: pre;
+}
+
+.pdf-text-layer ::selection {
+  background: color-mix(in srgb, var(--selection) 35%, transparent);
+}
+
+/* pdf.js TextLayer 追加的收尾元素（点击空白处取消选区用） */
+.pdf-text-layer .endOfContent {
+  cursor: pointer;
+  display: block;
+  inset: 100% 0 0;
+  position: absolute;
+  user-select: none;
+  z-index: -1;
+}

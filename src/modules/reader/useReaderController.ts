@@ -417,6 +417,22 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     return loadedDocument.renderThumbnail(pageIndex, canvas, maxWidth);
   }, []);
 
+  /** ISS-QA-18：渲染 pdfjs TextLayer（可选中文字 span 层）到容器。文档未打开时 no-op。 */
+  const renderTextLayer = useCallback(async (
+    pageIndex: number,
+    container: HTMLDivElement,
+    zoom: number,
+    options?: { signal?: AbortSignal },
+  ) => {
+    const loadedDocument = loadedDocumentRef.current;
+
+    if (!loadedDocument) {
+      return;
+    }
+
+    return loadedDocument.renderTextLayer(pageIndex, container, zoom, options);
+  }, []);
+
   /**
    * 返回当前打开的 PDF 源字节副本。无文档时返回 null；底层使用 openFile 时缓存的 arrayBuffer，
    * 避免再次读取 file。同一文件被多次调用时共用同一 bytesPromise 但消费方各自 copy 出独立 Uint8Array。
@@ -484,6 +500,7 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     getPageText,
     renderPageToCanvas,
     renderThumbnail,
+    renderTextLayer,
     getFileBytes,
     getCurrentFileName,
     saveUpdatedBytes,

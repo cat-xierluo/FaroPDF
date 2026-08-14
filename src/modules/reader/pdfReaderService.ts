@@ -10,6 +10,8 @@ interface PdfJsViewportLike {
   width: number;
   height: number;
   rotation?: number;
+  /** viewport 缩放（getViewport({ scale }) 的入参回显）；ISS-QA-18 文字层用 */
+  scale?: number;
 }
 
 interface PdfJsTextContentLike {
@@ -76,6 +78,19 @@ export interface LoadedPdfDocument {
   ) => Promise<void>;
   /** 将指定页以缩略图尺寸渲染到 canvas；maxWidth 约束最长边。失败时抛出错误。 */
   renderThumbnail: (pageIndex: number, canvas: HTMLCanvasElement, maxWidth: number) => Promise<void>;
+  /**
+   * ISS-QA-18（2026-08-15）：把指定页的 pdfjs TextLayer（透明可选中文字 span）
+   * 渲染进 container，与 canvas 的 CSS 尺寸同域对齐（--total-scale-factor =
+   * viewport.scale，CSS px；canvas backing store 的 DPR 放大不影响本层）。
+   * 页面无文字层（纯扫描）或 pdfjs 页对象不支持 streamTextContent 时抛错，
+   * 由调用方 fail-closed 跳过（阅读区仍可看 canvas）。
+   */
+  renderTextLayer: (
+    pageIndex: number,
+    container: HTMLDivElement,
+    zoom: number,
+    options?: { signal?: AbortSignal },
+  ) => Promise<void>;
   /** ISS-NEW-M M4：读取 PDF outline（书签 destination）并归一化为树。无 outline 时返回空数组。 */
   getOutline: () => Promise<OutlineNode[]>;
   destroy: () => Promise<void>;
@@ -188,8 +203,7 @@ async function renderPageToCanvas(
 
 /** 将指定页以缩略图尺寸渲染到 canvas，maxWidth 约束最长边像素。
  *  scale = maxWidth / pageViewport.width；canvas 的 width/height 同步设置。 */
-async function renderThumbnail(
-  document: PdfJsDocumentLike,
+async function renderThumbnail(  document: PdfJsDocumentLike,
   pageIndex: number,
   canvas: HTMLCanvasElement,
   maxWidth: number,
@@ -208,6 +222,43 @@ async function renderThumbnail(
   const renderContext = { canvasContext: context, viewport };
   const renderResult = (page as unknown as { render(ctx: typeof renderContext): { promise: Promise<void> } }).render(renderContext);
   await renderResult.promise;
+}
+
+/**
+ * ISS-QA-18（2026-08-15）：渲染 pdfjs TextLayer（透明可选中的文字 span 层）。
+ *
+ * - 几何域：span 定位 / 字号由 `--total-scale-factor`（= viewport.scale，CSS px）
+ *   驱动，与 canvas 的 CSS 尺寸同域对齐；Retina backing store 的 DPR 放大不影响
+ *   本层（文字是矢量 span，天然清晰）。
+ * - textContentSource 用 `page.streamTextContent()`（流式），TextLayer 内部按
+ *   viewport.rawDims 计算 transform；无文字页（纯扫描）产出零 span，不抛错。
+ * - 页对象不支持 streamTextContent（单测 mock）时抛错，调用方 fail-closed 跳过。
+ */
+async function renderTextLayer(
+  document: PdfJsDocumentLike,
+  pageIndex: number,
+  container: HTMLDivElement,
+  zoom: number,
+  options: { signal?: AbortSignal } = {},
+): Promise<void> {
+  throwIfAborted(options.signal);
+  const page = await document.getPage(pageIndex + 1);
+  throwIfAborted(options.signal);
+  const streamTextContent = (page as unknown as {
+    streamTextContent?: () => ReadableStream<unknown>;
+  }).streamTextContent;
+  if (typeof streamTextContent !== "function") {
+    throw new Error("pdfjs 页对象不支持 streamTextContent，无法渲染文字层");
+  }
+  const viewport = page.getViewport({ scale: zoom });
+  container.style.setProperty("--total-scale-factor", String(viewport.scale ?? zoom));
+  const { TextLayer } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const textLayer = new TextLayer({
+    textContentSource: streamTextContent.call(page),
+    container,
+    viewport: viewport as never,
+  });
+  await textLayer.render();
 }
 
 /**
@@ -481,6 +532,7 @@ export async function loadPdfFromBytes(
     },
     renderPageToCanvas: (pageIndex, canvas, zoom, options) => renderPageToCanvas(document, pageIndex, canvas, zoom, options),
     renderThumbnail: (pageIndex, canvas, maxWidth) => renderThumbnail(document, pageIndex, canvas, maxWidth),
+    renderTextLayer: (pageIndex, container, zoom, options) => renderTextLayer(document, pageIndex, container, zoom, options),
     getOutline: () => readOutlineTree(document),
     destroy: () => loadingTask.destroy?.() ?? Promise.resolve(),
   };

@@ -50,6 +50,7 @@ function mockLoadedPdf({
     getRawTextContent: vi.fn(async () => null),
     renderPageToCanvas: vi.fn(async () => undefined),
     renderThumbnail: vi.fn(async () => undefined),
+      renderTextLayer: vi.fn(async () => undefined),
     getOutline: vi.fn(async () => []),
     destroy: vi.fn(async () => undefined),
   }));
@@ -148,6 +149,7 @@ describe("search UI integration", () => {
     getRawTextContent: vi.fn(async () => null),
     renderPageToCanvas: vi.fn(async () => undefined),
     renderThumbnail: vi.fn(async () => undefined),
+      renderTextLayer: vi.fn(async () => undefined),
     getOutline: vi.fn(async () => []),
     destroy: vi.fn(async () => undefined),
   }));

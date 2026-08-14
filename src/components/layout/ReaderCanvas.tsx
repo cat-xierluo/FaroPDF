@@ -23,6 +23,14 @@ export type RenderPageToCanvasFn = (
   options?: { signal?: AbortSignal },
 ) => Promise<void>;
 
+/** ISS-QA-18：把 pdfjs TextLayer（可选中文字 span 层）渲染进容器的函数签名 */
+export type RenderTextLayerFn = (
+  pageIndex: number,
+  container: HTMLDivElement,
+  zoom: number,
+  options?: { signal?: AbortSignal },
+) => Promise<void>;
+
 interface ReaderCanvasProps {
   onOpenFile?: (file: File) => void | Promise<void>;
   /** ISS-NEW-M M5：加密 PDF 用户提交密码（接 reader.submitPassword）。 */
@@ -33,6 +41,8 @@ interface ReaderCanvasProps {
   searchState?: TextSearchState;
   /** 由 reader controller 提供的 canvas 渲染方法 */
   renderPageToCanvas?: RenderPageToCanvasFn;
+  /** ISS-QA-18：由 reader controller 提供的文字层渲染方法（可选，缺省无选区） */
+  renderTextLayer?: RenderTextLayerFn;
   /** 滚动时检测当前可见页并同步到 reader state；可选，未提供时不启用滚动同步 */
   onPageVisible?: (pageNumber: number) => void;
   /** 键盘翻页回调；可选，未提供时不启用键盘监听 */
@@ -77,6 +87,7 @@ export function ReaderCanvas({
   readerState,
   searchState,
   renderPageToCanvas,
+  renderTextLayer,
   recentFiles,
   onClearRecent,
   onOpenRecent,
@@ -144,6 +155,7 @@ export function ReaderCanvas({
       onRequestOcr={onRequestOcr}
       pageViewports={readerState.pageViewports}
       renderPageToCanvas={renderPageToCanvas}
+      renderTextLayer={renderTextLayer}
       renderRange={readerState.renderRange}
       searchState={searchState}
     />
@@ -156,13 +168,14 @@ interface DocumentReaderProps {
   renderRange: ReaderState["renderRange"];
   searchState?: TextSearchState;
   renderPageToCanvas?: RenderPageToCanvasFn;
+  renderTextLayer?: RenderTextLayerFn;
   onOpenFile?: (file: File) => void | Promise<void>;
   onPageVisible?: (pageNumber: number) => void;
   onPageNavigate?: (nextPage: number) => void;
   onRequestOcr?: () => void;
 }
 
-function DocumentReader({ document, pageViewports, renderRange, searchState, renderPageToCanvas, onOpenFile, onPageVisible, onPageNavigate, onRequestOcr }: DocumentReaderProps) {
+function DocumentReader({ document, pageViewports, renderRange, searchState, renderPageToCanvas, renderTextLayer, onOpenFile, onPageVisible, onPageNavigate, onRequestOcr }: DocumentReaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const activeHitPageNumber = searchState?.activeHit?.pageNumber;
@@ -305,6 +318,7 @@ function DocumentReader({ document, pageViewports, renderRange, searchState, ren
             pageStyle={pageStyle}
             pageWidth={pageWidth}
             renderPageToCanvas={renderPageToCanvas}
+            renderTextLayer={renderTextLayer}
             rotation={document.rotation}
             textLayerStatus={document.textLayerStatus}
             viewMode={document.viewMode}
@@ -347,6 +361,7 @@ interface PdfPageProps {
       : never
     : never;
   renderPageToCanvas?: RenderPageToCanvasFn;
+  renderTextLayer?: RenderTextLayerFn;
   /** 页面进入视口时通知父组件，用于同步 currentPage */
   onVisible?: (pageNumber: number) => void;
   /** 单页/双页模式下点击页边时翻页 */
@@ -366,12 +381,14 @@ function PdfPage({
   textLayerStatus,
   viewMode,
   renderPageToCanvas,
+  renderTextLayer,
   onVisible,
   onPageNavigate,
   activeHit = false,
 }: PdfPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
   // 渲染失败标记，用于决定是否隐藏 fallback
   const [renderFailed, setRenderFailed] = useState(false);
 
@@ -379,6 +396,31 @@ function PdfPage({
   useEffect(() => {
     setRenderFailed(false);
   }, [pageNumber, zoom, rotation]);
+
+  // ISS-QA-18：canvas 渲染成功后渲染 pdfjs 文字层（透明可选中 span）。
+  // 仅在文档级 textLayerStatus=available 时启用；失败 fail-closed（console.warn
+  // + 清空容器），阅读不受影响——纯扫描页本就无文字。
+  useEffect(() => {
+    const container = textLayerRef.current;
+    if (!container || !renderTextLayer || textLayerStatus !== "available" || renderFailed) {
+      return;
+    }
+    const pageIndex = pageNumber - 1;
+    const abortController = new AbortController();
+    container.replaceChildren();
+    renderTextLayer(pageIndex, container, zoom, { signal: abortController.signal }).catch(
+      (error: unknown) => {
+        if (isAbortError(error) || abortController.signal.aborted) {
+          return;
+        }
+        console.warn(`[FaroPDF] 第 ${pageNumber} 页文字层渲染跳过：`, error);
+        container.replaceChildren();
+      },
+    );
+    return () => {
+      abortController.abort();
+    };
+  }, [pageNumber, zoom, rotation, renderTextLayer, textLayerStatus, renderFailed]);
 
   // 在 renderRange 页面变化或 zoom/rotation 变化时触发 canvas 渲染
   useEffect(() => {
@@ -475,6 +517,11 @@ function PdfPage({
             style={{ display: "block" }}
             width={pageWidth}
           />
+        )}
+        {/* ISS-QA-18：pdfjs 文字层（透明可选中 span），与 canvas CSS 尺寸同域对齐；
+            textLayerStatus=available 时才渲染（纯扫描 fail-closed 不出层） */}
+        {showCanvas && renderTextLayer && textLayerStatus === "available" && (
+          <div className="pdf-text-layer" ref={textLayerRef} />
         )}
         {/* 搜索高亮叠加层，绝对定位在 canvas 之上 */}
         {highlights.length > 0 && (

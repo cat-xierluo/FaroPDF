@@ -1281,6 +1281,7 @@ export function AppShell({
               readerState={reader.state}
               recentFiles={settings.recentFiles}
               renderPageToCanvas={reader.renderPageToCanvas}
+              renderTextLayer={reader.renderTextLayer}
               searchState={search.state}
               onSubmitPassword={reader.submitPassword}
               onCancelPassword={reader.cancelPassword}

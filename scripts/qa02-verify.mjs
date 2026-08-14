@@ -52,11 +52,28 @@ const result = await page.evaluate(async ({ data, corruptData }) => {
       fileName: "reference.pdf",
       filePath: "/fixtures/reference.pdf",
     });
+    // ISS-QA-18：文字层（TextLayer span）真实渲染断言——选中/复制的能力基础。
+    let textLayer = null;
+    try {
+      const container = document.createElement("div");
+      document.body.append(container);
+      await doc.renderTextLayer(0, container, 1);
+      const spans = container.querySelectorAll("span");
+      const text = Array.from(spans)
+        .map((s) => s.textContent ?? "")
+        .join("")
+        .trim();
+      textLayer = { ok: spans.length > 0 && text.length > 0, spanCount: spans.length, sampleText: text.slice(0, 60) };
+      container.remove();
+    } catch (e) {
+      textLayer = { ok: false, error: e instanceof Error ? `${e.name}: ${e.message}` : String(e) };
+    }
     results.fixed = {
       ok: true,
       pageCount: doc.metadata.pageCount,
       textLayerStatus: doc.metadata.textLayerStatus,
       firstPageChars: (await doc.getPageText(0)).charCount,
+      textLayer,
     };
     await doc.destroy();
   } catch (e) {
@@ -81,6 +98,6 @@ console.log("\n=== QA-02 VERIFY RESULT ===");
 console.log(JSON.stringify(result, null, 2));
 await browser.close();
 
-const pass = result.fixed?.ok && result.fixed?.textLayerStatus !== "unknown" && result.corrupt?.ok;
+const pass = result.fixed?.ok && result.fixed?.textLayerStatus !== "unknown" && result.fixed?.textLayer?.ok && result.corrupt?.ok;
 console.log(`\n=== ${pass ? "PASS" : "FAIL"} ===`);
 process.exit(pass ? 0 : 1);

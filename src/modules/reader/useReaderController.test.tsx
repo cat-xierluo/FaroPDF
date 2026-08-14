@@ -44,6 +44,7 @@ function createLoadedDocument(overrides: Partial<ReaderLoadedMetadata> = {}): Lo
     getRawTextContent: vi.fn(async () => null),
     renderPageToCanvas: vi.fn(async () => undefined),
     renderThumbnail: vi.fn(async () => undefined),
+    renderTextLayer: vi.fn(async () => undefined),
     getOutline: vi.fn(async () => []),
     destroy: vi.fn(async () => undefined),
   };
