@@ -332,7 +332,7 @@ describe("AppShell modes 上下文工具条", () => {
     expect(screen.queryByRole("button", { name: "适合页面" })).not.toBeInTheDocument();
   });
 
-  test("核心工作流在 L3 直接可达，完整命令仍由工具菜单承载", async () => {
+  test("核心工作流在 L3 直接可达，「+」工具菜单不再重复承载（ISS-QA-12 去重）", async () => {
     const user = userEvent.setup();
     const onModeChange = vi.fn();
     renderAppShell({ onModeChange, reader: makeReadyReader(), utilityPanel: "none" });
@@ -348,10 +348,12 @@ describe("AppShell modes 上下文工具条", () => {
 
     await user.click(within(toolbar).getByRole("button", { name: "工具" }));
     const menu = screen.getByRole("menu", { name: "PDF 工具菜单" });
-    expect(within(menu).getByRole("menuitem", { name: "批注" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "导出" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "填写和签名" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: "OCR" })).toBeInTheDocument();
+    // QA-12（553f5a1）后 launcher 渲染层过滤 mode-* 与 view-pages——
+    // 工作流切换（批注/导出/填写签名/OCR/页面管理）只留 L3 一级入口。
+    expect(within(menu).queryByRole("menuitem", { name: "批注" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "导出" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "填写和签名" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "OCR" })).not.toBeInTheDocument();
 
     expect(within(menu).getByRole("menuitem", { name: "设置" })).toBeInTheDocument();
   });
@@ -368,10 +370,12 @@ describe("AppShell modes 上下文工具条", () => {
     await user.click(screen.getByRole("button", { name: "工具" }));
 
     const menu = screen.getByRole("menu", { name: "PDF 工具菜单" });
-    expect(within(menu).getByRole("group", { name: "组织页面" })).toBeInTheDocument();
+    // QA-12 去重后：organize（仅 view-pages）与 scan（仅 mode-ocr）段被过滤为空、
+    // 渲染层跳过；deliver / markup 两段保留真实工具。
+    expect(within(menu).queryByRole("group", { name: "组织页面" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("group", { name: "扫描 OCR" })).not.toBeInTheDocument();
     expect(within(menu).getByRole("group", { name: "交付导出" })).toBeInTheDocument();
     expect(within(menu).getByRole("group", { name: "标注填写" })).toBeInTheDocument();
-    expect(within(menu).getByRole("group", { name: "扫描 OCR" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /添加页码/ })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /Bates 编号/ })).toBeInTheDocument();
 
@@ -1486,8 +1490,39 @@ describe("AppShell M2.2：Toolbar 5 段层级 + L2 tab", () => {
     expect(sections[4]).toHaveAttribute("aria-label", "全文搜索");
   });
 
-  test("TitlebarTabs 渲染在 Toolbar 上方（独立行，不嵌在 Toolbar 内）", () => {
-    const { container } = renderAppShell({ utilityPanel: "none" });
+  test("TitlebarTabs 渲染在 Toolbar 上方（独立行，不嵌在 Toolbar 内）", async () => {
+    // TitlebarTabs 只在有 tab 时渲染——需 harness 开一条 tab（与下方「L2 tab 上移」
+    // 同款；无 tab 时该断言必然失败，此前一直被套件悬挂掩盖）。用 waitFor 等
+    // effect 提交后的 titlebar-tabs 行出现。
+    function OpenTabsHarness(): import("react").ReactElement {
+      const store = useTabStore();
+      useEffect(() => {
+        // 查重守卫同 AppShell.tsx 真实接线：防 effect↔dispatch 无限循环。
+        if (store.state.tabs.length === 0) {
+          store.openTab("/case/position.pdf", "position.pdf");
+        }
+      }, [store]);
+      return <></>;
+    }
+
+    const { container } = render(
+      <TabProvider>
+        <OpenTabsHarness />
+        <AppShell
+          activeMode="read"
+          onModeChange={() => undefined}
+          onUtilityPanelChange={() => undefined}
+          reader={makeReader()}
+          search={makeSearch()}
+          settings={makeSettings()}
+          utilityPanel="none"
+        />
+      </TabProvider>,
+    );
+
+    await waitFor(() => {
+      expect(container.querySelector(".titlebar-tabs")).not.toBeNull();
+    });
 
     const appShell = container.querySelector(".app-shell");
     expect(appShell).not.toBeNull();
@@ -1508,7 +1543,14 @@ describe("AppShell M2.2：Toolbar 5 段层级 + L2 tab", () => {
     function OpenTabsHarness(): import("react").ReactElement {
       const store = useTabStore();
       useEffect(() => {
-        store.openTab("/case/a.pdf", "a.pdf");
+        // 必须像 AppShell.tsx 真实接线（tab 注册 effect 的 exists 查重）那样
+        // 先查重再开：OPEN_TAB 每次生成新 id 追加新 tab（有意支持同文件多
+        // tab），store value 随 state 变化 → 本 effect 重跑 → 不查重就会
+        // effect↔dispatch 无限循环（React act 队列微任务死循环，vitest
+        // worker 永不退出——2026-08-14 全量 npm test 悬挂的根因）。
+        if (store.state.tabs.length === 0) {
+          store.openTab("/case/a.pdf", "a.pdf");
+        }
       }, [store]);
       return <></>;
     }
