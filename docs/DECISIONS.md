@@ -1,5 +1,230 @@
 # FaroPDF 决策记录
 
+## 主题索引
+
+> 本节按主题聚合 DEC-001..DEC-197，详细内容见对应 DEC 段。每条 (DEC-N) 列出主题相关编号 + 标题。Agent 接续任务时优先按主题查 → 找对应 DEC（编号与正文一一对应，anchor 跳转可由编辑器的 TOC 实现）。
+
+### 项目奠基与策略
+- DEC-001 项目命名为 FaroPDF
+- DEC-002 单开独立项目，不并入 Folia
+- DEC-003 技术选型采用 Tauri + React + PDF.js + pdf-lib
+- DEC-004 v0.1 直接做完整基础版
+- DEC-006 使用 project-init 完成项目上下文初始化
+- DEC-007 GitHub 私有仓库命名为 FaroPDF
+- DEC-008 先 Foundation Gate，再多 worktree 并行
+- DEC-009 v0.1 设置页纳入基础能力
+- DEC-010 吸收 legal-skills PDF 脚本算法，不照搬 Agent 工作流
+- DEC-011 Foundation Gate 采用共享契约先行
+- DEC-012 阅读底座与设置配置并行落地
+- DEC-026 借鉴 folia 的发布与设置体验
+- DEC-029 v0.3 优先基础 PDF / PaddleOCR / 倾斜矫正 / 压缩，agent 集成延后
+- DEC-052 README 参照 Folia 模板重写
+- DEC-053 根目录配置收束到 `config/` 子目录
+- DEC-054 项目身份收尾（LICENSE + author.name + icon）
+
+### 应用架构与Shell
+- DEC-013 应用 Shell 采用阅读优先的任务模式信息架构
+- DEC-014 临时应用图标采用灯塔方案
+- DEC-032 ReaderToolbar 重构为 mode 注册表（toolbarRegistry）
+- DEC-049 ISS-009 PDF Expert Shell UI 收口（v0.1 alpha.10）
+- DEC-142 ISS-059 Phase 1：多 Tab 顶部 bar（state + UI + AppShell 集成）
+- DEC-144 ISS-NEW-A 阶段 1：L2 tab 上移 + Toolbar 5 段骨架 + A/T 按钮 + 视图模式 4-icon toggle
+- DEC-145 AGENTS.md 多 Agent 并行与 PR 收口纪律章落地
+- DEC-146 ISS-NEW-C 右栏文档摘要 + OCR 状态 panel（Wave 2 W1）
+- DEC-147 ISS-NEW-I 编辑网格 + 形状/搜索右栏 + L3 按钮（Wave 2 W2）
+- DEC-152 恢复 L3 旋转入口（修正 DEC-144 回归，PM 单 session）
+- DEC-156 ISS-NEW-E 第 1 步：L4 二级工具条统一抽象（read 模式并入 ContextToolbar，2026-06-22）
+- DEC-164 ISS-NEW-E 任务卡收口（PM 单 session，2026-06-23）
+- DEC-172 PDF Expert 高保真复刻合同与 fail-closed 实机验收（2026-07-23）
+- DEC-173 PDF Expert 参考证据降级、任务状态重置与唯一推进序列（2026-07-23）
+- DEC-174 PDF Expert 多 Agent 阶段并发权与 PM 证据验收（2026-07-23）
+- DEC-187 PDF Expert 改为功能框架参考，未实现入口统一 fail-closed（2026-07-30）
+- DEC-191 TASKS 按最新 AGENTS 协议恢复为精简唯一任务源（2026-07-30）
+
+### 阅读底座与Toolbar
+- DEC-034 阅读模式深化（连续/单页/双页/适合宽度 + 缩放/旋转/键盘翻页）
+- DEC-087 ISS-049 阅读模式工具注册幂等修复（2026-06-08）
+- DEC-093 ISS-055 顶栏任务模式入口收口（2026-06-09）
+- DEC-094 3 阶段排查与 ISS-FIX-1 Toolbar 左区 aria-label（2026-06-14）
+- DEC-155 ISS-NEW-A 阶段 2 + ISS-NEW-B 收口 2 块（PM 单 session，2026-06-22）
+- DEC-161 ISS-NEW-H 第 2 阶段：视图菜单 3 占位改真实行为（PM 单 session，2026-06-22）
+
+### 批注系统
+- DEC-015 批注第一版采用 schema 化 sidecar
+- DEC-031 批注深化第一版采用几何/搜索/图章模板/工具条 model + Overlay/Toolbar UI 组合
+- DEC-037 批注深化第二阶段：侧边栏 4 维度分组 + 真实 PDF 绘制导出
+- DEC-041 批注深化第三阶段：AnnotationSidebar 挂 AppShell + 中文 stamp 真实字形
+- DEC-044 批注深化第四阶段收尾方案（ISS-026 stage 4 总体方案）
+- DEC-045 批注深化第四阶段 milestone 1：AppShell 接线 + AnnotationOverlay 渲染（ISS-026 stage 4）
+- DEC-046 批注深化第四阶段 milestone 2：AppShell ContextToolbar 接入受控 AnnotationToolbar（ISS-026 stage 4）
+- DEC-047 批注深化第四阶段 milestone 3：pdfOperationEngine flatten-annotations draw 策略 + stamp 模板预览（ISS-026 stage 4）
+- DEC-057 ISS-026 批注 Overlay ↔ Sidebar active 联动（activeAnnotationId 双向同步）
+- DEC-082 ISS-045 批注扁平化入口与批注侧栏导出接入（2026-06-08）
+- DEC-086 ISS-048 工具启动器去假入口与批注摘要重路由（2026-06-08）
+- DEC-167 ISS-NEW-D 阶段 3：批注形状 3 补（ellipse / line / double-arrow）实质 arm（PM 单 session，2026-06-23）
+- DEC-185 拆分内容编辑与页面管理，并按 surface 重建 M2 门禁（2026-07-28）
+- DEC-189 形状右栏、页面 overlay 与 PDF writer 使用统一批注状态和坐标（2026-07-30）
+
+### 页面管理与扫描
+- DEC-005 原始 PDF 默认不可变
+- DEC-018 导出引擎与 OCR bridge 作为下一批并行主线
+- DEC-021 页面整理第一版采用可回退状态和 plan-only 导出
+- DEC-033 page-organizer-suite 第二阶段（ISS-006 + ISS-018 真实改写）
+- DEC-040 ISS-016 扫描预处理第二阶段真实处理（lopdf + 任务队列 + list/poll/cancel）
+- DEC-081 ISS-044 页面管理工作台真实状态与另存导出接入（2026-06-08）
+- DEC-115 ISS-066 阶段 2 扫描拆页 SplitPagesDialog + PageOrganizerWorkspace 集成
+- DEC-130 ISS-066 阶段 2 后续：裁边切算法（trimPageMargins）
+
+### 搜索与检索
+- DEC-017 搜索第一版采用按需内存索引
+- DEC-183 PDF Expert 搜索态补采与选区浮条负面验证（2026-07-24）
+
+### PDF工具能力与提取
+- DEC-097 ISS-NEW-A 阶段 1 PDF 插入 / 合并 / 提取能力（2026-06-14）
+- DEC-098 ISS-NEW-A 阶段 2 PDF 插入 / 合并 / 提取 UI 入口（2026-06-14）
+- DEC-125 ISS-069 阶段 1 算法层 + pdf-lib outline 写入落地
+- DEC-126 ISS-069 阶段 2 UI 二次编辑 + AppShell 集成落地
+- DEC-127 ISS-069 阶段 3 OCR 衔接 + Rust vs 前端路径决策
+
+### 导出与交付
+- DEC-019 PDF 导出第一版采用 bytes-first 引擎和 plan-only 批注策略
+- DEC-023 交付工具第一版采用 pdf-lib 写入和压缩 plan-only
+- DEC-068 v0.2 批注摘要分组面板 + 案件材料核查清单导出
+- DEC-069 ISS-013 法院上传体积压缩预设 4 档 + 真实 JPEG 重编码
+- DEC-077 ISS-040 文字 / 图片水印交付面板接入（2026-06-08）
+- DEC-078 ISS-041 压缩交付面板接入（2026-06-08）
+- DEC-079 ISS-042 页眉页脚交付面板接入（2026-06-08）
+- DEC-080 ISS-043 表单扁平化入口与填写签名工具条收口（2026-06-08）
+- DEC-084 ISS-046 页面管理重排 UI 与真实另存接入（2026-06-08）
+- DEC-089 ISS-051 页眉页脚奇偶页范围接入（2026-06-09）
+- DEC-091 ISS-053 页眉页脚视觉位置选择器（2026-06-09）
+- DEC-132 ISS-067 阶段 2 后续：去页眉页脚（涂白 margin 算法）
+
+### OCR
+- DEC-016 扫描预处理第一版采用 job bridge stub
+- DEC-020 OCR bridge 第一版采用安全 command stub
+- DEC-022 联网 OCR 隐私确认采用 notice/consent/audit 三段模型
+- DEC-024 OCR 质量检查第一版采用抽象报告服务
+- DEC-030 ISS-007 OCR bridge 真实接入方案
+- DEC-042 OCR 模式工具条接入 AppShell（ISS-007 UI 接线）
+- DEC-050 ISS-007 OCR 端到端联调（fixture + E2E 集成测试）
+- DEC-061 ISS-007 keychain apiKeyRef + OS Keychain 集成
+- DEC-095 ISS-FIX-7 OCR 真实接入文档修订（2026-06-14）
+- DEC-168 ISS-NEW-D 阶段 4：扫描菜单 7 ocr command 实质接通（PM 单 session，2026-06-23）
+- DEC-194 M5 收尾：权限不足 + OCR 失败，异常态四项全部 behavior-complete（2026-07-30）
+
+### 表单与签署
+- DEC-035 ISS-008 表单填写与签署第一版方案
+- DEC-055 ISS-008 FormsPanel 窄屏底部 sheet 适配
+- DEC-064 ISS-008 FormsPanel 从全局浮层迁入 AppShell 左侧 utility panel
+- DEC-108 ISS-070 阶段 1 SignaturePad 手写签名板落地
+- DEC-113 ISS-070 阶段 2 + ISS-060 阶段 2 第二步：签名持久化 + RightPanel 接入
+- DEC-119 ISS-070 阶段 3 SignatureLibraryPicker + FormsPanel 签名库选择
+- DEC-133 ISS-070 阶段 3 收口：拖动 resize 留 v0.3，点按模式 ship
+- DEC-188 AcroForm 以会话工作副本形成填写、签名与扁平化闭环（2026-07-30）
+
+### 水印遮罩与安全
+- DEC-107 ISS-067 阶段 1 矩形遮罩算法落地
+- DEC-114 ISS-067 阶段 2 RedactionOverlay 拖矩形 UI + commands.ts 入口
+- DEC-123 ISS-068 去水印评估：本 session 暂缓
+- DEC-134 ISS-068 阶段 1：水印检测层 ship（不修改 PDF）
+- DEC-135 ISS-064 阶段 2 前置评估：set_pdfpassword 路径决策
+- DEC-139 ISS-064 阶段 2：升级 lopdf 0.41 + 真实加密 + DEC-135 决策更新
+- DEC-140 review follow-up：RedactionOverlay 颜色透传 + SecurityPanel 密码文案修复
+- DEC-193 加密 PDF 密码输入闭环：提示 / 重试 / 取消 + 中英 i18n（2026-07-30）
+
+### 设置与UI整合
+- DEC-038 设置页面 UI 整合方案（ISS-022 + ISS-023 第一版）
+- DEC-051 ISS-023 作者卡 + 微信二维码占位方案
+- DEC-056 ISS-021 follow-up：autoUpdateCheck 设置项 + About toggle
+- DEC-059 ISS-022 lazy load settings sections 收口
+- DEC-092 ISS-054 深色模式最小接入（2026-06-09）
+- DEC-151 ISS-NEW-G 状态栏语言切换 toggle（PM 单 session）
+- DEC-153 ISS-NEW-G Preferences documentAuthor 字段（PM 单 session）
+- DEC-154 ISS-NEW-G 收口 4 块（PM 单 session，2026-06-22）
+
+### 发布工程
+- DEC-048 ISS-021 全平台打包与自动更新落地方案
+- DEC-063 封箱 0.1.0-alpha.18：合并 Unreleased + 版本号 bump + release.yml tag pattern 扩展
+- DEC-065 ISS-021 正式 Tauri updater keypair + macOS Keychain 密码管理 SOP（跨项目可复用）
+- DEC-066 ISS-021 增量更新失败回退到完整重装 + 用户引导
+- DEC-067 v0.1.0-beta.1 封箱
+- DEC-070 ISS-021 v0.1.0 正式版发布：4 轮 CI 修复 + 密钥链 / pubkey / 跨平台 shell 排坑
+- DEC-071 ISS-021 v0.1.1 Folia release workflow 全面对齐
+- DEC-099 撤回 working tree 半做的 0.1.2 updater 启用尝试
+- DEC-100 修正 DEC-099：Cargo.lock 升 0.1.2 是正确同步，不应撤回
+
+### 平台菜单与系统集成
+- DEC-075 ISS-032 原生菜单事件桥接与文件打开补齐（2026-06-08）
+- DEC-088 ISS-050 原生菜单系统动作去提示型假入口（2026-06-08）
+- DEC-157 ISS-NEW-H 视图菜单 submenu 深度补全（Wave 4e minimax + PM 收口，2026-06-22）
+- DEC-159 ISS-NEW-D 阶段 1：macOS 4 独立顶层菜单 + 多 submenu 深度补全（PM 单 session，2026-06-22）
+- DEC-160 ISS-NEW-D 阶段 2 收尾：批注菜单补 9 辅助 command（PM 单 session，2026-06-22）
+- DEC-161 ISS-NEW-H 第 2 阶段：视图菜单 3 占位改真实行为（PM 单 session，2026-06-22）
+- DEC-166 ISS-NEW-H 第 3 阶段：视图菜单 7 补 + 2 真实行为接通（PM 单 session，2026-06-23）
+- DEC-168 ISS-NEW-D 阶段 4：扫描菜单 7 ocr command 实质接通（PM 单 session，2026-06-23）
+- DEC-171 ISS-NEW-D 阶段 5：前往浏览历史栈实质接通（PM 单 session，2026-06-25）
+
+### 窗口Tab与多窗口
+- DEC-162 ISS-NEW-F 第 1 步：tab drag detach 手势 DOM 端检测（PM 单 session，2026-06-22）
+- DEC-163 ISS-NEW-F 第 2 步：Tauri WebviewWindow create IPC + frontend invoke（PM 单 session，2026-06-23）
+- DEC-170 ISS-NEW-F 第 3 步：跨窗口 detach 状态共享（PM 单 session，2026-06-24）
+
+### 工具链doc-curator
+- DEC-025 git-workflow skill 描述部分中文化
+- DEC-027 清理合并残留分支并启动 3 wave 多 worktree 推进
+- DEC-028 部署 doc-curator 文档瘦身 subagent（post-action 触发，不依赖 hooks）
+- DEC-043 doc-curator symlink 治理决策（ISS-024 首跑基线调整）
+- DEC-083 doc-curator 硬门禁收口：进度日志瘦身与 ISS 归档排序（2026-06-08）
+- DEC-143 `feature-extract-from-screenshots` skill 落地
+
+### 多Agent编排实战
+- DEC-104 Wave 1 multi-agent spawn 实战教训：claude -p batch 模式 autocompact thrash + spawn-worker `<` redirect bug
+- DEC-106 Wave A 5-worker multi-agent 实战完全失败 + multi-agent 退役决策
+- DEC-117 Wave 7 多 Agent 重试：MiniMax 配额耗尽 → graceful 降级（multi-agent skill §3.2 实证）
+- DEC-148 Wave 2 多 Agent 编排复盘（DEC-145 纪律首次实战）
+- DEC-150 Wave 3 多 Agent 复盘（glm-5.2 配额耗尽 + 图片工具循环教训）
+- DEC-165 v0.1 收口沉淀后续：pre-existing vitest 4.x 根因确认 + 修复计划（PM 单 session，2026-06-23）
+
+### 项目调研
+- DEC-103 PDF-Guru 参考项目调研结论
+- DEC-124 research/ 目录不入仓
+- DEC-141 ISS-069 Playwright 端到端实操验证 + auto-toc getPage bug 修复
+
+### v02实机回归
+- DEC-172 PDF Expert 高保真复刻合同与 fail-closed 实机验收（2026-07-23）
+- DEC-173 PDF Expert 参考证据降级、任务状态重置与唯一推进序列（2026-07-23）
+- DEC-174 PDF Expert 多 Agent 阶段并发权与 PM 证据验收（2026-07-23）
+- DEC-176 PDF Expert 实机版本更正：25.2.1 → 3.9.2（2026-07-23）
+- DEC-180 ISS-NEW-N-P01/P04/P06 面板选中蓝与统一图章面板实现（2026-07-24）
+- DEC-181 ISS-NEW-N-P02 SecurityPanel modal 化（2026-07-24）
+- DEC-184 基于补采 measured 的栏宽校准与 M2 验证器扩展（2026-07-25）
+- DEC-185 拆分内容编辑与页面管理，并按 surface 重建 M2 门禁（2026-07-28）
+- DEC-186 二次像素校准并重建 Shell 层级、页面密度与页卡门禁（2026-07-28）
+- DEC-187 PDF Expert 改为功能框架参考，未实现入口统一 fail-closed（2026-07-30）
+- DEC-188 AcroForm 以会话工作副本形成填写、签名与扁平化闭环（2026-07-30）
+- DEC-189 形状右栏、页面 overlay 与 PDF writer 使用统一批注状态和坐标（2026-07-30）
+- DEC-190 页面书签使用独立隐私 sidecar，并统一 L5a 与命令入口（2026-07-30）
+- DEC-191 TASKS 按最新 AGENTS 协议恢复为精简唯一任务源（2026-07-30）
+- DEC-192 损坏 PDF 不再 silent failure：归一化错误码与中文错误卡片闭环（2026-07-30）
+- DEC-193 加密 PDF 密码输入闭环：提示 / 重试 / 取消 + 中英 i18n（2026-07-30）
+- DEC-194 M5 收尾：权限不足 + OCR 失败，异常态四项全部 behavior-complete（2026-07-30）
+- DEC-195 M3 页面剪贴板：同文档复制/粘贴闭环（2026-07-30）
+- DEC-196 实机验证回写（2026-08-05，v0.2.0 + workerPort 后）
+- DEC-197 ISS-036 仓库公开，updater 闭环（2026-08-14）
+
+### DOC维护
+- DEC-058 官网 / 文档站入口迁出到 personal-site 仓（跨仓 cleanup）
+- DEC-062 ISS-029 跨仓同步：FaroPDF 仓替换 AuthorCard 微信二维码占位为真实图片
+- DEC-072 移除 ISS-028 活跃任务卡（已迁移到 personal-site 仓完成）
+- DEC-118 ISS-061 阶段 2 选区→draft + 翻译/朗读真接入
+- DEC-128 ISS-071 阶段 2：4 抽象全面迁移（OCR / 命名 / 字节单位）
+- DEC-129 ISS-062 阶段 3 集成收口（纯文档化，无新代码）
+- DEC-195 M3 页面剪贴板：同文档复制/粘贴闭环（2026-07-30）
+- DEC-196 实机验证回写（2026-08-05，v0.2.0 + workerPort 后）
+- DEC-197 ISS-036 仓库公开，updater 闭环（2026-08-14）
+
+
 ## DEC-001 项目命名为 FaroPDF
 
 - 日期：2026-06-02
