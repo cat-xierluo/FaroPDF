@@ -250,19 +250,21 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 > ISS-QA-04 核心已修（Fix-1 mode-aware，main `f54d43a`）。完整 fail-closed + 右栏宽度核查需改 forbidden 域（Toolbar / shared），W5 worker 不能动，另立以下延伸 ISS。
 
-#### ISS-QA-04a　stub 入口完整 fail-closed（改 Toolbar / commands.ts）　[P1][体验]　[待开工]
+#### ISS-QA-04a　stub 入口完整 fail-closed（改 Toolbar / commands.ts）　[P1][体验]　[已完成 2026-08-14，无需改代码]
 
 - **现象**：批注辅助 9 命令 / view-toggle / ocr-enhance-all / forms-flatten 等 stub 子命令点击只弹 toast「待接入」，未 disabled + tooltip，fail-closed 不完整。
 - **根因**：disabled + tooltip 需在 `src/components/layout/Toolbar.tsx`（mode 按钮渲染）+ `src/shared/app/commands.ts`（`availability` 字段）配置，W5 forbidden 域。
 - **范围**：`Toolbar.tsx` + `commands.ts`（`availability: "planned"`）。
 - **证据**：W5 RESULT §1 分类 ③。
+- **完成确认（2026-08-14 PM 复核）**：本卡写于 2026-08-04（W5），其后 `55364a1`（2026-08-05 launcher 去重）已在 `Toolbar.tsx:287-296` ToolLauncherMenu 按 `availability==="planned"` 渲染 `disabled` + `title="${label}尚未接入真实功能"`（git blame 证）；行为层 `AppShell.tsx:809` planned 早返回 toast 兜底。20 个 planned 命令中仅 `annotation-translate` 在 ToolLauncherMenu 有 UI 入口（已 disabled），其余 19 个（annotation-* 10 / pdf-* 5 / view-* 4 / ocr-enhance-all）**无 UI 渲染入口**（AnnotationToolbar 渲染硬编码工具、AnnotationSidebar 处理批注列表、pdf-* 仅在 executeCommand 路由无 JSX 按钮）→ 用户不可达、不裸奔。typecheck + lint 全过。所有可达 stub 入口已 disabled+tooltip，验收满足。
 
-#### ISS-QA-04b　右栏宽度 panelWidthStore 默认值核查（src/shared）　[P1][体验]　[待开工]
+#### ISS-QA-04b　右栏宽度 panelWidthStore 默认值核查（src/shared）　[P1][体验]　[已完成 2026-08-14，核查通过无需改代码]
 
 - **现象**：右栏 export-preview / ocr-queue 渲染真实面板，但若 `panelWidthStore` 默认 right 宽度 = 0，视觉折叠（看似「没展开」）。
 - **根因**：NOT_VERIFIED（W5 无法读 `src/shared` forbidden）；需核查 `panelWidthStore` 默认值 + `showRightPanel` 宽度派生。
 - **范围**：`src/shared`（panelWidthStore）+ 可能 `AppShell.tsx`。
 - **证据**：W5 RESULT §1 分类 ④。
+- **完成确认（2026-08-14 PM 核查）**：假设证伪。`panelWidthStore.ts:19` `DEFAULT_RIGHT_WIDTH = 320`（非 0），`MIN_WIDTH=160` 兜底，loadAll 默认返回 `{left:272, right:320}`。`AppShell.tsx:268-272` `showRightPanel` 在 export/ocr mode 正确派生 true（`defaultRightPanel` 253-257 → export-preview/ocr-queue），`rightWidth`=320，右栏展开 320px。历史「rightPanel stuck 在 mount 的 none」bug 已由 `useMemo` 按 activeMode 派生修复（line 251-252 P2-6 注释）。`panelWidthStore.test.ts` 8/8 PASS。edit/pages/read 的右栏折叠是 by design，非 bug。结论：无视觉折叠问题，无需改代码。
 
 ---
 
@@ -292,10 +294,11 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 待排查：Toolbar mode 段 / ContextToolbar（annotate L4）/ AnnotationToolbar 渲染挂载点 + CSS 布局；可能浮动/错位。
 - 验收：批注工具在批注 mode 的 L4 工具条位置，不浮在左上角。
 
-#### ISS-QA-08　批注有二级菜单、编辑没有（不一致）　[P1][待排查]
+#### ISS-QA-08　批注有二级菜单、编辑没有（不一致）　[P1][已排查 2026-08-14，非 bug]
 - 现象：批注按钮有二级菜单（形状 submenu 等），编辑按钮没有。
 - 待排查：Toolbar annotate/edit mode 按钮的二级菜单注册（commands.ts submenu）；edit mode 是否应有 L4（文本/图像/链接/隐藏）。
 - 验收：批注/编辑入口的二级菜单行为一致（按 DESIGN，都有或都无）。
+- **排查结论（2026-08-14 PM）**：非 bug，是功能成熟度差异。`Toolbar.tsx:168-178` T 编辑按钮硬编码 `disabled` + `title="内容编辑引擎尚未接入"`（无 onClick，不切 mode），edit mode 5 命令（pdf-edit-content/add-text/add-image/add-link/redact）全 `availability:"planned"`（引擎未接入，依赖 ISS-015 PDF 直接编辑，暂缓）。批注有二级菜单/L4 因批注工具已实装（AnnotationToolbar highlight/underline/形状）；编辑无菜单因编辑引擎未实装——强行给 edit 加二级菜单会违反 fail-closed（给未实装功能伪造入口）。待 ISS-015 落地后 edit 自然获得菜单，一致性自动达成。当前 T 按钮 disabled+tooltip 已是正确 fail-closed，无需改代码。
 
 #### ISS-QA-09　导出二级菜单很怪　[P1][待排查]
 - 现象：导出二级菜单视觉/结构怪。
