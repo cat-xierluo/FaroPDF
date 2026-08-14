@@ -361,13 +361,13 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 - 修复：backing store × devicePixelRatio + pdfjs render `transform: [dpr,0,0,dpr,0,0]`，CSS 尺寸钉 viewport；`verify:prod-render` 门禁新增 DPR=2 场景断言（backing = css × dpr），此 bug 类机械拦截。
 - 验证：本地 DPR1/DPR2 双场景 PASS（backing 2056 = 1028×2 + 像素非空）；真机确认留用户（新包已含）。
 
-### ISS-QA-18　阅读区无 pdfjs 文字层 DOM → 无法选中/复制　[P1][待开工]
+### ISS-QA-18　阅读区无 pdfjs 文字层 DOM → 无法选中/复制　[P1][已完成 2026-08-15，真机走查留用户]
 
 - 现象：真机页面内容无法选中和复制（canvas 是位图，无文本可选）。
 - 根因（静态诊断）：阅读区只渲染 canvas + 文字层状态徽标，**pdfjs TextLayer（透明 span 层）从未渲染**；`TextSelectionToolbar` / `usePdfTextSelection`（ISS-061 阶段 2，AppShell.tsx:296 监听 workspace__main 选区）在等一个不存在的文字层——此前单测/组件测试用 mock DOM 覆盖，真机从未可用。
-- 修复方向：ReaderCanvas 按 viewport 渲染 pdfjs `TextLayer`（legacy 构建同源 API）：透明 span 对齐 canvas、随缩放/旋转同步、`user-select` 开启；与搜索高亮层、批注 overlay 的 z-order 对齐（DESIGN.md）。
-- 验收（behavior-complete）：真机/产物层 chromium 框选文字 → 浮动工具条出现（高亮/复制可执行）；复制到剪贴板内容正确；缩放后选区跟随；无文字层 PDF（纯扫描）不出浮条不报错（fail-closed）。
-- 关联：ISS-061（工具条已就绪，等文字层）、ISS-QA-02（legacy 构建 + DPR 修复是前置）。
+- **实现（2026-08-15）**：`pdfReaderService.renderTextLayer`（pdfjs legacy `TextLayer` + `streamTextContent` 流式；`--total-scale-factor` = viewport.scale，与 canvas CSS 尺寸同域，Retina backing 的 DPR 放大不影响本层）→ `useReaderController.renderTextLayer` → `AppShell` → `ReaderCanvas.PdfPage` 在 canvas 上叠 `.pdf-text-layer`（zoom/rotation 重渲 + abort 跟随；`textLayerStatus=available` 才渲染；失败 console.warn + 清空 fail-closed）。CSS 对照 pdf.js 官方 `.textLayer` 裁剪（透明文字 + `::selection` 用 `--selection` 35% tint）。
+- 验证（断言深度）：`verify:reader-e2e` 加 TextLayer 断言（chromium 真 Worker：16 span + sampleText 非空）；`verify:prod-render` 加**真实 UI 程序化框选**断言（build 产物：38 span，`window.getSelection()` 取到「MUTUAL NON-DISCLOSURE AGREEMENT」，DPR1/DPR2 双场景）；typecheck / lint / 全量 1496 单测全绿。真机选中 + 浮动工具条（高亮/复制）走查留用户。
+- 关联：ISS-061（工具条自此有真实选区可用）、ISS-QA-02（legacy 构建 + DPR 修复是前置）。
 
 ---
 
