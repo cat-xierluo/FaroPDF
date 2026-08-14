@@ -430,17 +430,9 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 （ISS-039~055 已完成，2026-07-31 归档至 `docs/DECISIONS.md`「ISS 任务归档」区。）
 
-### ISS-036 检查更新失败（私有仓库导致 latest.json 不可访问）
+## 暂缓任务
 
-- 优先级：P2
-- 类型：发布 / 缺陷
-- 状态：✅ 已闭环 2026-08-14（仓库公开，代码零改动）
-- 来源：用户实际使用反馈
-- 描述：设置页"检查更新"始终显示失败。
-- 原因：仓库 `cat-xierluo/FaroPDF` 当前为 **private**，updater endpoint `https://github.com/cat-xierluo/FaroPDF/releases/latest/download/latest.json` 对未认证请求返回 404。
-- 解决方案：仓库公开后自动修复。若需在私有阶段测试更新，可改用 GitHub API + token 或私有 CDN 托管 `latest.json`（不在 v0.1 阻塞）。
-- 关键文件：`src-tauri/tauri.conf.json` § plugins.updater.endpoints、`src/modules/settings/sections/AboutSection.tsx`（更新状态 UI）。
-- **闭环确认（2026-08-14）**：用户决策路径 A — `gh repo edit cat-xierluo/FaroPDF --visibility public --accept-visibility-change-consequences` 执行成功，`isPrivate:false`。验证：`curl -L https://github.com/cat-xierluo/FaroPDF/releases/latest/download/latest.json` → HTTP 200，1788 bytes，tauri schema 正确（version + pub_date + 3 平台 signature/url 齐全）；.sig 旁车（macOS aarch64/x64 + Windows x64）均 200。代码零改动，updater 立即闭环。v0.2.0 用户实机点「检查更新」应显示「可从 X 升级到 0.2.0」或「已是最新版本」。
+明确不进入 v0.x 关键路径的调研 / 工具链 / 后期能力，本节保留任务卡供追溯，不算「活跃任务」。Agent 不得从本节领取任务，除非 PM 明确决策回归条件。
 
 ### ISS-015 直接编辑 PDF 原有文字、图片和链接
 
@@ -1227,6 +1219,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 已合并到 main 或第一版已发布的功能，详细任务卡归档在 `docs/DECISIONS.md` 的「ISS 任务归档」一节。索引按领域分组：
 
+- **发布 / 工程**：ISS-021、ISS-022、ISS-027、**ISS-036**（2026-08-14 仓库公开闭环，DEC-197）
 - **工程基础**：ISS-001、ISS-011、ISS-012
 - **阅读核心**：ISS-002
 - **检索**：ISS-003
