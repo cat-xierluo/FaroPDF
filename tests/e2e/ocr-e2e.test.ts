@@ -78,23 +78,20 @@ function requireTools(): boolean {
 async function ensureFixture(): Promise<string> {
   if (!existsSync(FIXTURE_PDF)) {
     await new Promise<void>((resolvePromise, rejectPromise) => {
-      // 优先用 `node` 命令；如 PATH 不可用则回退到 process.execPath。
-      const candidates = [
-        process.env["NODE_BINARY"],
-        "/opt/homebrew/bin/node",
-        "/usr/local/bin/node",
-        process.execPath,
-      ].filter((value): value is string => Boolean(value));
+      // 优先 NODE_BINARY 覆盖 → process.execPath（当前运行时 node，必然存在，
+      // CI/ubuntu 上也正确）→ PATH 上的 `node`。不再硬编码 /opt/homebrew 等
+      // 本机路径（GitHub Actions ubuntu runner 上 ENOENT，2026-08-14 CI 首跑暴露）。
+      const candidates = [process.env["NODE_BINARY"], process.execPath, "node"].filter(
+        (value): value is string => Boolean(value),
+      );
       const spawnNode = (() => {
-        let lastError: unknown = null;
         for (const candidate of candidates) {
-          try {
+          // `node` 走 PATH 解析，无法 existsSync 预检，直接放行交由 spawn error 处理。
+          if (candidate === "node" || existsSync(candidate)) {
             return { command: candidate, error: null as unknown };
-          } catch (error) {
-            lastError = error;
           }
         }
-        return { command: null, error: lastError };
+        return { command: null, error: new Error(`候选 node 均不存在：${candidates.join(", ")}`) };
       })();
       if (!spawnNode.command) {
         rejectPromise(new Error(`未找到可执行 node：${String(spawnNode.error)}`));
