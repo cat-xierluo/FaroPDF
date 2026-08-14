@@ -1,0 +1,106 @@
+name: CI
+
+# 拦截前端 typecheck / lint / e2e / build 回归，确保 PR 合入前测试套件
+# 处于绿态。push 与 PR 都触发；仅跑 pnpm 链路，不编译 Tauri（避免 macOS
+# WKWebView / Windows WiX 的 release-only 依赖；Tauri 构建由 release.yml 负责）。
+#
+# 参照 Folia ci.yml，但去掉 Folia 的 @rolldown/binding / lightningcss 平台
+# 二进制 hack：FaroPDF 用 vite 7 + 标准 vitest 4，无原生二进制问题。
+#
+# verification-gate 8 阶段映射（AGENTS.md §验证体系 / legal-skills
+# verification-gate skill）：CI 跑 1-5 + 7-8（缺阶段 6 真机——WKWebView
+# 在 Linux runner 跑不动，真机门禁走本地 `npm run etv:run` / tauri build 产物）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 显式最小权限：只读仓库内容。
+permissions:
+  contents: read
+
+# 同一分支 / PR 上一次只跑一个，cancel 旧的节省 runner 配额。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: typecheck / lint / e2e(jsdom) / build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Vitest e2e (jsdom)
+        # 只跑 tests/e2e（reader / forms / ocr 真实 fixture 链路，约 5s，正常退出）。
+        # 不跑全量 `pnpm test`：vitest 4.1.8 全量退出悬挂（open handles，
+        # docs/TASKS.md 待补齐清单 D，2026-07-28 起可复现，本地 240s+ 不退出），
+        # 全量单测待该问题修复后回到 CI。ocr-e2e 在无 ocrmypdf/pdftotext 的
+        # CI 环境自动 skip，不视为失败。
+        run: pnpm run test:e2e
+
+      - name: Build
+        # 不产出 artifact，只验证 vite build 可成功；防止 chunk 拆分 / 资源路径
+        # 类回归（含 standard_fonts 资产复制，ISS-QA-02）溜进 main。
+        run: pnpm run build
+
+  reader-e2e:
+    # verification-gate 阶段 5 的浏览器层：chromium 真 module Worker +
+    # 真 standardFontDataUrl fetch（jsdom 用 legacy fake worker 覆盖不到，
+    # QA-02「jsdom 过、真机崩」教训）。dev server 由脚本自起自灭。
+    name: reader e2e (chromium real worker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run verify:reader-e2e
+        # 起 vite dev(1420) → chromium 打开 reference.pdf 断言
+        # textLayerStatus="available" + corrupt.pdf 抛 InvalidPDF。
+        run: pnpm run verify:reader-e2e
+
+      - name: Upload verification log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reader-e2e-log
+          path: .playwright-mcp/
+          retention-days: 7
+          if-no-files-found: ignore
