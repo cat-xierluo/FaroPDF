@@ -159,14 +159,28 @@ async function renderPageToCanvas(
   const page = await document.getPage(pageIndex + 1);
   throwIfAborted(options.signal);
   const viewport = page.getViewport({ scale: zoom });
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
+  // Retina/HiDPI（ISS-QA-17，2026-08-15 真机反馈「渲染成模糊图片」）：
+  // backing store 按 devicePixelRatio 放大 + pdfjs render transform 同步缩放，
+  // CSS 尺寸钉在 viewport（CSS px）。否则 1x 位图被浏览器拉伸显示，Retina 真
+  // 机上发糊——chromium 门禁默认 DPR=1 不可复现（verify:prod-render 已加 DPR=2 断言）。
+  const dpr = typeof globalThis.devicePixelRatio === "number" && globalThis.devicePixelRatio > 0
+    ? globalThis.devicePixelRatio
+    : 1;
+  canvas.width = Math.floor(viewport.width * dpr);
+  canvas.height = Math.floor(viewport.height * dpr);
+  canvas.style.width = `${Math.floor(viewport.width)}px`;
+  canvas.style.height = `${Math.floor(viewport.height)}px`;
   const context = canvas.getContext("2d");
   if (!context) {
     return;
   }
-  // PDF.js 渲染接口：page.render 接受 canvasContext 和 viewport
-  const renderContext = { canvasContext: context, viewport };
+  // PDF.js 渲染接口：page.render 接受 canvasContext 和 viewport；
+  // transform 把 PDF 坐标系映射到放大后的 backing store。
+  const renderContext = {
+    canvasContext: context,
+    viewport,
+    transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
+  };
   // page.render() 返回包含 promise 属性的对象
   const renderResult = (page as unknown as { render(ctx: typeof renderContext): PdfJsRenderTaskLike }).render(renderContext);
   await waitForRenderTask(renderResult, options.signal);

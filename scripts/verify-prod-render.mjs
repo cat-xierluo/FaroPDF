@@ -39,53 +39,65 @@ if (!(await up())) {
 }
 
 const browser = await chromium.launch();
-const page = await browser.newPage();
-const consoleMsgs = [];
-page.on("console", (m) => consoleMsgs.push(`[${m.type()}] ${m.text()}`));
-page.on("pageerror", (e) => consoleMsgs.push(`[pageerror] ${e.message}`));
 
-await page.goto(URL, { waitUntil: "domcontentloaded" });
-await delay(1500);
+async function runScenario(label, { deviceScaleFactor } = {}) {
+  const context = await browser.newContext({ deviceScaleFactor });
+  const page = await context.newPage();
+  const consoleMsgs = [];
+  page.on("console", (m) => consoleMsgs.push(`[${m.type()}] ${m.text()}`));
+  page.on("pageerror", (e) => consoleMsgs.push(`[${label}-pageerror] ${e.message}`));
 
-const input = page.getByTestId("welcome-file-input");
-if (!(await input.count())) {
-  console.error("未找到 welcome-file-input（Welcome 屏未渲染？）");
-  console.log(consoleMsgs.join("\n"));
-  process.exit(1);
+  await page.goto(URL, { waitUntil: "domcontentloaded" });
+  await delay(1500);
+
+  const input = page.getByTestId("welcome-file-input");
+  await input.setInputFiles(FIXTURE);
+
+  let canvasInfo = null;
+  for (let i = 0; i < 40; i++) {
+    canvasInfo = await page.evaluate(() => {
+      const c = document.querySelector("canvas");
+      if (!c) return null;
+      const rect = c.getBoundingClientRect();
+      const ctx = c.getContext("2d");
+      if (!ctx) return { exists: true, w: c.width, h: c.height, ctx: false };
+      const d = ctx.getImageData(0, 0, Math.min(c.width, 400), Math.min(c.height, 400)).data;
+      let nonZero = 0;
+      for (let j = 0; j < d.length; j += 4) {
+        if (d[j] || d[j + 1] || d[j + 2]) nonZero += 1;
+      }
+      return {
+        exists: true,
+        w: c.width,
+        h: c.height,
+        cssW: Math.round(rect.width),
+        dpr: window.devicePixelRatio,
+        ctx: true,
+        nonZero,
+      };
+    });
+    if (canvasInfo?.ctx && canvasInfo.nonZero > 100) break;
+    await delay(500);
+  }
+  console.log(`[${label}] canvas=`, JSON.stringify(canvasInfo));
+  console.log(`[${label}] console 尾部：`, consoleMsgs.slice(-6).join(" || ") || "(无)");
+  await context.close();
+  return canvasInfo;
 }
-await input.setInputFiles(FIXTURE);
 
-// 等 reader canvas 出现（打开链路：configureWorker → loadPdfFromBytes → render）
-let canvasInfo = null;
-for (let i = 0; i < 40; i++) {
-  canvasInfo = await page.evaluate(() => {
-    const c = document.querySelector("canvas");
-    if (!c) return null;
-    const ctx = c.getContext("2d");
-    if (!ctx) return { exists: true, w: c.width, h: c.height, ctx: false };
-    const d = ctx.getImageData(0, 0, Math.min(c.width, 400), Math.min(c.height, 400)).data;
-    let nonZero = 0;
-    for (let j = 0; j < d.length; j += 4) {
-      if (d[j] || d[j + 1] || d[j + 2]) nonZero += 1;
-    }
-    return { exists: true, w: c.width, h: c.height, ctx: true, nonZero };
-  });
-  if (canvasInfo?.ctx && canvasInfo.nonZero > 100) break;
-  await delay(500);
-}
-
-const statusText = await page.evaluate(() => (document.body?.innerText || "").slice(0, 400));
-console.log("=== canvas ===", JSON.stringify(canvasInfo));
-console.log("=== body text (head) ===", statusText.replace(/\n/g, " | ").slice(0, 300));
-console.log("=== console ===");
-console.log(consoleMsgs.slice(-25).join("\n") || "(无)");
-
+const dpr1 = await runScenario("DPR1", {});
+const dpr2 = await runScenario("DPR2-Retina", { deviceScaleFactor: 2 });
 await browser.close();
 try {
   process.kill(-preview.pid, "SIGTERM");
 } catch {
   // preview 进程已自行退出则无需清理。
 }
-const ok = canvasInfo?.ctx && canvasInfo.nonZero > 100;
-console.log(`\n=== ${ok ? "PASS：产物层渲染正常" : "FAIL：产物层复现空白/无 canvas"} ===`);
+const renderOk = (info) => Boolean(info?.ctx && info.nonZero > 100);
+const retinaOk = Boolean(
+  dpr2 && renderOk(dpr2) && Math.abs(dpr2.w - dpr2.cssW * dpr2.dpr) <= 2,
+);
+const ok = renderOk(dpr1) && retinaOk;
+console.log(`[判定] DPR1 渲染=${renderOk(dpr1)} DPR2 渲染=${renderOk(dpr2)} Retina 倍率=${retinaOk}（backing ${dpr2?.w} vs css ${dpr2?.cssW}×${dpr2?.dpr}）`);
+console.log(`\n=== ${ok ? "PASS：产物层渲染正常（含 Retina DPR=2）" : "FAIL：产物层复现空白/无 canvas/Retina 倍率不符"} ===`);
 process.exit(ok ? 0 : 1);
