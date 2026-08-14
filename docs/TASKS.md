@@ -358,7 +358,7 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
   - [x] AGENTS.md 自测纪律 / 验证体系两节命令表改为真实存在命令，标注 `verify:ui-layout` 已移除。
   - [x] legal-skills `spawn-worker-deps.sh` 默认 verify 注入加 `test:e2e`（`grep -qx` 守卫）+ SKILL.md 同步；`test-spawn-worker-deps.sh` 7/7 PASS。
 - **残留（后续，不阻塞推进）**：
-  - [ ] CI 首跑验证（push 后 GitHub Actions 实际跑绿才算闭环；本地已验命令层）。
+  - [x] CI 首跑验证（2026-08-14 完成：第 1 跑抓出 ocr-e2e 硬编码 `/opt/homebrew/bin/node` 的环境假设 bug，`05ea72e` 修复后第 2 跑 run 31806377855 双 job 全绿）。
   - [ ] 全量 vitest 退出悬挂修复（见下方待补齐清单 D）后，CI 从 `test:e2e` 子集扩回全量 `pnpm test`。
   - [ ] etv WKWebView 链路依赖 wry 修复 `WEBKIT_INSPECTOR_SERVER`（DEC-196）；期间 etv 作可选层，真机以 `tauri build` 产物手测 + `verify:reader-e2e` 证据链为准。
 - **验证证据**：`verify:reader-e2e` PASS / `lint` 0 error / `typecheck` 过 / `test:e2e` 7/7（2026-08-14 实跑）。详见 DEC-198。

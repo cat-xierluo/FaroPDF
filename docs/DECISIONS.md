@@ -8015,5 +8015,6 @@ M5 异常态最终状态：文件损坏 ✅、密码 PDF ✅、权限不足 ✅�
   - AGENTS.md 同步：自测纪律 / 验证体系两节的命令表改为真实存在的命令（`test:e2e` / `verify:reader-e2e`），标注 `verify:ui-layout` 已移除（`02b07aa`）；触发表新增 `verification-gate` 行。
   - legal-skills 同步：`spawn-worker-deps.sh` `inject_default_verify_commands` 循环加 `test:e2e`（`grep -qx` 守卫，项目无该 script 自动跳过）+ SKILL.md §3.2 描述同步；`test-spawn-worker-deps.sh` 7/7 PASS（fixture 无 test:e2e，守卫正确跳过）。
 - **验证（实跑证据）**：`npm run verify:reader-e2e` 端到端 PASS（chromium `textLayerStatus="available"` / pageCount=5 / 422 字符 / corrupt 抛 `InvalidPDFException` / exit 0 / 端口 1420 清理干净）；`npm run lint` 0 error（新脚本 5 处 lint 当场修：`/* global */` + `process.exit` 跳过 finally 的 dev server 泄漏 bug）；`npm run typecheck` 过；`npm run test:e2e` 7/7。
-- **残留（不阻塞）**：CI 首跑要在 push 后 GitHub 侧验证；全量 vitest 悬挂修复前 CI 单测覆盖不全；etv WKWebView 真机链路受 wry 限制（DEC-196），`etv:run` 需 `WEBKIT_INSPECTOR_SERVER` 生效的 wry 版本或降级手测。
+- **残留（不阻塞）**：全量 vitest 悬挂修复前 CI 单测覆盖不全；etv WKWebView 真机链路受 wry 限制（DEC-196），`etv:run` 需 `WEBKIT_INSPECTOR_SERVER` 生效的 wry 版本或降级手测。
+- **CI 首跑闭环（2026-08-14 push 后验证）**：第 1 跑（run 31805952230）reader-e2e job ✅、test job ❌——`ocr-e2e.test.ts` fixture 生成的 node 候选硬编码 `/opt/homebrew/bin/node` 且不查存在性，ubuntu runner ENOENT（**CI 门禁当场抓到一个本地永远发现不了的环境假设 bug**）。修复（`05ea72e`）：候选改 `NODE_BINARY → process.execPath → PATH node` + existsSync 预检。第 2 跑（run 31806377855）**双 job 全部 success**。
 - **Refs**：DEC-196（QA-02 教训）/ DEC-145（PR 收口纪律）/ AGENTS.md §自测纪律 §验证体系 / docs/TASKS.md ISS-VERIF-01
