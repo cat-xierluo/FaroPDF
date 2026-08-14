@@ -132,6 +132,9 @@ describe("pdfReaderService", () => {
     const canvas = {
       width: 0,
       height: 0,
+      // renderPageToCanvas 会写 style.width/height（Retina DPR 修复 ISS-QA-17：
+      // backing × dpr、CSS 尺寸钉 viewport），mock 需带 style。
+      style: {} as Record<string, string>,
       getContext: vi.fn(() => ({ fillRect: vi.fn() })),
     } as unknown as HTMLCanvasElement;
 
@@ -154,6 +157,39 @@ describe("pdfReaderService", () => {
     await loaded.destroy();
   });
 
+  test("renderPageToCanvas 在 Retina（devicePixelRatio=2）下 backing store 放大 + transform 同步（ISS-QA-17 回归）", async () => {
+    const { adapter, renderMock } = createAdapter();
+    const data = new Uint8Array([1, 2, 3]);
+
+    const loaded = await loadPdfFromBytes(
+      { data, fileName: "retina-test.pdf" },
+      adapter,
+    );
+
+    const canvas = {
+      width: 0,
+      height: 0,
+      style: {} as Record<string, string>,
+      getContext: vi.fn(() => ({ fillRect: vi.fn() })),
+    } as unknown as HTMLCanvasElement;
+
+    vi.stubGlobal("devicePixelRatio", 2);
+    try {
+      await loaded.renderPageToCanvas(0, canvas, 1);
+      // backing store = viewport × dpr；CSS 尺寸钉在 viewport（CSS px）。
+      expect(canvas.width).toBe(612 * 2);
+      expect(canvas.height).toBe(792 * 2);
+      expect(canvas.style["width"]).toBe("612px");
+      expect(canvas.style["height"]).toBe("792px");
+      const renderArgs = renderMock.mock.calls[0] as unknown as [{ transform?: number[] }];
+      expect(renderArgs[0].transform).toEqual([2, 0, 0, 2, 0, 0]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    await loaded.destroy();
+  });
+
   test("renderPageToCanvas uses 1-based page numbers for PDF.js", async () => {
     const { adapter, getPage } = createAdapter();
     const data = new Uint8Array([1, 2, 3]);
@@ -166,6 +202,7 @@ describe("pdfReaderService", () => {
     const canvas = {
       width: 0,
       height: 0,
+      style: {} as Record<string, string>,
       getContext: vi.fn(() => ({})),
     } as unknown as HTMLCanvasElement;
 
@@ -202,6 +239,9 @@ describe("pdfReaderService", () => {
     const canvas = {
       width: 0,
       height: 0,
+      // renderPageToCanvas 会写 style.width/height（Retina DPR 修复 ISS-QA-17：
+      // backing × dpr、CSS 尺寸钉 viewport），mock 需带 style。
+      style: {} as Record<string, string>,
       getContext: vi.fn(() => ({ fillRect: vi.fn() })),
     } as unknown as HTMLCanvasElement;
     const controller = new AbortController();
@@ -226,6 +266,9 @@ describe("pdfReaderService", () => {
     const canvas = {
       width: 0,
       height: 0,
+      // renderPageToCanvas 会写 style.width/height（Retina DPR 修复 ISS-QA-17：
+      // backing × dpr、CSS 尺寸钉 viewport），mock 需带 style。
+      style: {} as Record<string, string>,
       getContext: vi.fn(() => ({ fillRect: vi.fn() })),
     } as unknown as HTMLCanvasElement;
 
