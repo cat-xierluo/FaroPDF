@@ -48,6 +48,14 @@ function makeReader(overrides: Partial<ReaderController> = {}): ReaderController
     openFile: vi.fn(),
     renderPageToCanvas: vi.fn().mockResolvedValue(undefined),
     renderThumbnail: vi.fn().mockResolvedValue(undefined),
+    renderTextLayer: vi.fn().mockResolvedValue(undefined),
+    getPageViewport: vi.fn(async (pageIndex: number) => ({
+      pageIndex,
+      width: 612,
+      height: 792,
+      rotation: 0,
+      scale: 1,
+    })),
     // ISS-NEW-H：视图菜单 submenu 命令路由测试需要这些 reader API 的 mock。
     setZoom: vi.fn(),
     zoomIn: vi.fn(),

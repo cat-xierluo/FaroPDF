@@ -202,8 +202,14 @@ async function renderPageToCanvas(
 }
 
 /** 将指定页以缩略图尺寸渲染到 canvas，maxWidth 约束最长边像素。
- *  scale = maxWidth / pageViewport.width；canvas 的 width/height 同步设置。 */
-async function renderThumbnail(  document: PdfJsDocumentLike,
+ *  scale = maxWidth / pageViewport.width；canvas 的 width/height 同步设置。
+ *  ISS-QA-17 同源修复（2026-08-15）：backing store 按 devicePixelRatio 等比
+ *  放大（宽高同乘，比例不变）。三个调用方（Sidebar 缩略图 / 页面管理页卡 /
+ *  Welcome 最近文件）都用 CSS 约束显示尺寸（width:100% / 固定 174px +
+ *  object-fit），属性等比放大只提升清晰度、不改布局；因此这里**不写
+ *  canvas.style**——显示尺寸归调用方所有。 */
+async function renderThumbnail(
+  document: PdfJsDocumentLike,
   pageIndex: number,
   canvas: HTMLCanvasElement,
   maxWidth: number,
@@ -213,13 +219,20 @@ async function renderThumbnail(  document: PdfJsDocumentLike,
   const safeMaxWidth = Math.max(1, maxWidth);
   const scale = safeMaxWidth / Math.max(1, baseViewport.width);
   const viewport = page.getViewport({ scale });
-  canvas.width = Math.round(viewport.width);
-  canvas.height = Math.round(viewport.height);
+  const dpr = typeof globalThis.devicePixelRatio === "number" && globalThis.devicePixelRatio > 0
+    ? globalThis.devicePixelRatio
+    : 1;
+  canvas.width = Math.round(viewport.width * dpr);
+  canvas.height = Math.round(viewport.height * dpr);
   const context = canvas.getContext("2d");
   if (!context) {
     return;
   }
-  const renderContext = { canvasContext: context, viewport };
+  const renderContext = {
+    canvasContext: context,
+    viewport,
+    transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
+  };
   const renderResult = (page as unknown as { render(ctx: typeof renderContext): { promise: Promise<void> } }).render(renderContext);
   await renderResult.promise;
 }

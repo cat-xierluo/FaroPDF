@@ -11,6 +11,7 @@ import {
   Trash2,
   Undo2,
 } from "lucide-react";
+import type { PdfPageViewport } from "../../shared";
 import type { ReaderController } from "../../modules/reader";
 import { createPdfOperationEngine } from "../../modules/export";
 import {
@@ -453,6 +454,7 @@ export function PageOrganizerWorkspace({ reader }: PageOrganizerWorkspaceProps) 
             key={`${reader.state.document?.documentId ?? "none"}:${page.id}`}
             onDropPage={handlePageDrop}
             onToggle={togglePage}
+            getPageViewport={reader.getPageViewport}
             pageNumber={page.originalPageNumber}
             renderThumbnail={reader.renderThumbnail}
             rotation={page.rotation}
@@ -545,12 +547,40 @@ interface PageCardProps {
   onDropPage: (draggedPageNumber: number, targetPageNumber: number) => void;
   onToggle: (pageNumber: number, shiftKey: boolean) => void;
   renderThumbnail: ReaderController["renderThumbnail"];
+  /** M3（2026-08-15）：按页懒取真实视口（PDF pt），用于真实尺寸标签（替换硬编码 A4）。 */
+  getPageViewport: ReaderController["getPageViewport"];
 }
 
-function PageCard({ pageNumber, rotation, selected, onDropPage, onToggle, renderThumbnail }: PageCardProps) {
+/** PDF pt → 毫米（1 pt = 25.4/72 mm），取整显示。 */
+function formatPageDimensionsMm(width: number, height: number): string {
+  return `${Math.round((width * 25.4) / 72)} x ${Math.round((height * 25.4) / 72)} 毫米`;
+}
+
+function PageCard({ pageNumber, rotation, selected, onDropPage, onToggle, renderThumbnail, getPageViewport }: PageCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderPromiseRef = useRef<Promise<void> | null>(null);
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  // 真实尺寸标签（M3：替换硬编码 "A4 (210 x 297 毫米)"）。readerState.pageViewports
+  // 只含首页视口（虚拟化设计），故按页懒取；失败静默不显示尺寸，不伪造 A4。
+  const [dimensionsLabel, setDimensionsLabel] = useState<string | null>(null);
+  useEffect(() => {
+    // fail-closed：controller 未提供 getPageViewport（旧 mock / 异常装配）时
+    // 静默跳过尺寸标签，不让页卡挂掉。
+    if (typeof getPageViewport !== "function") {
+      return;
+    }
+    let cancelled = false;
+    getPageViewport(pageNumber - 1)
+      .then((viewport: PdfPageViewport) => {
+        if (!cancelled) {
+          setDimensionsLabel(formatPageDimensionsMm(viewport.width, viewport.height));
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [pageNumber, getPageViewport]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -597,7 +627,7 @@ function PageCard({ pageNumber, rotation, selected, onDropPage, onToggle, render
   return (
     <li className="page-card-grid-item">
       <button
-        aria-label={`第 ${pageNumber} 页，A4 (210 x 297 毫米)`}
+        aria-label={`第 ${pageNumber} 页${dimensionsLabel ? `，${dimensionsLabel}` : ""}`}
         aria-pressed={selected}
         className={"page-card" + (selected ? " page-card--selected" : "")}
         data-page-number={pageNumber}
@@ -614,7 +644,7 @@ function PageCard({ pageNumber, rotation, selected, onDropPage, onToggle, render
           {thumbnailFailed ? <span className="page-card__thumbnail-error">缩略图不可用</span> : null}
         </div>
         <span>{pageNumber}</span>
-        <small>A4 (210 x 297 毫米)</small>
+        {dimensionsLabel ? <small>{dimensionsLabel}</small> : null}
       </button>
     </li>
   );

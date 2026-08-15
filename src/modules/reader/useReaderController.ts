@@ -417,6 +417,17 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     return loadedDocument.renderThumbnail(pageIndex, canvas, maxWidth);
   }, []);
 
+  /** 按页取视口（PDF pt，pageIndex 0-based）。文档未打开时返回首页兜底尺寸。
+   *  M3 真实尺寸标签（2026-08-15）等按页需要真实 viewport 的 UI 使用。 */
+  const getPageViewport = useCallback(async (pageIndex: number, scale: number = 1) => {
+    const loadedDocument = loadedDocumentRef.current;
+
+    if (loadedDocument) {
+      return loadedDocument.getPageViewport(pageIndex, scale);
+    }
+    return { pageIndex, width: 612, height: 792, rotation: 0, scale } as const;
+  }, []);
+
   /** ISS-QA-18：渲染 pdfjs TextLayer（可选中文字 span 层）到容器。文档未打开时 no-op。 */
   const renderTextLayer = useCallback(async (
     pageIndex: number,
@@ -501,6 +512,7 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     renderPageToCanvas,
     renderThumbnail,
     renderTextLayer,
+    getPageViewport,
     getFileBytes,
     getCurrentFileName,
     saveUpdatedBytes,

@@ -50,12 +50,21 @@ function makeReader(state: ReaderState, overrides: ReaderOverrides = {}): Reader
     canvas.width = 174;
     canvas.height = 247;
   });
+  // M3 真实尺寸标签（2026-08-15）：页卡按页懒取视口（612x792pt = 216x279 毫米）。
+  const getPageViewport = vi.fn(async (pageIndex: number) => ({
+    pageIndex,
+    width: 612,
+    height: 792,
+    rotation: 0,
+    scale: 1,
+  }));
   return {
     state,
     getFileBytes,
     getCurrentFileName,
     saveUpdatedBytes,
     renderThumbnail,
+    getPageViewport,
   } as unknown as ReaderController;
 }
 
