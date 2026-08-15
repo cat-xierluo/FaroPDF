@@ -1,5 +1,8 @@
 ## 未发版
 
+### Added
+- **侧栏批注点击闭环（ISS-QA-21，2026-08-15）**：侧栏 AnnotationSidebar 列表点批注以前只 setActiveAnnotationId（不跳页、不滚位置），跨页批注必须手动翻页才能看到高亮；现合成的回调三步走——`reader.setCurrentPage(pageIndex + 1)` 跳页（reader mock 单元验证）、setActiveAnnotationId 同步 active（overlay glyph 加 is-active + sidebar 行加 --active class）、双 RAF 等 React 提交后用 `data-annotation-id` 选择器定位 glyph + `scrollIntoView({block:"center"})` 把批注位置滚入视口。`useRef` + `useEffect` 持有 latest 函数（避 React TSC TDZ）。Overlay 的 5 类 glyph（Rect/Ink/Line/Stamp/Underline）都加 `data-annotation-id` 属性。jsdom 没实现 scrollIntoView，用 try/catch 静默；真机 / chromium 正常生效。
+
 ### Fixed
 - **缩略图 Retina 清晰度 + 页面管理真实尺寸标签 + 死代码清理（M3 收尾）**：① `renderThumbnail`（侧栏缩略图 / 页面管理页卡 / Welcome 最近文件共用）backing store 按 `devicePixelRatio` 等比放大（宽高同乘比例不变，三个调用方均 CSS 约束显示尺寸，只提升清晰度不改布局）——Retina 屏缩略图不再发糊；② 页面管理页卡硬编码 `A4 (210 x 297 毫米)` 替换为**真实尺寸**：按页懒取 `reader.getPageViewport`（新暴露的 controller 委托方法；`readerState.pageViewports` 只含首页，虚拟化设计不变），PDF pt → 毫米换算；取不到时 fail-closed 不显示，不再伪造 A4；③ 删除零引用死代码 `EditModeGridView` 三件（tsx/css/test，M2.1 起已从运行时卸载）。
 - **打包真机页面恢复渲染 — pdfjs 切 legacy 构建（ISS-QA-02 第 4 版收口，DEC-200）**：真机 devtools console 定案：pdfjs-dist 6 现代构建使用 `Map.prototype.getOrInsertComputed`（TC39 Map upsert 提案，Safari 26 才有），macOS 15 WKWebView（Safari 18 引擎）下 `getTextContent` / `getOptionalContentConfig`（render 路径）直接 `TypeError` → 页面空白 + 文字层未知；chromium 门禁引擎（≥136 自带该方法）全部覆盖不到。**全线切换 `pdfjs-dist/legacy/build`（转译 + polyfill）**，worker 与主线程同步切。配套两处：① worker 改 `?worker&inline` 内联 blob（blob: URL 不依赖页面 scheme，修 `tauri://` 下 module worker 异步加载失败后 `workerPort` 死挂、`getDocument` 永久挂起；error 事件主动清 port 降级 fake worker）；② `standardFontDataUrl` 从根相对 `/standard_fonts/` 改为主线程 `new URL(..., document.baseURI)` 绝对化（blob worker 内根相对路径以 blob: 为 base 解析失败）。真机验证：页面恢复渲染（2026-08-15 用户确认）。

@@ -494,6 +494,7 @@ function RectGlyph({ annotation, color, isActive, isPreview, onSelect, opacity, 
     const lineY = annotation.type === "underline" ? bounds.y + 1 : bounds.y + bounds.height / 2;
     return (
       <div
+        data-annotation-id={annotation.id}
         aria-label={describeAnnotation(annotation)}
         className={"annotation-glyph annotation-glyph--line" + (isActive ? " is-active" : "")}
         onClick={onSelect}
@@ -514,7 +515,8 @@ function RectGlyph({ annotation, color, isActive, isPreview, onSelect, opacity, 
 
   return (
     <div
-      aria-label={describeAnnotation(annotation)}
+      data-annotation-id={annotation.id}
+        aria-label={describeAnnotation(annotation)}
       className={
         "annotation-glyph" +
         (isActive ? " is-active" : "") +
@@ -545,7 +547,8 @@ function InkGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyphP
 
   return (
     <svg
-      aria-label={describeAnnotation(annotation)}
+      data-annotation-id={annotation.id}
+        aria-label={describeAnnotation(annotation)}
       className={"annotation-glyph annotation-glyph--ink" + (isActive ? " is-active" : "")}
       onClick={onSelect}
       role="button"
@@ -599,7 +602,8 @@ function LineGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyph
 
   return (
     <svg
-      aria-label={describeAnnotation(annotation)}
+      data-annotation-id={annotation.id}
+        aria-label={describeAnnotation(annotation)}
       className={"annotation-glyph annotation-glyph--line-shape" + (isActive ? " is-active" : "")}
       onClick={onSelect}
       role="button"
@@ -681,7 +685,8 @@ function StampGlyph({ annotation, isActive, onSelect, viewport }: AnnotationGlyp
 
   return (
     <div
-      aria-label={describeAnnotation(annotation)}
+      data-annotation-id={annotation.id}
+        aria-label={describeAnnotation(annotation)}
       className={"annotation-glyph annotation-glyph--stamp" + (isActive ? " is-active" : "")}
       onClick={onSelect}
       role="button"

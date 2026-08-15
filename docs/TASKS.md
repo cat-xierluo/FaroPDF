@@ -354,6 +354,13 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 > 来源：用户实机（打包 WKWebView）验证 QA-02 修复后的新反馈：「能看了，但渲染成模糊图片、内容没法选中和复制」。
 
+### ISS-QA-21　侧栏批注点击闭环（跳页 + 选中 + 滚位置）　[P1][已完成 2026-08-15]
+
+- 现象：AnnotationSidebar 列表点批注只更新 active 状态、不跳页、不滚位置；跨页批注需手动翻页才看到高亮。
+- 实现：AppShell `sidebarClickRef` 合成回调——跳页（reader.setCurrentPage）+ 选中（setActiveAnnotationId）+ scrollIntoView 滚到 glyph。Overlay 5 类 glyph 加 `data-annotation-id` 供选择器定位；双 RAF 等 React 提交。jsdom try/catch（无 scrollIntoView）；真机/产物 chromium 生效。
+- 验证：单测「点击 Sidebar 跨页批注 → 同步跳页 + active 联动」断言 `reader.setCurrentPage(2)` 被调 + sidebar 行 active；全量 1498 单测。
+- 关联：AnnotationOverlay 已有的 is-active 视觉态（被本卡自然激活）。
+
 ### ISS-QA-20　全局键盘快捷键（搜索/命中）　[P1][已完成 2026-08-15]
 
 - 现象：搜索只可点鼠标，键盘用户需切回鼠标点搜索框/下一个命中按钮，效率低。

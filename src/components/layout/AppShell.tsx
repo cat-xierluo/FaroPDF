@@ -600,6 +600,33 @@ export function AppShell({
     };
   }, [annotations, document, reader]);
 
+  // 侧栏批注点击闭环（2026-08-15，ISS-QA-21）：跳页 + 选中 + 滚到 glyph。
+  // 用 ref 持有 latest 函数（避免新 hook 定义后 JSX 引用时的 TSC TDZ 误报），
+  // effect 内同步稳定 closure。
+  const sidebarClickRef = useRef<(annotationId: string) => void>(() => undefined);
+  useEffect(() => {
+    sidebarClickRef.current = (annotationId: string) => {
+      const target = (annotations ?? []).find((a: PdfAnnotation) => a.id === annotationId);
+      if (target) {
+        reader.setCurrentPage(target.pageIndex + 1);
+      }
+      setActiveAnnotationId(annotationId);
+      // 双 RAF 让 activeAnnotationId state 提交到 glyph DOM 再滚动。jsdom
+      // 没实现 scrollIntoView —— 真机/产物 chromium 才有；测试环境 try/catch。
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          try {
+            window.document
+              .querySelector(`[data-annotation-id="${annotationId}"]`)
+              ?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+          } catch {
+            // jsdom 等无 scrollIntoView 实现的环境静默跳过
+          }
+        });
+      });
+    };
+  }, [annotations, reader]);
+
   // ISS-067 阶段 2：应用涂黑矩形 → 调 applyRedaction → 输出 *-redacted.pdf 新副本。
   // 坐标转换：RedactionOverlay 传的是屏幕 clientX/Y，需减去 canvas origin 并按 PDF 视口缩放。
   // DEC-114 review P0-1 修复：选择器从虚构的 ".reader-canvas canvas" 改为真实 DOM
@@ -1242,7 +1269,7 @@ export function AppShell({
             currentPdfPath={document?.path ?? null}
             formController={formController}
             key={activeMode === "edit" ? "edit-outline" : "utility-panel"}
-            onAnnotationClick={setActiveAnnotationId}
+            onAnnotationClick={(annotationId) => sidebarClickRef.current(annotationId)}
             onAddBookmark={handleAddCurrentPageBookmark}
             annotationViewSignal={annotationViewSignal}
             onFlattenAnnotations={handleFlattenAnnotations}

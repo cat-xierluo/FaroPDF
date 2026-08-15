@@ -1090,6 +1090,32 @@ describe("AppShell AnnotationOverlay ↔ AnnotationSidebar active 联动 (ISS-02
     expect(updatedSidebarRow).toHaveAttribute("aria-current", "true");
   });
 
+  test("点击 Sidebar 跨页批注 → 同步跳页 + active 联动（ISS-QA-21 闭环，2026-08-15）", async () => {
+    const user = userEvent.setup();
+    const reader = makeReadyReader(2);
+    const annotations = [
+      makeAnnotation({ id: "ann-page1", pageIndex: 0, type: "highlight" }),
+      makeAnnotation({ id: "ann-page2", pageIndex: 1, type: "note", content: "需要复核" }),
+    ];
+    // 当前在第 1 页 → 点击 ann-page2（位于第 2 页）→ 期望跳到第 2 页 + 激活。
+    renderAppShell({ activeMode: "annotate", annotations, reader, utilityPanel: "annotation" });
+
+    const beforePage = reader.state.document?.currentPage;
+    expect(beforePage).toBe(1);
+
+    const row = document.querySelector('[data-annotation-row-id="ann-page2"]') as HTMLElement;
+    expect(row).not.toBeNull();
+    await user.click(row);
+
+    // 1) reader.setCurrentPage 调到目标页（1-based）。
+    expect(reader.setCurrentPage).toHaveBeenCalledWith(2);
+    // 2) active 联动：ann-page2 的 overlay glyph（渲染在第 2 页的 overlay）获得 is-active。
+    // 注：Overlay 只渲染当前页（currentPage=1 时第 2 页 overlay 未挂载）；跳页后才出现。
+    // 这里只断言 sidebar 行获得 active（同步高亮独立于页码），跳转留 reader.setCurrentPage mock 验证。
+    const activeRow = document.querySelector('[data-annotation-row-id="ann-page2"]') as HTMLElement;
+    expect(activeRow).toHaveClass("annotation-sidebar__row-button--active");
+  });
+
   test("点击 Overlay 批注 → Sidebar 同步高亮该行（双向）", async () => {
     const user = userEvent.setup();
     const reader = makeReadyReader(2);
