@@ -1429,10 +1429,11 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 #### M3 — 页面管理垂直闭环
 
 - [x] 将 `T 编辑` 与 `pages` 状态拆分；`T 编辑` 保持单页画布，页面管理挂载 `PageOrganizerWorkspace`（M2.1）
-- [ ] 删除/归档已从运行时卸载的 `EditModeGridView` 历史 skeleton
+- [x] 删除/归档已从运行时卸载的 `EditModeGridView` 历史 skeleton（2026-08-15 git rm 三件：tsx/css/test，零外部引用）
 - [x] 运行时 `PageOrganizerWorkspace` 使用真实 PDF canvas 缩略图；1280×832 下五卡 bbox 与首卡选中态通过 measured 门禁（M2.2）
-- [ ] 删除 legacy `EditModeGridView` 的空白渐变/硬编码 A4 历史文件
-- [ ] 用真实页面尺寸替换元数据占位，并按 M1 断点证据完成响应式卡片网格
+- [x] 删除 legacy `EditModeGridView` 的空白渐变/硬编码 A4 历史文件（同上，2026-08-15）
+- [x] 用真实页面尺寸替换元数据占位（2026-08-15：页卡按页懒取 `reader.getPageViewport`，PDF pt → 毫米真实标签替换硬编码 A4；`readerState.pageViewports` 只含首页，虚拟化设计不变）
+- [ ] 按 M1 断点证据完成响应式卡片网格（留待 M1 accepted-golden 证据）
 - [x] 实现选择、多选、拖拽排序、插入、删除、旋转和撤销的真实状态
 - [x] 重排/旋转/删除结果写入 `*-organized.pdf`；Playwright 下载后用 `pdfinfo` 重开解析，确认 5 页且第一页旋转 90°
 - [x] 页面复制/粘贴已接通同文档剪贴板（DEC-195）：复制写剪贴板、粘贴克隆副本插入选中页后（页数+1）、可撤销、导出重开页数正确；不再 disabled
