@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState, type ChangeEvent, type ReactNode } from "react";
-import { StickyNote } from "lucide-react";
+import { StickyNote, Trash2 } from "lucide-react";
 import type { PdfAnnotation, PdfAnnotationType } from "../../shared/pdf/annotation";
 import {
   ANNOTATION_SIDEBAR_COLOR_CHOICES,
@@ -86,6 +86,8 @@ export interface AnnotationSidebarProps {
   activeAnnotationId?: string | null;
   /** 点击批注触发选中回调 */
   onAnnotationClick?: (annotationId: string) => void;
+  /** 删除批注（ISS-QA-22）；父级接 service.deleteAnnotation */
+  onDeleteAnnotation?: (annotationId: string) => void;
   /** 将当前批注真实绘制到新 PDF 副本；入口只在有批注且父级接线后显示 */
   onFlattenAnnotations?: () => Promise<AnnotationFlattenResult>;
   /** 深层命令可请求侧栏打开指定视图，nonce 变化时重新应用。 */
@@ -98,6 +100,7 @@ export function AnnotationSidebar({
   currentPage,
   hasDocument,
   onAnnotationClick,
+  onDeleteAnnotation,
   onFlattenAnnotations,
   onSelectPage,
   pageCount,
@@ -368,6 +371,7 @@ export function AnnotationSidebar({
                     isActive={annotation.id === activeAnnotationId}
                     key={annotation.id}
                     onAnnotationClick={onAnnotationClick}
+                    onDeleteAnnotation={onDeleteAnnotation}
                     onSelectPage={onSelectPage}
                   />
                 ))}
@@ -385,6 +389,7 @@ interface AnnotationRowProps {
   currentPage?: number;
   isActive: boolean;
   onAnnotationClick?: (annotationId: string) => void;
+  onDeleteAnnotation?: (annotationId: string) => void;
   onSelectPage?: (pageIndex: number) => void;
 }
 
@@ -393,6 +398,7 @@ function AnnotationRow({
   currentPage,
   isActive,
   onAnnotationClick,
+  onDeleteAnnotation,
   onSelectPage,
 }: AnnotationRowProps) {
   const typeLabel = ANNOTATION_TYPE_LABELS[annotation.type];
@@ -425,6 +431,34 @@ function AnnotationRow({
         type="button"
       >
         <span className="annotation-sidebar__row-icon" aria-hidden="true">{typeIcon}</span>
+        {onDeleteAnnotation ? (
+          <span
+            className="annotation-sidebar__row-actions"
+            // 避免按钮嵌套按钮导致非法 HTML；用 span + role + onClick
+            role="button"
+            tabIndex={0}
+            onClick={(event) => {
+              event.stopPropagation();
+              // ISS-QA-22（2026-08-15）：native confirm 是最稳的跨平台确认，
+              // 后续可换 Dialog 弹窗组件做更精美的二次确认。
+              if (typeof window !== "undefined" && window.confirm(`确认删除此批注？`)) {
+                onDeleteAnnotation(annotation.id);
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                if (typeof window !== "undefined" && window.confirm(`确认删除此批注？`)) {
+                  onDeleteAnnotation(annotation.id);
+                }
+              }
+            }}
+            aria-label={`删除批注：${typeLabel} · 第 ${annotation.pageIndex + 1} 页`}
+            data-annotation-row-action="delete"
+          >
+            <Trash2 size={14} aria-hidden="true" />
+          </span>
+        ) : null}
         <span
           aria-hidden="true"
           className="annotation-sidebar__row-color"

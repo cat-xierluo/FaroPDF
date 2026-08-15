@@ -111,6 +111,8 @@ interface AppShellProps {
   onAnnotationDraft?: (input: AnnotationDraftSubmission) => void;
   /** 用户点击已有批注时回调（用于侧边栏跳转等扩展） */
   onAnnotationClick?: (annotationId: string) => void;
+  /** 侧栏删除批注（ISS-QA-22，2026-08-15）；App 注入 service.deleteAnnotation */
+  onDeleteAnnotation?: (annotationId: string) => void;
   /**
    * OCR-needed 状态条"前往 OCR 模式"按钮的回调（ISS-009 M1 / DEC-049）。
    * 由 App.tsx 注入到 ReaderCanvas，避免阅读态组件直接依赖 mode setter。
@@ -151,6 +153,7 @@ export function AppShell({
   commandSignal,
   onAnnotationClick,
   onAnnotationDraft,
+  onDeleteAnnotation,
   onModeChange,
   onSettingsChange,
   onUtilityPanelChange,
@@ -611,14 +614,20 @@ export function AppShell({
         reader.setCurrentPage(target.pageIndex + 1);
       }
       setActiveAnnotationId(annotationId);
-      // 双 RAF 让 activeAnnotationId state 提交到 glyph DOM 再滚动。jsdom
-      // 没实现 scrollIntoView —— 真机/产物 chromium 才有；测试环境 try/catch。
+      // 双 RAF 让 activeAnnotationId state 提交到 glyph DOM 再滚动（glyph + sidebar）。
+      // jsdom 没实现 scrollIntoView —— 真机/产物 chromium 才有；测试环境 try/catch。
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => {
           try {
+            // 1) glyph 滚入视口（点 glyph 的反向 + 跨页跳转后回看）
             window.document
               .querySelector(`[data-annotation-id="${annotationId}"]`)
               ?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+            // 2) sidebar 行滚入视口（点 glyph 联动侧栏）
+            // ISS-QA-23（2026-08-15）：点 overlay glyph → 选中 → 滚 sidebar 行。
+            window.document
+              .querySelector(`[data-annotation-row-id="${annotationId}"]`)
+              ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
           } catch {
             // jsdom 等无 scrollIntoView 实现的环境静默跳过
           }
@@ -1270,6 +1279,7 @@ export function AppShell({
             formController={formController}
             key={activeMode === "edit" ? "edit-outline" : "utility-panel"}
             onAnnotationClick={(annotationId) => sidebarClickRef.current(annotationId)}
+            onDeleteAnnotation={onDeleteAnnotation}
             onAddBookmark={handleAddCurrentPageBookmark}
             annotationViewSignal={annotationViewSignal}
             onFlattenAnnotations={handleFlattenAnnotations}
@@ -1587,6 +1597,7 @@ function UtilityPanel({
   formController,
   annotationViewSignal,
   onAnnotationClick,
+  onDeleteAnnotation,
   onAddBookmark,
   onFlattenAnnotations,
   onRemoveBookmark,
@@ -1603,6 +1614,7 @@ function UtilityPanel({
   annotationViewSignal: { view: "list" | "summary"; nonce: number };
   currentPdfPath: string | null;
   onAnnotationClick: (annotationId: string) => void;
+  onDeleteAnnotation?: (annotationId: string) => void;
   onAddBookmark: () => void;
   onFlattenAnnotations: () => Promise<AnnotationFlattenResult>;
   onRemoveBookmark: (bookmarkId: string) => void;
@@ -1654,6 +1666,7 @@ function UtilityPanel({
         hasDocument={reader.state.document !== null}
         onAnnotationClick={onAnnotationClick}
         onFlattenAnnotations={(annotations ?? []).length > 0 ? onFlattenAnnotations : undefined}
+        onDeleteAnnotation={onDeleteAnnotation}
         onSelectPage={reader.setCurrentPage}
         pageCount={reader.state.document?.pageCount}
         preferredViewSignal={annotationViewSignal}

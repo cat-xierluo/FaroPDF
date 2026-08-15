@@ -306,4 +306,41 @@ describe("AnnotationSidebar 跳转与选中", () => {
     expect(activeButton).toHaveClass("annotation-sidebar__row-button--active");
     expect(activeButton).toHaveClass("annotation-sidebar__row-button--current-page");
   });
+
+  test("侧栏行删除按钮 → 触发 onDeleteAnnotation（ISS-QA-22，2026-08-15）", async () => {
+    const user = userEvent.setup();
+    const onDeleteAnnotation = vi.fn();
+    // 静默 window.confirm（jsdom 默认 undefined，不触发实际 prompt）
+    window.confirm = vi.fn(() => true);
+    render(
+      <AnnotationSidebar
+        annotations={annotations}
+        currentPage={3}
+        hasDocument={true}
+        onDeleteAnnotation={onDeleteAnnotation}
+      />,
+    );
+
+    const action = document.querySelector(
+      '[data-annotation-row-id="nt-1"] [data-annotation-row-action="delete"]',
+    ) as HTMLElement;
+    expect(action).not.toBeNull();
+    await user.click(action);
+    expect(window.confirm).toHaveBeenCalled();
+    expect(onDeleteAnnotation).toHaveBeenCalledWith("nt-1");
+  });
+
+  test("未传 onDeleteAnnotation 时不渲染删除按钮", () => {
+    render(
+      <AnnotationSidebar
+        annotations={annotations}
+        currentPage={3}
+        hasDocument={true}
+      />,
+    );
+    expect(
+      document.querySelector('[data-annotation-row-action="delete"]'),
+    ).toBeNull();
+  });
 });
+

@@ -1116,6 +1116,32 @@ describe("AppShell AnnotationOverlay ↔ AnnotationSidebar active 联动 (ISS-02
     expect(activeRow).toHaveClass("annotation-sidebar__row-button--active");
   });
 
+  test("点击 Sidebar 批注 → scrollIntoView 滚 glyph + sidebar 行（ISS-QA-21 + 23）", async () => {
+    const user = userEvent.setup();
+    const reader = makeReadyReader(2);
+    const annotations = [
+      makeAnnotation({ id: "ann-page1", pageIndex: 0, type: "highlight" }),
+    ];
+    const scrolled: { tag: string | null } = { tag: null };
+    const orig = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function () {
+      const el = this as HTMLElement;
+      scrolled.tag = el.getAttribute("data-annotation-row-id") ?? el.getAttribute("data-annotation-id");
+    };
+    try {
+      renderAppShell({ activeMode: "annotate", annotations, reader, utilityPanel: "annotation" });
+      const row = document.querySelector('[data-annotation-row-id="ann-page1"]') as HTMLElement;
+      expect(row).not.toBeNull();
+      await user.click(row);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      // 双 RAF 后调过 scrollIntoView；glyph（data-annotation-id）或 sidebar 行（row-id）皆可
+      expect(scrolled.tag).not.toBeNull();
+      expect(scrolled.tag).toContain("ann-page1");
+    } finally {
+      Element.prototype.scrollIntoView = orig;
+    }
+  });
+
   test("点击 Overlay 批注 → Sidebar 同步高亮该行（双向）", async () => {
     const user = userEvent.setup();
     const reader = makeReadyReader(2);

@@ -988,7 +988,7 @@ select.zoom-control {
 
 .annotation-sidebar__row-button {
   display: grid;
-  grid-template-columns: 20px 12px minmax(0, 1fr);
+  grid-template-columns: 20px 12px minmax(0, 1fr) max-content;
   align-items: center;
   gap: 7px;
   width: 100%;
@@ -1963,4 +1963,39 @@ select.zoom-control {
 .page-search-rect.is-active {
   background: color-mix(in srgb, var(--selection) 50%, transparent);
   box-shadow: 0 0 0 1px var(--selection);
+}
+
+/* ── 侧栏批注行删除按钮（ISS-QA-22，2026-08-15）───────────────────────
+ * hover 时显示在行右侧；嵌套 button 用 span+role，避免非法 HTML；
+ * 配色用 destructive token（--accent 或独立红）。 */
+.annotation-sidebar__row-actions {
+  align-items: center;
+  background: transparent;
+  border-radius: 4px;
+  color: var(--panel-fg-muted, #888);
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  justify-content: center;
+  margin-left: auto;
+  opacity: 0;
+  padding: 4px;
+  transition: opacity 120ms ease;
+}
+
+.annotation-sidebar__row-actions:focus-visible {
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  color: #d33;
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 父级 row 容器 hover 时显示 actions；按 contains 兼容 row-button:hover .row-actions */
+.annotation-sidebar__row:has(.annotation-sidebar__row-button:hover) .annotation-sidebar__row-actions,
+.annotation-sidebar__row:has(.annotation-sidebar__row-button:focus-visible) .annotation-sidebar__row-actions,
+.annotation-sidebar__row-actions:hover {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  color: #d33;
+  opacity: 1;
 }

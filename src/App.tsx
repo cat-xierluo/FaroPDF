@@ -361,6 +361,29 @@ function App() {
     }
   }, [activeMode, annotationToolState.activeToolType]);
 
+  // 侧栏删除批注（ISS-QA-22，2026-08-15）：service.deleteAnnotation + 列表刷新。
+  const handleDeleteAnnotation = useCallback(
+    (annotationId: string) => {
+      const document = reader.state.document;
+      if (!document) {
+        return;
+      }
+      const service = getAnnotationService();
+      void service
+        .deleteAnnotation(
+          { path: document.path, fingerprint: document.fingerprint, pageCount: document.pageCount },
+          annotationId,
+        )
+        .then((ok) => {
+          if (ok) {
+            setLoadedAnnotations((prev) => prev.filter((a) => a.id !== annotationId));
+          }
+        })
+        .catch(() => undefined);
+    },
+    [reader.state.document],
+  );
+
   // 用户在 overlay 上完成一次新建 → 调 service.addAnnotation 并刷新本地列表
   const handleAnnotationDraft = useCallback(
     (input: AnnotationDraftSubmission) => {
@@ -405,6 +428,7 @@ function App() {
         commandSignal={commandSignal}
         ocr={ocrController}
         onAnnotationDraft={handleAnnotationDraft}
+        onDeleteAnnotation={handleDeleteAnnotation}
         onModeChange={handleModeChange}
         onRequestOcr={() => setActiveMode("ocr")}
         onSettingsChange={handleSettingsChange}

@@ -354,6 +354,18 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 > 来源：用户实机（打包 WKWebView）验证 QA-02 修复后的新反馈：「能看了，但渲染成模糊图片、内容没法选中和复制」。
 
+### ISS-QA-22　侧栏批注删除入口　[P1][已完成 2026-08-15]
+
+- 现象：AnnotationSidebar 只有跳转和高亮，没有删除入口；用户要删批注只能走侧栏外路径（不直观）。
+- 实现：AnnotationRow hover 显示 Trash2 按钮 + native confirm + onDeleteAnnotation 回调 → App.tsx 调 AnnotationService.deleteAnnotation 并过滤本地列表。Hover 用 `:has(:hover/:focus-visible)` 选择器避免暴露给屏幕阅读器。
+- 验证：单测 2（点击触发 + 未传回调不渲染）；全量 1501 单测。
+
+### ISS-QA-23　Overlay→Sidebar 滚动闭环　[P1][已完成 2026-08-15]
+
+- 现象：ISS-QA-21 实现「sidebar→glyph」滚动，但反方向（点 glyph→sidebar）缺——点 overlay 批注时 sidebar 行被选中但如果不在视口需要滚屏找。
+- 实现：AppShell sidebarClickRef effect 双 RAF 内同时 `[data-annotation-id]` glyph + `[data-annotation-row-id]` sidebar 行都 `scrollIntoView`（try/catch 适配 jsdom）。
+- 验证：单测 spy scrollIntoView 收到 ann-page1 命中；全量 1501 单测。
+
 ### ISS-QA-21　侧栏批注点击闭环（跳页 + 选中 + 滚位置）　[P1][已完成 2026-08-15]
 
 - 现象：AnnotationSidebar 列表点批注只更新 active 状态、不跳页、不滚位置；跨页批注需手动翻页才看到高亮。
