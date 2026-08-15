@@ -212,8 +212,7 @@ async function runMultiHitScenario() {
   await context.close();
   return info;
 }
-const FORM_FIXTURE = resolve(process.cwd(), "tests/fixtures/forms/reference-form.pdf");
-const multiHit = await runMultiHitScenario(); // uses FORM_FIXTURE directly inside
+const multiHit = await runMultiHitScenario(); // 内部用局部 FIXTURE_FORM
 await browser.close();
 try {
   process.kill(-preview.pid, "SIGTERM");
