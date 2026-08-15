@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import type { PdfPageText } from "../../shared/pdf/text";
 import {
+  computeTextItemRects,
   createTextSearchSession,
   getSearchHighlightsForPage,
   summarizeTextLayerStatus,
@@ -123,5 +124,40 @@ describe("textSearchService", () => {
     expect(summarizeTextLayerStatus([pageText(0, "合同"), pageText(1, "", "missing")], 2)).toBe("partial");
     expect(summarizeTextLayerStatus([pageText(0, "", "missing"), pageText(1, "", "missing")], 2)).toBe("missing");
     expect(summarizeTextLayerStatus([pageText(0, ""), pageText(1, "")], 2)).toBe("poor");
+  });
+});
+
+describe("computeTextItemRects（真实搜索高亮矩形，2026-08-15）", () => {
+  const items = [
+    // A4 页（595x842pt）顶部一行：基线 y=800（PDF 空间 y 向上），宽 200 高 10
+    { str: "MUTUAL NON-DISCLOSURE AGREEMENT", transform: [10, 0, 0, 10, 60, 800], width: 200, height: 10 },
+    { str: "reference fixture", transform: [10, 0, 0, 10, 60, 780], width: 80, height: 8 },
+    { str: "无关键词行", transform: [10, 0, 0, 10, 60, 760], width: 60, height: 8 },
+  ];
+
+  test("命中 item 返回 pt 域矩形，y 已翻转为页面左上原点", () => {
+    const rects = computeTextItemRects(items, "non-disclosure", 842);
+    expect(rects).toHaveLength(1);
+    expect(rects[0]).toEqual({ x: 60, y: 842 - 800 - 10, width: 200, height: 10 });
+  });
+
+  test("大小写不敏感；多命中逐项返回", () => {
+    const both = computeTextItemRects(
+      [
+        { str: "Contract A", transform: [1, 0, 0, 1, 10, 700], width: 50, height: 10 },
+        { str: "contract B", transform: [1, 0, 0, 1, 10, 600], width: 50, height: 10 },
+      ],
+      "CONTRACT",
+      842,
+    );
+    expect(both).toHaveLength(2);
+  });
+
+  test("无命中 / 空 query / 缺几何（transform/width/height 不全）跳过或返回空", () => {
+    expect(computeTextItemRects(items, "不存在的词", 842)).toEqual([]);
+    expect(computeTextItemRects(items, "  ", 842)).toEqual([]);
+    expect(
+      computeTextItemRects([{ str: "有词但缺 transform", width: 10, height: 5 }], "有词", 842),
+    ).toEqual([]);
   });
 });

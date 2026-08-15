@@ -50,6 +50,28 @@ const fakeWorkerAdapter: PdfJsReaderAdapter = {
 };
 
 describe("reader loadPdfFromBytes（ISS-QA-02 回归 + 诊断）", () => {
+  test("findTextRects 返回真实 text item 几何矩形（搜索高亮，2026-08-15）", async () => {
+    const bytes = new Uint8Array(await readFile(referencePath));
+    const doc = await loadPdfFromBytes(
+      { data: bytes, fileName: "reference.pdf", filePath: referencePath },
+      fakeWorkerAdapter,
+    );
+    const pageHeightPt = doc.metadata.initialViewport.height;
+
+    const rects = await doc.findTextRects(0, "MUTUAL");
+    expect(rects.length).toBeGreaterThan(0);
+    for (const rect of rects) {
+      // pt 域、页面左上原点：全部落在页面内
+      expect(rect.x).toBeGreaterThanOrEqual(0);
+      expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.y + rect.height).toBeLessThanOrEqual(pageHeightPt + 1);
+      expect(rect.width).toBeGreaterThan(0);
+      expect(rect.height).toBeGreaterThan(0);
+    }
+
+    await doc.destroy();
+  });
+
   test("reference.pdf 加载成功 + 文字层可检测 + 不抛错", async () => {
     const bytes = new Uint8Array(await readFile(referencePath));
     const doc = await loadPdfFromBytes(

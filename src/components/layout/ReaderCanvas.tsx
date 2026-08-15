@@ -23,6 +23,12 @@ export type RenderPageToCanvasFn = (
   options?: { signal?: AbortSignal },
 ) => Promise<void>;
 
+/** 真实搜索高亮矩形查询（pt 域，UI 侧 × zoom 定位；2026-08-15 替换页内 chips） */
+export type FindTextRectsFn = (
+  pageIndex: number,
+  query: string,
+) => Promise<import("../../modules/search").TextItemRect[]>;
+
 /** ISS-QA-18：把 pdfjs TextLayer（可选中文字 span 层）渲染进容器的函数签名 */
 export type RenderTextLayerFn = (
   pageIndex: number,
@@ -43,6 +49,10 @@ interface ReaderCanvasProps {
   renderPageToCanvas?: RenderPageToCanvasFn;
   /** ISS-QA-18：由 reader controller 提供的文字层渲染方法（可选，缺省无选区） */
   renderTextLayer?: RenderTextLayerFn;
+  /** 真实搜索高亮矩形查询（可选，缺省不画页内矩形） */
+  findTextRects?: FindTextRectsFn;
+  /** 当前搜索词（画命中矩形用；来自 searchState.query） */
+  searchQuery?: string;
   /** 滚动时检测当前可见页并同步到 reader state；可选，未提供时不启用滚动同步 */
   onPageVisible?: (pageNumber: number) => void;
   /** 键盘翻页回调；可选，未提供时不启用键盘监听 */
@@ -88,6 +98,8 @@ export function ReaderCanvas({
   searchState,
   renderPageToCanvas,
   renderTextLayer,
+  findTextRects,
+  searchQuery,
   recentFiles,
   onClearRecent,
   onOpenRecent,
@@ -156,6 +168,8 @@ export function ReaderCanvas({
       pageViewports={readerState.pageViewports}
       renderPageToCanvas={renderPageToCanvas}
       renderTextLayer={renderTextLayer}
+      findTextRects={findTextRects}
+      searchQuery={searchQuery}
       renderRange={readerState.renderRange}
       searchState={searchState}
     />
@@ -169,13 +183,15 @@ interface DocumentReaderProps {
   searchState?: TextSearchState;
   renderPageToCanvas?: RenderPageToCanvasFn;
   renderTextLayer?: RenderTextLayerFn;
+  findTextRects?: FindTextRectsFn;
+  searchQuery?: string;
   onOpenFile?: (file: File) => void | Promise<void>;
   onPageVisible?: (pageNumber: number) => void;
   onPageNavigate?: (nextPage: number) => void;
   onRequestOcr?: () => void;
 }
 
-function DocumentReader({ document, pageViewports, renderRange, searchState, renderPageToCanvas, renderTextLayer, onOpenFile, onPageVisible, onPageNavigate, onRequestOcr }: DocumentReaderProps) {
+function DocumentReader({ document, pageViewports, renderRange, searchState, renderPageToCanvas, renderTextLayer, findTextRects, onOpenFile, onPageVisible, onPageNavigate, onRequestOcr }: DocumentReaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const activeHitPageNumber = searchState?.activeHit?.pageNumber;
@@ -319,6 +335,8 @@ function DocumentReader({ document, pageViewports, renderRange, searchState, ren
             pageWidth={pageWidth}
             renderPageToCanvas={renderPageToCanvas}
             renderTextLayer={renderTextLayer}
+            findTextRects={findTextRects}
+            searchQuery={searchState?.query ?? ""}
             rotation={document.rotation}
             textLayerStatus={document.textLayerStatus}
             viewMode={document.viewMode}
@@ -362,6 +380,8 @@ interface PdfPageProps {
     : never;
   renderPageToCanvas?: RenderPageToCanvasFn;
   renderTextLayer?: RenderTextLayerFn;
+  findTextRects?: FindTextRectsFn;
+  searchQuery?: string;
   /** 页面进入视口时通知父组件，用于同步 currentPage */
   onVisible?: (pageNumber: number) => void;
   /** 单页/双页模式下点击页边时翻页 */
@@ -382,6 +402,8 @@ function PdfPage({
   viewMode,
   renderPageToCanvas,
   renderTextLayer,
+  findTextRects,
+  searchQuery,
   onVisible,
   onPageNavigate,
   activeHit = false,
@@ -391,11 +413,38 @@ function PdfPage({
   const textLayerRef = useRef<HTMLDivElement>(null);
   // 渲染失败标记，用于决定是否隐藏 fallback
   const [renderFailed, setRenderFailed] = useState(false);
+  // 真实搜索命中矩形（pt 域，2026-08-15 替换页内文字 chips 占位）
+  const [searchRects, setSearchRects] = useState<import("../../modules/search").TextItemRect[]>([]);
 
   // 页码、缩放或旋转变化时重置失败状态，以便重新尝试渲染
   useEffect(() => {
     setRenderFailed(false);
   }, [pageNumber, zoom, rotation]);
+
+  // 真实搜索命中矩形：本页有命中且有查询词时按页取 pt 域矩形；失败清空。
+  useEffect(() => {
+    const query = searchQuery ?? "";
+    if (!findTextRects || !query.trim() || highlights.length === 0) {
+      setSearchRects((prev) => (prev.length === 0 ? prev : []));
+      return;
+    }
+    let cancelled = false;
+    findTextRects(pageNumber - 1, query)
+      .then((rects) => {
+        if (!cancelled) {
+          setSearchRects(rects);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSearchRects([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // zoom 不入依赖：矩形是 pt 域，渲染时 × zoom 定位
+  }, [pageNumber, searchQuery, highlights.length, findTextRects]);
 
   // ISS-QA-18：canvas 渲染成功后渲染 pdfjs 文字层（透明可选中 span）。
   // 仅在文档级 textLayerStatus=available 时启用；失败 fail-closed（console.warn
@@ -523,17 +572,26 @@ function PdfPage({
         {showCanvas && renderTextLayer && textLayerStatus === "available" && (
           <div className="pdf-text-layer" ref={textLayerRef} />
         )}
-        {/* 搜索高亮叠加层，绝对定位在 canvas 之上 */}
+        {/* 真实搜索命中矩形层（pt × zoom 定位；v1 item 级，替换文字 chips 占位）。
+            在文字层之下：高亮垫底、透明文字与选区叠加其上。 */}
         {highlights.length > 0 && (
           <div
             aria-label={`第 ${pageNumber} 页搜索高亮`}
-            className="page-search-highlights"
-            style={{ position: "absolute", top: 0, left: 0, width: "100%", pointerEvents: "none" }}
+            className="page-search-rects"
+            data-testid={`page-search-rects-${pageNumber}`}
           >
-            {highlights.map((highlight) => (
-              <span className={highlight.active ? "page-search-highlight is-active" : "page-search-highlight"} key={highlight.id}>
-                {highlight.active ? "当前页高亮" : "搜索命中"}：{highlight.matchText}
-              </span>
+            {searchRects.map((rect, index) => (
+              <span
+                className="page-search-rect"
+                key={`${pageNumber}-rect-${index}`}
+                style={{
+                  height: rect.height * zoom,
+                  left: rect.x * zoom,
+                  position: "absolute",
+                  top: rect.y * zoom,
+                  width: rect.width * zoom,
+                }}
+              />
             ))}
           </div>
         )}

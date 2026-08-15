@@ -362,3 +362,58 @@ function selectRelativeHit(state: TextSearchState, direction: 1 | -1): TextSearc
     activeHit,
   };
 }
+
+/** 文本项几何（pdfjs TextItem 的结构化子集；纯函数解耦，避免 search→reader 反向依赖） */
+export interface TextItemGeometry {
+  str?: string;
+  width?: number;
+  height?: number;
+  /** pdfjs transform [a,b,c,d,e,f]：e/f 为基线起点（PDF 用户空间，y 向上） */
+  transform?: ReadonlyArray<number>;
+}
+
+/** 搜索命中矩形（PDF pt 域，y 已翻转为页面左上原点；UI 侧 × zoom 定位） */
+export interface TextItemRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * 真实搜索高亮矩形（2026-08-15，替换页内文字 chips 占位）：
+ * 在 pdfjs 原始 text items 里做大小写不敏感匹配，返回命中 item 的包围盒
+ * （pt 域、页面左上原点）。v1 为 **item 级**高亮（整个 text run 一个矩形，
+ * pdf.js viewer 的字符级推进算法留后续）；跨 item 的命中不覆盖（搜索
+ * 引擎的拼接命中仍进结果列表，只是页内不画矩形）。
+ */
+export function computeTextItemRects(
+  items: ReadonlyArray<TextItemGeometry>,
+  query: string,
+  pageHeightPt: number,
+): TextItemRect[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return [];
+  }
+  const rects: TextItemRect[] = [];
+  for (const item of items) {
+    if (!item.str || !item.str.toLowerCase().includes(normalized)) {
+      continue;
+    }
+    const transform = item.transform;
+    if (!transform || transform.length < 6 || !item.width || !item.height) {
+      continue;
+    }
+    const x = transform[4];
+    const baselineY = transform[5];
+    // PDF 用户空间 y 向上、基线为原点 → 页面左上原点：top = pageH - (baseline + ascent 高度)
+    rects.push({
+      x,
+      y: pageHeightPt - baselineY - item.height,
+      width: item.width,
+      height: item.height,
+    });
+  }
+  return rects;
+}

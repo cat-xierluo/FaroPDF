@@ -354,6 +354,13 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 > 来源：用户实机（打包 WKWebView）验证 QA-02 修复后的新反馈：「能看了，但渲染成模糊图片、内容没法选中和复制」。
 
+### ISS-QA-19　搜索高亮为文字 chips 占位（无真实坐标）　[P1][已完成 2026-08-15]
+
+- 现象：搜索命中在页面上显示为文字标签列表（「搜索命中：xxx」），不是 PDF 阅读器应有的坐标高亮矩形。
+- 实现：`computeTextItemRects`（search 模块纯函数：pdfjs text item transform/width/height → pt 域包围盒，y 翻转左上原点）→ `LoadedPdfDocument.findTextRects` → controller → `ReaderCanvas.PdfPage` 按 `pt × zoom` 渲染 `.page-search-rect`（`--selection` 30%，z-index 垫文字层下）。v1 item 级矩形，跨 item 命中不画（仍进结果列表）。
+- 验证：单测（几何翻转/大小写/缺几何）+ e2e 真 pdfjs（pt 界内）+ prod-render 真实 UI（搜索 MUTUAL → 1 个 771×38px 矩形）+ 全量 1492 用例。
+- 后续候选：字符级矩形（pdf.js viewer 推进算法）；active 命中矩形差异化样式。
+
 ### ISS-QA-17　Retina 屏渲染模糊（渲染成低清图片）　[P1][已修复 2026-08-15]
 
 - 现象：打包真机（Retina）页面渲染模糊如低清截图。

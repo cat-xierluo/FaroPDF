@@ -1,3 +1,4 @@
+import { computeTextItemRects, type TextItemRect } from "../search/textSearchService";
 import type { OutlineNode, ReaderByteLoadInput, ReaderLoadedMetadata } from "../../shared/pdf/reader";
 import type { PdfPageText } from "../../shared/pdf/text";
 import type { PdfPageViewport, TextLayerStatus } from "../../shared/pdf/types";
@@ -91,6 +92,12 @@ export interface LoadedPdfDocument {
     zoom: number,
     options?: { signal?: AbortSignal },
   ) => Promise<void>;
+  /**
+   * 真实搜索高亮矩形（2026-08-15）：在指定页的原始 text items 里匹配 query，
+   * 返回 pt 域命中包围盒（页面左上原点）。v1 为 item 级匹配；空 query /
+   * 无文字层返回空数组。
+   */
+  findTextRects: (pageIndex: number, query: string) => Promise<TextItemRect[]>;
   /** ISS-NEW-M M4：读取 PDF outline（书签 destination）并归一化为树。无 outline 时返回空数组。 */
   getOutline: () => Promise<OutlineNode[]>;
   destroy: () => Promise<void>;
@@ -272,6 +279,18 @@ async function renderTextLayer(
     viewport: viewport as never,
   });
   await textLayer.render();
+}
+
+/** 读取原始 TextContent（auto-toc / 搜索高亮矩形共用）。 */
+async function readRawTextContent(
+  document: PdfJsDocumentLike,
+  pageIndex: number,
+): Promise<PdfRawTextContent | null> {
+  const page = await document.getPage(pageIndex + 1);
+  if (!page.getTextContent) {
+    return null;
+  }
+  return (await page.getTextContent()) as PdfRawTextContent;
 }
 
 /**
@@ -536,16 +555,21 @@ export async function loadPdfFromBytes(
     },
     getPageViewport: (pageIndex, scale = 1) => readPageViewport(document, pageIndex, scale),
     getPageText: (pageIndex) => readPageText(document, pageIndex),
-    getRawTextContent: async (pageIndex) => {
-      const page = await document.getPage(pageIndex + 1);
-      if (!page.getTextContent) {
-        return null;
-      }
-      return (await page.getTextContent()) as PdfRawTextContent;
-    },
+    getRawTextContent: (pageIndex) => readRawTextContent(document, pageIndex),
     renderPageToCanvas: (pageIndex, canvas, zoom, options) => renderPageToCanvas(document, pageIndex, canvas, zoom, options),
     renderThumbnail: (pageIndex, canvas, maxWidth) => renderThumbnail(document, pageIndex, canvas, maxWidth),
     renderTextLayer: (pageIndex, container, zoom, options) => renderTextLayer(document, pageIndex, container, zoom, options),
+    findTextRects: async (pageIndex, query) => {
+      if (!query.trim()) {
+        return [];
+      }
+      const content = await readRawTextContent(document, pageIndex);
+      if (!content) {
+        return [];
+      }
+      const viewportPt = await readPageViewport(document, pageIndex, 1);
+      return computeTextItemRects(content.items, query, viewportPt.height);
+    },
     getOutline: () => readOutlineTree(document),
     destroy: () => loadingTask.destroy?.() ?? Promise.resolve(),
   };

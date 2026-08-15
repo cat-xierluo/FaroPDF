@@ -51,6 +51,7 @@ function mockLoadedPdf({
     renderPageToCanvas: vi.fn(async () => undefined),
     renderThumbnail: vi.fn(async () => undefined),
       renderTextLayer: vi.fn(async () => undefined),
+      findTextRects: vi.fn(async () => []),
     getOutline: vi.fn(async () => []),
     destroy: vi.fn(async () => undefined),
   }));
@@ -90,7 +91,12 @@ describe("search UI integration", () => {
     expect(within(searchResults).getByTestId("search-results-count")).toHaveTextContent("2");
     expect(within(searchResults).getAllByTestId("search-results-item")).toHaveLength(2);
     expect(within(searchResults).getAllByText("Line 1")).toHaveLength(2);
-    expect(screen.getByText("当前页高亮：合同")).toBeInTheDocument();
+    // 2026-08-15：页内高亮从文字 chips 换成真实矩形层（.page-search-rects）。
+    // 本测试的 reader mock findTextRects 返回空数组 → 容器渲染但矩形数 0；
+    // 真实几何断言在 tests/e2e/reader-renders（真 pdfjs）与 verify:prod-render。
+    const rectsLayers = screen.getAllByTestId(/^page-search-rects-\d+$/);
+    expect(rectsLayers.length).toBeGreaterThan(0);
+    expect(screen.queryByText(/搜索命中|当前页高亮/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "下一个命中" }));
 
@@ -150,6 +156,7 @@ describe("search UI integration", () => {
     renderPageToCanvas: vi.fn(async () => undefined),
     renderThumbnail: vi.fn(async () => undefined),
       renderTextLayer: vi.fn(async () => undefined),
+      findTextRects: vi.fn(async () => []),
     getOutline: vi.fn(async () => []),
     destroy: vi.fn(async () => undefined),
   }));

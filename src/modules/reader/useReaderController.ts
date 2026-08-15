@@ -428,6 +428,17 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     return { pageIndex, width: 612, height: 792, rotation: 0, scale } as const;
   }, []);
 
+  /** 真实搜索高亮矩形（pt 域）。文档未打开时返回空数组。 */
+  const findTextRects = useCallback(async (pageIndex: number, query: string) => {
+    const loadedDocument = loadedDocumentRef.current;
+
+    if (!loadedDocument) {
+      return [];
+    }
+
+    return loadedDocument.findTextRects(pageIndex, query);
+  }, []);
+
   /** ISS-QA-18：渲染 pdfjs TextLayer（可选中文字 span 层）到容器。文档未打开时 no-op。 */
   const renderTextLayer = useCallback(async (
     pageIndex: number,
@@ -513,6 +524,7 @@ export function useReaderController(settings: AppSettings, options: UseReaderCon
     renderThumbnail,
     renderTextLayer,
     getPageViewport,
+    findTextRects,
     getFileBytes,
     getCurrentFileName,
     saveUpdatedBytes,

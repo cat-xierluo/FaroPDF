@@ -101,6 +101,34 @@ async function runScenario(label, { deviceScaleFactor } = {}) {
   }
   canvasInfo = canvasInfo ? { ...canvasInfo, selection: selectionInfo } : canvasInfo;
   console.log(`[${label}] 文字层选区=`, JSON.stringify(selectionInfo));
+
+  // 真实搜索高亮矩形（2026-08-15）：输入搜索词 → 断言页内出现定位矩形
+  // （.page-search-rect，pt × zoom 绝对定位）。仅 DPR1 场景跑（DPR2 复用同链路）。
+  let searchRectInfo = null;
+  if (deviceScaleFactor === undefined || deviceScaleFactor === 1) {
+    try {
+      const box = page.getByRole("searchbox", { name: "全文搜索" });
+      await box.fill("MUTUAL", { timeout: 5_000 });
+      await box.press("Enter");
+      for (let i = 0; i < 20; i++) {
+        searchRectInfo = await page.evaluate(() => {
+          const rects = Array.from(document.querySelectorAll(".page-search-rect"));
+          if (rects.length === 0) return null;
+          const first = rects[0].getBoundingClientRect();
+          return {
+            count: rects.length,
+            firstRect: { w: Math.round(first.width), h: Math.round(first.height) },
+          };
+        });
+        if (searchRectInfo && searchRectInfo.count > 0 && searchRectInfo.firstRect.w > 0) break;
+        await delay(500);
+      }
+    } catch (error) {
+      searchRectInfo = { error: String(error).slice(0, 120) };
+    }
+  }
+  canvasInfo = canvasInfo ? { ...canvasInfo, searchRects: searchRectInfo } : canvasInfo;
+  console.log(`[${label}] 搜索矩形=`, JSON.stringify(searchRectInfo));
   console.log(`[${label}] canvas=`, JSON.stringify(canvasInfo));
   console.log(`[${label}] console 尾部：`, consoleMsgs.slice(-6).join(" || ") || "(无)");
   await context.close();
@@ -119,10 +147,13 @@ const renderOk = (info) => Boolean(info?.ctx && info.nonZero > 100);
 const selectionOk = Boolean(
   dpr1?.selection && dpr1.selection.spanCount > 0 && dpr1.selection.selectedText.trim().length > 0,
 );
+const searchRectsOk = Boolean(
+  dpr1?.searchRects && dpr1.searchRects.count > 0 && dpr1.searchRects.firstRect?.w > 0,
+);
 const retinaOk = Boolean(
   dpr2 && renderOk(dpr2) && Math.abs(dpr2.w - dpr2.cssW * dpr2.dpr) <= 2,
 );
-const ok = renderOk(dpr1) && selectionOk && retinaOk;
-console.log(`[判定] DPR1 渲染=${renderOk(dpr1)} 文字层选区=${selectionOk} DPR2 渲染=${renderOk(dpr2)} Retina 倍率=${retinaOk}（backing ${dpr2?.w} vs css ${dpr2?.cssW}×${dpr2?.dpr}）`);
-console.log(`\n=== ${ok ? "PASS：产物层渲染正常（含 Retina DPR=2 + 文字层选区）" : "FAIL：产物层复现空白/无 canvas/Retina 倍率不符/无文字层"} ===`);
+const ok = renderOk(dpr1) && selectionOk && searchRectsOk && retinaOk;
+console.log(`[判定] DPR1 渲染=${renderOk(dpr1)} 文字层选区=${selectionOk} 搜索矩形=${searchRectsOk} DPR2 渲染=${renderOk(dpr2)} Retina 倍率=${retinaOk}（backing ${dpr2?.w} vs css ${dpr2?.cssW}×${dpr2?.dpr}）`);
+console.log(`\n=== ${ok ? "PASS：产物层渲染正常（Retina DPR=2 + 文字层选区 + 搜索矩形）" : "FAIL：产物层复现空白/无 canvas/Retina 倍率不符/无文字层/无搜索矩形"} ===`);
 process.exit(ok ? 0 : 1);
