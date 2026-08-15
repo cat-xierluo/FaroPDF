@@ -160,7 +160,7 @@ if (searchRectInfo && searchRectInfo.count > 0 && searchRectInfo.firstRect.w > 0
       await delay(400);
       const focusInfo = await page.evaluate(() => {
         const ae = document.activeElement;
-        return { tag: ae?.tagName ?? null, type: ae instanceof HTMLInputElement ? ae.type : null, testid: ae?.getAttribute("data-testid") ?? null };
+        return { tag: ae?.tagName ?? null, type: /** @type {HTMLInputElement|null} */(ae)?.type ?? null, testid: ae?.getAttribute("data-testid") ?? null };
       });
       shortcutCheck = { beforeFocus, focus: focusInfo };
     } catch (error) {
