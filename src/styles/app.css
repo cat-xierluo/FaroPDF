@@ -1920,6 +1920,10 @@ select.zoom-control {
   forced-color-adjust: none;
   transform-origin: 0 0;
   z-index: 1;
+  /* 显式声明（ISS-QA-24）：user-select:auto 在祖先为 none 时按规范计算为 none，
+   * 显式 text 永远生效——消除宿主全局样式 / WKWebView 继承差异导致选不中。 */
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .pdf-text-layer :is(span, br) {
@@ -1928,6 +1932,8 @@ select.zoom-control {
   position: absolute;
   transform-origin: 0% 0%;
   white-space: pre;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .pdf-text-layer ::selection {

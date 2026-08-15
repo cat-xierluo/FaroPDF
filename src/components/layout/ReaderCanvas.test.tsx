@@ -333,3 +333,79 @@ describe("ReaderCanvas 加载失败错误态（ISS-NEW-M M5）", () => {
     expect(clickSpy).toHaveBeenCalledOnce();
   });
 });
+
+describe("ReaderCanvas 单/双页点击翻页守卫（ISS-QA-24）", () => {
+  let originalResizeObserver: typeof ResizeObserver | undefined;
+  beforeEach(() => {
+    originalResizeObserver = (globalThis as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
+    (globalThis as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver = class {
+      observe() {
+        return;
+      }
+      unobserve() {
+        return;
+      }
+      disconnect() {
+        return;
+      }
+    } as unknown as typeof ResizeObserver;
+  });
+  afterEach(() => {
+    (globalThis as { ResizeObserver?: typeof ResizeObserver }).ResizeObserver = originalResizeObserver;
+    vi.restoreAllMocks();
+  });
+
+  function mockSelection(collapsed: boolean) {
+    const getSelection = vi.fn(() => ({ isCollapsed: collapsed, rangeCount: collapsed ? 0 : 1 }));
+    Object.defineProperty(window, "getSelection", { configurable: true, value: getSelection });
+    return getSelection;
+  }
+
+  test("single 模式点击空白仍翻页（右半 → 下一页）", () => {
+    mockSelection(true);
+    const onPageNavigate = vi.fn();
+    const state = makeState({
+      document: { ...baseDocument, viewMode: "single", currentPage: 1 },
+      renderRange: { endPage: 5, pageNumbers: [1, 2, 3, 4, 5], startPage: 1 },
+    });
+    render(<ReaderCanvas onPageNavigate={onPageNavigate} readerState={state} />);
+    fireEvent.click(screen.getByLabelText("第 1 页"));
+    expect(onPageNavigate).toHaveBeenCalledWith(2);
+  });
+
+  test("single 模式刚完成文字拖选时点击不翻页（选区保护）", () => {
+    mockSelection(false);
+    const onPageNavigate = vi.fn();
+    const state = makeState({
+      document: { ...baseDocument, viewMode: "single", currentPage: 1 },
+      renderRange: { endPage: 5, pageNumbers: [1, 2, 3, 4, 5], startPage: 1 },
+    });
+    render(<ReaderCanvas onPageNavigate={onPageNavigate} readerState={state} />);
+    fireEvent.click(screen.getByLabelText("第 1 页"));
+    expect(onPageNavigate).not.toHaveBeenCalled();
+  });
+
+  test("点击落在 pdfjs 文字层 span 上不翻页（交给文字选择）", () => {
+    mockSelection(true);
+    const onPageNavigate = vi.fn();
+    const renderTextLayer = vi.fn(async () => undefined);
+    const state = makeState({
+      document: { ...baseDocument, viewMode: "single", currentPage: 1 },
+      renderRange: { endPage: 5, pageNumbers: [1, 2, 3, 4, 5], startPage: 1 },
+    });
+    render(
+      <ReaderCanvas
+        onPageNavigate={onPageNavigate}
+        readerState={state}
+        renderPageToCanvas={vi.fn(async () => undefined)}
+        renderTextLayer={renderTextLayer}
+      />,
+    );
+    const page = screen.getByLabelText("第 1 页");
+    const layer = page.querySelector(".pdf-text-layer");
+    expect(layer).not.toBeNull();
+    // 点击事件 target 模拟落在文字层容器内（span 的父级）
+    fireEvent.click(page, { target: layer });
+    expect(onPageNavigate).not.toHaveBeenCalled();
+  });
+});

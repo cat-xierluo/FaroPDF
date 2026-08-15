@@ -546,12 +546,26 @@ function PdfPage({
   // fallback 始终存在于 DOM 中（保持测试兼容），canvas 成功时通过 CSS 隐藏
   const fallbackHidden = showCanvas;
 
-  // 单页/双页模式下，点击页边空白时翻到下一页（点击左半 → 上一页，右半 → 下一页）
+  // 单页/双页模式下，点击页边空白时翻到下一页（点击左半 → 上一页，右半 → 下一页）。
+  // 两种情况不翻页（ISS-QA-24）：
+  // 1) 刚完成文字拖选（mouseup 后的 click）——翻页立即销毁选区，体感「选不中文字」；
+  // 2) 点击落在 pdfjs 文字层 span 上——点文字交给选择/定位，只让空白区域翻页。
   function handlePageClick(event: React.MouseEvent<HTMLElement>) {
     if (viewMode === "continuous") {
       return;
     }
     if (!onPageNavigate) {
+      return;
+    }
+    const selection = typeof window === "undefined" ? undefined : window.getSelection?.();
+    if (selection && !selection.isCollapsed) {
+      return;
+    }
+    if (
+      textLayerRef.current &&
+      event.target instanceof Node &&
+      textLayerRef.current.contains(event.target)
+    ) {
       return;
     }
     const target = event.currentTarget;
@@ -576,13 +590,13 @@ function PdfPage({
       ref={sectionRef}
       style={{ ...pageStyle, transform: rotation ? `rotate(${rotation}deg)` : undefined, transformOrigin: "center center" }}
     >
-      <div className="page-container" style={{ width: pageWidth, height: pageHeight, position: "relative" }}>
+      <div className="page-container" style={{ width: pageWidth, height: pageHeight, position: "relative", zIndex: 0 }}>
         {/* 真实 PDF canvas 渲染层 */}
         {showCanvas && (
           <canvas
             ref={canvasRef}
             height={pageHeight}
-            style={{ display: "block" }}
+            style={{ display: "block", zIndex: 0, position: "relative" }}
             width={pageWidth}
           />
         )}

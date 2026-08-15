@@ -207,8 +207,10 @@ export function TextSelectionToolbar({ bounds, onAction, onClose, color, noteCon
 /**
  * 观察 `rootRef` 容器内的文本选区。
  *
- * - selectionchange 事件触发即取一次 bounding rect
- * - 选区起点不在 rootRef 内、跨多页、rect 为 0 → 隐藏
+ * - mouseup / keyup（选择完成后）取一次 bounding rect；selectionchange 兜底
+ *   处理程序化清除（ISS-QA-24：拖选进行中抑制——selectionchange 在拖动时高频
+ *   触发，每次 setBounds 都会重渲染整棵 AppShell，真机上表现为拖选卡顿/选不动）
+ * - 选区起点不在 rootRef 内、跨多页、rect 为 0 → 隐藏（含 collapsed 选区清理）
  * - 选区落在 rootRef 容器 → 返回 rect（屏幕坐标，给 fixed 定位用）
  */
 export function usePdfTextSelection(rootRef: React.RefObject<HTMLElement | null>) {
@@ -220,10 +222,13 @@ export function usePdfTextSelection(rootRef: React.RefObject<HTMLElement | null>
     }
     const root = rootRef.current;
     const insideReader = { value: false };
+    // 拖选进行中标记：mousedown 起到 mouseup 止，期间 selectionchange 不 setState
+    let dragging = false;
 
     function update() {
       const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) {
+      // collapsed（点击单点 / 选区被清）也要收起工具条，否则点击空白后残留
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
         if (insideReader.value) {
           insideReader.value = false;
           setBounds(null);
@@ -237,6 +242,10 @@ export function usePdfTextSelection(rootRef: React.RefObject<HTMLElement | null>
       }
       const rect = range.getBoundingClientRect();
       if (!rect || (rect.width === 0 && rect.height === 0)) {
+        if (insideReader.value) {
+          insideReader.value = false;
+          setBounds(null);
+        }
         return;
       }
       // 选区根节点必须落在 root 容器内
@@ -253,24 +262,50 @@ export function usePdfTextSelection(rootRef: React.RefObject<HTMLElement | null>
       if (!insideReader.value) {
         insideReader.value = true;
       }
-      setBounds({
-        bottom: rect.bottom,
-        left: rect.left,
-        right: rect.right,
-        top: rect.top,
+      setBounds((prev) => {
+        // 值未变（亚像素抖动）返回同一引用，跳过整树重渲染
+        if (
+          prev &&
+          Math.abs(prev.top - rect.top) < 1 &&
+          Math.abs(prev.left - rect.left) < 1 &&
+          Math.abs(prev.right - rect.right) < 1 &&
+          Math.abs(prev.bottom - rect.bottom) < 1
+        ) {
+          return prev;
+        }
+        return {
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+        };
       });
     }
 
+    function onMouseDown() {
+      dragging = true;
+    }
+
     function onMouseUp() {
+      dragging = false;
       // 浏览器在 mouseup 之后才把选区写进 Selection，因此延后一拍读
       setTimeout(update, 0);
     }
 
-    document.addEventListener("selectionchange", update);
+    function onSelectionChange() {
+      if (dragging) {
+        return;
+      }
+      update();
+    }
+
+    document.addEventListener("selectionchange", onSelectionChange);
+    root.addEventListener("mousedown", onMouseDown);
     root.addEventListener("mouseup", onMouseUp);
     root.addEventListener("keyup", onMouseUp);
     return () => {
-      document.removeEventListener("selectionchange", update);
+      document.removeEventListener("selectionchange", onSelectionChange);
+      root.removeEventListener("mousedown", onMouseDown);
       root.removeEventListener("mouseup", onMouseUp);
       root.removeEventListener("keyup", onMouseUp);
     };
