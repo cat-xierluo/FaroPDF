@@ -240,6 +240,7 @@ export function Toolbar({ activeMode, onCommand, onModeChange, onRightPanelChang
               placeholder={document ? "搜索" : "打开后搜索"}
               type="search"
               value={search.state.query}
+              data-testid="toolbar-search-input"
             />
           </label>
         </div>

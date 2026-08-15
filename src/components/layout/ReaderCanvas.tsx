@@ -327,6 +327,9 @@ function DocumentReader({ document, pageViewports, renderRange, searchState, ren
             activeHit={activeHitPageNumber === pageNumber}
             key={pageNumber}
             highlights={searchState ? getSearchHighlightsForPage(searchState, pageNumber - 1) : []}
+            activeRectIndex={(
+              searchState ? getSearchHighlightsForPage(searchState, pageNumber - 1) : []
+            ).findIndex((h) => h.active)}
             onPageNavigate={onPageNavigate}
             onVisible={onPageVisible}
             pageHeight={pageHeight}
@@ -372,6 +375,8 @@ interface PdfPageProps {
   zoom: number;
   rotation: 0 | 90 | 180 | 270;
   highlights: Array<{ id: string; active: boolean; matchText: string }>;
+  /** 当前页搜索命中矩形数组中 active 命中的矩形索引（用于 scrollIntoView）；无 active = -1 */
+  activeRectIndex: number;
   textLayerStatus: TextLayerStatus;
   viewMode: ReaderState["document"] extends infer Doc
     ? Doc extends { viewMode: infer V }
@@ -398,6 +403,7 @@ function PdfPage({
   zoom,
   rotation,
   highlights,
+  activeRectIndex,
   textLayerStatus,
   viewMode,
   renderPageToCanvas,
@@ -415,6 +421,8 @@ function PdfPage({
   const [renderFailed, setRenderFailed] = useState(false);
   // 真实搜索命中矩形（pt 域，2026-08-15 替换页内文字 chips 占位）
   const [searchRects, setSearchRects] = useState<import("../../modules/search").TextItemRect[]>([]);
+  // active 命中矩形 DOM ref（active 变化时 scrollIntoView；2026-08-15）
+  const activeRectRef = useRef<HTMLSpanElement>(null);
 
   // 页码、缩放或旋转变化时重置失败状态，以便重新尝试渲染
   useEffect(() => {
@@ -445,6 +453,17 @@ function PdfPage({
     };
     // zoom 不入依赖：矩形是 pt 域，渲染时 × zoom 定位
   }, [pageNumber, searchQuery, highlights.length, findTextRects]);
+
+  // active 命中变化：把对应矩形滚入视口（block:nearest 不粗暴置顶；不动水平滚动）
+  useEffect(() => {
+    if (activeRectIndex < 0) {
+      return;
+    }
+    const node = activeRectRef.current;
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    }
+  }, [activeRectIndex, pageNumber]);
 
   // ISS-QA-18：canvas 渲染成功后渲染 pdfjs 文字层（透明可选中 span）。
   // 仅在文档级 textLayerStatus=available 时启用；失败 fail-closed（console.warn
@@ -582,8 +601,10 @@ function PdfPage({
           >
             {searchRects.map((rect, index) => (
               <span
-                className="page-search-rect"
+                aria-current={index === activeRectIndex ? "true" : undefined}
+                className={"page-search-rect" + (index === activeRectIndex ? " is-active" : "")}
                 key={`${pageNumber}-rect-${index}`}
+                ref={index === activeRectIndex ? activeRectRef : null}
                 style={{
                   height: rect.height * zoom,
                   left: rect.x * zoom,

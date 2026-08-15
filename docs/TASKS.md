@@ -354,6 +354,13 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 > 来源：用户实机（打包 WKWebView）验证 QA-02 修复后的新反馈：「能看了，但渲染成模糊图片、内容没法选中和复制」。
 
+### ISS-QA-20　全局键盘快捷键（搜索/命中）　[P1][已完成 2026-08-15]
+
+- 现象：搜索只可点鼠标，键盘用户需切回鼠标点搜索框/下一个命中按钮，效率低。
+- 实现：`useGlobalHotkeys` hook 在 AppShell 挂载：⌘/Ctrl+F 聚焦搜索（Shift 不触发，留浏览器「页面内查找」语义）；⌘/Ctrl+[ ] 切命中（接 search controller selectPreviousHit/NextHit）；Esc 关搜索面板；input/textarea/contenteditable 内不拦截（避免编辑冲突）。Toolbar 搜索框补 `toolbar-search-input` testid。
+- 验证：单测 5（⌘F 聚焦 / Ctrl+F 同效 / Esc 任意上下文 / ⌘[ ] 切 / 可编辑跳过 + ⌘⇧F 不触发）+ `verify:prod-render` 真实 UI ⌘F 断言 + 全量 1497 单测。
+- 后续候选：⌘O 打开 / ⌘S 保存当前文档副本 / ⌘1-9 跳转页 / 方向键长按翻页。
+
 ### ISS-QA-19　搜索高亮为文字 chips 占位（无真实坐标）　[P1][已完成 2026-08-15]
 
 - 现象：搜索命中在页面上显示为文字标签列表（「搜索命中：xxx」），不是 PDF 阅读器应有的坐标高亮矩形。

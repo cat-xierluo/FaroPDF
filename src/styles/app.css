@@ -1958,3 +1958,9 @@ select.zoom-control {
   border-radius: 2px;
   display: block;
 }
+
+/* active 搜索命中矩形：边框 + 稍亮底色与普通区分 */
+.page-search-rect.is-active {
+  background: color-mix(in srgb, var(--selection) 50%, transparent);
+  box-shadow: 0 0 0 1px var(--selection);
+}

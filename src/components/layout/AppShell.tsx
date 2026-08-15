@@ -44,6 +44,7 @@ import { AnnotationToolbar } from "./AnnotationToolbar";
 import { PageOrganizerWorkspace } from "./PageOrganizerWorkspace";
 import { RightPanel } from "./RightPanel";
 import { SecurityPanel } from "./SecurityPanel";
+import { useGlobalHotkeys } from "./useGlobalHotkeys";
 import type { ShapeToolValue } from "./panels/ShapeToolPanel";
 import type { SearchHitItem } from "./panels/SearchResultsPanel";
 import type { DocSummary } from "./panels/DocSummaryPanelView";
@@ -242,6 +243,23 @@ export function AppShell({
     }
     setRightPanelOverride((current) => current === "shape" ? null : current);
   }, [activeMode, annotationState.activeToolType]);
+
+  // 全局快捷键（2026-08-15）：⌘/Ctrl+F 聚焦搜索、⌘/Ctrl+[ / ] 切命中、
+  // Esc 关闭搜索面板。search controller 直接 selectNextHit / selectPreviousHit /
+  // reset；面板切换走 setRightPanelOverride（用户之前展开的形状面板会被
+  // 这次切覆盖，无文档态聚焦也允许——搜不到东西的引导动作）。
+  useGlobalHotkeys({
+    onFocusSearch: () => {
+      setRightPanelOverride("search");
+    },
+    onCloseSearch: () => {
+      if (rightPanel === "search") {
+        setRightPanelOverride(null);
+      }
+    },
+    onPreviousHit: () => search.selectPreviousHit(),
+    onNextHit: () => search.selectNextHit(),
+  });
 
   // ISS-060 阶段 2 后续：左右栏宽度持久化（panelWidthStore 提供 localStorage 读写）。
   // 当前 ship：mount 时读 localStorage 注入 inline style；用户拖拽 divider 留后续 session。

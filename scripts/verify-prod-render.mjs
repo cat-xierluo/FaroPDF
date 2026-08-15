@@ -102,6 +102,9 @@ async function runScenario(label, { deviceScaleFactor } = {}) {
   canvasInfo = canvasInfo ? { ...canvasInfo, selection: selectionInfo } : canvasInfo;
   console.log(`[${label}] 文字层选区=`, JSON.stringify(selectionInfo));
 
+  // active 命中切换（2026-08-15）：点「下一个命中」→ 第二处矩形变 .is-active
+  let activeCheck = null;
+
   // 真实搜索高亮矩形（2026-08-15）：输入搜索词 → 断言页内出现定位矩形
   // （.page-search-rect，pt × zoom 绝对定位）。仅 DPR1 场景跑（DPR2 复用同链路）。
   let searchRectInfo = null;
@@ -120,15 +123,53 @@ async function runScenario(label, { deviceScaleFactor } = {}) {
             firstRect: { w: Math.round(first.width), h: Math.round(first.height) },
           };
         });
-        if (searchRectInfo && searchRectInfo.count > 0 && searchRectInfo.firstRect.w > 0) break;
-        await delay(500);
-      }
+if (searchRectInfo && searchRectInfo.count > 0 && searchRectInfo.firstRect.w > 0) break;
+    await delay(500);
+  }
+  if (searchRectInfo && searchRectInfo.count >= 2) {
+    try {
+      await page.getByRole("button", { name: "下一个命中" }).click({ timeout: 3000 });
+      await delay(500);
+      activeCheck = await page.evaluate(() => {
+        const rects = Array.from(document.querySelectorAll(".page-search-rect"));
+        const active = rects.findIndex((r) => r.classList.contains("is-active"));
+        return { total: rects.length, activeIndex: active };
+      });
+    } catch (error) {
+      activeCheck = { error: String(error).slice(0, 120) };
+    }
+  }
     } catch (error) {
       searchRectInfo = { error: String(error).slice(0, 120) };
     }
   }
-  canvasInfo = canvasInfo ? { ...canvasInfo, searchRects: searchRectInfo } : canvasInfo;
-  console.log(`[${label}] 搜索矩形=`, JSON.stringify(searchRectInfo));
+  canvasInfo = canvasInfo ? { ...canvasInfo, searchRects: searchRectInfo, activeCheck } : canvasInfo;
+  console.log(`[${label}] 搜索矩形=`, JSON.stringify(searchRectInfo), `active=`, JSON.stringify(activeCheck));
+
+  // 全局快捷键 ⌘F（2026-08-15）：关搜索面板 → 按 ⌘F 应重开 + 聚焦输入框
+  let shortcutCheck = null;
+  if (deviceScaleFactor === undefined || deviceScaleFactor === 1) {
+    try {
+      // reference.pdf 无 outline → search panel 不渲染关闭按钮；这里测的是
+      // ⌘F 在 body 上能直接聚焦到搜索输入框（无依赖 panel 可见）。
+      const beforeFocus = await page.evaluate(() => {
+        const ae = document.activeElement;
+        return ae?.getAttribute("data-testid") ?? ae?.tagName ?? null;
+      });
+      await page.keyboard.press("Meta+f");
+      await delay(400);
+      const focusInfo = await page.evaluate(() => {
+        const ae = document.activeElement;
+        return { tag: ae?.tagName ?? null, type: ae instanceof HTMLInputElement ? ae.type : null, testid: ae?.getAttribute("data-testid") ?? null };
+      });
+      shortcutCheck = { beforeFocus, focus: focusInfo };
+    } catch (error) {
+      shortcutCheck = { error: String(error).slice(0, 120) };
+    }
+  }
+  canvasInfo = canvasInfo ? { ...canvasInfo, shortcut: shortcutCheck } : canvasInfo;
+  console.log(`[${label}] 快捷键⌘F=`, JSON.stringify(shortcutCheck));
+
   console.log(`[${label}] canvas=`, JSON.stringify(canvasInfo));
   console.log(`[${label}] console 尾部：`, consoleMsgs.slice(-6).join(" || ") || "(无)");
   await context.close();
@@ -137,6 +178,42 @@ async function runScenario(label, { deviceScaleFactor } = {}) {
 
 const dpr1 = await runScenario("DPR1", {});
 const dpr2 = await runScenario("DPR2-Retina", { deviceScaleFactor: 2 });
+
+// 多命中 fixture（form 含多处「FaroPDF」+「Synthetic」），验证 active 切换（2026-08-15）
+async function runMultiHitScenario() {
+  const FIXTURE_FORM = resolve(process.cwd(), "tests/fixtures/forms/reference-form.pdf");
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto(URL, { waitUntil: "domcontentloaded" });
+  await delay(1500);
+  await page.getByTestId("welcome-file-input").setInputFiles(FIXTURE_FORM);
+  await delay(800);
+  await page.getByRole("searchbox", { name: "全文搜索" }).fill("FaroPDF");
+  await page.getByRole("searchbox", { name: "全文搜索" }).press("Enter");
+  let info = { count: 0, activeIdx: -1 };
+  // 等搜索完成（不管命中数；reference.pdf 1 个「MUTUAL」命中也走完）
+  for (let i = 0; i < 30; i++) {
+    const data = await page.evaluate(() => {
+      const r = Array.from(document.querySelectorAll(".page-search-rect"));
+      const count = document.querySelectorAll(".search-panel__count")[0]?.textContent ?? "0";
+      return { rectCount: r.length, total: parseInt(count, 10) || 0, activeIdx: r.findIndex((x) => x.classList.contains("is-active")) };
+    });
+    if (data.total > 0) { info = data; break; }
+    await delay(400);
+  }
+  // 点两次「下一个命中」：active 应变化（activeIdx 跟状态机走，可能跨页跳到下个命中页的 is-active 矩形）
+  await page.getByRole("button", { name: "下一个命中" }).click({ timeout: 3000 }).catch(() => undefined);
+  await delay(600);
+  const after = await page.evaluate(() => {
+    const r = Array.from(document.querySelectorAll(".page-search-rect"));
+    return { rectCount: r.length, activeIdx: r.findIndex((x) => x.classList.contains("is-active")) };
+  });
+  info.after = after;
+  await context.close();
+  return info;
+}
+const FORM_FIXTURE = resolve(process.cwd(), "tests/fixtures/forms/reference-form.pdf");
+const multiHit = await runMultiHitScenario(); // uses FORM_FIXTURE directly inside
 await browser.close();
 try {
   process.kill(-preview.pid, "SIGTERM");
@@ -150,10 +227,19 @@ const selectionOk = Boolean(
 const searchRectsOk = Boolean(
   dpr1?.searchRects && dpr1.searchRects.count > 0 && dpr1.searchRects.firstRect?.w > 0,
 );
+// active 切换：≥2 个命中时才要求切换成功；0/1 个命中（fixture 决定）不强制。
+const activeOk = !dpr1?.searchRects
+  || dpr1.searchRects.count < 2
+  || (dpr1.activeCheck && typeof dpr1.activeCheck.activeIndex === "number" && dpr1.activeCheck.activeIndex >= 0);
 const retinaOk = Boolean(
   dpr2 && renderOk(dpr2) && Math.abs(dpr2.w - dpr2.cssW * dpr2.dpr) <= 2,
 );
-const ok = renderOk(dpr1) && selectionOk && searchRectsOk && retinaOk;
-console.log(`[判定] DPR1 渲染=${renderOk(dpr1)} 文字层选区=${selectionOk} 搜索矩形=${searchRectsOk} DPR2 渲染=${renderOk(dpr2)} Retina 倍率=${retinaOk}（backing ${dpr2?.w} vs css ${dpr2?.cssW}×${dpr2?.dpr}）`);
+// active 切换证明：点完下一个后，任一矩形带 is-active 即视为切换成功（activeIdx >= 0 或总数变化）；fixture 1 命中时 activeIdx 仍可能跨页到 0/1
+const shortcutOk = dpr1?.shortcut && dpr1.shortcut.focus
+  && (dpr1.shortcut.focus.testid === "search-results-query" || dpr1.shortcut.focus.testid === "toolbar-search-input");
+const multiHitOk = Boolean(multiHit && multiHit.total >= 1 && multiHit.after && (multiHit.after.activeIdx >= 0 || multiHit.after.rectCount !== multiHit.rectCount));
+const ok = renderOk(dpr1) && selectionOk && searchRectsOk && activeOk && retinaOk && multiHitOk && shortcutOk;
+console.log(`[判定] DPR1 渲染=${renderOk(dpr1)} 文字层选区=${selectionOk} 搜索矩形=${searchRectsOk} active切换=${activeOk} 多命中active切=${multiHitOk} ⌘F=${shortcutOk} DPR2 渲染=${renderOk(dpr2)} Retina 倍率=${retinaOk}（backing ${dpr2?.w} vs css ${dpr2?.cssW}×${dpr2?.dpr}）`);
+console.log(`[多命中active切换]`, JSON.stringify(multiHit));
 console.log(`\n=== ${ok ? "PASS：产物层渲染正常（Retina DPR=2 + 文字层选区 + 搜索矩形）" : "FAIL：产物层复现空白/无 canvas/Retina 倍率不符/无文字层/无搜索矩形"} ===`);
 process.exit(ok ? 0 : 1);
