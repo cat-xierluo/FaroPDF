@@ -8054,3 +8054,17 @@ M5 异常态最终状态：文件损坏 ✅、密码 PDF ✅、权限不足 ✅�
 - **遗留（登记新卡）**：ISS-QA-18 阅读区无 pdfjs 文字层 DOM → 选区/复制不可用（`usePdfTextSelection` 在等一个从未渲染的文字层；ISS-061 工具条依赖它）。ISS-QA-17 已同轮修复。
 - **教训**：桌面 WebView 应用的「验证矩阵」必须包含**引擎代差**维度——chromium 全绿 ≠ WKWebView 过，pdfjs 这类重度使用新内置的库要按目标引擎选构建（legacy）；真机 console 是唯一决定性证据源，构建戳是打通它的前提。
 - **Refs**：DEC-196（诊断可观测性基建，本轮全部用上）/ DEC-198/199（门禁体系）/ ISS-QA-02 / ISS-QA-17 / ISS-QA-18
+
+## DEC-201 真机文字选不中：程序化选区断言的盲区 + 三层修复（2026-08-15）
+
+- **触发**：用户真机（打包 WKWebView）反馈「依然无法选中文字层」（ISS-QA-18 文字层已落地、产物层断言全过的前提下）。产物层诊断一切正常：38 span、userSelect auto、cursor text、程序化框选拿到完整标题文本——诊断与现象矛盾。
+- **盲区定式（本轮核心方法论）**：程序化 Range 选区（`sel.addRange(range)`）**不经过 hit-testing、user-select、pointer-events**——它只证明「DOM 里有可选文本」，不证明「用户鼠标真能选」。「覆盖层挡住鼠标」「click 事件销毁选区」「user-select 继承为 none」这类 bug 对程序化选区全部不可见。凡是「能不能选中」类验收必须走真实鼠标事件路径（CDP `mouse.down → move → up` 驱动浏览器原生选择）。
+- **三个确定性缺陷（本地证据 + 排除法）**：
+  1. **`handlePageClick` 翻页吞掉选择**（ReaderCanvas）：single/double 模式整页 click 都当翻页——拖选文字松手必触发 click→翻页→页面组件切换销毁选区；且点击文字本身也翻页。修：双守卫（selection 非空 return + target 在 `.pdf-text-layer` 内 return，点空白才翻）。
+  2. **selectionchange 高频全树重渲染**（TextSelectionToolbar `usePdfTextSelection`）：每次 selectionchange 都 setBounds → AppShell 全树重渲染，拖动中每 mousemove 触发一次——真机 WKWebView 上拖选卡顿/「选不动」。修：拖选进行中（root mousedown→window mouseup）抑制 + 值等价跳过（亚像素抖动返回同一引用）+ collapsed/0×0 选区清 null（顺带修了点击空白后工具条残留）。
+  3. **user-select 未显式声明**：CSS 规范里 `auto` 在祖先为 none 时计算为 none；`.pdf-text-layer` 及 span 显式 `-webkit-user-select/user-select: text` 永远生效，消除宿主全局样式/引擎继承差异。同轮入库 canvas/page-container 显式 `z-index:0`（WKWebView 堆叠规则差异防御，chromium 上是 no-op）。
+- **排除记录**（都已查证，非根因）：CSS 层叠（text layer z-index:1 在 canvas 上、search-rects 层 pointer-events:none 垫底）；无祖先 `user-select:none`（全仓 4 处均为非祖先组件自身）；AnnotationOverlay 仅 annotate 模式挂载；TextSelectionToolbar 无全屏遮罩；`.empty-state` fallback 有 pointer-events:none；wry drag-drop 拦截影响文字选择——无证据支持（tauri#13761 是 Windows/HTML5 draggable），未改 `dragDropEnabled`（`faropdf://file-drop` 依赖它）。
+- **门禁升级**：`verify:prod-render` 新增「真实拖选」断言——chromium CDP 原生选择路径从标题 span 中心拖到 1.4 倍宽处，断言 `selection.toString() ≥ 2` 字符（实跑 387 字符，跨 span 拖到正文）。ReaderCanvas 翻页守卫单测 3 条（空白仍翻 / 有选区不翻 / 点文字层不翻）。
+- **验证**：typecheck / 全量 136 文件 1504 用例 / test:e2e 8 / verify:reader-e2e / build + verify:prod-render（含新拖选断言 + DPR2）/ lint 全绿。**真机 WKWebView 待用户确认**——三层修复分别对应「选区被翻页销毁」「拖动卡死」「选择被样式引擎拒绝」三种互斥失败模式，覆盖面收敛。
+- **教训**：「存在可选 DOM」≠「用户可选」。Selection API 断言只能作为文字层存在性门禁；交互可用性必须用真实鼠标事件（CDP / Playwright mouse）断言——与 Folia mermaid「节点文字可见 + getBBox 非空」同理（断言功能结果，非元素存在）。
+- **Refs**：DEC-200（文字层落地链路）/ ISS-QA-18（文字层）/ ISS-QA-24 / ISS-061（选区工具条）/ Folia `docs/TASKS.md:266` mermaid-fidelity 教训

@@ -354,6 +354,19 @@ FaroPDF 特定的额外约束（不在 skill 里、必须保留）：
 
 > 来源：用户实机（打包 WKWebView）验证 QA-02 修复后的新反馈：「能看了，但渲染成模糊图片、内容没法选中和复制」。
 
+### ISS-QA-24　真机文字选不中三层修复 +「真实拖选」门禁　[P1][代码已完成 2026-08-15，真机待验]
+
+- 现象：ISS-QA-18 文字层落地、产物层断言全过后，用户真机（打包 WKWebView）仍反馈「无法选中文字层」。产物层诊断一切正常（38 span / user-select auto / cursor text / 程序化框选成功）——诊断与现象矛盾。
+- 盲区定式（本轮核心方法论）：**程序化 Range 选区不经过 hit-testing / user-select / pointer-events**——它证明「DOM 里有可选文本」，不证明「用户鼠标真能选」。凡是「能不能选中」类验收必须走真实鼠标事件路径（CDP）。
+- 三个确定性缺陷（本地证据 + 排除法，见 DEC-201）：
+  1. `handlePageClick` 在 single/double 模式把整页 click 当翻页——拖选松手必触发 click→翻页销毁选区，点文字也翻页（默认 continuous 不受影响，single/double 必现）。
+  2. `usePdfTextSelection` 监听 selectionchange 每次都 setBounds → AppShell 全树重渲染，拖动中每 mousemove 一次——真机 WKWebView 大文档下拖选卡顿/「选不动」。
+  3. `.pdf-text-layer` 未显式声明 user-select——规范里 auto 在祖先为 none 时计算为 none，宿主全局样式/引擎继承差异可致选不中（防御性）。
+- 修复：handlePageClick 双守卫（selection 非空 return + target 在文字层内 return）；拖选期间（mousedown→mouseup）抑制 selectionchange setState + 值等价跳过 + collapsed/0×0 清 null（顺带修工具条残留）；`.pdf-text-layer` 与 span 显式 `-webkit-user-select/user-select: text`；上轮 z-index 防御（canvas/page-container z:0）一并入库。
+- 门禁升级：`verify:prod-render` 新增「真实拖选」断言（CDP mouse.down→分步 move→up 原生选择路径，实跑 387 字符）；ReaderCanvas 翻页守卫单测 3 条。
+- 验证：全量 1504 单测 / test:e2e 8 / verify:reader-e2e / verify:prod-render（含新拖选断言）/ lint / typecheck 全绿。**真机 WKWebView 待用户确认**（硬刷新 + 新构建）。
+- 残留：若真机仍选不中 → 要 devtools Elements（`.pdf-text-layer` span 是否存在）+ Console 红字；下一个怀疑方向是 WKWebView 特异行为（wry drag-drop 拦截已查证无据，见 DEC-201 排除记录）。
+
 ### ISS-QA-22　侧栏批注删除入口　[P1][已完成 2026-08-15]
 
 - 现象：AnnotationSidebar 只有跳转和高亮，没有删除入口；用户要删批注只能走侧栏外路径（不直观）。
