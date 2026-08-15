@@ -102,6 +102,49 @@ async function runScenario(label, { deviceScaleFactor } = {}) {
   canvasInfo = canvasInfo ? { ...canvasInfo, selection: selectionInfo } : canvasInfo;
   console.log(`[${label}] 文字层选区=`, JSON.stringify(selectionInfo));
 
+  // 真实鼠标拖选（ISS-QA-24，2026-08-15）：上面 selectionInfo 走程序化 Range——
+  // 不经过 hit-testing，抓不到「覆盖层挡住鼠标 / click 翻页销毁选区」类 bug。
+  // 这里走 chromium CDP 原生选择路径（mouse.down → 分步 move → up），
+  // 断言用户拖选真的能选中文字。仅 DPR1 跑（DPR2 复用同链路）。
+  let dragSelectInfo;
+  if (deviceScaleFactor === undefined || deviceScaleFactor === 1) {
+    try {
+      await page.evaluate(() => window.getSelection()?.removeAllRanges());
+      const spanBox = await page.evaluate(() => {
+        const span = document.querySelector(".pdf-text-layer span");
+        if (!span) return null;
+        const r = span.getBoundingClientRect();
+        return { x: r.x, y: r.y, w: r.width, h: r.height, text: span.textContent?.slice(0, 30) ?? "" };
+      });
+      if (!spanBox) {
+        dragSelectInfo = { error: "no-span" };
+      } else {
+        const startX = spanBox.x + spanBox.w * 0.3;
+        const y = spanBox.y + spanBox.h * 0.5;
+        await page.mouse.move(startX, y);
+        await page.mouse.down();
+        for (let s = 0.3; s <= 1.4 + 1e-9; s += 0.11) {
+          await page.mouse.move(spanBox.x + spanBox.w * s, y);
+        }
+        await page.mouse.up();
+        const picked = await page.evaluate(() => ({
+          text: window.getSelection()?.toString() ?? "",
+          collapsed: window.getSelection()?.isCollapsed ?? true,
+        }));
+        dragSelectInfo = {
+          spanText: spanBox.text,
+          collapsed: picked.collapsed,
+          pickedLen: picked.text.trim().length,
+          pickedPreview: picked.text.trim().slice(0, 40),
+        };
+      }
+    } catch (error) {
+      dragSelectInfo = { error: String(error).slice(0, 120) };
+    }
+    canvasInfo = canvasInfo ? { ...canvasInfo, dragSelect: dragSelectInfo } : canvasInfo;
+    console.log(`[${label}] 真实拖选=`, JSON.stringify(dragSelectInfo));
+  }
+
   // active 命中切换（2026-08-15）：点「下一个命中」→ 第二处矩形变 .is-active
   let activeCheck = null;
 
@@ -223,6 +266,10 @@ const renderOk = (info) => Boolean(info?.ctx && info.nonZero > 100);
 const selectionOk = Boolean(
   dpr1?.selection && dpr1.selection.spanCount > 0 && dpr1.selection.selectedText.trim().length > 0,
 );
+// 真实拖选：CDP 原生选择路径必须选中 ≥2 个字符（ISS-QA-24）
+const dragSelectOk = Boolean(
+  dpr1?.dragSelect && !dpr1.dragSelect.error && dpr1.dragSelect.pickedLen >= 2,
+);
 const searchRectsOk = Boolean(
   dpr1?.searchRects && dpr1.searchRects.count > 0 && dpr1.searchRects.firstRect?.w > 0,
 );
@@ -237,8 +284,8 @@ const retinaOk = Boolean(
 const shortcutOk = dpr1?.shortcut && dpr1.shortcut.focus
   && (dpr1.shortcut.focus.testid === "search-results-query" || dpr1.shortcut.focus.testid === "toolbar-search-input");
 const multiHitOk = Boolean(multiHit && multiHit.total >= 1 && multiHit.after && (multiHit.after.activeIdx >= 0 || multiHit.after.rectCount !== multiHit.rectCount));
-const ok = renderOk(dpr1) && selectionOk && searchRectsOk && activeOk && retinaOk && multiHitOk && shortcutOk;
-console.log(`[判定] DPR1 渲染=${renderOk(dpr1)} 文字层选区=${selectionOk} 搜索矩形=${searchRectsOk} active切换=${activeOk} 多命中active切=${multiHitOk} ⌘F=${shortcutOk} DPR2 渲染=${renderOk(dpr2)} Retina 倍率=${retinaOk}（backing ${dpr2?.w} vs css ${dpr2?.cssW}×${dpr2?.dpr}）`);
+const ok = renderOk(dpr1) && selectionOk && dragSelectOk && searchRectsOk && activeOk && retinaOk && multiHitOk && shortcutOk;
+console.log(`[判定] DPR1 渲染=${renderOk(dpr1)} 文字层选区=${selectionOk} 真实拖选=${dragSelectOk} 搜索矩形=${searchRectsOk} active切换=${activeOk} 多命中active切=${multiHitOk} ⌘F=${shortcutOk} DPR2 渲染=${renderOk(dpr2)} Retina 倍率=${retinaOk}（backing ${dpr2?.w} vs css ${dpr2?.cssW}×${dpr2?.dpr}）`);
 console.log(`[多命中active切换]`, JSON.stringify(multiHit));
 console.log(`\n=== ${ok ? "PASS：产物层渲染正常（Retina DPR=2 + 文字层选区 + 搜索矩形）" : "FAIL：产物层复现空白/无 canvas/Retina 倍率不符/无文字层/无搜索矩形"} ===`);
 process.exit(ok ? 0 : 1);
